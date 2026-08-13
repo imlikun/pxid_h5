@@ -164,14 +164,14 @@ export const collections = [
 ]
 
 export const products = [
-  { id: 1, name: '鸭舌帽 男士', price: 280, origin: 399, cover: '🧢', tag: '踏春装备', sales: 1203, collection: 'spring' },
-  { id: 2, name: '原装后轮 适配P1', price: 6800, origin: 7200, cover: '⚙️', tag: 'P1配件', sales: 86, collection: 'p1parts' },
-  { id: 3, name: '防晒冰丝袖套', price: 59, origin: 99, cover: '🧤', tag: '踏春装备', sales: 3420, collection: 'spring' },
-  { id: 4, name: '智能中控屏 P1', price: 1299, origin: 1499, cover: '📟', tag: 'P1配件', sales: 210, collection: 'p1parts' },
-  { id: 5, name: '骑行头盔 一体成型', price: 399, origin: 499, cover: '⛑️', tag: '踏春装备', sales: 880, collection: 'spring' },
-  { id: 6, name: '原装电池 48V', price: 1999, origin: 2399, cover: '🔋', tag: 'P1配件', sales: 56, collection: 'p1parts' },
-  { id: 7, name: '车尾储物包', price: 129, origin: 169, cover: '🎒', tag: '踏春装备', sales: 1540, collection: 'spring' },
-  { id: 8, name: '蓝牙控车模块', price: 299, origin: 359, cover: '🔵', tag: 'P1配件', sales: 430, collection: 'p1parts' },
+  { id: 1, name: '鸭舌帽 男士', price: 280, origin: 399, cover: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=600&q=80', tag: '踏春装备', sales: 1203, collection: 'spring' },
+  { id: 2, name: '原装后轮 适配P1', price: 6800, origin: 7200, cover: 'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=600&q=80', tag: 'P1配件', sales: 86, collection: 'p1parts' },
+  { id: 3, name: '防晒冰丝袖套', price: 59, origin: 99, cover: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=600&q=80', tag: '踏春装备', sales: 3420, collection: 'spring' },
+  { id: 4, name: '智能中控屏 P1', price: 1299, origin: 1499, cover: 'https://images.unsplash.com/photo-1493238792000-8113da705763?w=600&q=80', tag: 'P1配件', sales: 210, collection: 'p1parts' },
+  { id: 5, name: '骑行头盔 一体成型', price: 399, origin: 499, cover: 'https://images.unsplash.com/photo-1505705694340-019e1e335916?w=600&q=80', tag: '踏春装备', sales: 880, collection: 'spring' },
+  { id: 6, name: '原装电池 48V', price: 1999, origin: 2399, cover: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=600&q=80', tag: 'P1配件', sales: 56, collection: 'p1parts' },
+  { id: 7, name: '车尾储物包', price: 129, origin: 169, cover: 'https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?w=600&q=80', tag: '踏春装备', sales: 1540, collection: 'spring' },
+  { id: 8, name: '蓝牙控车模块', price: 299, origin: 359, cover: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80', tag: 'P1配件', sales: 430, collection: 'p1parts' },
 ]
 
 // ---------------- 服务（售后 hub）----------------

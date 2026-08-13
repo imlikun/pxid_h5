@@ -1,6 +1,6 @@
 <template>
   <div class="pcard" @click="go">
-    <div class="pcard__cover">{{ product.cover }}</div>
+    <img class="pcard__cover" :src="product.cover" :alt="product.name" />
     <div class="pcard__name">{{ product.name }}</div>
     <div class="pcard__price">
       <span class="price">¥{{ product.price }}</span>
@@ -33,12 +33,10 @@ function go() {
   overflow: hidden;
 }
 .pcard__cover {
+  width: 100%;
   height: 140px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 56px;
-  background: linear-gradient(135deg, #f3f6ff, #eaf1ff);
+  object-fit: cover;
+  display: block;
 }
 .pcard__name {
   padding: 8px 10px 0;

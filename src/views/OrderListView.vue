@@ -30,7 +30,7 @@
 
         <div class="o-items">
           <div v-for="(it, i) in o.items" :key="i" class="o-item">
-            <div class="o-cover">{{ it.cover }}</div>
+            <img class="o-cover" :src="it.cover" :alt="it.name" />
             <div class="o-mid">
               <div class="o-name">{{ it.name }}</div>
               <div class="o-spec">¥{{ it.price }} × {{ it.qty }}</div>
@@ -150,11 +150,7 @@ function detail(o) {
   width: 48px;
   height: 48px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #f3f6ff, #eaf1ff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
+  object-fit: cover;
   flex: none;
 }
 .o-mid { flex: 1; min-width: 0; }

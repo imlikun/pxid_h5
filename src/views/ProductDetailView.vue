@@ -8,7 +8,7 @@
     </div>
 
     <!-- 主图 -->
-    <div class="cover">{{ product.cover }}</div>
+    <img class="cover" :src="product.cover" :alt="product.name" />
 
     <!-- 信息 -->
     <div class="info">
@@ -149,12 +149,10 @@ function onBuy() {
   white-space: nowrap;
 }
 .cover {
+  width: 100%;
   height: 320px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 140px;
-  background: linear-gradient(135deg, #f3f6ff, #eaf1ff);
+  object-fit: cover;
+  display: block;
 }
 .info {
   background: #fff;

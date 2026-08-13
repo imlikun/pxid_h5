@@ -14,7 +14,7 @@
         <span class="check" :class="{ on: it.checked }" @click="toggleChecked(it.id)">
           <svg v-if="it.checked" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
         </span>
-        <div class="cover">{{ it.cover }}</div>
+        <img class="cover" :src="it.cover" :alt="it.name" />
         <div class="mid">
           <div class="name">{{ it.name }}</div>
           <div class="price">¥{{ it.price }}</div>
@@ -127,11 +127,7 @@ function goCheckout() {
   width: 56px;
   height: 56px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #f3f6ff, #eaf1ff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
+  object-fit: cover;
   flex: none;
 }
 .mid { flex: 1; min-width: 0; }

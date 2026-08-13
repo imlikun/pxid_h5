@@ -23,7 +23,7 @@
     <!-- 商品清单（勾选项） -->
     <div class="goods">
       <div v-for="it in checkedItems" :key="it.id" class="g-row">
-        <div class="g-cover">{{ it.cover }}</div>
+        <img class="g-cover" :src="it.cover" :alt="it.name" />
         <div class="g-mid">
           <div class="g-name">{{ it.name }}</div>
           <div class="g-spec">{{ it.tag || '原厂配件' }}</div>
@@ -158,11 +158,7 @@ async function onSubmit() {
   width: 56px;
   height: 56px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #f3f6ff, #eaf1ff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
+  object-fit: cover;
   flex: none;
 }
 .g-mid { flex: 1; min-width: 0; }
