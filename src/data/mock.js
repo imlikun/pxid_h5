@@ -12,13 +12,16 @@ export const discoverQuick = [
   { key: 'points', label: '积分兑换', icon: '🎁' },
 ]
 
-export const vehicleFilters = ['全部', 'H10', 'M2', 'Z3']
+// 三个 tab 各自的车型筛选（与设计稿一致：推荐=全部、动态=最新、广场=P1-P6）
+export const recommendFilters = ['全部', 'H10', 'M2', 'Z3']
+export const dynamicFilters = ['最新', 'H10', 'M2', 'Z3']
+export const plazaFilters = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6']
 
 export const feedItems = [
   {
     id: 1,
     kind: 'official',
-    author: '官方产品经理',
+    author: 'PXID 官方产品经理',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&q=80',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     cover: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
@@ -31,53 +34,53 @@ export const feedItems = [
     kind: 'user',
     author: '一路向前',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80',
-    title: '城市通勤一个月真实续航记录，M2 真的很能打',
+    title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     cover: 'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=600&q=80',
     likes: 206,
     time: '05-13',
-    filter: 'M2',
-  },
-  {
-    id: 3,
-    kind: 'user',
-    author: '都市穿梭者',
-    avatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=80&q=80',
-    title: 'H10 旗舰骑行质感分享，这做工对得起价格',
-    cover: 'https://images.unsplash.com/photo-1485965120184-e224f7a1dbfe?w=600&q=80',
-    likes: 88,
-    time: '05-12',
     filter: 'H10',
   },
   {
-    id: 4,
+    id: 3,
     kind: 'official',
-    author: 'PXID 门店',
+    author: 'PXID 官方产品经理',
+    avatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=80&q=80',
+    title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
+    cover: 'https://images.unsplash.com/photo-1485965120184-e224f7a1dbfe?w=600&q=80',
+    likes: 30,
+    time: '05-12',
+    filter: 'M2',
+  },
+  {
+    id: 4,
+    kind: 'user',
+    author: '一路向前',
     avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcabd36?w=80&q=80',
-    title: 'Z3 折叠款开箱：三步收纳，地铁通勤神器',
+    title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     cover: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=600&q=80',
-    likes: 142,
+    likes: 206,
     time: '05-11',
     filter: 'Z3',
   },
   {
     id: 5,
-    kind: 'user',
-    author: '老李骑行',
+    kind: 'official',
+    author: 'PXID 官方产品经理',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&q=80',
-    title: '春游踏青路线推荐，沿河绿道一路繁花',
+    title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     cover: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=600&q=80',
-    likes: 56,
+    likes: 30,
     time: '05-10',
     filter: '全部',
   },
   {
     id: 6,
     kind: 'user',
-    author: '外卖小哥阿强',
+    author: '一路向前',
     avatar: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=80&q=80',
-    title: '货运三轮实测：一天 80 公里，电量还剩 30%',
+    title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     cover: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&q=80',
-    likes: 311,
+    likes: 206,
     time: '05-09',
     filter: '全部',
   },
@@ -93,10 +96,9 @@ export const plazaShowcase = [
   { id: 'P6', name: 'P6', cover: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80' },
 ]
 
-// 广场：热门活动
+// 广场：热门活动（与设计稿一致：新一代货运电动三轮车 05-14 立即查看）
 export const activities = [
-  { id: 1, title: '新一代货运电动三轮车 大空间载货', date: '05-14', cover: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80' },
-  { id: 2, title: '踏春骑行季 · 装备直降专场', date: '05-10', cover: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=400&q=80' },
+  { id: 1, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80' },
 ]
 
 // ---------------- 消息中心 ----------------

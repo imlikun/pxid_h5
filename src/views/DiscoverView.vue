@@ -8,7 +8,7 @@
           :key="t"
           class="tab"
           :class="{ active: activeTab === t }"
-          @click="activeTab = t"
+          @click="setTab(t)"
           >{{ t }}</span
         >
       </div>
@@ -33,7 +33,7 @@
       <div class="banner">
         <img
           class="banner__img"
-          src="https://images.unsplash.com/photo-1558981806-ec527fa84c3d?w=800&q=80"
+          src="/discover-banner.jpg"
           alt="Banner"
         />
       </div>
@@ -45,11 +45,11 @@
       </div>
     </template>
 
-    <!-- 车型筛选：推荐/动态显示 -->
-    <div v-if="activeTab !== '广场'" class="filter">
+    <!-- 车型筛选：三个 tab 各自标签（推荐=全部/动态=最新/广场=P1-P6，与设计稿一致） -->
+    <div class="filter">
       <div class="chips">
         <span
-          v-for="f in vehicleFilters"
+          v-for="f in currentFilters"
           :key="f"
           class="chip"
           :class="{ active: activeFilter === f }"
@@ -80,7 +80,7 @@
     <div v-else-if="activeTab === '广场'" class="content">
       <div class="grid3">
         <div
-          v-for="p in plazaShowcase"
+          v-for="p in filteredShowcase"
           :key="p.id"
           class="showcase"
           @click="onShowcase(p)"
@@ -119,7 +119,9 @@ import FeedCard from '../components/FeedCard.vue'
 import {
   discoverTabs,
   discoverQuick,
-  vehicleFilters,
+  recommendFilters,
+  dynamicFilters,
+  plazaFilters,
   feedItems,
   plazaShowcase,
   activities,
@@ -128,14 +130,29 @@ import bridge from '../bridge'
 
 const router = useRouter()
 const tabs = discoverTabs
+const filtersByTab = {
+  推荐: recommendFilters,
+  动态: dynamicFilters,
+  广场: plazaFilters,
+}
+const defaultsByTab = { 推荐: '全部', 动态: '最新', 广场: 'P1' }
 const activeTab = ref('推荐')
 const activeFilter = ref('全部')
 
-const filteredFeed = computed(() =>
-  activeFilter.value === '全部'
-    ? feedItems
-    : feedItems.filter((i) => i.filter === activeFilter.value)
+const currentFilters = computed(() => filtersByTab[activeTab.value])
+const filteredFeed = computed(() => {
+  const f = activeFilter.value
+  if (f === '全部' || f === '最新') return feedItems
+  return feedItems.filter((i) => i.filter === f)
+})
+const filteredShowcase = computed(() =>
+  plazaShowcase.filter((p) => p.id === activeFilter.value)
 )
+
+function setTab(t) {
+  activeTab.value = t
+  activeFilter.value = defaultsByTab[t]
+}
 
 function onAdd() { bridge.call('openNative', { target: 'discover.publish' }) }
 function onNotice() { router.push('/message') }
