@@ -21,25 +21,28 @@ defineEmits(['tap'])
 
 <style scoped>
 .quick {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  padding: 12px;
+  margin: 14px 12px 0;
 }
 .qitem {
   flex: 1;
-  background: var(--card);
-  border-radius: var(--radius);
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
   padding: 12px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 .qicon {
-  font-size: 24px;
+  font-size: 22px;
+  line-height: 28px;
 }
 .qlabel {
-  font-size: 12px;
-  color: var(--text);
+  font-size: 13px;
+  color: #333333;
 }
 </style>

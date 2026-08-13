@@ -9,10 +9,20 @@
           class="tab"
           :class="{ active: activeTab === t.key }"
           @click="activeTab = t.key"
-          >{{ t.label }}<i v-if="t.en" class="en">{{ t.en }}</i></span
+          >{{ t.label }}</span
         >
       </div>
-      <span class="search-ico">🔍</span>
+      <span class="search-ico">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </span>
+    </div>
+
+    <!-- 搜索框（与发现一致） -->
+    <div class="search">
+      <span class="sicon">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </span>
+      <input class="sinput" placeholder="搜索内容/活动/车型" />
     </div>
 
     <!-- 推荐 -->
@@ -73,7 +83,7 @@ const router = useRouter()
 const topTabs = [
   { key: 'rec', label: '推荐' },
   { key: 'spring', label: '踏春装备' },
-  { key: 'bikes', label: 'Bikes', en: 'Bikes' },
+  { key: 'bikes', label: 'Bikes' },
 ]
 const activeTab = ref('rec')
 
@@ -95,6 +105,8 @@ function onQuick(q) {
 
 <style scoped>
 .featured {
+  min-height: 100vh;
+  background: #ffffff;
   padding-top: env(safe-area-inset-top);
   padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
 }
@@ -102,39 +114,59 @@ function onQuick(q) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px;
+  padding: 10px 12px 6px;
   position: sticky;
   top: 0;
-  background: #fff;
+  background: #ffffff;
   z-index: 10;
 }
 .tabs {
   display: flex;
-  align-items: baseline;
-  gap: 16px;
+  align-items: center;
+  gap: 18px;
 }
 .tab {
-  font-size: 17px;
-  font-weight: 700;
-  color: #999999;
+  font-size: 18px;
+  font-weight: 400;
+  color: #666666;
   line-height: 1.2;
 }
 .tab.active {
-  color: #111111;
-}
-.tab .en {
-  font-size: 12px;
-  font-weight: 400;
-  font-style: normal;
-  color: var(--text-sub);
-  margin-left: 2px;
+  color: #000000;
+  font-weight: 700;
 }
 .search-ico {
-  font-size: 18px;
+  color: #000000;
+  display: flex;
+  align-items: center;
+}
+.search {
+  margin: 6px 12px 0;
+  height: 44px;
+  background: #f5f5f5;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+}
+.sicon {
+  color: #999999;
+  display: flex;
+  align-items: center;
+}
+.sinput {
+  flex: 1;
+  font-size: 14px;
+  color: #333333;
+  background: transparent;
+}
+.sinput::placeholder {
+  color: #999999;
 }
 .banner {
-  margin: 0 12px 12px;
-  border-radius: var(--radius-lg);
+  margin: 12px 12px 0;
+  border-radius: 12px;
   background: linear-gradient(120deg, #1f6fff, #4f9bff);
   color: #fff;
   padding: 18px;

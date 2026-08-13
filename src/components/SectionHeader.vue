@@ -1,11 +1,10 @@
 <template>
   <div class="sheader">
     <div class="left">
-      <span class="bar"></span>
       <span class="title">{{ title }}</span>
       <span v-if="sub" class="sub">{{ sub }}</span>
     </div>
-    <div v-if="more" class="more" @click="$emit('more')">{{ more }} ›</div>
+    <div v-if="more" class="more" @click="$emit('more')">{{ more }} &gt;</div>
   </div>
 </template>
 
@@ -23,29 +22,24 @@ defineEmits(['more'])
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 12px 8px;
+  padding: 20px 12px 10px;
 }
 .left {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.bar {
-  width: 3px;
-  height: 14px;
-  background: var(--brand);
-  border-radius: 2px;
-}
 .title {
   font-size: 16px;
   font-weight: 700;
+  color: #000000;
 }
 .sub {
   font-size: 12px;
   color: var(--price);
 }
 .more {
-  font-size: 12px;
-  color: var(--text-sub);
+  font-size: 13px;
+  color: #999999;
 }
 </style>
