@@ -33,7 +33,7 @@
       <div class="banner">
         <img
           class="banner__img"
-          src="/discover-banner.jpg"
+          :src="bannerImg"
           alt="Banner"
         />
       </div>
@@ -130,6 +130,7 @@ import {
 import bridge from '../bridge'
 
 const router = useRouter()
+const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
 const tabs = discoverTabs
 const filtersByTab = {
   推荐: recommendFilters,
