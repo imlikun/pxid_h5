@@ -6,6 +6,7 @@ import ProductDetailView from '../views/ProductDetailView.vue'
 import CartView from '../views/CartView.vue'
 import CheckoutView from '../views/CheckoutView.vue'
 import OrderSuccessView from '../views/OrderSuccessView.vue'
+import OrderListView from '../views/OrderListView.vue'
 import MessageView from '../views/MessageView.vue'
 
 // 服务子页
@@ -65,6 +66,7 @@ const routes = [
   { path: '/cart', name: 'cart', component: CartView, meta: { hideTabBar: true } },
   { path: '/cart/checkout', name: 'checkout', component: CheckoutView, meta: { hideTabBar: true, title: '确认订单' } },
   { path: '/order/success', name: 'order-success', component: OrderSuccessView, meta: { hideTabBar: true, title: '支付成功' } },
+  { path: '/order/list', name: 'order-list', component: OrderListView, meta: { hideTabBar: true, title: '我的订单' } },
 
   // 发现
   { path: '/message', name: 'message', component: MessageView, meta: { hideTabBar: true } },

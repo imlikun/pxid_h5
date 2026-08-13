@@ -464,3 +464,23 @@ export const feedbackFaqs = [
   { id: 5, q: '车型参数对比' },
   { id: 6, q: '发票与售后流程' },
 ]
+
+// ---------------- 精选 · 我的订单 ----------------
+export const orderTabs = ['全部', '待付款', '待发货', '已发货', '已完成']
+
+export const orders = [
+  {
+    id: 'PX20260812003',
+    time: '2026-08-12 15:22',
+    status: '已发货',
+    items: [{ name: '原装后轮 适配P1', cover: '⚙️', price: 6800, qty: 1 }],
+    total: 6800,
+  },
+  {
+    id: 'PX20260810007',
+    time: '2026-08-10 11:03',
+    status: '已完成',
+    items: [{ name: '智能中控屏 P1', cover: '📟', price: 1299, qty: 1 }],
+    total: 1299,
+  },
+]

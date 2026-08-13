@@ -68,6 +68,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { checkedItems, checkedTotal, removeFromCart } from '../store/cart'
+import { orders } from '../data/mock'
 import bridge from '../bridge'
 
 const router = useRouter()
@@ -87,14 +88,19 @@ function onAddr() {
 async function onSubmit() {
   if (checkedItems.value.length === 0 || submitting.value) return
   submitting.value = true
+  const now = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
   const order = {
     orderId: 'PX' + Date.now().toString().slice(-10),
-    items: checkedItems.value,
+    time: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    status: '待发货',
+    items: checkedItems.value.map((i) => ({ name: i.name, cover: i.cover, price: i.price, qty: i.qty })),
     total: checkedTotal.value,
   }
   const ok = await bridge.requestPurchase({ orderId: order.orderId, items: order.items, total: order.total })
   submitting.value = false
   if (ok) {
+    orders.unshift(order)
     checkedItems.value.forEach((i) => removeFromCart(i.id))
     router.replace({ path: '/order/success', query: { id: order.orderId, total: order.total } })
   }

@@ -30,7 +30,7 @@ function goFeatured() {
   router.replace('/featured')
 }
 function goOrders() {
-  router.replace('/featured')
+  router.replace('/order/list')
 }
 </script>
 
