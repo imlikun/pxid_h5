@@ -149,7 +149,7 @@ export const messages = [
 export const featuredBanner = {
   title: '踏春出行季',
   sub: '装备直降 · 限时开启',
-  cover: '🌷',
+  cover: 'flower',
 }
 
 export const featuredQuick = [
@@ -159,8 +159,8 @@ export const featuredQuick = [
 ]
 
 export const collections = [
-  { id: 'spring', title: '踏春装备', sub: '限时直降', cover: '🌸' },
-  { id: 'p1parts', title: 'P1 原厂配件', sub: '适配专用', cover: '⚙️' },
+  { id: 'spring', title: '踏春装备', sub: '限时直降', cover: 'flower' },
+  { id: 'p1parts', title: 'P1 原厂配件', sub: '适配专用', cover: 'gear' },
 ]
 
 export const products = [
@@ -473,14 +473,14 @@ export const orders = [
     id: 'PX20260812003',
     time: '2026-08-12 15:22',
     status: '已发货',
-    items: [{ name: '原装后轮 适配P1', cover: '⚙️', price: 6800, qty: 1 }],
+    items: [{ name: '原装后轮 适配P1', cover: 'gear', price: 6800, qty: 1 }],
     total: 6800,
   },
   {
     id: 'PX20260810007',
     time: '2026-08-10 11:03',
     status: '已完成',
-    items: [{ name: '智能中控屏 P1', cover: '📟', price: 1299, qty: 1 }],
+    items: [{ name: '智能中控屏 P1', cover: 'device', price: 1299, qty: 1 }],
     total: 1299,
   },
 ]

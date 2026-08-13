@@ -3,7 +3,7 @@
     <div class="store__main">
       <div class="store__name">{{ store.name }}</div>
       <div class="store__rate">
-        <span class="star">★ {{ store.rating }}</span>
+        <span class="star"><IconSvg name="star" :size="14" /> {{ store.rating }}</span>
         <span class="rev">{{ store.reviews }}条评价</span>
         <span class="dist">{{ store.distance }}</span>
       </div>
@@ -18,6 +18,7 @@
 
 <script setup>
 import { bridge } from '../bridge'
+import IconSvg from '../components/IconSvg.vue'
 
 const props = defineProps({
   store: { type: Object, required: true },

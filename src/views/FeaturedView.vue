@@ -33,7 +33,7 @@
           <div class="b-title">{{ banner.title }}</div>
           <div class="b-sub">{{ banner.sub }}</div>
         </div>
-        <div class="banner__emoji">{{ banner.cover }}</div>
+        <IconSvg :name="banner.cover" :size="46" class="banner__icon" />
       </div>
 
       <!-- 三个快捷 -->
@@ -77,6 +77,7 @@ import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
 import { featuredBanner, featuredQuick, products } from '../data/mock'
+import IconSvg from '../components/IconSvg.vue'
 
 const router = useRouter()
 
@@ -183,8 +184,9 @@ function onQuick(q) {
   opacity: 0.9;
   margin-top: 4px;
 }
-.banner__emoji {
-  font-size: 46px;
+.banner__icon {
+  color: var(--brand);
+  flex: none;
 }
 .grid2 {
   display: grid;

@@ -30,7 +30,7 @@
 
         <div class="o-items">
           <div v-for="(it, i) in o.items" :key="i" class="o-item">
-            <img class="o-cover" :src="it.cover" :alt="it.name" />
+            <IconSvg :name="it.cover" :size="40" style="width:48px;height:48px;border-radius:8px;background:var(--brand-soft);color:var(--brand);padding:9px;box-sizing:border-box;flex:none" />
             <div class="o-mid">
               <div class="o-name">{{ it.name }}</div>
               <div class="o-spec">¥{{ it.price }} × {{ it.qty }}</div>
@@ -61,6 +61,7 @@ import { useRouter } from 'vue-router'
 import { orderTabs, orders } from '../data/mock'
 import { addToCart } from '../store/cart'
 import bridge from '../bridge'
+import IconSvg from '../components/IconSvg.vue'
 
 const router = useRouter()
 const activeTab = ref('全部')

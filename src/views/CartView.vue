@@ -14,7 +14,8 @@
         <span class="check" :class="{ on: it.checked }" @click="toggleChecked(it.id)">
           <svg v-if="it.checked" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
         </span>
-        <img class="cover" :src="it.cover" :alt="it.name" />
+        <img v-if="it.cover && (it.cover.startsWith('http') || it.cover.startsWith('/'))" class="cover" :src="it.cover" :alt="it.name" />
+        <IconSvg v-else :name="it.cover" :size="44" style="width:56px;height:56px;border-radius:10px;background:var(--brand-soft);color:var(--brand);padding:11px;box-sizing:border-box;flex:none" />
         <div class="mid">
           <div class="name">{{ it.name }}</div>
           <div class="price">¥{{ it.price }}</div>
