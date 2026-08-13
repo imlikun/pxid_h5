@@ -99,12 +99,12 @@ const p1Table = [
 ]
 
 const models = [
-  { name: 'P1', img: 'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=800&q=80', table: p1Table },
-  { name: 'P2', img: 'https://images.unsplash.com/photo-1558981806-ec527fa84c3d?w=800&q=80', table: p1Table },
-  { name: 'P3', img: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&q=80', table: p1Table },
-  { name: 'H10', img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80', table: p1Table },
-  { name: 'M2', img: 'https://images.unsplash.com/photo-1485965120184-e224f7a1dbfe?w=800&q=80', table: p1Table },
-  { name: 'Z3', img: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=800&q=80', table: p1Table },
+  { name: 'P1', img: '/unsplash/photo-1571068316344-75bc76f77890_w_800_q_80.jpg', table: p1Table },
+  { name: 'P2', img: '/feed_r2.jpg', table: p1Table },
+  { name: 'P3', img: '/unsplash/photo-1565193566173-7a0ee3dbe261_w_800_q_80.jpg', table: p1Table },
+  { name: 'H10', img: '/unsplash/photo-1558618666-fcd25c85cd64_w_800_q_80.jpg', table: p1Table },
+  { name: 'M2', img: '/feed_r3.jpg', table: p1Table },
+  { name: 'Z3', img: '/unsplash/photo-1517649763962-0c623066013b_w_800_q_80.jpg', table: p1Table },
 ]
 
 const currentModel = ref(models[0])
