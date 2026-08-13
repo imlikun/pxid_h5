@@ -6,19 +6,53 @@
       </span>
       <span class="title">附近门店</span>
     </div>
-    <div class="body">
-      <p>附近门店骨架占位</p>
+
+    <!-- 搜索 + 排序 -->
+    <div class="bar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input v-model="kw" placeholder="搜索门店名称 / 地址" />
+      </div>
+      <div class="sort">
+        <span :class="{ on: sort === 'dist' }" @click="sort = 'dist'">距离最近</span>
+        <span :class="{ on: sort === 'rate' }" @click="sort = 'rate'">评分最高</span>
+      </div>
+    </div>
+
+    <!-- 门店列表 -->
+    <div class="list">
+      <StoreCard v-for="s in list" :key="s.name" :store="s" />
+      <div v-if="list.length === 0" class="empty">未找到匹配的门店</div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import StoreCard from '../components/StoreCard.vue'
+import { stores } from '../data/mock'
+
 const router = useRouter()
+const kw = ref('')
+const sort = ref('dist')
+
+const list = computed(() => {
+  let arr = stores
+  const k = kw.value.trim()
+  if (k) arr = arr.filter((s) => (s.name + s.address).includes(k))
+  arr = [...arr]
+  if (sort.value === 'dist') {
+    arr.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance))
+  } else {
+    arr.sort((a, b) => b.rating - a.rating)
+  }
+  return arr
+})
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: #efefef; padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
+.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
 .nav {
   height: 48px;
   display: flex;
@@ -27,7 +61,50 @@ const router = useRouter()
   position: relative;
   background: #ffffff;
 }
-.back { position: absolute; left: 12px; display: flex; color: #333333; }
-.title { font-size: 17px; font-weight: 600; color: #333333; }
-.body { padding: 24px; text-align: center; color: #999999; }
+.back { position: absolute; left: 12px; display: flex; color: var(--text); }
+.title { font-size: 17px; font-weight: 600; color: var(--text); }
+
+.bar {
+  background: #ffffff;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f2f3f5;
+  border-radius: 20px;
+  padding: 9px 14px;
+}
+.search input { flex: 1; font-size: 14px; color: var(--text); }
+.search input::placeholder { color: #bbb; }
+.sort { display: flex; gap: 8px; }
+.sort span {
+  font-size: 12px;
+  color: var(--text-sub);
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: #f2f3f5;
+}
+.sort span.on {
+  color: #fff;
+  background: var(--brand-gradient);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0 16px;
+}
+.empty {
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  padding: 40px 0;
+}
 </style>

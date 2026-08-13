@@ -192,6 +192,58 @@ export const nearbyStore = {
   lng: 119.016,
 }
 
+// 附近门店列表（列表页用；按距离升序）
+export const stores = [
+  {
+    name: 'PXID 淮安体验店',
+    rating: 4.8,
+    reviews: 128,
+    distance: '4.8km',
+    phone: '0517-88886666',
+    address: '江苏省淮安市清江浦区翔宇大道 88 号',
+    lat: 33.5104,
+    lng: 119.016,
+    hours: '09:00 - 21:00',
+    tags: ['体验试驾', '售后维修', '配件购买'],
+  },
+  {
+    name: 'PXID 苏州工业园区店',
+    rating: 4.9,
+    reviews: 89,
+    distance: '372km',
+    phone: '0512-55556666',
+    address: '江苏省苏州市工业园区星湖街 328 号',
+    lat: 31.323,
+    lng: 120.735,
+    hours: '10:00 - 21:00',
+    tags: ['售后维修', '配件购买'],
+  },
+  {
+    name: 'PXID 南京新街口旗舰店',
+    rating: 4.7,
+    reviews: 256,
+    distance: '184km',
+    phone: '025-66667777',
+    address: '江苏省南京市秦淮区中山南路 100 号',
+    lat: 32.041,
+    lng: 118.791,
+    hours: '09:30 - 22:00',
+    tags: ['体验试驾', '以旧换新'],
+  },
+  {
+    name: 'PXID 上海浦东服务中心',
+    rating: 4.6,
+    reviews: 312,
+    distance: '405km',
+    phone: '021-33334444',
+    address: '上海市浦东新区张江高科技园区博云路 2 号',
+    lat: 31.205,
+    lng: 121.605,
+    hours: '09:00 - 20:30',
+    tags: ['售后维修', '道路救援接单'],
+  },
+]
+
 export const faqs = [
   {
     id: 1,
