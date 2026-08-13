@@ -96,9 +96,10 @@ export const plazaShowcase = [
   { id: 'P6', name: 'P6', cover: '/plaza_p6.jpg' },
 ]
 
-// 广场：热门活动（与设计稿一致：新一代货运电动三轮车 05-14 立即查看）
+// 广场：热门活动 2 条（封面按 广场/ 子目录文件顺序：(7)→活动1、base→活动2）
 export const activities = [
-  { id: 1, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: '/feed_r4.jpg' },
+  { id: 1, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: '/plaza_p7.jpg' },
+  { id: 2, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: '/plaza_p8.jpg' },
 ]
 
 // ---------------- 消息中心 ----------------

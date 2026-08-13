@@ -45,8 +45,8 @@
       </div>
     </template>
 
-    <!-- 车型筛选：三个 tab 各自标签（推荐=全部/动态=最新/广场=P1-P6，与设计稿一致） -->
-    <div class="filter">
+    <!-- 车型筛选：仅推荐/动态显示（推荐=全部、动态=最新；广场无筛选条，与设计稿一致） -->
+    <div v-if="activeTab !== '广场'" class="filter">
       <div class="chips">
         <span
           v-for="f in currentFilters"
@@ -80,7 +80,7 @@
     <div v-else-if="activeTab === '广场'" class="content">
       <div class="grid3">
         <div
-          v-for="p in filteredShowcase"
+          v-for="p in plazaShowcase"
           :key="p.id"
           class="showcase"
           @click="onShowcase(p)"
@@ -145,9 +145,6 @@ const filteredFeed = computed(() => {
   if (f === '全部' || f === '最新') return feedItems
   return feedItems.filter((i) => i.filter === f)
 })
-const filteredShowcase = computed(() =>
-  plazaShowcase.filter((p) => p.id === activeFilter.value)
-)
 
 function setTab(t) {
   activeTab.value = t
@@ -358,8 +355,8 @@ function onActivity(a) { console.log('activity tap:', a.id) }
   padding: 10px;
 }
 .act__img {
-  width: 104px;
-  height: 132px;
+  width: 132px;
+  aspect-ratio: 4 / 3;
   border-radius: 10px;
   object-fit: cover;
   flex: none;
