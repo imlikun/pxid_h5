@@ -1,0 +1,51 @@
+<template>
+  <div class="page">
+    <div class="nav">
+      <span class="back" @click="router.back()">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </span>
+      <span class="title">新手指导视频</span>
+    </div>
+
+    <div class="list">
+      <div v-for="v in guideVideos" :key="v.id" class="video">
+        <div class="video__t">{{ v.title }}</div>
+        <div class="player" @click="onPlay(v)">
+          <div class="player__mask">视频将在预览时播放</div>
+          <div class="player__bar">
+            <span class="play">▶</span>
+            <span class="time">0:00 / 0:00</span>
+            <span class="spacer"></span>
+            <span class="vol">🔊</span>
+            <span class="full">⛶</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { useRouter } from 'vue-router'
+import { guideVideos } from '../data/mock'
+
+const router = useRouter()
+function onPlay(v) {
+  // 真实环境：调用 bridge 拉起原生播放器 / 或 <video> 加载视频源
+  console.log('[guide] play video', v.id)
+}
+</script>
+
+<style scoped>
+.page { min-height: 100vh; background: #efefef; padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
+.nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: #fff; }
+.back { position: absolute; left: 12px; display: flex; color: #333; }
+.title { font-size: 17px; font-weight: 600; color: #333; }
+.list { padding: 12px; display: flex; flex-direction: column; gap: 16px; }
+.video__t { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.player { position: relative; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #3a3a3a, #1c1c1c); aspect-ratio: 16 / 9; }
+.player__mask { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.7); font-size: 13px; }
+.player__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 28px; display: flex; align-items: center; gap: 10px; padding: 0 10px; background: rgba(0,0,0,.45); color: #fff; font-size: 11px; }
+.player__bar .play { font-size: 12px; }
+.player__bar .spacer { flex: 1; }
+</style>
