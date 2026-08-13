@@ -3,7 +3,7 @@
     <!-- 顶栏 -->
     <div class="topbar">
       <span class="back" @click="goBack">←</span>
-      <span class="t">商品详情</span>
+      <span class="t">{{ product.name }}</span>
       <span class="cart" @click="goCart">🛒</span>
     </div>
 
@@ -21,11 +21,43 @@
       <span v-if="product.tag" class="tag">{{ product.tag }}</span>
     </div>
 
+    <!-- 规格选择 -->
+    <div class="block">
+      <div class="block__title">规格</div>
+      <div class="opts">
+        <span
+          v-for="(s, i) in specs"
+          :key="i"
+          class="opt"
+          :class="{ active: activeSpec === i }"
+          @click="activeSpec = i"
+          >{{ s }}</span
+        >
+      </div>
+    </div>
+
+    <!-- 数量 -->
+    <div class="block">
+      <div class="block__title">数量</div>
+      <div class="qty">
+        <button @click="changeQty(-1)">－</button>
+        <span>{{ qty }}</span>
+        <button @click="changeQty(1)">＋</button>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
     <!-- 底部操作 -->
     <div class="actions">
       <button class="btn btn--cart" @click="onAddCart">加入购物车</button>
       <button class="btn btn--buy" @click="onBuy">立即购买</button>
     </div>
+
+    <!-- toast -->
+    <transition name="fade">
+      <div v-if="toast" class="toast">{{ toast }}</div>
+    </transition>
   </div>
 
   <div class="empty" v-else>
@@ -35,7 +67,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { products } from '../data/mock'
 import { addToCart } from '../store/cart'
@@ -48,6 +80,20 @@ const product = computed(() =>
   products.find((p) => String(p.id) === String(route.params.id))
 )
 
+const specs = ['标准版', '旗舰版', 'Pro 套装']
+const activeSpec = ref(0)
+const qty = ref(1)
+const toast = ref('')
+
+function showToast(msg) {
+  toast.value = msg
+  setTimeout(() => (toast.value = ''), 1500)
+}
+
+function changeQty(d) {
+  qty.value = Math.max(1, qty.value + d)
+}
+
 function goBack() {
   router.back()
 }
@@ -55,11 +101,21 @@ function goCart() {
   router.push('/cart')
 }
 function onAddCart() {
-  if (product.value) addToCart(product.value)
-  bridge.requestPurchase({ type: 'addToCart', id: product.value?.id })
+  if (!product.value) return
+  const item = { ...product.value, spec: specs[activeSpec.value] }
+  addToCart(item, qty.value)
+  bridge.requestPurchase({ type: 'addToCart', id: product.value.id, spec: specs[activeSpec.value], qty: qty.value })
+  showToast('已加入购物车')
 }
 function onBuy() {
-  bridge.requestPurchase({ type: 'buyNow', product: product.value })
+  if (!product.value) return
+  bridge.requestPurchase({
+    type: 'buyNow',
+    product: product.value,
+    spec: specs[activeSpec.value],
+    qty: qty.value,
+  })
+  showToast('正在唤起结算…')
 }
 </script>
 
@@ -75,6 +131,9 @@ function onBuy() {
   justify-content: space-between;
   padding: 12px;
   background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 .back,
 .cart {
@@ -84,6 +143,10 @@ function onBuy() {
 .t {
   font-size: 15px;
   font-weight: 600;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cover {
   height: 320px;
@@ -132,6 +195,57 @@ function onBuy() {
   padding: 3px 8px;
   border-radius: 6px;
 }
+.block {
+  background: #fff;
+  margin-top: 10px;
+  padding: 14px;
+}
+.block__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.opt {
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 16px;
+}
+.opt.active {
+  color: var(--brand);
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  font-weight: 600;
+}
+.qty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.qty button {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 16px;
+  color: var(--text);
+}
+.qty span {
+  font-size: 15px;
+  min-width: 20px;
+  text-align: center;
+}
+.gap {
+  height: 10px;
+}
 .actions {
   position: fixed;
   left: 50%;
@@ -159,6 +273,26 @@ function onBuy() {
 .btn--buy {
   background: var(--brand);
   color: #fff;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  z-index: 100;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 .empty {
   padding: 80px 20px;
