@@ -12,7 +12,7 @@ export const discoverQuick = [
   { key: 'points', label: '积分兑换', icon: '🎁' },
 ]
 
-export const vehicleFilters = ['最新', 'H10', 'M2', 'Z3']
+export const vehicleFilters = ['全部', 'H10', 'M2', 'Z3']
 
 export const feedItems = [
   {

@@ -1,93 +1,133 @@
 <template>
   <div class="featured">
-    <!-- 顶部标题 + 搜索 -->
+    <!-- 顶部：三 tab + 搜索 -->
     <div class="topbar">
-      <div class="title">推荐 踏春装备 <span class="bikes">Bikes</span></div>
+      <div class="tabs">
+        <span
+          v-for="t in topTabs"
+          :key="t.key"
+          class="tab"
+          :class="{ active: activeTab === t.key }"
+          @click="activeTab = t.key"
+          >{{ t.label }}<i v-if="t.en" class="en">{{ t.en }}</i></span
+        >
+      </div>
       <span class="search-ico">🔍</span>
     </div>
 
-    <!-- Banner -->
-    <div class="banner">
-      <div class="banner__txt">
-        <div class="b-title">{{ banner.title }}</div>
-        <div class="b-sub">{{ banner.sub }}</div>
+    <!-- 推荐 -->
+    <template v-if="activeTab === 'rec'">
+      <!-- Banner -->
+      <div class="banner">
+        <div class="banner__txt">
+          <div class="b-title">{{ banner.title }}</div>
+          <div class="b-sub">{{ banner.sub }}</div>
+        </div>
+        <div class="banner__emoji">{{ banner.cover }}</div>
       </div>
-      <div class="banner__emoji">{{ banner.cover }}</div>
-    </div>
 
-    <!-- 三个快捷 -->
-    <QuickActions :items="featuredQuick" @tap="onQuick" />
+      <!-- 三个快捷 -->
+      <QuickActions :items="featuredQuick" @tap="onQuick" />
 
-    <!-- 子集合筛选 -->
-    <div class="filter">
-      <div class="chips">
-        <span
-          v-for="c in chips"
-          :key="c.key"
-          class="chip"
-          :class="{ active: activeKey === c.key }"
-          @click="activeKey = c.key"
-          >{{ c.label }}</span
-        >
+      <!-- 热购榜单 -->
+      <SectionHeader title="热购榜单" />
+      <div class="grid2">
+        <ProductCard v-for="p in hotProducts" :key="p.id" :product="p" />
       </div>
-    </div>
 
-    <!-- 商品网格 -->
-    <SectionHeader title="踏春装备" sub="限时直降" more="更多" />
-    <div class="grid2">
-      <ProductCard
-        v-for="p in filteredProducts"
-        :key="p.id"
-        :product="p"
-      />
-    </div>
+      <!-- 踏春装备 | 限时直降 -->
+      <SectionHeader title="踏春装备" sub="限时直降" more="更多" @more="activeTab = 'spring'" />
+      <div class="grid2">
+        <ProductCard v-for="p in springProducts" :key="p.id" :product="p" />
+      </div>
+    </template>
+
+    <!-- 踏春装备 -->
+    <template v-else-if="activeTab === 'spring'">
+      <SectionHeader title="踏春装备" sub="限时直降" more="更多" />
+      <div class="grid2">
+        <ProductCard v-for="p in springProducts" :key="p.id" :product="p" />
+      </div>
+    </template>
+
+    <!-- Bikes -->
+    <template v-else>
+      <SectionHeader title="Bikes" sub="车型原厂配件" />
+      <div class="grid2">
+        <ProductCard v-for="p in bikeProducts" :key="p.id" :product="p" />
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
-import { featuredBanner, featuredQuick, collections, products } from '../data/mock'
+import { featuredBanner, featuredQuick, products } from '../data/mock'
+
+const router = useRouter()
+
+const topTabs = [
+  { key: 'rec', label: '推荐' },
+  { key: 'spring', label: '踏春装备' },
+  { key: 'bikes', label: 'Bikes', en: 'Bikes' },
+]
+const activeTab = ref('rec')
 
 const banner = featuredBanner
-
-const chips = [
-  { key: 'all', label: '全部' },
-  ...collections.map((c) => ({ key: c.id, label: c.title })),
-]
-const activeKey = ref('all')
-
-const filteredProducts = computed(() =>
-  activeKey.value === 'all'
-    ? products
-    : products.filter((p) => p.collection === activeKey.value)
-)
+const hotProducts = computed(() => products.slice(0, 4))
+const springProducts = computed(() => products.filter((p) => p.collection === 'spring'))
+const bikeProducts = computed(() => products.filter((p) => p.collection === 'p1parts'))
 
 function onQuick(q) {
-  console.log('featured quick:', q.key)
+  if (q.key === 'hot') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  } else if (q.key === 'new') {
+    activeTab.value = 'spring'
+  } else if (q.key === 'points') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 </script>
 
 <style scoped>
 .featured {
   padding-top: env(safe-area-inset-top);
+  padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
 }
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 10;
 }
-.title {
+.tabs {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+.tab {
   font-size: 17px;
   font-weight: 700;
+  color: #999999;
+  line-height: 1.2;
 }
-.bikes {
-  color: var(--text-sub);
+.tab.active {
+  color: #111111;
+}
+.tab .en {
+  font-size: 12px;
   font-weight: 400;
-  font-size: 14px;
+  font-style: normal;
+  color: var(--text-sub);
+  margin-left: 2px;
 }
 .search-ico {
   font-size: 18px;
@@ -114,24 +154,10 @@ function onQuick(q) {
 .banner__emoji {
   font-size: 46px;
 }
-.filter {
-  display: flex;
-  padding: 4px 12px 8px;
-}
-.chips {
-  display: flex;
-  gap: 8px;
-}
-.chip {
-  font-size: 12px;
-  color: var(--text-sub);
-  background: #fff;
-  border-radius: 14px;
-  padding: 5px 12px;
-}
-.chip.active {
-  color: var(--brand);
-  background: var(--brand-soft);
-  font-weight: 600;
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 0 12px 12px;
 }
 </style>

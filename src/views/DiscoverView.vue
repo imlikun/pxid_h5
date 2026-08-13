@@ -129,10 +129,10 @@ import bridge from '../bridge'
 const router = useRouter()
 const tabs = discoverTabs
 const activeTab = ref('推荐')
-const activeFilter = ref('最新')
+const activeFilter = ref('全部')
 
 const filteredFeed = computed(() =>
-  activeFilter.value === '最新'
+  activeFilter.value === '全部'
     ? feedItems
     : feedItems.filter((i) => i.filter === activeFilter.value)
 )
