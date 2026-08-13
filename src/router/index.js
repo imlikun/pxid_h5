@@ -19,6 +19,7 @@ import WorkOrderView from '../views/WorkOrderView.vue'
 import WorkOrderDetailView from '../views/WorkOrderDetailView.vue'
 import FaqView from '../views/FaqView.vue'
 import FaqDetailView from '../views/FaqDetailView.vue'
+import FaqFilterView from '../views/FaqFilterView.vue'
 
 // 用 hash 路由：WebView 内加载任意域名/本地文件都不会 404，无需服务端 rewrite
 const routes = [
@@ -54,6 +55,7 @@ const routes = [
   { path: '/service/workorders', name: 'workorders', component: WorkOrderView, meta: { hideTabBar: true, title: '我的工单' } },
   { path: '/service/workorders/:id', name: 'workorder-detail', component: WorkOrderDetailView, meta: { hideTabBar: true, title: '工单详情' } },
   { path: '/service/faq', name: 'faq', component: FaqView, meta: { hideTabBar: true, title: '常见问题' } },
+  { path: '/service/faq/filter', name: 'faq-filter', component: FaqFilterView, meta: { hideTabBar: true, title: '问题筛选' } },
   { path: '/service/faq/:id', name: 'faq-detail', component: FaqDetailView, meta: { hideTabBar: true, title: '问题详情' } },
 
   // 精选
