@@ -46,10 +46,10 @@ H5 通过全局对象 **`window.PXIDBridge`** 调用原生能力。**原生须�
 |---|---|---|---|
 | `getToken` | 无 | `Promise<string>` | 获取登录态 token（H5 需要用户信息时调用） |
 | `navigateTo` | `tab: 'discover'\|'featured'\|'purchase'\|'service'\|'profile'` | `void` | 切换到原生底部 tab |
-| `requestPurchase` | `payload: object` | `void` | 拉起原生购买/下单（如道路救援、加购、结算） |
+| `requestPurchase` | `payload: object` | `Promise<boolean>` | 拉起原生购买/下单；**支付完成/取消后必须 resolve(true/false)**，H5 据此跳成功页或停留 |
 | `callPhone` | `phone: string` | `void` | 拨打电话（服务页「门店电话」） |
-| `openMap` | `{ lat:number, lng:number, name:string }` | `void` | 打开原生地图导航（服务页「地图导航」） |
-| `openNative` | `path: string` | `void` | 打开原生页面（如 `/service/rescue`、`/service/policy`） |
+| `openMap` | `{ lat:number, lng:number, name:string }` | `void` | 打开原生地图导航（服务页「地图导航」；独立预览时浏览器直开跳苹果/高德） |
+| `openNative` | `{ target: string, ...payload }` | `void` | 打开原生页面（如 `{target:'vehicleCheck'}`、`{target:'address.list'}`） |
 
 ### 3.2 H5 侧调用示例（已是现成代码）
 
@@ -80,10 +80,13 @@ controller.evaluateJavascript(source: '''
       NativeBridge.postMessage(JSON.stringify({ method: 'getToken' }));
     }),
     navigateTo: (tab) => NativeBridge.postMessage(JSON.stringify({ method:'navigateTo', tab })),
-    requestPurchase: (p) => NativeBridge.postMessage(JSON.stringify({ method:'requestPurchase', payload: p })),
+    requestPurchase: (p) => new Promise((resolve) => {
+      window._resolvePurchase = resolve;   // 支付完成后原生回调 resolve(true/false)
+      NativeBridge.postMessage(JSON.stringify({ method:'requestPurchase', payload: p }));
+    }),
     callPhone: (phone) => NativeBridge.postMessage(JSON.stringify({ method:'callPhone', phone })),
     openMap: (o) => NativeBridge.postMessage(JSON.stringify({ method:'openMap', data: o })),
-    openNative: (path) => NativeBridge.postMessage(JSON.stringify({ method:'openNative', path })),
+    openNative: (o) => NativeBridge.postMessage(JSON.stringify({ method:'openNative', data: o })),
   };
 ''');
 
@@ -92,11 +95,13 @@ controller.evaluateJavascript(source: '''
 //  - navigateTo → 切换原生底部 tab（如跳到购车/我的）
 //  - callPhone  → url_launcher 拨号 / 原生 Intent
 //  - openMap    → 调起高德/百度地图
-//  - requestPurchase / openNative → 路由到对应原生页面
+//  - requestPurchase → 支付/下单流程，完成后再 evaluateJavascript("window._resolvePurchase(true)")
+//  - openNative → 路由到对应原生页面
 ```
 
-**getToken 是异步的**：H5 用 `Promise` 等原生回传，原生拿到 token 后调用
-`window._resolveToken(token)` 兑现 Promise。其余方法为单向通知，无需回传。
+**getToken / requestPurchase 是异步的**：H5 用 `Promise` 等原生回传，原生拿到结果后调用
+`window._resolveToken(token)` / `window._resolvePurchase(true|false)` 兑现 Promise。
+`requestPurchase` 必须回传布尔（支付成功 true / 取消或失败 false），H5 才会跳支付成功页。
 
 ---
 
@@ -123,15 +128,17 @@ pxid_h5/
 ├─ index.html
 ├─ vite.config.js
 ├─ package.json
+├─ README.md               # 开发文档（快速开始/功能/目录/双机协作）
 ├─ INTEGRATION.md          # 本文件
+├─ public/                 # 设计稿原图（banner/卡片封面/车型图）
 └─ src/
    ├─ main.js
    ├─ App.vue
    ├─ bridge/index.js      # JS Bridge 契约（mock + 真实调用出口）
    ├─ router/index.js      # 路由（hash 模式）
-   ├─ store/cart.js        # 购物车
+   ├─ store/cart.js        # 购物车（勾选/合计）
    ├─ data/mock.js         # Mock 数据（接 API 时整文件替换）
    ├─ styles/tokens.css    # 设计 token（蓝强调/红价/白底）
-   ├─ components/          # DemoTabBar / ProductCard / FeedCard / ...
-   └─ views/               # Discover / Featured / Service / ProductDetail / Cart / Placeholder
+   ├─ components/          # DemoTabBar / ProductCard / FeedCard / StoreCard / FaqItem / SectionHeader / QuickActions
+   └─ views/               # 发现/精选/服务 三板块 + 商品详情/购物车/结算/订单/成功页 + 13 个服务子页
 ```
