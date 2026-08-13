@@ -24,7 +24,7 @@ export const feedItems = [
     author: 'PXID 官方产品经理',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&q=80',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
-    cover: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
+    cover: '/feed_r1.jpg',
     likes: 30,
     time: '05-14',
     filter: '全部',
@@ -35,7 +35,7 @@ export const feedItems = [
     author: '一路向前',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
-    cover: 'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=600&q=80',
+    cover: '/feed_d1.jpg',
     likes: 206,
     time: '05-13',
     filter: 'H10',
@@ -46,7 +46,7 @@ export const feedItems = [
     author: 'PXID 官方产品经理',
     avatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=80&q=80',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
-    cover: 'https://images.unsplash.com/photo-1485965120184-e224f7a1dbfe?w=600&q=80',
+    cover: '/feed_r2.jpg',
     likes: 30,
     time: '05-12',
     filter: 'M2',
@@ -57,7 +57,7 @@ export const feedItems = [
     author: '一路向前',
     avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcabd36?w=80&q=80',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
-    cover: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=600&q=80',
+    cover: '/feed_d2.jpg',
     likes: 206,
     time: '05-11',
     filter: 'Z3',
@@ -68,7 +68,7 @@ export const feedItems = [
     author: 'PXID 官方产品经理',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&q=80',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
-    cover: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=600&q=80',
+    cover: '/feed_r3.jpg',
     likes: 30,
     time: '05-10',
     filter: '全部',
@@ -79,26 +79,26 @@ export const feedItems = [
     author: '一路向前',
     avatar: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=80&q=80',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
-    cover: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&q=80',
+    cover: '/feed_d3.jpg',
     likes: 206,
     time: '05-09',
     filter: '全部',
   },
 ]
 
-// 广场：车型展示 P1-P6（名称条只标型号，与设计稿一致）
+// 广场：车型展示 P1-P6（封面取自设计稿 广场/ 子目录原图）
 export const plazaShowcase = [
-  { id: 'P1', name: 'P1', cover: 'https://images.unsplash.com/photo-1558981806-ec527fa84c3d?w=400&q=80' },
-  { id: 'P2', name: 'P2', cover: 'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=400&q=80' },
-  { id: 'P3', name: 'P3', cover: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80' },
-  { id: 'P4', name: 'P4', cover: 'https://images.unsplash.com/photo-1485965120184-e224f7a1dbfe?w=400&q=80' },
-  { id: 'P5', name: 'P5', cover: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=400&q=80' },
-  { id: 'P6', name: 'P6', cover: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80' },
+  { id: 'P1', name: 'P1', cover: '/plaza_p1.jpg' },
+  { id: 'P2', name: 'P2', cover: '/plaza_p2.jpg' },
+  { id: 'P3', name: 'P3', cover: '/plaza_p3.jpg' },
+  { id: 'P4', name: 'P4', cover: '/plaza_p4.jpg' },
+  { id: 'P5', name: 'P5', cover: '/plaza_p5.jpg' },
+  { id: 'P6', name: 'P6', cover: '/plaza_p6.jpg' },
 ]
 
 // 广场：热门活动（与设计稿一致：新一代货运电动三轮车 05-14 立即查看）
 export const activities = [
-  { id: 1, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80' },
+  { id: 1, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: '/feed_r4.jpg' },
 ]
 
 // ---------------- 消息中心 ----------------
