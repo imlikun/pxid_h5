@@ -13,7 +13,7 @@
         class="entry"
         @click="onEntry(s)"
       >
-        <span class="eicon">{{ s.icon }}</span>
+        <IconSvg class="eicon" :name="s.icon" :size="26" />
         <span class="elabel">{{ s.label }}</span>
         <span class="edesc">{{ s.desc }}</span>
       </div>
@@ -36,6 +36,7 @@ import { useRouter } from 'vue-router'
 import StoreCard from '../components/StoreCard.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import FaqItem from '../components/FaqItem.vue'
+import IconSvg from '../components/IconSvg.vue'
 import { serviceEntries, nearbyStore, faqs } from '../data/mock'
 
 const router = useRouter()
@@ -91,7 +92,9 @@ function goFaqDetail(f) {
   gap: 4px;
 }
 .eicon {
-  font-size: 26px;
+  width: 26px;
+  height: 26px;
+  color: #333333;
 }
 .elabel {
   font-size: 13px;

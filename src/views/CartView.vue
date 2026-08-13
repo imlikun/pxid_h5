@@ -28,7 +28,7 @@
     </div>
 
     <div v-else class="empty">
-      <div class="e-emoji">🛒</div>
+      <IconSvg class="e-emoji" name="shopping-cart" :size="56" />
       <p>购物车还是空的</p>
       <button @click="goDiscover">去精选逛逛</button>
     </div>
@@ -53,6 +53,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import IconSvg from '../components/IconSvg.vue'
 import {
   cart,
   changeQty,
@@ -154,7 +155,12 @@ function goCheckout() {
   text-align: center;
   color: #999;
 }
-.e-emoji { font-size: 56px; }
+.e-emoji {
+  width: 56px;
+  height: 56px;
+  color: #cccccc;
+  margin: 0 auto 8px;
+}
 .empty button {
   margin-top: 14px;
   background: #548eff;

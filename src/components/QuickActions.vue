@@ -6,13 +6,14 @@
       class="qitem"
       @click="$emit('tap', q)"
     >
-      <span class="qicon">{{ q.icon }}</span>
+      <IconSvg class="qicon" :name="q.icon" :size="22" />
       <span class="qlabel">{{ q.label }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
+import IconSvg from './IconSvg.vue'
 defineProps({
   items: { type: Array, required: true },
 })
@@ -38,8 +39,9 @@ defineEmits(['tap'])
   gap: 8px;
 }
 .qicon {
-  font-size: 22px;
-  line-height: 28px;
+  width: 22px;
+  height: 22px;
+  color: #333333;
 }
 .qlabel {
   font-size: 13px;

@@ -6,10 +6,10 @@
 export const discoverTabs = ['推荐', '动态', '广场']
 
 export const discoverQuick = [
-  { key: 'custom', label: '立即定制', icon: '✂️' },
-  { key: 'notice', label: '官方公告', icon: '📢' },
-  { key: 'ai', label: '智能助手', icon: '🤖' },
-  { key: 'points', label: '积分兑换', icon: '🎁' },
+  { key: 'custom', label: '立即定制', icon: 'scissors' },
+  { key: 'notice', label: '官方公告', icon: 'megaphone' },
+  { key: 'ai', label: '智能助手', icon: 'headset' },
+  { key: 'points', label: '积分兑换', icon: 'gift' },
 ]
 
 // 三个 tab 各自的车型筛选（与设计稿一致：推荐=全部、动态=最新、广场=P1-P6）
@@ -153,9 +153,9 @@ export const featuredBanner = {
 }
 
 export const featuredQuick = [
-  { key: 'hot', label: '热购榜单', icon: '🔥' },
-  { key: 'new', label: '近期上新', icon: '✨' },
-  { key: 'points', label: '玩转积分', icon: '🎁' },
+  { key: 'hot', label: '热购榜单', icon: 'flame' },
+  { key: 'new', label: '近期上新', icon: 'sparkles' },
+  { key: 'points', label: '玩转积分', icon: 'award' },
 ]
 
 export const collections = [
@@ -176,12 +176,12 @@ export const products = [
 
 // ---------------- 服务（售后 hub）----------------
 export const serviceEntries = [
-  { key: 'rescue', label: '道路救援', icon: '🚑', desc: '一键呼叫' },
-  { key: 'guide', label: '使用指南', icon: '📖', desc: '新手必看' },
-  { key: 'check', label: '车辆体检', icon: '🩺', desc: '远程诊断' },
-  { key: 'feedback', label: '意见反馈', icon: '💬', desc: '吐槽建议' },
-  { key: 'policy', label: '三包政策', icon: '📄', desc: '权益保障' },
-  { key: 'workorders', label: '我的工单', icon: '📦', desc: '查看进度' },
+  { key: 'rescue', label: '道路救援', icon: 'wrench', desc: '一键呼叫' },
+  { key: 'guide', label: '使用指南', icon: 'book-open', desc: '新手必看' },
+  { key: 'check', label: '车辆体检', icon: 'gauge', desc: '远程诊断' },
+  { key: 'feedback', label: '意见反馈', icon: 'message-circle', desc: '吐槽建议' },
+  { key: 'policy', label: '三包政策', icon: 'shield-check', desc: '权益保障' },
+  { key: 'workorders', label: '我的工单', icon: 'clipboard-list', desc: '查看进度' },
 ]
 
 export const nearbyStore = {

@@ -39,7 +39,7 @@
       </div>
       <div class="quick">
         <div v-for="q in discoverQuick" :key="q.key" class="quick__item" @click="onQuick(q)">
-          <div class="quick__icon">{{ q.icon }}</div>
+          <IconSvg class="quick__icon" :name="q.icon" :size="22" />
           <div class="quick__label">{{ q.label }}</div>
         </div>
       </div>
@@ -116,6 +116,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
+import IconSvg from '../components/IconSvg.vue'
 import {
   discoverTabs,
   discoverQuick,
@@ -257,11 +258,9 @@ function onActivity(a) { console.log('activity tap:', a.id) }
   gap: 8px;
 }
 .quick__icon {
-  width: 28px;
-  height: 28px;
-  font-size: 22px;
-  line-height: 28px;
-  text-align: center;
+  width: 24px;
+  height: 24px;
+  color: #333333;
 }
 .quick__label {
   font-size: 13px;

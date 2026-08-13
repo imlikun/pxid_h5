@@ -9,7 +9,7 @@
 
     <!-- 当前车辆 -->
     <div class="vehicle">
-      <div class="v-img">🛵</div>
+      <div class="v-img"><IconSvg name="scooter" :size="40" /></div>
       <div class="v-info">
         <div class="v-model">PXID {{ vehicle.model }}</div>
         <div class="v-meta">已绑定 {{ vehicle.days }} 天 · 累计 {{ vehicle.km }} km</div>
@@ -52,6 +52,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { bridge } from '../bridge'
+import IconSvg from '../components/IconSvg.vue'
 
 const router = useRouter()
 
@@ -137,7 +138,7 @@ function switchVehicle() {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  color: var(--brand);
   flex: none;
 }
 .v-info { flex: 1; }

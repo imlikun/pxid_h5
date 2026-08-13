@@ -4,7 +4,7 @@
     <div class="topbar">
       <span class="back" @click="goBack">←</span>
       <span class="t">{{ product.name }}</span>
-      <span class="cart" @click="goCart">🛒</span>
+      <span class="cart" @click="goCart"><IconSvg name="shopping-cart" :size="22" /></span>
     </div>
 
     <!-- 主图 -->
@@ -72,6 +72,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { products } from '../data/mock'
 import { addToCart } from '../store/cart'
 import { bridge } from '../bridge'
+import IconSvg from '../components/IconSvg.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -135,10 +136,16 @@ function onBuy() {
   top: 0;
   z-index: 10;
 }
-.back,
-.cart {
+.back {
   font-size: 18px;
   width: 32px;
+}
+.cart {
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333333;
 }
 .t {
   font-size: 15px;
