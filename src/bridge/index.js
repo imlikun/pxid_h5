@@ -32,9 +32,10 @@ const mockBridge = {
     }
   },
 
-  // 拉起原生购买 / 下单流程
+  // 拉起原生购买 / 下单流程（原生在支付完成/取消后 resolve(true/false)；mock 模拟支付成功）
   requestPurchase(payload) {
     logMock('requestPurchase', payload)
+    return Promise.resolve(true)
   },
 
   // 拨打电话（走原生拨号）
