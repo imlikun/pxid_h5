@@ -86,15 +86,16 @@ const router = useRouter()
 
 // 车型数据：框架阶段 P1 用设计稿真实数据，其余车型暂共用 P1（接后端后按车型下发）
 const p1Table = [
-  { part: '电机', period: '3年', note: '原厂质保' },
-  { part: '控制器', period: '1年', note: '原厂质保' },
-  { part: '仪表', period: '1年', note: '原厂质保' },
-  { part: '车架', period: '2年', note: '原厂质保' },
-  { part: '车架套件', period: '1年', note: '原厂质保' },
-  { part: '充电器', period: '1年', note: '原厂质保' },
-  { part: '防盗器', period: '1年', note: '原厂质保' },
-  { part: '中控', period: '1年', note: '原厂质保' },
-  { part: '中控总成', period: '1年', note: '原厂质保' },
+  { part: '电机', period: '3年', note: '出现线圈烧毁、缺相、退磁、短路等性能或功能质量问题，0-24个月换新，后12个月维修或维护电机（非个为因素）' },
+  { part: '控制器', period: '1年', note: '功能性故障（非人为因素）' },
+  { part: '仪表', period: '1年', note: '屏幕无帮黑屏、性能故障、主板损坏（非人为因素）' },
+  { part: '车架', period: '2年', note: '非外力导致的变形、脱焊、断裂等质量问题（非人为因素）' },
+  { part: '车架套件', period: '1年', note: '因产品原因发生的性能故障或质量问题且无法修复（非人为因素）' },
+  { part: '充电器', period: '1年', note: '因产品原因发生的性能故障或质量问题且无法修复（非人为因素）' },
+  { part: '充电器', period: '1年', note: '功能性故障（非人为因素）' },
+  { part: '防盗器', period: '1年', note: '主机主板无故损坏、遥控器电路板失效、传感器硬件缺陷（非人为因素）' },
+  { part: '中控', period: '1年', note: '因产品原因发生的性能故障或质量问题且无法修复（非人为因素）' },
+  { part: '中控总成', period: '1年', note: '因产品原因发生的性能故障或质量问题且无法修复（非人为因素）' },
 ]
 
 const models = [
@@ -186,8 +187,8 @@ function pickModel(m) {
 }
 .tr {
   display: flex;
-  align-items: center;
-  padding: 12px;
+  align-items: flex-start;
+  padding: 14px 12px;
   border-bottom: 1px solid #ececec;
 }
 .tr:last-child { border-bottom: none; }
@@ -195,11 +196,13 @@ function pickModel(m) {
   background: #eef0f3;
   font-weight: 600;
   color: #333;
+  align-items: center;
 }
-.td { font-size: 13px; color: #333; }
-.td--part { width: 34%; }
-.td--period { width: 22%; color: #e53935; font-weight: 600; }
-.td--note { flex: 1; color: #999; }
+.td { font-size: 13px; color: #333; line-height: 1.5; }
+.td--part { width: 26%; }
+.td--period { width: 18%; color: #e53935; font-weight: 600; }
+.tr--head .td--period { color: #e53935; }
+.td--note { flex: 1; color: #666; line-height: 1.6; }
 
 .note {
   margin: 0 12px 12px;
