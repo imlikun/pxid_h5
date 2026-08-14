@@ -27,7 +27,10 @@
           <span class="q">Q</span>
           <span class="q-txt">{{ f.q }}</span>
         </div>
-        <div class="a-row">{{ f.a }}</div>
+        <div class="a-row">
+          <span class="a">A</span>
+          <span class="a-txt">{{ f.a }}</span>
+        </div>
       </div>
       <div v-if="filteredFaqs.length === 0" class="empty">暂无匹配问题</div>
     </div>
@@ -79,10 +82,11 @@ function goFilter() {
   align-items: center;
   justify-content: center;
   position: relative;
-  background: #ffffff;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
-.back { position: absolute; left: 12px; display: flex; color: #333; }
-.title { font-size: 17px; font-weight: 600; color: #333; }
+.back { position: absolute; left: 12px; display: flex; color: var(--text); }
+.title { font-size: 17px; font-weight: 600; color: var(--text); }
 .filter-btn {
   position: absolute;
   right: 16px;
@@ -90,10 +94,10 @@ function goFilter() {
   align-items: center;
   gap: 4px;
   font-size: 14px;
-  color: #333;
+  color: var(--text);
 }
 .filter-badge {
-  background: #333;
+  background: var(--text);
   color: #ffffff;
   font-size: 10px;
   line-height: 1;
@@ -104,18 +108,18 @@ function goFilter() {
 }
 
 .search {
-  margin: 8px 12px 12px;
+  margin: 12px;
   height: 40px;
-  background: #ffffff;
+  background: var(--card);
   border-radius: var(--radius-xxl);
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 14px;
 }
-.sicon { color: #999; display: flex; }
-.sinput { flex: 1; font-size: 14px; color: #333; background: transparent; }
-.sinput::placeholder { color: #999; }
+.sicon { color: var(--text-hint); display: flex; }
+.sinput { flex: 1; font-size: 14px; color: var(--text); background: transparent; }
+.sinput::placeholder { color: var(--text-hint); }
 
 .list {
   padding: 0 12px 16px;
@@ -124,30 +128,50 @@ function goFilter() {
   gap: 10px;
 }
 .card {
-  background: #ffffff;
+  background: var(--card);
   border-radius: var(--radius);
   padding: 14px;
 }
-.q-row { display: flex; align-items: center; gap: 10px; }
+.q-row { display: flex; align-items: flex-start; gap: 10px; }
 .q {
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  background: #eaf2ff;
-  color: var(--brand-light);
+  background: var(--brand);
+  color: #ffffff;
   font-size: 11px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
+  margin-top: 1px;
 }
-.q-txt { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+.q-txt { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.4; flex: 1; }
 .a-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   margin-top: 8px;
-  margin-left: 28px;
+}
+.a {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: #d1d5db;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  margin-top: 1px;
+}
+.a-txt {
+  flex: 1;
   font-size: 13px;
-  color: #888;
+  color: var(--text-sub);
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 1;
@@ -155,5 +179,5 @@ function goFilter() {
   overflow: hidden;
 }
 .card:active { background: #fafafa; }
-.empty { text-align: center; color: #999; padding: 32px 0; font-size: 13px; }
+.empty { text-align: center; color: var(--text-hint); padding: 32px 0; font-size: 13px; }
 </style>

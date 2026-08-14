@@ -3,7 +3,7 @@
     <!-- 顶部：× + 标题"问题筛选" -->
     <div class="nav">
       <span class="close" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </span>
       <span class="title">问题筛选</span>
       <span class="placeholder"></span>
@@ -63,7 +63,7 @@ function confirm() {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
   padding-top: env(safe-area-inset-top);
@@ -75,16 +75,17 @@ function confirm() {
   justify-content: space-between;
   padding: 0 12px;
   position: relative;
-  background: #ffffff;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
-.close { display: flex; }
+.close { display: flex; color: var(--text-hint); }
 .title {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   font-size: 17px;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
 }
 .placeholder { width: 22px; }
 
@@ -97,7 +98,7 @@ function confirm() {
 .group-title {
   font-size: 15px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--text);
   margin-bottom: 14px;
 }
 .tags {
@@ -112,15 +113,15 @@ function confirm() {
   min-width: 96px;
   height: 38px;
   padding: 0 14px;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
   font-size: 14px;
-  color: #555;
+  color: var(--text-sub);
 }
 .tag.active {
-  background: #1a1a1a;
-  border-color: #1a1a1a;
+  background: var(--text);
+  border-color: var(--text);
   color: #ffffff;
   font-weight: 600;
 }
@@ -129,23 +130,23 @@ function confirm() {
   display: flex;
   gap: 12px;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: #ffffff;
-  border-top: 1px solid #f2f2f2;
+  background: var(--card);
+  border-top: 1px solid var(--line);
 }
 .btn-reset, .btn-confirm {
   flex: 1;
   height: 48px;
-  border-radius: 24px;
+  border-radius: var(--radius-xxl);
   font-size: 16px;
   font-weight: 600;
 }
 .btn-reset {
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  color: #333;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--text);
 }
 .btn-confirm {
-  background: #1a1a1a;
+  background: #2F2F2F;
   color: #ffffff;
   border: none;
 }
