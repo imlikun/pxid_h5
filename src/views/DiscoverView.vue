@@ -259,7 +259,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 .quick__item {
   width: 80px;
   height: 60px;
-  background: linear-gradient(135deg, #EAF2FF 0%, #DDE9FF 100%);
+  background: #F5F7FA;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
