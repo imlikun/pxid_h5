@@ -70,7 +70,7 @@ function onClick(t) {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  color: #999999;
+  color: var(--text-hint);
 }
 .tab.active {
   color: var(--brand);
