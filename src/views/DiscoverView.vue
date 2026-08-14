@@ -259,7 +259,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 .quick__item {
   width: 80px;
   height: 60px;
-  background: #ffffff;
+  background: linear-gradient(135deg, #EAF2FF 0%, #DDE9FF 100%);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -270,7 +270,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 .quick__icon {
   width: 20px;
   height: 20px;
-  color: #333333;
+  color: #2563EB;
 }
 .quick__label {
   font-size: 17px;
