@@ -252,21 +252,20 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 .quick {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  justify-items: center;
-  gap: 18px;
+  gap: 10px;
   margin: 14px 14px 24px;
 }
 .quick__item {
-  width: 80px;
-  height: 60px;
+  height: 72px;
   background: transparent;
-  border: 1.5px solid #E5E5E5;
+  border: 2px solid #E5E5E5;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 8px;
-  gap: 8px;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 4px;
 }
 .quick__icon {
   width: 20px;
