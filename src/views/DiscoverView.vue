@@ -254,7 +254,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   grid-template-columns: repeat(4, 1fr);
   justify-items: center;
   gap: 18px;
-  margin: 14px 14px 0;
+  margin: 14px 14px 24px;
 }
 .quick__item {
   width: 80px;
@@ -281,7 +281,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 16px 0 0;
+  margin: 24px 0 0;
   height: 44px;
   padding: 0 16px;
 }
@@ -309,7 +309,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   flex: none;
 }
 .content {
-  margin-top: 16px;
+  margin-top: 24px;
   padding-bottom: 16px;
 }
 .grid2 {
