@@ -13,9 +13,9 @@
         >
       </div>
       <div class="topacts">
-        <span class="act" @click="onAdd">＋</span>
-        <span class="act" @click="onNotice">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="act act--add" @click="onAdd">＋</span>
+        <span class="act act--bell" @click="onNotice">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
         </span>
       </div>
     </div>
@@ -23,7 +23,7 @@
     <!-- 搜索：推荐/广场显示 -->
     <div v-if="activeTab !== '动态'" class="search">
       <span class="sicon">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </span>
       <input class="sinput" placeholder="搜索内容/活动/车型" />
     </div>
@@ -173,12 +173,12 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px 6px;
+  padding: 14px 16px 8px;
   background: #ffffff;
 }
 .tabs {
   display: flex;
-  gap: 18px;
+  gap: 13px;
 }
 .tab {
   font-size: 18px;
@@ -193,27 +193,35 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 .topacts {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   color: #000000;
 }
 .act {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  font-size: 22px;
+  color: #000000;
+}
+.act--add {
+  width: 20px;
+  height: 20px;
+  font-size: 18px;
+  font-weight: 300;
   line-height: 1;
 }
+.act--bell {
+  width: 24px;
+  height: 24px;
+}
 .search {
-  margin: 6px 12px 0;
+  margin: 10px 16px 0;
   height: 44px;
   background: #f5f5f5;
   border-radius: 22px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px;
+  padding: 0 16px 0 10px;
 }
 .sicon {
   color: #999999;
@@ -230,7 +238,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   color: #999999;
 }
 .banner {
-  margin: 12px 12px 0;
+  margin: 16px 14px 0;
   border-radius: 12px;
   overflow: hidden;
   aspect-ratio: 16 / 9;
@@ -245,7 +253,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  margin: 14px 12px 0;
+  margin: 14px 14px 0;
 }
 .quick__item {
   background: #ffffff;
