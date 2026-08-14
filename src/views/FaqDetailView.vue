@@ -118,7 +118,7 @@ function goFeedback() {
 .back-btn {
   margin-top: 16px;
   padding: 8px 24px;
-  border-radius: 20px;
+  border-radius: var(--radius-xxl);
   background: var(--brand-gradient);
   color: #fff;
   font-size: 14px;

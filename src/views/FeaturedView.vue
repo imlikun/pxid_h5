@@ -129,7 +129,7 @@ function onQuick(q) {
 }
 .banner {
   margin: 12px 14px 0;
-  border-radius: 12px;
+  border-radius: var(--radius);
   overflow: hidden;
   aspect-ratio: 16 / 9;
 }

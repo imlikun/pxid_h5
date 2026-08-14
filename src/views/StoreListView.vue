@@ -77,7 +77,7 @@ const list = computed(() => {
   align-items: center;
   gap: 8px;
   background: #f2f3f5;
-  border-radius: 20px;
+  border-radius: var(--radius-xxl);
   padding: 9px 14px;
 }
 .search input { flex: 1; font-size: 14px; color: var(--text); }

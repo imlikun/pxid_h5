@@ -216,7 +216,7 @@ function onSubmit() {
   position: relative;
   height: 320px;
   margin: 12px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background:
     linear-gradient(135deg, #e8eef7 0%, #dbe6f5 100%);
   overflow: hidden;
@@ -262,7 +262,7 @@ function onSubmit() {
   margin: 0 12px 12px;
   padding: 14px 16px;
   background: #fff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
 }
 .addr-icon { flex: none; color: var(--brand); }
@@ -279,7 +279,7 @@ function onSubmit() {
   align-items: center;
   padding: 14px 16px;
   background: #fff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
   margin: 0 12px 12px;
 }

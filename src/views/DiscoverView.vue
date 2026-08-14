@@ -223,7 +223,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   height: 40px;
   background: #ffffff;
   border: 1px solid #E0E0E0;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -245,7 +245,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .banner {
   margin: 16px 14px 0;
-  border-radius: 12px;
+  border-radius: var(--radius);
   overflow: hidden;
   aspect-ratio: 16 / 9;
 }
@@ -265,7 +265,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   height: 72px;
   background: #ffffff;
   border: 1px solid #E0E0E0;
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
@@ -333,7 +333,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .showcase {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 .showcase__img {
@@ -372,7 +372,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .activity {
   background: #f7f7f7;
-  border-radius: 12px;
+  border-radius: var(--radius);
   display: flex;
   align-items: center;
   gap: 10px;

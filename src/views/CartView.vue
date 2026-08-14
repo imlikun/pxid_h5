@@ -104,7 +104,7 @@ function goCheckout() {
 }
 .row {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 12px;
   display: flex;
   align-items: center;
@@ -166,7 +166,7 @@ function goCheckout() {
   margin-top: 14px;
   background: var(--brand-light);
   color: #fff;
-  border-radius: 20px;
+  border-radius: var(--radius-xxl);
   padding: 8px 18px;
   font-size: 13px;
 }

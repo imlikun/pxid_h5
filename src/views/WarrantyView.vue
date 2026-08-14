@@ -141,7 +141,7 @@ function pickModel(m) {
   width: 100%;
   height: 180px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: #f2f4f7;
 }
 

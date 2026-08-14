@@ -44,7 +44,7 @@ function onDownload() {
 .title { font-size: 17px; font-weight: 600; color: #333; }
 .dl { position: absolute; right: 12px; display: flex; color: #333; }
 .doc { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-.sec { background: #f7f7f7; border-radius: 12px; padding: 14px; }
+.sec { background: #f7f7f7; border-radius: var(--radius); padding: 14px; }
 .sec__head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .sec__page { background: #333; color: #fff; font-size: 11px; border-radius: 6px; padding: 2px 8px; }
 .sec__title { font-size: 15px; font-weight: 600; color: #333; }

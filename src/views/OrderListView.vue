@@ -126,7 +126,7 @@ function detail(o) {
 .list { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 .card {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 14px;
 }
 .o-head { display: flex; align-items: center; justify-content: space-between; }
@@ -169,7 +169,7 @@ function detail(o) {
 .o-total b { color: #e53935; font-size: 15px; }
 .o-actions { display: flex; gap: 8px; }
 .btn {
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 7px 14px;
   font-size: 12px;
 }

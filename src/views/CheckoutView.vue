@@ -130,7 +130,7 @@ async function onSubmit() {
   gap: 8px;
   background: #ffffff;
   margin: 12px 12px 0;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 14px;
 }
 .addr-info { flex: 1; min-width: 0; }
@@ -143,7 +143,7 @@ async function onSubmit() {
 .goods {
   background: #ffffff;
   margin: 12px 12px 0;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 4px 14px;
 }
 .g-row {
@@ -171,7 +171,7 @@ async function onSubmit() {
 .amount {
   background: #ffffff;
   margin: 12px 12px 0;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 4px 14px;
 }
 .a-row {

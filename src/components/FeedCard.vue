@@ -31,7 +31,7 @@ function go() {
 <style scoped>
 .fcard {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 .fcard__cover {

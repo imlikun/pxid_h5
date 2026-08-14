@@ -11,9 +11,19 @@
   --text-sub: #666666;                    /* 次文本 textSecondary */
   --text-hint: #7F7F7F;                   /* 弱文本 textTertiary */
   --line: #E5E7EB;                        /* 默认边框 border */
+  /* 圆角 5 档（ToC 规范：控件12 / 卡片16 / 业务18 / 沉浸20 / 胶囊999） */
   --radius: 12px;                         /* 控件圆角 */
   --radius-lg: 16px;                      /* 常规卡片圆角 */
   --radius-xl: 18px;                      /* 业务详情卡圆角 */
+  --radius-xxl: 20px;                     /* 沉浸圆角 */
+  --radius-pill: 999px;                   /* 胶囊 / 全圆角 */
+  /* 间距刻度（ToC 规范：8 / 12 / 16 / 24 / 28 / 32） */
+  --sp-8: 8px;
+  --sp-12: 12px;
+  --sp-16: 16px;
+  --sp-24: 24px;
+  --sp-28: 28px;
+  --sp-32: 32px;
   --tab-h: 56px;
 }
 

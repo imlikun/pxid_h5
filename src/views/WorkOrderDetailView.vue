@@ -122,7 +122,7 @@ function onHeadset() {
 .body { padding: 16px 12px; }
 .head {
   background: #f7f7f7;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 14px;
 }
 .oid { font-size: 15px; font-weight: 600; color: var(--text); }
@@ -176,7 +176,7 @@ function onHeadset() {
 .info {
   margin-top: 16px;
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid #f0f0f0;
   overflow: hidden;
 }

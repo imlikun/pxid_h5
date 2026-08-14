@@ -63,6 +63,6 @@ function onSend() {
 .faq__q { flex: 1; font-size: 14px; color: #333; }
 .faq__arrow { color: #ccc; font-size: 20px; }
 .input-bar { display: flex; gap: 8px; padding: 10px 12px; background: #fff; border-top: 1px solid #f0f0f0; }
-.input { flex: 1; border: 1px solid #eee; border-radius: 18px; padding: 8px 14px; font-size: 14px; background: #f7f7f7; outline: none; }
-.send { background: var(--brand); color: #fff; border: none; border-radius: 18px; padding: 0 18px; font-size: 14px; }
+.input { flex: 1; border: 1px solid #eee; border-radius: var(--radius-xl); padding: 8px 14px; font-size: 14px; background: #f7f7f7; outline: none; }
+.send { background: var(--brand); color: #fff; border: none; border-radius: var(--radius-xl); padding: 0 18px; font-size: 14px; }
 </style>

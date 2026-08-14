@@ -133,7 +133,7 @@ function switchVehicle() {
 .v-img {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--brand-soft);
   display: flex;
   align-items: center;
@@ -148,7 +148,7 @@ function switchVehicle() {
   font-size: 12px;
   color: var(--brand);
   border: 1px solid var(--brand);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 6px 14px;
 }
 

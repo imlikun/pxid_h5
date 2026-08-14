@@ -69,7 +69,7 @@ function onCall() {
   flex: 1;
   border: 1px solid var(--brand);
   color: var(--brand);
-  border-radius: 20px;
+  border-radius: var(--radius-xxl);
   padding: 8px 0;
   font-size: 13px;
 }

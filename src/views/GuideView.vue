@@ -68,12 +68,12 @@ function go(kind) {
 .nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: #ffffff; }
 .back { position: absolute; left: 12px; display: flex; color: var(--text); }
 .title { font-size: 17px; font-weight: 600; color: var(--text); }
-.hero { position: relative; margin: 12px; border-radius: 12px; overflow: hidden; background: #e9e9e9; }
+.hero { position: relative; margin: 12px; border-radius: var(--radius); overflow: hidden; background: #e9e9e9; }
 .hero__img { width: 100%; height: 220px; object-fit: cover; display: block; }
-.model-pick { position: absolute; left: 12px; top: 12px; background: rgba(0,0,0,.55); color: #fff; border: none; border-radius: 16px; padding: 6px 12px; font-size: 13px; display: flex; align-items: center; gap: 4px; }
+.model-pick { position: absolute; left: 12px; top: 12px; background: rgba(0,0,0,.55); color: #fff; border: none; border-radius: var(--radius-lg); padding: 6px 12px; font-size: 13px; display: flex; align-items: center; gap: 4px; }
 .caret { font-size: 10px; }
 .entries { margin: 12px; display: flex; flex-direction: column; gap: 12px; }
-.entry { background: #fff; border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.entry { background: #fff; border-radius: var(--radius); padding: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
 .entry__t { font-size: 15px; font-weight: 600; color: #333; }
 .entry__s { font-size: 12px; color: #999; margin-top: 4px; }
 .entry__arrow { color: #ccc; font-size: 22px; }

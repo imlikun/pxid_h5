@@ -58,7 +58,7 @@ h2 { margin-top: 20px; font-size: 22px; font-weight: 700; color: #1a1a1a; }
 .card {
   width: 100%;
   background: #f7f7f7;
-  border-radius: 12px;
+  border-radius: var(--radius);
   margin-top: 32px;
   padding: 6px 16px;
 }

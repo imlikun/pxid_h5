@@ -107,7 +107,7 @@ function goFilter() {
   margin: 8px 12px 12px;
   height: 40px;
   background: #ffffff;
-  border-radius: 20px;
+  border-radius: var(--radius-xxl);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -125,7 +125,7 @@ function goFilter() {
 }
 .card {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 14px;
 }
 .q-row { display: flex; align-items: center; gap: 10px; }

@@ -135,7 +135,7 @@ function onDetail(o) {
 .card {
   position: relative;
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 14px;
   margin-bottom: 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
