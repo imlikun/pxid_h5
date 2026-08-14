@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back" @click="goBack">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">{{ model }} 产品说明书</span>
@@ -24,12 +24,17 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { manualSections } from '../data/mock'
 import { bridge } from '../bridge'
 
 const route = useRoute()
+const router = useRouter()
 const model = ref(route.query.model || 'P1')
+
+function goBack() {
+  router.back()
+}
 
 function onDownload() {
   // 真实环境：调用 bridge 拉起原生下载 / 或直接打开 PDF

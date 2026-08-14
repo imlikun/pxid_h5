@@ -25,13 +25,14 @@
       </div>
     </div>
 
-    <div class="faq-list">
-      <div v-for="(f, i) in feedbackFaqs" :key="f.id" class="faq" @click="goFaq(f)">
+    <div v-if="filteredFaqs.length" class="faq-list">
+      <div v-for="(f, i) in filteredFaqs" :key="f.id" class="faq" @click="goFaq(f)">
         <span class="faq__no">{{ i + 1 }}</span>
         <span class="faq__q">{{ f.q }}</span>
         <span class="faq__arrow">›</span>
       </div>
     </div>
+    <div v-else class="empty">暂无该分类问题，试试其他分类或输入描述</div>
 
     <div class="input-bar">
       <span class="grid-icon">
@@ -43,13 +44,17 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { feedbackTabs, feedbackFaqs } from '../data/mock'
 
 const router = useRouter()
 const activeTab = ref(feedbackTabs[0])
 const text = ref('')
+
+const filteredFaqs = computed(() =>
+  feedbackFaqs.filter((f) => f.category === activeTab.value)
+)
 
 function onSend() {
   // 真实环境：调用 bridge 发给客服系统
@@ -88,6 +93,7 @@ function goFaq(f) {
 .faq__no { color: var(--text-hint); font-size: 14px; width: 18px; }
 .faq__q { flex: 1; font-size: 14px; color: var(--text); }
 .faq__arrow { color: var(--text-hint); font-size: 20px; }
+.empty { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--text-hint); padding: 40px 20px; text-align: center; }
 .input-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); }
 .grid-icon { color: var(--text-hint); display: flex; }
 .input { flex: 1; border: none; border-radius: var(--radius-xl); padding: 8px 14px; font-size: 14px; background: var(--bg); color: var(--text); outline: none; }
