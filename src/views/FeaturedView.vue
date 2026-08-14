@@ -1,6 +1,6 @@
 <template>
   <div class="featured">
-    <!-- 顶部：三 tab + 搜索 -->
+    <!-- 顶部：三 tab + 搜索图标 -->
     <div class="topbar">
       <div class="tabs">
         <span
@@ -17,23 +17,11 @@
       </span>
     </div>
 
-    <!-- 搜索框（与发现一致） -->
-    <div class="search">
-      <span class="sicon">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </span>
-      <input class="sinput" placeholder="搜索内容/活动/车型" />
-    </div>
-
     <!-- 推荐 -->
     <template v-if="activeTab === 'rec'">
       <!-- Banner -->
       <div class="banner">
-        <div class="banner__txt">
-          <div class="b-title">{{ banner.title }}</div>
-          <div class="b-sub">{{ banner.sub }}</div>
-        </div>
-        <IconSvg :name="banner.cover" :size="46" class="banner__icon" />
+        <img class="banner__img" src="/discover-banner.jpg" alt="Banner" />
       </div>
 
       <!-- 三个快捷 -->
@@ -76,8 +64,7 @@ import { useRouter } from 'vue-router'
 import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
-import { featuredBanner, featuredQuick, products } from '../data/mock'
-import IconSvg from '../components/IconSvg.vue'
+import { featuredQuick, products } from '../data/mock'
 
 const router = useRouter()
 
@@ -88,7 +75,6 @@ const topTabs = [
 ]
 const activeTab = ref('rec')
 
-const banner = featuredBanner
 const hotProducts = computed(() => products.slice(0, 4))
 const springProducts = computed(() => products.filter((p) => p.collection === 'spring'))
 const bikeProducts = computed(() => products.filter((p) => p.collection === 'p1parts'))
@@ -141,52 +127,17 @@ function onQuick(q) {
   display: flex;
   align-items: center;
 }
-.search {
-  margin: 6px 12px 0;
-  height: 44px;
-  background: #f5f5f5;
-  border-radius: 22px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-}
-.sicon {
-  color: #999999;
-  display: flex;
-  align-items: center;
-}
-.sinput {
-  flex: 1;
-  font-size: 14px;
-  color: #333333;
-  background: transparent;
-}
-.sinput::placeholder {
-  color: #999999;
-}
 .banner {
-  margin: 12px 12px 0;
+  margin: 12px 14px 0;
   border-radius: 12px;
-  background: linear-gradient(120deg, #1f6fff, #4f9bff);
-  color: #fff;
-  padding: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
 }
-.b-title {
-  font-size: 17px;
-  font-weight: 700;
-}
-.b-sub {
-  font-size: 12px;
-  opacity: 0.9;
-  margin-top: 4px;
-}
-.banner__icon {
-  color: var(--brand);
-  flex: none;
+.banner__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .grid2 {
   display: grid;
