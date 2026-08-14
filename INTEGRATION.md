@@ -14,6 +14,7 @@
 | `requestPurchase` | `(payload) => Promise<boolean>` | 拉起原生购买/下单；resolve 支付结果 |
 | `callPhone` | `(phone: string) => void` | 拨号 |
 | `openMap` | `({lat, lng, name}) => void` | 地图导航 |
+| `openShopify` | `(url: string) => void` | 打开 Shopify 商品/页面（商城与 Shopify 打通，H5 仅展示、点击跳 Shopify 购买） |
 
 ## `openNative` 约定（重要）
 
@@ -46,7 +47,7 @@
 | `points/rules` | 积分页「积分规则」 | 积分 |
 | `points/guide` | 积分页「玩转积分」banner | 积分 |
 | `points/mall` | 积分页「更多」跳转积分商城 | 积分 |
-| `product/detail?id=<id>` | 积分商品 / 好物点击进商品详情 | 积分 |
+| `product/detail?id=<id>` | （已废弃）积分商品改为 `openShopify` 直跳 Shopify | 积分 |
 | `points/exchange?id=<id>` | 积分商品「兑换」 | 积分 |
 
 ## H5 兜底页（预览 / 无原生时）
@@ -58,3 +59,10 @@
 - `search?q=<kw>` → `/search`
 
 > 原生接入后，上述 H5 兜底页可保留作为降级，也可由原生直接接管。
+
+## 商城（精选 / 积分好物）与 Shopify 打通
+
+- ToC App **只在前台展示商品数据**（图片、名称、价格来自 Shopify 商品 feed / 接口，预览期用 `mock.products` / `mock.pointsProducts` 等价字段）。
+- 用户点击商品 / 「去购买」时，调用 `bridge.openShopify(product.shopUrl)` 跳转到 Shopify 完成购买；H5 **不自建购物车 / 结算 / 订单流**。
+- 商品数据需携带 `shopUrl`（Shopify 商品页地址）。预览期 mock 用 `https://shop.pxid.com/products/<handle>` 占位。
+- 原生侧 `openShopify` 实现：在 WebView 或外部浏览器打开该 URL，并保留返回能力。

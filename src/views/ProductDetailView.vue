@@ -50,8 +50,8 @@
 
     <!-- 底部操作 -->
     <div class="actions">
-      <button class="btn btn--cart" @click="onAddCart">加入购物车</button>
-      <button class="btn btn--buy" @click="onBuy">立即购买</button>
+      <button class="btn btn--cart" @click="onAddCart">去 Shopify 加购</button>
+      <button class="btn btn--buy" @click="onBuy">去 Shopify 购买</button>
     </div>
 
     <!-- toast -->
@@ -70,7 +70,6 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { products } from '../data/mock'
-import { addToCart } from '../store/cart'
 import { bridge } from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
 
@@ -99,24 +98,17 @@ function goBack() {
   router.back()
 }
 function goCart() {
-  router.push('/cart')
+  bridge.openShopify('https://shop.pxid.com/cart')
 }
 function onAddCart() {
   if (!product.value) return
-  const item = { ...product.value, spec: specs[activeSpec.value] }
-  addToCart(item, qty.value)
-  bridge.requestPurchase({ type: 'addToCart', id: product.value.id, spec: specs[activeSpec.value], qty: qty.value })
-  showToast('已加入购物车')
+  bridge.openShopify(product.value.shopUrl)
+  showToast('正在前往 Shopify…')
 }
 function onBuy() {
   if (!product.value) return
-  bridge.requestPurchase({
-    type: 'buyNow',
-    product: product.value,
-    spec: specs[activeSpec.value],
-    qty: qty.value,
-  })
-  showToast('正在唤起结算…')
+  bridge.openShopify(product.value.shopUrl)
+  showToast('正在前往 Shopify…')
 }
 </script>
 

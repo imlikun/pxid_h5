@@ -87,7 +87,7 @@ function onMore() {
   bridge.openNative('points/mall')
 }
 function onProduct(p) {
-  bridge.openNative('product/' + p.id)
+  bridge.openShopify(p.shopUrl)
 }
 function onExchange(p) {
   bridge.openNative('points/exchange?id=' + p.id)

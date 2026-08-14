@@ -10,15 +10,15 @@
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { bridge } from '../bridge'
 
 const props = defineProps({
   product: { type: Object, required: true },
 })
-const router = useRouter()
 
 function go() {
-  router.push('/product/' + props.product.id)
+  // 商城与 Shopify 打通：H5 仅展示，点击跳 Shopify 购买
+  bridge.openShopify(props.product.shopUrl)
 }
 </script>
 

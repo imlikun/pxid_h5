@@ -254,26 +254,26 @@ export const collections = [
 ]
 
 export const products = [
-  { id: 1, name: '鸭舌帽 男士', price: 280, origin: 399, cover: 'unsplash/photo-1588850561407-ed78c282e89b_w_600_q_80.jpg', tag: '踏春装备', sales: 1203, collection: 'spring' },
-  { id: 2, name: '原装后轮 适配P1', price: 6800, origin: 7200, cover: 'unsplash/photo-1571068316344-75bc76f77890_w_600_q_80.jpg', tag: 'P1配件', sales: 86, collection: 'p1parts' },
-  { id: 3, name: '防晒冰丝袖套', price: 59, origin: 99, cover: 'unsplash/photo-1517649763962-0c623066013b_w_600_q_80.jpg', tag: '踏春装备', sales: 3420, collection: 'spring' },
-  { id: 4, name: '智能中控屏 P1', price: 1299, origin: 1499, cover: 'unsplash/photo-1493238792000-8113da705763_w_600_q_80.jpg', tag: 'P1配件', sales: 210, collection: 'p1parts' },
-  { id: 5, name: '骑行头盔 一体成型', price: 399, origin: 499, cover: 'unsplash/photo-1505705694340-019e1e335916_w_600_q_80.jpg', tag: '踏春装备', sales: 880, collection: 'spring' },
-  { id: 6, name: '原装电池 48V', price: 1999, origin: 2399, cover: 'unsplash/photo-1593941707882-a5bba14938c7_w_600_q_80.jpg', tag: 'P1配件', sales: 56, collection: 'p1parts' },
-  { id: 7, name: '车尾储物包', price: 129, origin: 169, cover: 'unsplash/photo-1532298229144-0ec0c57515c7_w_600_q_80.jpg', tag: '踏春装备', sales: 1540, collection: 'spring' },
-  { id: 8, name: '蓝牙控车模块', price: 299, origin: 359, cover: 'unsplash/photo-1518770660439-4636190af475_w_600_q_80.jpg', tag: 'P1配件', sales: 430, collection: 'p1parts' },
+  { id: 1, name: '鸭舌帽 男士', price: 280, origin: 399, cover: 'unsplash/photo-1588850561407-ed78c282e89b_w_600_q_80.jpg', tag: '踏春装备', sales: 1203, collection: 'spring', shopUrl: 'https://shop.pxid.com/products/cap-men' },
+  { id: 2, name: '原装后轮 适配P1', price: 6800, origin: 7200, cover: 'unsplash/photo-1571068316344-75bc76f77890_w_600_q_80.jpg', tag: 'P1配件', sales: 86, collection: 'p1parts', shopUrl: 'https://shop.pxid.com/products/rear-wheel-p1' },
+  { id: 3, name: '防晒冰丝袖套', price: 59, origin: 99, cover: 'unsplash/photo-1517649763962-0c623066013b_w_600_q_80.jpg', tag: '踏春装备', sales: 3420, collection: 'spring', shopUrl: 'https://shop.pxid.com/products/ice-sleeves' },
+  { id: 4, name: '智能中控屏 P1', price: 1299, origin: 1499, cover: 'unsplash/photo-1493238792000-8113da705763_w_600_q_80.jpg', tag: 'P1配件', sales: 210, collection: 'p1parts', shopUrl: 'https://shop.pxid.com/products/smart-display-p1' },
+  { id: 5, name: '骑行头盔 一体成型', price: 399, origin: 499, cover: 'unsplash/photo-1505705694340-019e1e335916_w_600_q_80.jpg', tag: '踏春装备', sales: 880, collection: 'spring', shopUrl: 'https://shop.pxid.com/products/helmet' },
+  { id: 6, name: '原装电池 48V', price: 1999, origin: 2399, cover: 'unsplash/photo-1593941707882-a5bba14938c7_w_600_q_80.jpg', tag: 'P1配件', sales: 56, collection: 'p1parts', shopUrl: 'https://shop.pxid.com/products/battery-48v' },
+  { id: 7, name: '车尾储物包', price: 129, origin: 169, cover: 'unsplash/photo-1532298229144-0ec0c57515c7_w_600_q_80.jpg', tag: '踏春装备', sales: 1540, collection: 'spring', shopUrl: 'https://shop.pxid.com/products/tail-bag' },
+  { id: 8, name: '蓝牙控车模块', price: 299, origin: 359, cover: 'unsplash/photo-1518770660439-4636190af475_w_600_q_80.jpg', tag: 'P1配件', sales: 430, collection: 'p1parts', shopUrl: 'https://shop.pxid.com/products/bluetooth-module' },
 ]
 
 // ---------------- 积分商城 ----------------
 export const pointsBalance = 0
 
 export const pointsProducts = [
-  { id: 'pp-1', name: 'PXID 原装充电器 48V', tags: ['原厂正品', '快充'], price: 299, points: 2990, cover: 'unsplash/photo-1593941707882-a5bba14938c7_w_300_q_80.jpg' },
-  { id: 'pp-2', name: '骑行头盔 一体成型', tags: ['安全认证', '透气'], price: 399, points: 3990, cover: 'unsplash/photo-1505705694340-019e1e335916_w_300_q_80.jpg' },
-  { id: 'pp-3', name: '智能中控屏 P1', tags: ['原装适配', 'GPS'], price: 1299, points: 12990, cover: 'unsplash/photo-1493238792000-8113da705763_w_300_q_80.jpg' },
-  { id: 'pp-4', name: '车尾储物包', tags: ['防水', '大容量'], price: 129, points: 1290, cover: 'unsplash/photo-1532298229144-0ec0c57515c7_w_300_q_80.jpg' },
-  { id: 'pp-5', name: '防晒冰丝袖套', tags: ['UPF50+', '凉感'], price: 59, points: 590, cover: 'unsplash/photo-1517649763962-0c623066013b_w_300_q_80.jpg' },
-  { id: 'pp-6', name: '蓝牙控车模块', tags: ['即插即用', 'APP联动'], price: 299, points: 2990, cover: 'unsplash/photo-1518770660439-4636190af475_w_300_q_80.jpg' },
+  { id: 'pp-1', name: 'PXID 原装充电器 48V', tags: ['原厂正品', '快充'], price: 299, points: 2990, cover: 'unsplash/photo-1593941707882-a5bba14938c7_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/charger-48v' },
+  { id: 'pp-2', name: '骑行头盔 一体成型', tags: ['安全认证', '透气'], price: 399, points: 3990, cover: 'unsplash/photo-1505705694340-019e1e335916_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/helmet' },
+  { id: 'pp-3', name: '智能中控屏 P1', tags: ['原装适配', 'GPS'], price: 1299, points: 12990, cover: 'unsplash/photo-1493238792000-8113da705763_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/smart-display-p1' },
+  { id: 'pp-4', name: '车尾储物包', tags: ['防水', '大容量'], price: 129, points: 1290, cover: 'unsplash/photo-1532298229144-0ec0c57515c7_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/tail-bag' },
+  { id: 'pp-5', name: '防晒冰丝袖套', tags: ['UPF50+', '凉感'], price: 59, points: 590, cover: 'unsplash/photo-1517649763962-0c623066013b_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/ice-sleeves' },
+  { id: 'pp-6', name: '蓝牙控车模块', tags: ['即插即用', 'APP联动'], price: 299, points: 2990, cover: 'unsplash/photo-1518770660439-4636190af475_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/bluetooth-module' },
 ]
 
 // ---------------- 服务（售后 hub）----------------

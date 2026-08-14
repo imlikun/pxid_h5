@@ -68,6 +68,13 @@ const mockBridge = {
     }
   },
 
+  // 打开 Shopify 商品/页面（商城与 Shopify 打通：H5 仅展示，点击跳 Shopify 购买）
+  // 原生实现：在 WebView / 外部浏览器打开该 URL；mock 直接新标签打开便于预览
+  openShopify(url) {
+    logMock('openShopify', url)
+    if (!isEmbed) window.open(url, '_blank')
+  },
+
   // 打开原生页面（如车型选择 / 绑定车辆）
   openNative(path) {
     logMock('openNative', path)
@@ -108,6 +115,7 @@ export const bridge = {
   callPhone: (p) => window.PXIDBridge.callPhone(p),
   openMap: (o) => window.PXIDBridge.openMap(o),
   openNative: (p) => window.PXIDBridge.openNative(p),
+  openShopify: (u) => window.PXIDBridge.openShopify(u),
 }
 
 export default bridge
