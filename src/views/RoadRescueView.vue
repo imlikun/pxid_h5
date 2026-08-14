@@ -188,14 +188,14 @@ function onSubmit() {
 
 .tabs {
   display: flex;
-  gap: 24px;
-  padding: 6px 16px 0;
   border-bottom: 1px solid #f0f0f0;
 }
 .tab {
+  flex: 1;
+  text-align: center;
   font-size: 15px;
   color: #999;
-  padding: 8px 0 10px;
+  padding: 12px 0 14px;
   position: relative;
 }
 .tab.active {
