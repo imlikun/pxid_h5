@@ -27,20 +27,23 @@ npm run preview    # 构建产物预览（默认 4173 端口）
 ## 2. 已实现功能
 
 ### 发现
-- 推荐 / 动态 / 广场 三 tab，车型筛选各自独立（推荐=全部 H10 M2 Z3、动态=最新 H10 M2 Z3、广场=P1-P6）
+- 推荐 / 动态 / 广场 三 tab，车型筛选各自独立（推荐=全部 MOTA Z3 / PX-4 / CoolPlay PX-2、动态=最新、广场=P1-P6）
 - Banner 用设计稿轮播图（`public/discover-banner.jpg`）
-- 快捷入口：立即定制 / 官方公告 / 智能助手 / 积分兑换
+- 快捷入口：立即定制 / 官方公告 / 智能助手 / 积分兑换（→ 我的积分页 `/points`）
 - 卡片内容与作者（PXID 官方产品经理 / 一路向前）按设计稿对齐
 - 广场：P1-P6 六车型展示 + 热门活动 2 条（封面按设计稿顺序）
 - 消息中心：系统 / 服务 / 车辆 / 互动 四类
 
-### 精选（商城）
+### 精选（商城，与 Shopify 打通）
 - 首页三 tab（推荐 / 踏春装备 / Bikes）+ 热购榜单 + 限时直降
-- 商品详情页：规格选择 / 数量步进 / 加入购物车 / 立即购买（bridge 原生支付）
-- 购物车：勾选 / 全选 / 数量步进 / 合计
-- 结算确认页：收货地址（原生地址管理）+ 商品清单 + 金额明细
-- 支付成功页 + 我的订单列表（状态 tab / 再来一单 / 去支付）
-- 完整链路：加购 → 购物车 → 结算 → 支付 → 订单
+- **商品点击 / 「去购买」统一跳 Shopify 成交**（H5 仅展示商品数据，不自建购物车 / 结算 / 订单流）
+- 商品详情页保留，购买按钮走 `bridge.openShopify(product.shopUrl)`
+- `CartView / CheckoutView / OrderListView / OrderSuccessView` 为招商遗留孤儿页，联调无需关注
+
+### 我的积分（`/points`）
+- 积分余额 + 积分规则 + 玩转积分 banner + 积分好物列表（价格 / 积分 / 兑换）
+- 发现页「积分兑换」、精选页「玩转积分」均跳转此页
+- 兑换 / 规则 / banner 等原生动作走 `openNative('points/...')`
 
 ### 服务（13 子页）
 道路救援（双 tab + 表单 + bridge 发起）、使用指南、新手视频、产品资料（P1 说明书）、车辆体检（6 项状态 + 远程体检）、意见反馈（在线客服）、三包政策（表格 + 服务范围 + 10 条不保修）、附近门店（搜索排序 + 地图导航/电话 bridge）、我的工单（5 状态 tab）、工单详情（4 进度节点 + 动态字段）、常见问题（12 条 Q+A + 搜索 + 问题筛选弹窗 3 组 12 标签）
@@ -98,7 +101,7 @@ pxid_h5/
 ## 6. 原生集成
 
 见 `INTEGRATION.md`——Flutter 侧注入 `window.PXIDBridge`，H5 统一走 `src/bridge/index.js` 封装：
-`getToken / navigateTo / requestPurchase / callPhone / openMap / openNative`。
+`getToken / navigateTo / requestPurchase / callPhone / openMap / openNative / openShopify`。
 独立预览时自动用 mock 实现，页面在浏览器里点得动、跑得通。
 
 ---
