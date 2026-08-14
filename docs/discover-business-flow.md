@@ -179,3 +179,21 @@
 | 8 | 车型详情归属 | **A. 购车车型页** | 广场车型卡、动态车型标签、推荐商品种草卡中的车型链接均跳 `/vehicle/:id`（购车 Tab） |
 
 > 决策已确认，下一节按此排期进入开发。
+
+---
+
+## 7. 开发进度（已落地）
+
+坤哥 2026-08-14 拍板"全选 A"后，按第 6 节排期逐块实现，全部已双 remote 推送（origin `master` + gitlab `main`）：
+
+| # | 模块 | 关键产出 | 提交 |
+|---|---|---|---|
+| 1 | 数据模型 + 登录 Gate | `mock.js` 补 moments/notices/commentSeed 等；`src/utils/auth.js` `requireLogin()` | `4ea8f8d` |
+| 2 | 官方公告入口 + 红点 | `NoticesView`/`NoticeDetailView` + 路由；发现页/消息中心红点并集；召回强提醒 | `a4f19fe` |
+| 3 | 内容详情排版 | `FeedDetailView` 重写：作者卡/富文本/种草卡/活动卡/互动栏/楼中楼/相关推荐/空态 | `c72d710` |
+| 4 | 动态独立流 | `moments` 独立源 + `MomentCard.vue`；发现页"动态"tab 单列渲染 | `75e2eed` |
+| 5 | 发布/点赞/关注交互 | ＋原生发布(H5 降级提示)；赞/关注/收藏/分享走 `requireLogin`；车型/定制跳原生；底部动态红点(`src/store/ui.js`) | `75e2eed` |
+
+**边界约定**：车型详情 / 立即定制 / 发布 均走原生承载（决策 A），H5 仅 `openNative` + 降级提示；当前项目内**无** `/purchase/customize`、`/vehicle/:id`、`/search` 路由，预览下这些点击只打 log 不跳转。若后续要 H5 也能跑完整链路，需补上述兜底页。
+
+**待补（可选）**：搜索页 `/search`、购车定制页 `/purchase/customize`、车型页 `/vehicle/:id` 的 H5 兜底实现。
