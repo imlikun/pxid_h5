@@ -25,13 +25,13 @@
       <div class="banner__img">
         <svg viewBox="0 0 120 120" width="90" height="90">
           <defs>
-            <linearGradient id="coin" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#FFE082"/>
-              <stop offset="100%" stop-color="#FFB300"/>
-            </linearGradient>
-          </defs>
-          <circle cx="60" cy="60" r="44" fill="url(#coin)" opacity="0.95"/>
-          <text x="60" y="72" text-anchor="middle" font-size="38" font-weight="700" fill="#7D4E00">P</text>
+          <linearGradient id="coin" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7DA2FF"/>
+            <stop offset="100%" stop-color="#4D7CFF"/>
+          </linearGradient>
+        </defs>
+        <circle cx="60" cy="60" r="44" fill="url(#coin)" opacity="0.95"/>
+        <text x="60" y="72" text-anchor="middle" font-size="38" font-weight="700" fill="#fff">P</text>
         </svg>
       </div>
     </div>
@@ -160,7 +160,7 @@ function onExchange(p) {
   margin: 16px;
   padding: 18px 20px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, #7DA2FF 0%, #4D7CFF 100%);
+  background: var(--brand-gradient);
   display: flex;
   align-items: center;
   justify-content: space-between;

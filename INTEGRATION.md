@@ -43,6 +43,11 @@
 | `rescue/submit?<params>` | 道路救援提交 | 服务 |
 | `buy/customize?<params>` | 购车定制提交 | 购车 |
 | `search?q=<kw>` | 搜索（决策相关，H5 兜底页） | 发现 |
+| `points/rules` | 积分页「积分规则」 | 积分 |
+| `points/guide` | 积分页「玩转积分」banner | 积分 |
+| `points/mall` | 积分页「更多」跳转积分商城 | 积分 |
+| `product/detail?id=<id>` | 积分商品 / 好物点击进商品详情 | 积分 |
+| `points/exchange?id=<id>` | 积分商品「兑换」 | 积分 |
 
 ## H5 兜底页（预览 / 无原生时）
 
