@@ -1,5 +1,6 @@
 <template>
   <div class="store">
+    <div v-if="tag" class="store__tag">{{ tag }}</div>
     <div class="store__main">
       <div class="store__name">{{ store.name }}</div>
       <div class="store__rate">
@@ -22,6 +23,7 @@ import IconSvg from '../components/IconSvg.vue'
 
 const props = defineProps({
   store: { type: Object, required: true },
+  tag: { type: String, default: '' },
 })
 
 function onMap() {
@@ -38,6 +40,12 @@ function onCall() {
   border-radius: var(--radius);
   padding: 14px;
   margin: 0 12px;
+}
+.store__tag {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
 }
 .store__name {
   font-size: 15px;

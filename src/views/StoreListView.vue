@@ -5,12 +5,15 @@
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">附近门店</span>
+      <span class="search-icon" @click="showSearch = !showSearch">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </span>
     </div>
 
     <!-- 搜索 + 排序 -->
-    <div class="bar">
+    <div v-if="showSearch" class="bar">
       <div class="search">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input v-model="kw" placeholder="搜索门店名称 / 地址" />
       </div>
       <div class="sort">
@@ -21,7 +24,7 @@
 
     <!-- 门店列表 -->
     <div class="list">
-      <StoreCard v-for="s in list" :key="s.name" :store="s" />
+      <StoreCard v-for="(s, i) in list" :key="s.name" :store="s" :tag="i === 0 ? '购车门店' : ''" />
       <div v-if="list.length === 0" class="empty">未找到匹配的门店</div>
     </div>
   </div>
@@ -36,6 +39,7 @@ import { stores } from '../data/mock'
 const router = useRouter()
 const kw = ref('')
 const sort = ref('dist')
+const showSearch = ref(false)
 
 const list = computed(() => {
   let arr = stores
@@ -59,36 +63,39 @@ const list = computed(() => {
   align-items: center;
   justify-content: center;
   position: relative;
-  background: #ffffff;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
 .back { position: absolute; left: 12px; display: flex; color: var(--text); }
 .title { font-size: 17px; font-weight: 600; color: var(--text); }
+.search-icon { position: absolute; right: 14px; display: flex; color: var(--text); }
 
 .bar {
-  background: #ffffff;
+  background: var(--card);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--line);
 }
 .search {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #f2f3f5;
+  background: var(--bg);
   border-radius: var(--radius-xxl);
   padding: 9px 14px;
 }
-.search input { flex: 1; font-size: 14px; color: var(--text); }
-.search input::placeholder { color: #bbb; }
+.search svg { color: var(--text-hint); }
+.search input { flex: 1; font-size: 14px; color: var(--text); background: transparent; }
+.search input::placeholder { color: var(--text-hint); }
 .sort { display: flex; gap: 8px; }
 .sort span {
   font-size: 12px;
   color: var(--text-sub);
   padding: 5px 12px;
   border-radius: 14px;
-  background: #f2f3f5;
+  background: var(--bg);
 }
 .sort span.on {
   color: #fff;
@@ -103,7 +110,7 @@ const list = computed(() => {
 }
 .empty {
   text-align: center;
-  color: #999;
+  color: var(--text-hint);
   font-size: 13px;
   padding: 40px 0;
 }

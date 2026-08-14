@@ -116,7 +116,8 @@ function switchVehicle() {
   align-items: center;
   justify-content: center;
   position: relative;
-  background: #ffffff;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
 .back { position: absolute; left: 12px; display: flex; color: var(--text); }
 .title { font-size: 17px; font-weight: 600; color: var(--text); }
@@ -172,8 +173,9 @@ function switchVehicle() {
   align-items: center;
   gap: 10px;
   padding: 13px 0;
-  border-bottom: 1px solid #f2f2f2;
+  border-bottom: 1px solid var(--line);
 }
+.item:last-child { border-bottom: none; }
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .dot--normal { background: #34c759; }
 .dot--warn { background: #ff9500; }
@@ -208,7 +210,7 @@ function switchVehicle() {
 .spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid #eee;
+  border: 3px solid var(--line);
   border-top-color: var(--brand);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;

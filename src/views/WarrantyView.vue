@@ -17,7 +17,7 @@
     <div class="model-select" @click="showModels = !showModels">
       <span class="ms-label">车型选择</span>
       <span class="ms-value">{{ currentModel.name }}</span>
-      <svg class="ms-caret" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      <svg class="ms-caret" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       <div v-if="showModels" class="model-pop">
         <div
           v-for="m in models"
@@ -119,7 +119,7 @@ function pickModel(m) {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--bg);
   padding-top: env(safe-area-inset-top);
   padding-bottom: calc(20px + env(safe-area-inset-bottom));
 }
@@ -129,10 +129,11 @@ function pickModel(m) {
   align-items: center;
   justify-content: center;
   position: relative;
-  background: #fff;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
-.back { position: absolute; left: 12px; display: flex; color: #333; }
-.title { font-size: 17px; font-weight: 600; color: #333; }
+.back { position: absolute; left: 12px; display: flex; color: var(--text); }
+.title { font-size: 17px; font-weight: 600; color: var(--text); }
 
 .hero {
   padding: 12px;
@@ -142,7 +143,7 @@ function pickModel(m) {
   height: 180px;
   object-fit: cover;
   border-radius: var(--radius);
-  background: #f2f4f7;
+  background: var(--bg);
 }
 
 .model-select {
@@ -152,20 +153,20 @@ function pickModel(m) {
   gap: 8px;
   margin: 0 12px 12px;
   padding: 12px;
-  background: #f7f8fa;
-  border-radius: 10px;
+  background: var(--card);
+  border-radius: var(--radius);
 }
-.ms-label { font-size: 14px; color: #666; }
-.ms-value { flex: 1; font-size: 15px; font-weight: 600; color: #333; }
-.ms-caret { flex: none; }
+.ms-label { font-size: 14px; color: var(--text-sub); }
+.ms-value { flex: 1; font-size: 15px; font-weight: 600; color: var(--text); }
+.ms-caret { flex: none; color: var(--text-hint); }
 .model-pop {
   position: absolute;
   top: 100%;
   left: 12px;
   right: 12px;
   margin-top: 4px;
-  background: #fff;
-  border-radius: 10px;
+  background: var(--card);
+  border-radius: var(--radius);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   z-index: 20;
   overflow: hidden;
@@ -173,66 +174,69 @@ function pickModel(m) {
 .model-pop-item {
   padding: 12px;
   font-size: 14px;
-  color: #333;
-  border-bottom: 1px solid #f2f2f2;
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
 }
 .model-pop-item:last-child { border-bottom: none; }
 .model-pop-item.on { color: var(--brand); font-weight: 600; }
 
 .table-card {
   margin: 0 12px 12px;
-  background: var(--bg);
-  border-radius: 10px;
+  background: var(--card);
+  border-radius: var(--radius);
   overflow: hidden;
 }
 .tr {
   display: flex;
   align-items: flex-start;
   padding: 14px 12px;
-  border-bottom: 1px solid #ececec;
+  border-bottom: 1px solid var(--line);
 }
 .tr:last-child { border-bottom: none; }
 .tr--head {
-  background: #eef0f3;
+  background: var(--bg);
   font-weight: 600;
-  color: #333;
+  color: var(--text);
   align-items: center;
 }
-.td { font-size: 13px; color: #333; line-height: 1.5; }
+.td { font-size: 13px; color: var(--text); line-height: 1.5; }
 .td--part { width: 26%; }
-.td--period { width: 18%; color: #e53935; font-weight: 600; }
-.tr--head .td--period { color: #e53935; }
-.td--note { flex: 1; color: #666; line-height: 1.6; }
+.td--period { width: 18%; color: var(--price); font-weight: 600; }
+.tr--head .td--period { color: var(--price); }
+.td--note { flex: 1; color: var(--text-sub); line-height: 1.6; }
 
 .note {
   margin: 0 12px 12px;
   font-size: 12px;
-  color: #888;
+  color: var(--text-sub);
   line-height: 1.6;
-  background: #f7f8fa;
+  background: var(--card);
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .scope {
   margin: 0 12px;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px;
 }
 .scope-title {
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
   margin-bottom: 8px;
 }
 .scope-law {
   font-size: 13px;
-  color: #555;
+  color: var(--text-sub);
   line-height: 1.7;
   margin: 0 0 8px;
 }
 .scope-sub {
   font-size: 13px;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
   margin: 10px 0 6px;
 }
 .scope-list {
@@ -241,7 +245,7 @@ function pickModel(m) {
 }
 .scope-list li {
   font-size: 12px;
-  color: #666;
+  color: var(--text-sub);
   line-height: 1.7;
   margin-bottom: 4px;
 }
