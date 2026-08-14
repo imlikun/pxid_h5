@@ -40,39 +40,37 @@
       <svg class="addr-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
     </div>
 
-    <!-- 表单 -->
-    <div class="form">
-      <div class="field" @click="showTime = !showTime">
-        <span class="f-label">救援时间</span>
-        <span class="f-value">{{ rescueTime }}</span>
-        <svg class="f-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
-        <div v-if="showTime" class="picker">
-          <div v-for="opt in timeOptions" :key="opt" class="picker-item" @click.stop="pickTime(opt)">{{ opt }}</div>
-        </div>
+    <!-- 表单（每个字段独立卡片） -->
+    <div class="field" @click="showTime = !showTime">
+      <span class="f-label">救援时间</span>
+      <span class="f-value">{{ rescueTime }}</span>
+      <svg class="f-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#7F7F7F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+      <div v-if="showTime" class="picker">
+        <div v-for="opt in timeOptions" :key="opt" class="picker-item" @click.stop="pickTime(opt)">{{ opt }}</div>
       </div>
+    </div>
 
-      <div class="field">
-        <span class="f-label">联系电话</span>
-        <input
-          v-model="phone"
-          class="f-input"
-          type="tel"
-          placeholder="请填写联系电话"
-          @focus="onFieldFocus"
-        />
-      </div>
+    <div class="field">
+      <span class="f-label">联系电话</span>
+      <input
+        v-model="phone"
+        class="f-input"
+        type="tel"
+        placeholder="请填写联系电话"
+        @focus="onFieldFocus"
+      />
+    </div>
 
-      <div class="field field--area">
-        <span class="f-label">故障描述</span>
-        <textarea
-          v-model="desc"
-          class="f-area"
-          rows="3"
-          placeholder="请文字描述或上传图片"
-          @focus="onFieldFocus"
-        ></textarea>
-        <svg class="f-icon f-icon--pen" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
-      </div>
+    <div class="field field--area">
+      <span class="f-label">故障描述</span>
+      <textarea
+        v-model="desc"
+        class="f-area"
+        rows="3"
+        placeholder="请文字描述或上传图片"
+        @focus="onFieldFocus"
+      ></textarea>
+      <svg class="f-icon f-icon--pen" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#7F7F7F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
     </div>
 
     <!-- 吸底按钮 -->
@@ -261,61 +259,57 @@ function onSubmit() {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 12px;
-  padding: 14px 12px;
+  margin: 0 12px 12px;
+  padding: 14px 16px;
   background: #fff;
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
 }
 .addr-icon { flex: none; }
 .addr-text {
   flex: 1;
-  font-size: 14px;
-  color: #333;
+  font-size: 16px;
+  color: #111111;
 }
 .addr-arrow { flex: none; }
 
-.form {
-  margin: 12px;
-  background: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
-}
 .field {
   position: relative;
   display: flex;
   align-items: center;
-  padding: 14px 12px;
-  border-bottom: 1px solid #f2f2f2;
+  padding: 14px 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+  margin: 0 12px 12px;
 }
-.field:last-child { border-bottom: none; }
+.field:last-child { margin-bottom: 0; }
+.field--area { align-items: flex-start; }
 .f-label {
   width: 72px;
   flex: none;
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
+  font-size: 16px;
+  color: #111111;
+  font-weight: 400;
 }
 .f-value {
   flex: 1;
-  font-size: 14px;
-  color: #333;
+  font-size: 16px;
+  color: #111111;
 }
 .f-input, .f-area {
   flex: 1;
   border: none;
   outline: none;
-  font-size: 14px;
-  color: #333;
+  font-size: 16px;
+  color: #111111;
   background: transparent;
   resize: none;
   font-family: inherit;
 }
-.f-input::placeholder, .f-area::placeholder { color: #bbb; }
+.f-input::placeholder, .f-area::placeholder { color: #7F7F7F; }
 .f-icon { flex: none; margin-left: 8px; }
 .f-icon--pen { align-self: flex-start; margin-top: 2px; }
-.field--area { align-items: flex-start; }
 
 .picker {
   position: absolute;
@@ -342,16 +336,16 @@ function onSubmit() {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
   background: #fff;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
 .submit {
   width: 100%;
-  height: 46px;
+  height: 48px;
   border: none;
-  border-radius: 0;
-  background: #333;
+  border-radius: 10px;
+  background: #2F2F2F;
   color: #fff;
   font-size: 16px;
   font-weight: 600;
