@@ -11,17 +11,6 @@
       </span>
     </div>
 
-    <!-- 双 Tab -->
-    <div class="tabs">
-      <div
-        v-for="t in tabs"
-        :key="t.key"
-        class="tab"
-        :class="{ active: activeTab === t.key }"
-        @click="activeTab = t.key"
-      >{{ t.label }}</div>
-    </div>
-
     <!-- 地图区域（约 60%，原生能力，此处占位） -->
     <div class="map" @click="onMap">
       <div class="map-marker">
@@ -31,6 +20,17 @@
         <div class="map-marker-base"></div>
       </div>
       <span class="map-tip">地图区域 · 原生提供</span>
+    </div>
+
+    <!-- 双 Tab -->
+    <div class="tabs">
+      <div
+        v-for="t in tabs"
+        :key="t.key"
+        class="tab"
+        :class="{ active: activeTab === t.key }"
+        @click="activeTab = t.key"
+      >{{ t.label }}</div>
     </div>
 
     <!-- 地址行 -->
