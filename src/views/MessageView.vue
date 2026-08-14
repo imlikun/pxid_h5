@@ -11,6 +11,7 @@
       <div class="right">
         <span class="act">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <span v-if="unread > 0" class="m-badge"></span>
         </span>
         <span class="act">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -47,19 +48,27 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { messageCategories, messages } from '../data/mock'
+import { messageCategories, messages, notices } from '../data/mock'
 import IconSvg from '../components/IconSvg.vue'
 
 const router = useRouter()
+
+// 铃铛红点 = 消息未读 + 公告未读（取并集，不重复计数）
+const unread = computed(
+  () => messages.filter((m) => m.unread).length + notices.filter((n) => !n.isRead).length
+)
 
 function goBack() {
   router.back()
 }
 function onCat(c) {
+  if (c.key === 'system') { router.push('/notices'); return }
   console.log('category tap:', c.key)
 }
 function onMsg(m) {
+  if (m.link) { router.push(m.link); return }
   console.log('message tap:', m.id)
 }
 </script>
@@ -100,11 +109,22 @@ function onMsg(m) {
   color: var(--text);
 }
 .act {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
+}
+.m-badge {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  min-width: 8px;
+  height: 8px;
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--price);
 }
 .categories {
   display: grid;

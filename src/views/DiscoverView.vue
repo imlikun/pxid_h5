@@ -41,6 +41,7 @@
       </div>
       <div class="quick">
         <div v-for="q in discoverQuick" :key="q.key" class="quick__item" @click="onQuick(q)">
+          <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
           <IconSvg class="quick__icon" :name="q.icon" :size="22" />
           <div class="quick__label">{{ q.label }}</div>
         </div>
@@ -128,6 +129,7 @@ import {
   feedItems,
   plazaShowcase,
   activities,
+  notices,
 } from '../data/mock'
 import bridge from '../bridge'
 
@@ -150,6 +152,9 @@ const filteredFeed = computed(() => {
   return feedItems.filter((i) => i.filter === f)
 })
 
+// 官方公告未读数（驱动发现页快捷区红点）
+const noticeUnread = computed(() => notices.filter((n) => !n.isRead).length)
+
 function setTab(t) {
   activeTab.value = t
   activeFilter.value = defaultsByTab[t]
@@ -157,7 +162,10 @@ function setTab(t) {
 
 function onAdd() { bridge.call('openNative', { target: 'discover.publish' }) }
 function onNotice() { router.push('/message') }
-function onQuick(q) { console.log('quick tap:', q.key) }
+function onQuick(q) {
+  if (q.key === 'notice') { router.push('/notices'); return }
+  console.log('quick tap:', q.key)
+}
 function onSort() { console.log('sort tap') }
 function onShowcase(p) { console.log('showcase tap:', p.id) }
 function onMoreActivity() { console.log('more activity') }
@@ -262,6 +270,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   margin: 14px 14px 24px;
 }
 .quick__item {
+  position: relative;
   height: 72px;
   background: #ffffff;
   border: 1px solid #E0E0E0;
@@ -283,6 +292,15 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   font-size: 14px;
   line-height: 1;
   color: var(--text);
+}
+.q-badge {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--price);
 }
 .filter {
   display: flex;
