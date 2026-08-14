@@ -58,7 +58,7 @@
         >
       </div>
       <span class="sort" @click="onSort">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m11 12 4 4 4-4"/><path d="M15 20V4"/></svg>
+        <svg viewBox="0 0 24 24" width="12" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m11 12 4 4 4-4"/><path d="M15 20V4"/></svg>
       </span>
     </div>
 
@@ -284,15 +284,17 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   justify-content: space-between;
   margin: 16px 0 0;
   height: 44px;
+  padding: 0 16px;
 }
 .chips {
   display: flex;
-  gap: 20px;
+  gap: 16px;
+  padding: 14px 0;
 }
 .chip {
-  font-size: 15px;
+  font-size: 16px;
   color: #666666;
-  line-height: 1.2;
+  line-height: 1;
 }
 .chip.active {
   color: var(--brand);
@@ -302,6 +304,10 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   color: #999999;
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 16px;
+  flex: none;
 }
 .content {
   margin-top: 16px;
