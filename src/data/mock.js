@@ -21,85 +21,127 @@ export const feedItems = [
   {
     id: 1,
     kind: 'official',
+    itemType: 'feed',
     author: 'PXID 官方产品经理',
     avatar: 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     content: '新一代货运电动三轮车正式亮相：大空间载货、强动力续航，为外卖配送与短途物流场景打造。多档动力可调，城市路况轻松应对，是骑手们的新搭档。',
     cover: 'feed_r1.jpg',
+    images: ['feed_r1.jpg'],
+    tags: ['货运三轮', '新品发布'],
+    carModel: 'H10',
     likes: 30,
+    isLiked: false,
+    comments: 12,
     time: '05-14',
     filter: '全部',
+    productCard: { id: 1, name: '货运三轮 P1 载货版', price: 8999, cover: 'plaza_p1.jpg' },
   },
   {
     id: 2,
     kind: 'user',
+    itemType: 'feed',
     author: '一路向前',
     avatar: 'unsplash/photo-1494790108377-be9c29b29330_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     content: '实测新一代货运电动三轮车：载货空间大、起步有力、续航稳定，日常跑单更省心。感兴趣的朋友可以到附近门店亲自体验。',
     cover: 'feed_d1.jpg',
+    images: ['feed_d1.jpg', 'feed_r2.jpg', 'feed_d3.jpg'],
+    tags: ['真实测评', '载货能力'],
+    carModel: 'H10',
     likes: 206,
+    isLiked: false,
+    comments: 48,
     time: '05-13',
     filter: 'H10',
+    productCard: null,
   },
   {
     id: 3,
     kind: 'official',
+    itemType: 'feed',
     author: 'PXID 官方产品经理',
     avatar: 'unsplash/photo-1527980965255-d3b416303d12_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     content: '新一代货运电动三轮车正式亮相：大空间载货、强动力续航，为外卖配送与短途物流场景打造。多档动力可调，城市路况轻松应对，是骑手们的新搭档。',
     cover: 'feed_r2.jpg',
+    images: ['feed_r2.jpg'],
+    tags: ['货运三轮', '新品发布'],
+    carModel: 'M2',
     likes: 30,
+    isLiked: false,
+    comments: 9,
     time: '05-12',
     filter: 'M2',
+    productCard: null,
   },
   {
     id: 4,
     kind: 'user',
+    itemType: 'feed',
     author: '一路向前',
     avatar: 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     content: '实测新一代货运电动三轮车：载货空间大、起步有力、续航稳定，日常跑单更省心。感兴趣的朋友可以到附近门店亲自体验。',
-    cover: 'feed_d2.jpg',
+    cover: 'feed_d3.jpg',
+    images: ['feed_d3.jpg', 'feed_d1.jpg'],
+    tags: ['真实测评', '续航实测'],
+    carModel: 'Z3',
     likes: 206,
+    isLiked: false,
+    comments: 33,
     time: '05-11',
     filter: 'Z3',
+    productCard: null,
   },
   {
     id: 5,
     kind: 'official',
+    itemType: 'feed',
     author: 'PXID 官方产品经理',
     avatar: 'unsplash/photo-1507003211169-0a1dd7228f2d_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     content: '新一代货运电动三轮车正式亮相：大空间载货、强动力续航，为外卖配送与短途物流场景打造。多档动力可调，城市路况轻松应对，是骑手们的新搭档。',
     cover: 'feed_r3.jpg',
+    images: ['feed_r3.jpg'],
+    tags: ['货运三轮', '新品发布'],
+    carModel: 'H10',
     likes: 30,
+    isLiked: false,
+    comments: 15,
     time: '05-10',
     filter: '全部',
+    productCard: null,
   },
   {
     id: 6,
     kind: 'user',
+    itemType: 'feed',
     author: '一路向前',
     avatar: 'unsplash/photo-1544723795-3fb6469f5b39_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
     content: '实测新一代货运电动三轮车：载货空间大、起步有力、续航稳定，日常跑单更省心。感兴趣的朋友可以到附近门店亲自体验。',
     cover: 'feed_d3.jpg',
+    images: ['feed_d3.jpg'],
+    tags: ['真实测评'],
+    carModel: 'Z3',
     likes: 206,
+    isLiked: false,
+    comments: 27,
     time: '05-09',
     filter: '全部',
+    productCard: null,
   },
 ]
 
 // 广场：车型展示 P1-P6（封面取自设计稿 广场/ 子目录原图）
 export const plazaShowcase = [
-  { id: 'P1', name: 'P1', cover: 'plaza_p1.jpg' },
-  { id: 'P2', name: 'P2', cover: 'plaza_p2.jpg' },
-  { id: 'P3', name: 'P3', cover: 'plaza_p3.jpg' },
-  { id: 'P4', name: 'P4', cover: 'plaza_p4.jpg' },
-  { id: 'P5', name: 'P5', cover: 'plaza_p5.jpg' },
-  { id: 'P6', name: 'P6', cover: 'plaza_p6.jpg' },
+  { id: 'P1', name: 'P1', cover: 'plaza_p1.jpg', itemType: 'buy-vehicle' },
+  { id: 'P2', name: 'P2', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
+  { id: 'P3', name: 'P3', cover: 'plaza_p3.jpg', itemType: 'buy-vehicle' },
+  { id: 'P4', name: 'P4', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
+  { id: 'P5', name: 'P5', cover: 'plaza_p5.jpg', itemType: 'buy-vehicle' },
+  { id: 'P6', name: 'P6', cover: 'plaza_p6.jpg', itemType: 'buy-vehicle' },
 ]
 
 // 广场：热门活动 2 条（封面按 广场/ 子目录文件顺序：(7)→活动1、base→活动2）
@@ -124,6 +166,10 @@ export const messages = [
     summary: '关于买车流程这里有一份说明',
     time: '05/14',
     unread: false,
+    category: 'system',
+    type: 'notice',
+    link: '/notice/N1',
+    payload: { id: 'N1' },
   },
   {
     id: 2,
@@ -132,6 +178,10 @@ export const messages = [
     summary: '品向M9 正式开售',
     time: '05/14',
     unread: false,
+    category: 'system',
+    type: 'activity',
+    link: '/activity/2',
+    payload: { id: 2 },
   },
   {
     id: 3,
@@ -140,6 +190,10 @@ export const messages = [
     summary: '关于买车流程这里有一份说明',
     time: '05/14',
     unread: false,
+    category: 'service',
+    type: 'order',
+    link: '/order/list',
+    payload: {},
   },
   {
     id: 4,
@@ -148,6 +202,10 @@ export const messages = [
     summary: '品向M9 正式开售',
     time: '05/14',
     unread: false,
+    category: 'interaction',
+    type: 'like',
+    link: '/feed/1',
+    payload: { id: 1 },
   },
 ]
 
@@ -490,3 +548,59 @@ export const orders = [
     total: 1299,
   },
 ]
+
+// ---------------- 动态流（关注流 UGC，独立数据源）----------------
+export const moments = [
+  { id: 101, itemType: 'moment', author: '骑手老王', avatar: 'unsplash/photo-1500648767791-00dcc994a43e_w_80_q_80.jpg', title: '今天跑了 120 公里，P1 载货版续航真顶', content: '早上 6 点出门，中午充了一次电，晚上回来还剩 18%。载了三箱水加两袋米，起步一点不肉。', images: ['feed_d1.jpg', 'feed_r2.jpg', 'feed_d3.jpg', 'feed_r3.jpg'], tags: ['日常跑单', '续航实测'], carModel: 'P1', likes: 88, isLiked: false, comments: 21, time: '2小时前', followed: false, focusCar: 'P1' },
+  { id: 102, itemType: 'moment', author: '城市摆渡人', avatar: 'unsplash/photo-1438761681033-6461ffad8d80_w_80_q_80.jpg', title: 'H10 山地版爬坡能力实测，坡道起步不溜车', content: '住老小区天天爬坡，换 H10 之后坡道辅助很稳，半坡起步也不慌。', images: ['feed_r1.jpg', 'feed_d1.jpg'], tags: ['爬坡', '山地版'], carModel: 'H10', likes: 154, isLiked: true, comments: 36, time: '5小时前', followed: true, focusCar: 'H10' },
+  { id: 103, itemType: 'moment', author: '夜行骑士', avatar: 'unsplash/photo-1472099645785-5658abf4ff4e_w_80_q_80.jpg', title: 'M2 夜间灯光升级，远近光切换太实用', content: '原厂灯够亮，自己加了一组辅灯跑夜路更安心。改装走正规渠道，别影响保修。', images: ['feed_r2.jpg'], tags: ['灯光改装', '夜骑'], carModel: 'M2', likes: 67, isLiked: false, comments: 14, time: '昨天', followed: false, focusCar: 'M2' },
+  { id: 104, itemType: 'moment', author: '宝妈代步', avatar: 'unsplash/photo-1544005313-94ddf0286df2_w_80_q_80.jpg', title: 'Z3 接送娃神器，折叠放进后备箱无压力', content: '幼儿园门口停一堆车，Z3 折叠一下塞后备箱，接娃不堵心。续航对宝妈完全够用。', images: ['feed_d3.jpg', 'feed_r3.jpg'], tags: ['接送娃', '折叠'], carModel: 'Z3', likes: 201, isLiked: false, comments: 52, time: '昨天', followed: false, focusCar: 'Z3' },
+]
+
+// ---------------- 官方公告（独立入口 + 消息中心系统分类共用）----------------
+export const notices = [
+  { id: 'N1', type: 'recall', forceAck: true, isRead: false, title: '关于部分批次 H10 控制器召回升级的通知', summary: '为保障骑行安全，对 2026 年 3 月前生产的 H10 批次控制器启动免费召回升级，请相关车主尽快预约。', publisher: 'PXID 产品安全委员会', publishTime: '2026-08-10 10:00', effectiveTime: '2026-08-10 起长期有效', content: '召回范围：2026-03-01 前生产的 H10 车型（车架号以 H10A 开头）。升级内容：更换优化版控制器固件。预约方式：附近门店或在线客服登记，全程免费，预计耗时 30 分钟。' },
+  { id: 'N2', type: 'version', forceAck: false, isRead: false, title: 'PXID App 3.2.0 版本更新公告', summary: '新增发现页官方公告独立入口与动态红点，优化消息中心分类与车型详情页体验。', publisher: 'PXID 产品研发部', publishTime: '2026-08-08 18:00', effectiveTime: '2026-08-08 起', content: '3.2.0 更新要点：① 发现页新增官方公告入口（带红点）；② 动态流独立，有新动态时底部发现图标显示红点；③ 消息中心按互动/系统/订单/车辆四类聚合未读。' },
+  { id: 'N3', type: 'activity', forceAck: false, isRead: true, title: '踏春出行季 · 装备直降限时开启', summary: '精选商城踏春装备专场开启，头盔、袖套、储物包等限时直降，积分可叠加抵扣。', publisher: 'PXID 运营中心', publishTime: '2026-08-01 09:00', effectiveTime: '2026-08-01 至 2026-08-31', content: '活动期间踏春装备专区全场直降，满 199 减 30，积分可 100:1 抵扣现金。' },
+  { id: 'N4', type: 'safety', forceAck: false, isRead: true, title: '雨季骑行安全提醒', summary: '雨季路面湿滑，请降低胎压、保持车距、避免涉水，刹车提前轻柔点刹。', publisher: 'PXID 用户运营', publishTime: '2026-07-20 11:00', effectiveTime: '2026-07-20 起', content: '雨季骑行三要点：① 胎压适当降低增加抓地；② 涉水深度不超过轮毂中心；③ 刹车提前点刹防止侧滑。' },
+]
+
+// ---------------- 立即定制 → 购车 Tab（前端展示，提交走原生）----------------
+export const customizeOptions = {
+  models: [
+    { id: 'P1', name: 'P1 都市版', desc: '日常通勤 · 轻巧折叠' },
+    { id: 'H10', name: 'H10 山地版', desc: '强劲动力 · 爬坡无忧' },
+    { id: 'M2', name: 'M2 长续航版', desc: '远途代步 · 续航升级' },
+    { id: 'Z3', name: 'Z3 亲子版', desc: '接送娃 · 安全舒适' },
+  ],
+  colors: ['极夜黑', '云朵白', '活力橙', '青松绿'],
+  batteries: ['标准续航', '长续航'],
+}
+
+export const buyIntentOrders = [
+  { id: 'YX20260810001', model: 'H10', color: '活力橙', battery: '长续航', contact: '138****6688', time: '2026-08-10 16:20', status: '已提交' },
+]
+
+// ---------------- 内容详情页评论种子（楼中楼）----------------
+export const commentSeed = {
+  1: [
+    { id: 'c1', author: '外卖小哥阿强', avatar: 'unsplash/photo-1500648767791-00dcc994a43e_w_80_q_80.jpg', content: '这车续航真有说的这么顶吗？求真实车主现身说法', time: '05-14 10:22', likes: 8, isLiked: false, replies: [ { id: 'c1r1', author: '一路向前', avatar: 'unsplash/photo-1494790108377-be9c29b29330_w_80_q_80.jpg', content: '我天天跑，亲测够用，别拉太满就行', time: '05-14 11:05', likes: 3, isLiked: false } ] },
+    { id: 'c2', author: '门店小妹', avatar: 'unsplash/photo-1438761681033-6461ffad8d80_w_80_q_80.jpg', content: '淮安体验店可预约试驾，欢迎到店', time: '05-14 14:30', likes: 5, isLiked: false, replies: [] },
+  ],
+  101: [
+    { id: 'c3', author: '新手小白', avatar: 'unsplash/photo-1472099645785-5658abf4ff4e_w_80_q_80.jpg', content: '老王你这改装合规吗？我也在考虑', time: '2小时前', likes: 4, isLiked: false, replies: [] },
+  ],
+}
+
+// ---------------- 接口占位（接 API 时整文件替换 mock）----------------
+export const API_ENDPOINTS = {
+  feedDetail: (id) => `/feed/${id}`,
+  moments: '/moments',
+  messageUnread: '/message/unread',
+  notices: '/notices',
+  noticeAck: (id) => `/notices/${id}/ack`,
+  customizeSubmit: '/customize/submit',
+  publish: '/publish',
+  interact: '/interact',
+  search: '/search',
+}
