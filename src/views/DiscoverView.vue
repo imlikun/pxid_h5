@@ -13,7 +13,9 @@
         >
       </div>
       <div class="topacts">
-        <span class="act act--add" @click="onAdd">＋</span>
+        <span class="act act--add" @click="onAdd">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        </span>
         <span class="act act--bell" @click="onNotice">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
         </span>
@@ -205,13 +207,16 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 .act--add {
   width: 24px;
   height: 24px;
-  font-size: 22px;
-  font-weight: 300;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .act--bell {
   width: 24px;
   height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .search {
   margin: 10px 16px 0;
