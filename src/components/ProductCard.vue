@@ -6,10 +6,6 @@
       <span class="price">¥{{ product.price }}</span>
       <span v-if="product.origin" class="origin">¥{{ product.origin }}</span>
     </div>
-    <div class="pcard__meta">
-      <span v-if="product.tag" class="tag">{{ product.tag }}</span>
-      <span class="sales">已售 {{ product.sales }}</span>
-    </div>
   </div>
 </template>
 
@@ -39,13 +35,14 @@ function go() {
   display: block;
 }
 .pcard__name {
-  padding: 8px 10px 0;
+  padding: 10px 10px 4px;
   font-size: 13px;
   line-height: 1.3;
   min-height: 34px;
+  color: var(--text);
 }
 .pcard__price {
-  padding: 4px 10px 0;
+  padding: 4px 10px 12px;
   display: flex;
   align-items: baseline;
   gap: 6px;
@@ -59,22 +56,5 @@ function go() {
   color: var(--text-sub);
   font-size: 11px;
   text-decoration: line-through;
-}
-.pcard__meta {
-  padding: 6px 10px 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.tag {
-  background: var(--brand-soft);
-  color: var(--brand);
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 6px;
-}
-.sales {
-  color: var(--text-sub);
-  font-size: 11px;
 }
 </style>

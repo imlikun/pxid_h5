@@ -93,7 +93,7 @@ function onQuick(q) {
 <style scoped>
 .featured {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--bg);
   padding-top: env(safe-area-inset-top);
   padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
 }
@@ -110,16 +110,16 @@ function onQuick(q) {
 .tabs {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
 }
 .tab {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 400;
   color: var(--text-sub);
   line-height: 1.2;
 }
 .tab.active {
-  color: #000000;
+  color: var(--text);
   font-weight: 700;
 }
 .search-ico {
@@ -128,8 +128,8 @@ function onQuick(q) {
   align-items: center;
 }
 .banner {
-  margin: 12px 14px 0;
-  border-radius: var(--radius);
+  margin: 12px 12px 0;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   aspect-ratio: 16 / 9;
 }
@@ -142,7 +142,7 @@ function onQuick(q) {
 .grid2 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  padding: 0 12px 12px;
+  gap: 12px;
+  padding: 0 12px 16px;
 }
 </style>
