@@ -184,6 +184,7 @@ function onQuick(q) {
   if (q.key === 'notice') { router.push('/notices'); return }
   // 决策 2：立即定制归口购车定制页（原生承载）
   if (q.key === 'custom') { bridge.openNative('purchase/customize'); return }
+  if (q.key === 'points') { router.push('/points'); return }
   console.log('quick tap:', q.key)
 }
 function onSort() { console.log('sort tap') }

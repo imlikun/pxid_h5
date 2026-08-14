@@ -85,7 +85,7 @@ function onQuick(q) {
   } else if (q.key === 'new') {
     activeTab.value = 'spring'
   } else if (q.key === 'points') {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    router.push('/points')
   }
 }
 </script>

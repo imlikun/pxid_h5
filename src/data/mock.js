@@ -264,6 +264,18 @@ export const products = [
   { id: 8, name: '蓝牙控车模块', price: 299, origin: 359, cover: 'unsplash/photo-1518770660439-4636190af475_w_600_q_80.jpg', tag: 'P1配件', sales: 430, collection: 'p1parts' },
 ]
 
+// ---------------- 积分商城 ----------------
+export const pointsBalance = 0
+
+export const pointsProducts = [
+  { id: 'pp-1', name: 'PXID 原装充电器 48V', tags: ['原厂正品', '快充'], price: 299, points: 2990, cover: 'unsplash/photo-1593941707882-a5bba14938c7_w_300_q_80.jpg' },
+  { id: 'pp-2', name: '骑行头盔 一体成型', tags: ['安全认证', '透气'], price: 399, points: 3990, cover: 'unsplash/photo-1505705694340-019e1e335916_w_300_q_80.jpg' },
+  { id: 'pp-3', name: '智能中控屏 P1', tags: ['原装适配', 'GPS'], price: 1299, points: 12990, cover: 'unsplash/photo-1493238792000-8113da705763_w_300_q_80.jpg' },
+  { id: 'pp-4', name: '车尾储物包', tags: ['防水', '大容量'], price: 129, points: 1290, cover: 'unsplash/photo-1532298229144-0ec0c57515c7_w_300_q_80.jpg' },
+  { id: 'pp-5', name: '防晒冰丝袖套', tags: ['UPF50+', '凉感'], price: 59, points: 590, cover: 'unsplash/photo-1517649763962-0c623066013b_w_300_q_80.jpg' },
+  { id: 'pp-6', name: '蓝牙控车模块', tags: ['即插即用', 'APP联动'], price: 299, points: 2990, cover: 'unsplash/photo-1518770660439-4636190af475_w_300_q_80.jpg' },
+]
+
 // ---------------- 服务（售后 hub）----------------
 export const serviceEntries = [
   { key: 'rescue', label: '道路救援', icon: 'wrench', desc: '一键呼叫' },
