@@ -181,7 +181,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   gap: 13px;
 }
 .tab {
-  font-size: 18px;
+  font-size: 16px;
   color: #666666;
   font-weight: 400;
   line-height: 1.2;
@@ -215,13 +215,14 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .search {
   margin: 10px 16px 0;
-  height: 44px;
-  background: #f5f5f5;
-  border-radius: 22px;
+  height: 40px;
+  background: #ffffff;
+  border: 1px solid #E0E0E0;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px 0 10px;
+  padding: 0 12px;
 }
 .sicon {
   color: #999999;
