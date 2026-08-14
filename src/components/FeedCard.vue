@@ -30,18 +30,18 @@ function go() {
 
 <style scoped>
 .fcard {
-  background: #ffffff;
+  background: transparent;
   border-radius: var(--radius);
   overflow: hidden;
 }
 .fcard__cover {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
 }
 .fcard__title {
-  padding: 10px 10px 0;
+  padding: 10px 0 0;
   font-size: 14px;
   color: var(--text);
   line-height: 1.45;
@@ -52,7 +52,7 @@ function go() {
   overflow: hidden;
 }
 .fcard__foot {
-  padding: 10px;
+  padding: 8px 0 0;
   display: flex;
   align-items: center;
   justify-content: space-between;

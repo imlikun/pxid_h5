@@ -167,7 +167,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 <style scoped>
 .discover {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--bg);
   padding-top: env(safe-area-inset-top);
   padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
 }
@@ -316,7 +316,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   flex: none;
 }
 .content {
-  margin-top: 24px;
+  margin-top: 16px;
   padding-bottom: 16px;
 }
 .grid2 {
@@ -353,12 +353,12 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 28px 12px 12px;
+  margin: 24px 12px 12px;
 }
 .section-title {
   font-size: 16px;
   font-weight: 700;
-  color: #000000;
+  color: var(--text);
 }
 .section-more {
   font-size: 13px;
@@ -371,17 +371,19 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   gap: 10px;
 }
 .activity {
-  background: #f7f7f7;
+  background: var(--card);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px;
 }
 .act__img {
-  width: 132px;
-  aspect-ratio: 4 / 3;
-  border-radius: 10px;
+  width: 120px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius);
   object-fit: cover;
   flex: none;
 }
@@ -405,7 +407,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .act__btn {
   flex: none;
-  background: var(--text);
+  background: #2F2F2F;
   color: #ffffff;
   border-radius: 6px;
   padding: 7px 12px;

@@ -10,9 +10,11 @@
       </div>
       <div class="right">
         <span class="act">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         </span>
-        <span class="act">＋</span>
+        <span class="act">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        </span>
       </div>
     </div>
 
@@ -65,7 +67,7 @@ function onMsg(m) {
 <style scoped>
 .message {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--bg);
   padding-top: env(safe-area-inset-top);
   padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
 }
@@ -74,6 +76,7 @@ function onMsg(m) {
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
+  background: var(--card);
 }
 .left {
   display: flex;
@@ -83,18 +86,18 @@ function onMsg(m) {
 .back {
   display: flex;
   align-items: center;
-  color: #000000;
+  color: var(--text);
 }
 .title {
   font-size: 18px;
   font-weight: 700;
-  color: #000000;
+  color: var(--text);
 }
 .right {
   display: flex;
   align-items: center;
   gap: 16px;
-  color: #000000;
+  color: var(--text);
 }
 .act {
   display: flex;
@@ -102,8 +105,6 @@ function onMsg(m) {
   justify-content: center;
   width: 24px;
   height: 24px;
-  font-size: 22px;
-  line-height: 1;
 }
 .categories {
   display: grid;
@@ -120,7 +121,7 @@ function onMsg(m) {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,7 +139,7 @@ function onMsg(m) {
   align-items: center;
   gap: 12px;
   padding: 14px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--line);
 }
 .avatar {
   width: 44px;
@@ -162,7 +163,7 @@ function onMsg(m) {
 .sender {
   font-size: 16px;
   font-weight: 700;
-  color: #000000;
+  color: var(--text);
 }
 .time {
   font-size: 13px;
