@@ -105,23 +105,34 @@ pxid_h5/
 
 ## 7. 双机协作（Windows ⇄ macOS）
 
-代码仓库托管在 **ECS 裸仓**（`ssh://root@101.133.136.140/srv/sync/pxid_h5.git`）：
+代码仓库有 **两个远端**：
+
+| remote | 地址 | 用途 |
+|---|---|---|
+| `origin` | `ssh://root@101.133.136.140/srv/sync/pxid_h5.git` | ECS 裸仓（双机同步主通道） |
+| `gitlab` | `http://likun:<PAT>@47.100.82.63:8099/likun/pxid_h5.git` | 公司自建 GitLab（web 可看、备份） |
 
 ```bash
-# macOS 首次拉取
+# 首次拉取（任意一个远端）
 git clone ssh://root@101.133.136.140/srv/sync/pxid_h5.git
+# 或
+git clone http://git.pxidiot.com:8099/likun/pxid_h5.git
 cd pxid_h5 && npm install && npm run dev
 
-# 日常：改完推送
-git add -A && git commit -m "说明" && git push origin master
+# 日常：改完推送（ECS 主通道 + GitLab 备份，一次推两个）
+git add -A && git commit -m "说明"
+git push origin master
+git push gitlab master:main
 
 # 换机接手前：先拉
 git pull origin master
 ```
 
-> ⚠️ 该裸仓无强制保护，**交替操作必须先 pull 再 push**，禁止 `push --force`。
+> ⚠️ 双远端**交替操作必须先 pull 再 push**，禁止 `push --force`。
+> ⚠️ GitLab 走 HTTP+PAT（SSH 22 在部分网络被墙）；本地 `credential.helper` 已置空，token 直挂 remote URL。
+> ⚠️ GitLab 默认分支为 `main`，本地为 `master`，推送用 `master:main` 显式映射。
 
-备份三处冗余：本地 git 库 + 本地副本 `pxid_h5_backup_20260813` + ECS 裸仓。
+备份三处冗余：本地 git 库 + 本地副本（`pxid_h5_backup_20260813` / `pxid_h5_backup_20260814`）+ ECS 裸仓 + GitLab。
 
 ---
 
