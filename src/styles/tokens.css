@@ -37,7 +37,7 @@ body {
 }
 
 #app {
-  max-width: 420px;
+  max-width: 480px; /* 覆盖 iPhone 17 Pro Max(440pt) 演示，避免左右留边；桌面仍居中 */
   margin: 0 auto;
   min-height: 100vh;
   background: var(--bg);
