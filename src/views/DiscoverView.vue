@@ -252,34 +252,38 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 .quick {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  justify-items: center;
+  gap: 18px;
   margin: 14px 14px 0;
 }
 .quick__item {
+  width: 80px;
+  height: 60px;
   background: #ffffff;
   border: 1px solid #e5e5e5;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 12px 0;
+  padding-top: 8px;
   gap: 8px;
 }
 .quick__icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   color: #333333;
 }
 .quick__label {
-  font-size: 13px;
+  font-size: 17px;
+  line-height: 1;
   color: #333333;
 }
 .filter {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 16px 12px 0;
+  margin: 16px 0 0;
+  height: 44px;
 }
 .chips {
   display: flex;
