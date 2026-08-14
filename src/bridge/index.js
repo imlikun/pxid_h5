@@ -71,6 +71,21 @@ const mockBridge = {
   // 打开原生页面（如车型选择 / 绑定车辆）
   openNative(path) {
     logMock('openNative', path)
+    // H5 预览兜底：把几个有 H5 等价页的原生标识映射到同名路由，浏览器里也能走通链路
+    if (!isEmbed && window.__router) {
+      const map = (p) => {
+        let m
+        if ((m = p.match(/^vehicle\/(P\d+)/))) return '/vehicle/' + m[1]
+        if (p === 'purchase/customize' || p.startsWith('purchase/customize?')) return '/purchase/customize'
+        if (p === 'search' || p.startsWith('search?')) return '/search'
+        return null
+      }
+      const target = map(path)
+      if (target) {
+        window.__router.push(target)
+        return
+      }
+    }
   },
 }
 

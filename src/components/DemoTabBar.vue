@@ -42,11 +42,8 @@ const tabs = [
 const current = computed(() => route.meta.tab || route.name)
 
 function onClick(t) {
-  if (t.key === 'purchase' || t.key === 'profile') {
-    bridge.call('openNative', { target: `tab.${t.key}` })
-    return
-  }
-  router.push(t.route)
+  // 切原生底部 tab（preview 下由 bridge 兜底到同名 H5 路由）
+  bridge.navigateTo(t.key)
 }
 </script>
 

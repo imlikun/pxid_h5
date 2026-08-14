@@ -73,11 +73,11 @@ function summaryLabel(o) {
   return '报修问题'
 }
 function onHeadset(o) {
-  bridge.openNative({ target: 'service.contact', orderId: o.id })
+  bridge.openNative('service/contact?orderId=' + o.id)
 }
 function onCancel(o) {
   console.log('cancel order:', o.id)
-  bridge.openNative({ target: 'service.cancelOrder', orderId: o.id })
+  bridge.openNative('service/cancelOrder?orderId=' + o.id)
 }
 function onDetail(o) {
   router.push(`/service/workorders/${o.id}`)

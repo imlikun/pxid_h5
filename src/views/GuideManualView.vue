@@ -33,7 +33,7 @@ const model = ref(route.query.model || 'P1')
 
 function onDownload() {
   // 真实环境：调用 bridge 拉起原生下载 / 或直接打开 PDF
-  bridge.openNative({ action: 'downloadManual', model: model.value })
+  bridge.openNative('manual/download?model=' + model.value)
 }
 </script>
 

@@ -124,7 +124,7 @@ const liked = ref(false)
 const detail = computed(() => workOrderDetails[route.params.id] || null)
 
 function onHeadset() {
-  bridge.openNative({ target: 'service.contact', orderId: route.params.id })
+  bridge.openNative('service/contact?orderId=' + route.params.id)
 }
 function onMap() {
   if (!detail.value) return

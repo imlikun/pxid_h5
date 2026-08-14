@@ -80,13 +80,13 @@ async function onLike() {
   if (!ok) return
   liked.value = !liked.value
   likeCount.value += liked.value ? 1 : -1
-  bridge.openNative('feed.interact?type=like&id=' + props.item.id)
+  bridge.openNative('feed/interact?type=like&id=' + props.item.id)
 }
 async function onFollow() {
   const ok = await requireLogin()
   if (!ok) return
   props.item.followed = true
-  bridge.openNative('feed.follow?id=' + props.item.id)
+  bridge.openNative('feed/follow?id=' + props.item.id)
 }
 </script>
 

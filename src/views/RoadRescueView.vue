@@ -151,16 +151,14 @@ function onSubmit() {
     showToast('请描述故障情况')
     return
   }
-  bridge.openNative({
-    action: 'submitRescue',
-    payload: {
-      type: activeTab.value,
-      time: rescueTime.value,
-      phone: phone.value,
-      desc: desc.value,
-      address: addressText.value,
-    },
-  })
+  const rescueParams = new URLSearchParams({
+    type: activeTab.value,
+    time: rescueTime.value,
+    phone: phone.value,
+    desc: desc.value,
+    address: addressText.value,
+  }).toString()
+  bridge.openNative('rescue/submit?' + rescueParams)
   showToast('救援请求已提交')
 }
 </script>

@@ -23,11 +23,11 @@
     </div>
 
     <!-- 搜索：推荐/广场显示 -->
-    <div v-if="activeTab !== '动态'" class="search">
+    <div v-if="activeTab !== '动态'" class="search" @click="onSearch">
       <span class="sicon">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </span>
-      <input class="sinput" placeholder="搜索内容/活动/车型" />
+      <input class="sinput" v-model="keyword" placeholder="搜索内容/活动/车型" @keyup.enter="onSearch" @click.stop />
     </div>
 
     <!-- Banner + 快捷入口：仅推荐页 -->
@@ -177,7 +177,7 @@ function setTab(t) {
 function onAdd() {
   // 决策 1：优先原生发布器；H5 降级提示
   if (!bridge.isEmbed) { showToast('请在 App 内发布动态'); return }
-  bridge.openNative('discover.publish')
+  bridge.openNative('discover/publish')
 }
 function onNotice() { router.push('/message') }
 function onQuick(q) {
@@ -193,6 +193,12 @@ function onShowcase(p) {
 }
 function onMoreActivity() { console.log('more activity') }
 function onActivity(a) { router.push('/activity/' + a.id) }
+
+const keyword = ref('')
+function onSearch() {
+  // 搜索（决策相关）：原生承载；H5 兜底跳 /search 并带 q
+  bridge.openNative('search?q=' + encodeURIComponent(keyword.value.trim()))
+}
 
 const toast = ref('')
 let toastTimer = null

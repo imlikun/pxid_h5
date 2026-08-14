@@ -82,7 +82,7 @@ const address = {
 
 function onAddr() {
   // 地址管理留原生：bridge 唤起
-  bridge.call('openNative', { target: 'address.list' })
+  bridge.openNative('address/list')
 }
 
 async function onSubmit() {

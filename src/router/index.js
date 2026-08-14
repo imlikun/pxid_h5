@@ -26,6 +26,9 @@ import WorkOrderDetailView from '../views/WorkOrderDetailView.vue'
 import FaqView from '../views/FaqView.vue'
 import FaqDetailView from '../views/FaqDetailView.vue'
 import FaqFilterView from '../views/FaqFilterView.vue'
+import VehicleDetailView from '../views/VehicleDetailView.vue'
+import CustomizeView from '../views/CustomizeView.vue'
+import SearchView from '../views/SearchView.vue'
 
 // 用 hash 路由：WebView 内加载任意域名/本地文件都不会 404，无需服务端 rewrite
 const routes = [
@@ -77,6 +80,11 @@ const routes = [
   { path: '/notice/:id', name: 'notice-detail', component: NoticeDetailView, meta: { hideTabBar: true, title: '公告详情' } },
   { path: '/feed/:id', name: 'feed-detail', component: FeedDetailView, meta: { hideTabBar: true, title: '内容详情' } },
   { path: '/activity/:id', name: 'activity-detail', component: FeedDetailView, meta: { hideTabBar: true, title: '活动详情' } },
+
+  // H5 兜底页（无原生时由 bridge 兜底路由到此）
+  { path: '/vehicle/:id', name: 'vehicle', component: VehicleDetailView, meta: { hideTabBar: true, title: '车型详情' } },
+  { path: '/purchase/customize', name: 'customize', component: CustomizeView, meta: { hideTabBar: true, title: '购车定制' } },
+  { path: '/search', name: 'search', component: SearchView, meta: { hideTabBar: true, title: '搜索' } },
 ]
 
 export default createRouter({

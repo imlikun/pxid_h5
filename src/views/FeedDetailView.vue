@@ -307,7 +307,7 @@ async function onLike() {
   if (!ok) return
   liked.value = !liked.value
   likeCount.value += liked.value ? 1 : -1
-  bridge.openNative('feed.interact?type=like&id=' + id.value)
+  bridge.openNative('feed/interact?type=like&id=' + id.value)
 }
 async function onCollect() {
   const ok = await requireLogin()
@@ -324,7 +324,7 @@ async function onFollow() {
 async function onShare() {
   const ok = await requireLogin()
   if (!ok) return
-  bridge.openNative('share?type=feed&id=' + id.value)
+  bridge.openNative('share/feed?id=' + id.value)
   showToast('已唤起分享')
 }
 function onActivitySignup() {

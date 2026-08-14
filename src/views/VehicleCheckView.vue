@@ -85,7 +85,7 @@ const summaryText = computed(() => {
 function startCheck() {
   if (checking.value) return
   checking.value = true
-  bridge.openNative({ action: 'vehicleCheck', model: vehicle.model })
+  bridge.openNative('vehicle/check?model=' + vehicle.model)
   // 模拟车载模块回传（原生侧真实实现时由 bridge 回调刷新）
   setTimeout(() => {
     items.value = [
@@ -104,7 +104,7 @@ function startCheck() {
 }
 
 function switchVehicle() {
-  bridge.openNative({ action: 'bindVehicle' })
+  bridge.openNative('vehicle/bind')
 }
 </script>
 
