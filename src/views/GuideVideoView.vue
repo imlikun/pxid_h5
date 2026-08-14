@@ -38,12 +38,12 @@ function onPlay(v) {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: #efefef; padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
-.nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: #fff; }
-.back { position: absolute; left: 12px; display: flex; color: #333; }
-.title { font-size: 17px; font-weight: 600; color: #333; }
+.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
+.nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: var(--card); border-bottom: 1px solid var(--line); }
+.back { position: absolute; left: 12px; display: flex; color: var(--text); }
+.title { font-size: 17px; font-weight: 600; color: var(--text); }
 .list { padding: 12px; display: flex; flex-direction: column; gap: 16px; }
-.video__t { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.video__t { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 .player { position: relative; border-radius: var(--radius); overflow: hidden; background: linear-gradient(135deg, #3a3a3a, #1c1c1c); aspect-ratio: 16 / 9; }
 .player__mask { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.7); font-size: 13px; }
 .player__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 28px; display: flex; align-items: center; gap: 10px; padding: 0 10px; background: rgba(0,0,0,.45); color: #fff; font-size: 11px; }

@@ -16,17 +16,13 @@
 
     <div class="entries">
       <div class="entry" @click="go('video')">
-        <div class="entry__txt">
-          <div class="entry__t">新手指导视频</div>
-          <div class="entry__s">开箱 / 操作 / 保养</div>
-        </div>
+        <span class="entry__icon"><IconSvg name="play-circle" :size="22" /></span>
+        <span class="entry__t">新手指导视频</span>
         <span class="entry__arrow">›</span>
       </div>
       <div class="entry" @click="go('manual')">
-        <div class="entry__txt">
-          <div class="entry__t">产品资料</div>
-          <div class="entry__s">说明书 / 参数</div>
-        </div>
+        <span class="entry__icon"><IconSvg name="book-open" :size="22" /></span>
+        <span class="entry__t">产品资料</span>
         <span class="entry__arrow">›</span>
       </div>
     </div>
@@ -49,6 +45,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { guideModels, guideVehicleImg } from '../data/mock'
+import IconSvg from '../components/IconSvg.vue'
 
 const router = useRouter()
 const model = ref('P1')
@@ -64,22 +61,23 @@ function go(kind) {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: #efefef; padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
-.nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: #ffffff; }
+.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
+.nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: var(--card); border-bottom: 1px solid var(--line); }
 .back { position: absolute; left: 12px; display: flex; color: var(--text); }
 .title { font-size: 17px; font-weight: 600; color: var(--text); }
-.hero { position: relative; margin: 12px; border-radius: var(--radius); overflow: hidden; background: #e9e9e9; }
+.hero { position: relative; margin: 12px; border-radius: var(--radius); overflow: hidden; background: var(--line); }
 .hero__img { width: 100%; height: 220px; object-fit: cover; display: block; }
-.model-pick { position: absolute; left: 12px; top: 12px; background: rgba(0,0,0,.55); color: #fff; border: none; border-radius: var(--radius-lg); padding: 6px 12px; font-size: 13px; display: flex; align-items: center; gap: 4px; }
+.model-pick { position: absolute; left: 12px; top: 12px; background: rgba(0,0,0,.55); color: #fff; border: none; border-radius: var(--radius); padding: 6px 12px; font-size: 13px; display: flex; align-items: center; gap: 4px; }
 .caret { font-size: 10px; }
-.entries { margin: 12px; display: flex; flex-direction: column; gap: 12px; }
-.entry { background: #fff; border-radius: var(--radius); padding: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
-.entry__t { font-size: 15px; font-weight: 600; color: #333; }
-.entry__s { font-size: 12px; color: #999; margin-top: 4px; }
-.entry__arrow { color: #ccc; font-size: 22px; }
+.entries { margin: 12px; background: var(--card); border-radius: var(--radius); overflow: hidden; }
+.entry { padding: 16px; display: flex; align-items: center; gap: 12px; }
+.entry:first-child { border-bottom: 1px solid var(--line); }
+.entry__icon { color: var(--brand); display: flex; }
+.entry__t { flex: 1; font-size: 15px; font-weight: 600; color: var(--text); }
+.entry__arrow { color: var(--text-hint); font-size: 22px; }
 .picker-mask { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; z-index: 50; }
-.picker { background: #fff; width: 100%; border-radius: 16px 16px 0 0; padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); animation: rise .2s ease; }
+.picker { background: var(--card); width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); animation: rise .2s ease; }
 @keyframes rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.picker__item { text-align: center; padding: 14px; font-size: 15px; color: #333; }
+.picker__item { text-align: center; padding: 14px; font-size: 15px; color: var(--text); }
 .picker__item.active { color: var(--brand); font-weight: 600; }
 </style>

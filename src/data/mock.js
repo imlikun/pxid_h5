@@ -183,7 +183,7 @@ export const products = [
 // ---------------- 服务（售后 hub）----------------
 export const serviceEntries = [
   { key: 'rescue', label: '道路救援', icon: 'wrench', desc: '一键呼叫' },
-  { key: 'guide', label: '使用指南', icon: 'book-open', desc: '新手必看' },
+  { key: 'guide', label: '使用指南', icon: 'guide', desc: '新手必看' },
   { key: 'check', label: '车辆体检', icon: 'gauge', desc: '远程诊断' },
   { key: 'feedback', label: '意见反馈', icon: 'message-circle', desc: '吐槽建议' },
   { key: 'policy', label: '三包政策', icon: 'shield-check', desc: '权益保障' },

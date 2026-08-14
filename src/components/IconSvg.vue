@@ -47,11 +47,23 @@
       <path d="M16 5v4" />
     </g>
 
-    <!-- 使用指南 -->
-    <g v-else-if="name === 'book-open'">
+    <!-- 使用指南（服务入口） -->
+    <g v-else-if="name === 'guide'">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 3" />
       <path d="M12 3v2" />
+    </g>
+
+    <!-- 产品资料/说明书 -->
+    <g v-else-if="name === 'book-open'">
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2V3z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7V3z" />
+    </g>
+
+    <!-- 播放按钮（圆形） -->
+    <g v-else-if="name === 'play-circle'">
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
     </g>
 
     <!-- 车辆体检 -->
