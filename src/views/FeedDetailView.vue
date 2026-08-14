@@ -13,7 +13,7 @@
 
     <!-- 作者卡 -->
     <div class="author">
-      <img class="avatar" :src="item.avatar" :alt="item.author" />
+      <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
       <div class="meta">
         <div class="name">
           {{ item.author || 'PXID 官方' }}

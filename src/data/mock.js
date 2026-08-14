@@ -188,7 +188,7 @@ export const messages = [
   {
     id: 1,
     sender: '官方产品经理',
-    avatar: '',
+    avatar: 'unsplash/photo-1527980965255-d3b416303d12_w_80_q_80.jpg',
     summary: '关于买车流程这里有一份说明',
     time: '05/14',
     unread: false,
@@ -200,7 +200,7 @@ export const messages = [
   {
     id: 2,
     sender: '官方资讯',
-    avatar: '',
+    avatar: 'unsplash/photo-1527980965255-d3b416303d12_w_80_q_80.jpg',
     summary: '品向M9 正式开售',
     time: '05/14',
     unread: false,
@@ -212,7 +212,7 @@ export const messages = [
   {
     id: 3,
     sender: '官方产品经理',
-    avatar: '',
+    avatar: 'unsplash/photo-1527980965255-d3b416303d12_w_80_q_80.jpg',
     summary: '关于买车流程这里有一份说明',
     time: '05/14',
     unread: false,
@@ -224,7 +224,7 @@ export const messages = [
   {
     id: 4,
     sender: '官方资讯',
-    avatar: '',
+    avatar: 'unsplash/photo-1527980965255-d3b416303d12_w_80_q_80.jpg',
     summary: '品向M9 正式开售',
     time: '05/14',
     unread: false,
@@ -657,3 +657,5 @@ export const API_ENDPOINTS = {
   interact: '/interact',
   search: '/search',
 }
+
+export const defaultAvatar = 'unsplash/photo-1527980965255-d3b416303d12_w_80_q_80.jpg'

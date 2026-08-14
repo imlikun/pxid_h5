@@ -1,7 +1,7 @@
 <template>
   <div class="moment" @click="open">
     <div class="m-head">
-      <img class="m-avatar" :src="item.avatar" :alt="item.author" />
+      <img class="m-avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
       <div class="m-meta">
         <div class="m-name">{{ item.author }}</div>
         <div class="m-time">{{ item.time }}</div>
@@ -49,6 +49,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import bridge from '../bridge'
+import { defaultAvatar } from '../data/mock'
 import { requireLogin } from '../utils/auth'
 
 const props = defineProps({

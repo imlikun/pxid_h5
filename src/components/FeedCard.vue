@@ -4,7 +4,7 @@
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
       <div class="author">
-        <img class="avatar" :src="item.avatar" :alt="item.author" />
+        <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
         <span class="name">{{ item.author }}</span>
       </div>
       <span class="like">
@@ -17,6 +17,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { defaultAvatar } from '../data/mock'
 
 const props = defineProps({
   item: { type: Object, required: true },
