@@ -24,6 +24,7 @@ export const feedItems = [
     author: 'PXID 官方产品经理',
     avatar: 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
+    content: '新一代货运电动三轮车正式亮相：大空间载货、强动力续航，为外卖配送与短途物流场景打造。多档动力可调，城市路况轻松应对，是骑手们的新搭档。',
     cover: 'feed_r1.jpg',
     likes: 30,
     time: '05-14',
@@ -35,6 +36,7 @@ export const feedItems = [
     author: '一路向前',
     avatar: 'unsplash/photo-1494790108377-be9c29b29330_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
+    content: '实测新一代货运电动三轮车：载货空间大、起步有力、续航稳定，日常跑单更省心。感兴趣的朋友可以到附近门店亲自体验。',
     cover: 'feed_d1.jpg',
     likes: 206,
     time: '05-13',
@@ -46,6 +48,7 @@ export const feedItems = [
     author: 'PXID 官方产品经理',
     avatar: 'unsplash/photo-1527980965255-d3b416303d12_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
+    content: '新一代货运电动三轮车正式亮相：大空间载货、强动力续航，为外卖配送与短途物流场景打造。多档动力可调，城市路况轻松应对，是骑手们的新搭档。',
     cover: 'feed_r2.jpg',
     likes: 30,
     time: '05-12',
@@ -57,6 +60,7 @@ export const feedItems = [
     author: '一路向前',
     avatar: 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
+    content: '实测新一代货运电动三轮车：载货空间大、起步有力、续航稳定，日常跑单更省心。感兴趣的朋友可以到附近门店亲自体验。',
     cover: 'feed_d2.jpg',
     likes: 206,
     time: '05-11',
@@ -68,6 +72,7 @@ export const feedItems = [
     author: 'PXID 官方产品经理',
     avatar: 'unsplash/photo-1507003211169-0a1dd7228f2d_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
+    content: '新一代货运电动三轮车正式亮相：大空间载货、强动力续航，为外卖配送与短途物流场景打造。多档动力可调，城市路况轻松应对，是骑手们的新搭档。',
     cover: 'feed_r3.jpg',
     likes: 30,
     time: '05-10',
@@ -79,6 +84,7 @@ export const feedItems = [
     author: '一路向前',
     avatar: 'unsplash/photo-1544723795-3fb6469f5b39_w_80_q_80.jpg',
     title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖',
+    content: '实测新一代货运电动三轮车：载货空间大、起步有力、续航稳定，日常跑单更省心。感兴趣的朋友可以到附近门店亲自体验。',
     cover: 'feed_d3.jpg',
     likes: 206,
     time: '05-09',
@@ -98,8 +104,8 @@ export const plazaShowcase = [
 
 // 广场：热门活动 2 条（封面按 广场/ 子目录文件顺序：(7)→活动1、base→活动2）
 export const activities = [
-  { id: 1, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: 'plaza_p7.jpg' },
-  { id: 2, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: 'plaza_p8.jpg' },
+  { id: 1, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: 'plaza_p7.jpg', content: '新一代货运电动三轮车主题活动进行中：到店可预约试驾体验装载与续航表现，现场下单享专属礼遇。' },
+  { id: 2, title: '新一代货运电动三轮车 大空间载货、强动力续航，外卖', date: '05-14', cover: 'plaza_p8.jpg', content: '新一代货运电动三轮车品鉴会：深度体验大空间载货与强动力续航，参与互动即有机会赢取好礼。' },
 ]
 
 // ---------------- 消息中心 ----------------

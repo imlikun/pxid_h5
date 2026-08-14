@@ -8,6 +8,7 @@ import CheckoutView from '../views/CheckoutView.vue'
 import OrderSuccessView from '../views/OrderSuccessView.vue'
 import OrderListView from '../views/OrderListView.vue'
 import MessageView from '../views/MessageView.vue'
+import FeedDetailView from '../views/FeedDetailView.vue'
 
 // 服务子页
 import RoadRescueView from '../views/RoadRescueView.vue'
@@ -70,6 +71,8 @@ const routes = [
 
   // 发现
   { path: '/message', name: 'message', component: MessageView, meta: { hideTabBar: true } },
+  { path: '/feed/:id', name: 'feed-detail', component: FeedDetailView, meta: { hideTabBar: true, title: '内容详情' } },
+  { path: '/activity/:id', name: 'activity-detail', component: FeedDetailView, meta: { hideTabBar: true, title: '活动详情' } },
 ]
 
 export default createRouter({

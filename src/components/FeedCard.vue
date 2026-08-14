@@ -1,5 +1,5 @@
 <template>
-  <div class="fcard">
+  <div class="fcard" @click="go">
     <img class="fcard__cover" :src="item.cover" :alt="item.title" />
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
@@ -16,9 +16,16 @@
 </template>
 
 <script setup>
-defineProps({
+import { useRouter } from 'vue-router'
+
+const props = defineProps({
   item: { type: Object, required: true },
 })
+const router = useRouter()
+
+function go() {
+  router.push('/feed/' + props.item.id)
+}
 </script>
 
 <style scoped>

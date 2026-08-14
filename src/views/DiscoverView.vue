@@ -159,7 +159,7 @@ function onQuick(q) { console.log('quick tap:', q.key) }
 function onSort() { console.log('sort tap') }
 function onShowcase(p) { console.log('showcase tap:', p.id) }
 function onMoreActivity() { console.log('more activity') }
-function onActivity(a) { console.log('activity tap:', a.id) }
+function onActivity(a) { router.push('/activity/' + a.id) }
 </script>
 
 <style scoped>
