@@ -67,14 +67,15 @@ function onCall() {
 }
 .act {
   flex: 1;
-  border: 1px solid var(--brand);
-  color: var(--brand);
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--text);
   border-radius: var(--radius-xxl);
   padding: 8px 0;
   font-size: 13px;
 }
 .act--call {
-  background: var(--brand);
-  color: #fff;
+  background: var(--card);
+  color: var(--text);
 }
 </style>

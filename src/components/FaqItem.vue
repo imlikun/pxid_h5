@@ -1,59 +1,75 @@
 <template>
-  <div class="faq" @click="open = !open">
+  <div class="faq">
     <div class="faq__q">
-      <span class="dot">Q</span>
+      <span class="badge badge--q">Q</span>
       <span class="txt">{{ faq.q }}</span>
-      <span class="arrow">{{ open ? '∧' : '∨' }}</span>
     </div>
-    <div v-if="open" class="faq__a">{{ faq.a }}</div>
+    <div class="faq__a">
+      <span class="badge badge--a">A</span>
+      <span class="summary">{{ faq.a }}</span>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-
 defineProps({
   faq: { type: Object, required: true },
 })
-
-const open = ref(false)
 </script>
 
 <style scoped>
 .faq {
   background: var(--card);
-  padding: 0 14px;
+  padding: 14px;
   border-bottom: 1px solid var(--line);
 }
-.faq__q {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 0;
+.faq:last-child {
+  border-bottom: none;
 }
-.dot {
+.faq__q,
+.faq__a {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.faq__a {
+  margin-top: 8px;
+}
+.badge {
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  background: var(--brand-soft);
-  color: var(--brand);
   font-size: 11px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
+  margin-top: 1px;
+}
+.badge--q {
+  background: var(--brand);
+  color: #ffffff;
+}
+.badge--a {
+  background: #d1d5db;
+  color: #ffffff;
 }
 .txt {
   flex: 1;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
 }
-.arrow {
-  color: var(--text-sub);
-}
-.faq__a {
-  padding: 0 0 14px 26px;
+.summary {
+  flex: 1;
   font-size: 13px;
   color: var(--text-sub);
-  line-height: 1.6;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

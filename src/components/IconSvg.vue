@@ -41,30 +41,36 @@
 
     <!-- 道路救援 -->
     <g v-else-if="name === 'wrench'">
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.3-3.3a6 6 0 0 1-7.3 7.3L5 20.3a1.4 1.4 0 0 1-2-2l7.7-7.7a6 6 0 0 1 7.3-7.3l-3.3 3.3z" />
+      <path d="M3 15h13a2 2 0 0 0 2-2v-2H5v-2h13V8a2 2 0 0 0-2-2h-2l-1.5-3H8v5H3a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2z" />
+      <circle cx="7" cy="15" r="1.5" />
+      <circle cx="17" cy="15" r="1.5" />
+      <path d="M16 5v4" />
     </g>
 
     <!-- 使用指南 -->
     <g v-else-if="name === 'book-open'">
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2V3z" />
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7V3z" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 3" />
+      <path d="M12 3v2" />
     </g>
 
     <!-- 车辆体检 -->
     <g v-else-if="name === 'gauge'">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 6v6l4 4" />
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+      <path d="M9 12l2 2 5-5" />
     </g>
 
     <!-- 意见反馈 -->
     <g v-else-if="name === 'message-circle'">
       <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" />
+      <path d="M12 8v4" />
+      <circle cx="12" cy="15" r=".8" />
     </g>
 
     <!-- 三包政策 -->
     <g v-else-if="name === 'shield-check'">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <path d="m9 12 2 2 5-5" />
+      <text x="12" y="14" text-anchor="middle" font-size="8" fill="currentColor" font-weight="bold" stroke="none">保</text>
     </g>
 
     <!-- 我的工单 -->

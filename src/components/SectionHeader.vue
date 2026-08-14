@@ -32,7 +32,7 @@ defineEmits(['more'])
 .title {
   font-size: 16px;
   font-weight: 700;
-  color: #000000;
+  color: var(--text);
 }
 .sub {
   font-size: 12px;

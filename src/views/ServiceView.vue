@@ -3,9 +3,12 @@
     <!-- 顶部标题 -->
     <div class="topbar">
       <div class="title">服务</div>
+      <span class="headset" @click="goFeedback">
+        <IconSvg name="headset" :size="24" />
+      </span>
     </div>
 
-    <!-- 6 个服务入口 -->
+    <!-- 6 个服务入口（单张白卡） -->
     <div class="grid">
       <div
         v-for="s in serviceEntries"
@@ -15,18 +18,17 @@
       >
         <IconSvg class="eicon" :name="s.icon" :size="26" />
         <span class="elabel">{{ s.label }}</span>
-        <span class="edesc">{{ s.desc }}</span>
       </div>
     </div>
 
     <!-- 附近门店 -->
-    <div class="block-title" @click="goStores">附近门店 <span class="more">更多 ›</span></div>
+    <SectionHeader title="附近门店" more="更多" @more="goStores" />
     <StoreCard :store="nearbyStore" />
 
     <!-- 常见问题 -->
     <SectionHeader title="常见问题" more="更多" @more="goFaqList" />
     <div class="faq-list">
-      <FaqItem v-for="f in faqs" :key="f.id" :faq="f" />
+      <FaqItem v-for="f in faqs.slice(0, 4)" :key="f.id" :faq="f" @click="goFaqDetail(f)" />
     </div>
   </div>
 </template>
@@ -62,6 +64,9 @@ function goFaqList() {
 function goFaqDetail(f) {
   router.push('/service/faq/' + f.id)
 }
+function goFeedback() {
+  router.push('/service/feedback')
+}
 </script>
 
 <style scoped>
@@ -69,54 +74,52 @@ function goFaqDetail(f) {
   padding-top: env(safe-area-inset-top);
 }
 .topbar {
-  padding: 16px 12px 8px;
+  padding: 16px 16px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 .title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
-  text-align: center;
+  color: var(--text);
+}
+.headset {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
 }
 .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  padding: 8px 12px;
-}
-.entry {
+  gap: 0;
+  margin: 0 12px;
+  padding: 18px 0;
   background: var(--card);
   border-radius: var(--radius);
-  padding: 14px 6px;
+}
+.entry {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  padding: 10px 4px;
 }
 .eicon {
   width: 26px;
   height: 26px;
-  color: var(--text);
+  color: var(--brand);
 }
 .elabel {
-  font-size: 13px;
-  font-weight: 600;
-  margin-top: 2px;
-}
-.edesc {
-  font-size: 11px;
-  color: var(--text-sub);
-}
-.block-title {
   font-size: 14px;
-  font-weight: 600;
-  padding: 12px 12px 6px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.block-title .more {
-  font-size: 12px;
-  color: var(--text-hint);
-  font-weight: 400;
+  color: var(--text);
 }
 .faq-list {
   background: var(--card);
