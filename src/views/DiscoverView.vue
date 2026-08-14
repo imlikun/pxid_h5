@@ -257,23 +257,24 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .quick__item {
   height: 72px;
-  background: transparent;
-  border: 2px solid #E5E5E5;
+  background: #ffffff;
+  border: 1px solid #E0E0E0;
   border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 8px 4px;
+  gap: 8px;
+  padding: 6px 4px;
 }
 .quick__icon {
   width: 20px;
   height: 20px;
-  color: #2563EB;
+  color: #333333;
 }
 .quick__label {
-  font-size: 17px;
+  font-size: 14px;
   line-height: 1;
   color: #333333;
 }
