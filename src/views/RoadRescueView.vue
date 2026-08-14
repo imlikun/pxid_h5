@@ -342,7 +342,7 @@ function onSubmit() {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
   background: #fff;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
@@ -350,8 +350,8 @@ function onSubmit() {
   width: 100%;
   height: 46px;
   border: none;
-  border-radius: 23px;
-  background: #555;
+  border-radius: 0;
+  background: #333;
   color: #fff;
   font-size: 16px;
   font-weight: 600;
