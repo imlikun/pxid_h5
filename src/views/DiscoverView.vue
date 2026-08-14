@@ -68,15 +68,14 @@
     <!-- 推荐：双列网格 -->
     <div v-if="activeTab === '推荐'" class="content">
       <div class="grid2">
-        <FeedCard v-for="it in filteredFeed" :key="it.id" :item="it" />
+        <FeedCard v-for="it in recommendList" :key="it.id" :item="it" />
       </div>
     </div>
 
-    <!-- 动态：双列网格 -->
+    <!-- 动态：独立 UGC 流（单列卡片） -->
     <div v-else-if="activeTab === '动态'" class="content">
-      <div class="grid2">
-        <FeedCard v-for="it in filteredFeed" :key="it.id" :item="it" />
-      </div>
+      <MomentCard v-for="it in dynamicList" :key="it.id" :item="it" />
+      <div v-if="dynamicList.length === 0" class="empty-tab">暂无该车型动态</div>
     </div>
 
     <!-- 广场：车型展示 + 热门活动 -->
@@ -112,6 +111,10 @@
         </div>
       </div>
     </div>
+
+    <transition name="fade">
+      <div v-if="toast" class="toast">{{ toast }}</div>
+    </transition>
   </div>
 </template>
 
@@ -119,6 +122,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
+import MomentCard from '../components/MomentCard.vue'
 import IconSvg from '../components/IconSvg.vue'
 import {
   discoverTabs,
@@ -127,10 +131,12 @@ import {
   dynamicFilters,
   plazaFilters,
   feedItems,
+  moments,
   plazaShowcase,
   activities,
   notices,
 } from '../data/mock'
+import { clearNewMoment } from '../store/ui'
 import bridge from '../bridge'
 
 const router = useRouter()
@@ -146,10 +152,17 @@ const activeTab = ref('推荐')
 const activeFilter = ref('全部')
 
 const currentFilters = computed(() => filtersByTab[activeTab.value])
-const filteredFeed = computed(() => {
+// 推荐：聚合 feedItems（按车型筛选）
+const recommendList = computed(() => {
   const f = activeFilter.value
   if (f === '全部' || f === '最新') return feedItems
   return feedItems.filter((i) => i.filter === f)
+})
+// 动态：独立 moments 流（按车型筛选，最新=全部）
+const dynamicList = computed(() => {
+  const f = activeFilter.value
+  if (f === '最新') return moments
+  return moments.filter((i) => i.carModel === f)
 })
 
 // 官方公告未读数（驱动发现页快捷区红点）
@@ -158,18 +171,36 @@ const noticeUnread = computed(() => notices.filter((n) => !n.isRead).length)
 function setTab(t) {
   activeTab.value = t
   activeFilter.value = defaultsByTab[t]
+  if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
 }
 
-function onAdd() { bridge.call('openNative', { target: 'discover.publish' }) }
+function onAdd() {
+  // 决策 1：优先原生发布器；H5 降级提示
+  if (!bridge.isEmbed) { showToast('请在 App 内发布动态'); return }
+  bridge.openNative('discover.publish')
+}
 function onNotice() { router.push('/message') }
 function onQuick(q) {
   if (q.key === 'notice') { router.push('/notices'); return }
+  // 决策 2：立即定制归口购车定制页（原生承载）
+  if (q.key === 'custom') { bridge.openNative('purchase/customize'); return }
   console.log('quick tap:', q.key)
 }
 function onSort() { console.log('sort tap') }
-function onShowcase(p) { console.log('showcase tap:', p.id) }
+function onShowcase(p) {
+  // 决策 8：车型卡跳购车车型页（原生承载）
+  bridge.openNative('vehicle/' + p.id)
+}
 function onMoreActivity() { console.log('more activity') }
 function onActivity(a) { router.push('/activity/' + a.id) }
+
+const toast = ref('')
+let toastTimer = null
+function showToast(msg) {
+  toast.value = msg
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toast.value = ''), 1600)
+}
 </script>
 
 <style scoped>
@@ -337,6 +368,12 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   margin-top: 16px;
   padding-bottom: 16px;
 }
+.empty-tab {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-hint);
+  padding: 40px 0;
+}
 .grid2 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -431,4 +468,18 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   padding: 7px 12px;
   font-size: 12px;
 }
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  z-index: 100;
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

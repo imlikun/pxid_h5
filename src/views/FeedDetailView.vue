@@ -190,7 +190,7 @@
 <script setup>
 import { computed, ref, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { feedItems, activities, commentSeed } from '../data/mock'
+import { feedItems, activities, moments, commentSeed } from '../data/mock'
 import { requireLogin } from '../utils/auth'
 import bridge from '../bridge'
 
@@ -201,7 +201,7 @@ const defaultAvatar = 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg'
 const isActivity = computed(() => route.path.startsWith('/activity'))
 const id = computed(() => Number(route.params.id))
 const item = computed(() => {
-  const pool = isActivity.value ? activities : feedItems
+  const pool = isActivity.value ? activities : [...feedItems, ...moments]
   return pool.find((i) => i.id === id.value) || null
 })
 
@@ -247,10 +247,12 @@ const gridCols = computed(() => {
   return 3
 })
 
-// 相关推荐：其余 feed
+// 相关推荐：其余 feed + moments
 const related = computed(() => {
   if (!item.value) return []
-  return feedItems.filter((i) => i.id !== item.value.id).slice(0, 4)
+  return [...feedItems, ...moments]
+    .filter((i) => i.id !== item.value.id)
+    .slice(0, 4)
 })
 
 // 富文本分段：#车型# / @用户 可点

@@ -8,6 +8,7 @@
       @click="onClick(t)"
     >
       <span class="ico" v-html="t.icon"></span>
+      <span v-if="t.key === 'discover' && uiState.hasNewMoment" class="tab-badge"></span>
       <span class="lbl">{{ t.label }}</span>
     </div>
   </div>
@@ -17,6 +18,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { bridge } from '../bridge'
+import { uiState } from '../store/ui'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,6 +67,7 @@ function onClick(t) {
 }
 .tab {
   flex: 1;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -79,6 +82,15 @@ function onClick(t) {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.tab-badge {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 18px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--price);
 }
 .lbl {
   font-size: 11px;
