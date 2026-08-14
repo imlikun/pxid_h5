@@ -203,9 +203,9 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   color: #000000;
 }
 .act--add {
-  width: 20px;
-  height: 20px;
-  font-size: 18px;
+  width: 24px;
+  height: 24px;
+  font-size: 22px;
   font-weight: 300;
   line-height: 1;
 }
@@ -260,8 +260,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   width: 80px;
   height: 60px;
   background: #ffffff;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
