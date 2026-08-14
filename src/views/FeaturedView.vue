@@ -21,7 +21,7 @@
     <template v-if="activeTab === 'rec'">
       <!-- Banner -->
       <div class="banner">
-        <img class="banner__img" src="/discover-banner.jpg" alt="Banner" />
+        <img class="banner__img" :src="bannerImg" alt="Banner" />
       </div>
 
       <!-- 三个快捷 -->
@@ -67,6 +67,7 @@ import ProductCard from '../components/ProductCard.vue'
 import { featuredQuick, products } from '../data/mock'
 
 const router = useRouter()
+const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
 
 const topTabs = [
   { key: 'rec', label: '推荐' },

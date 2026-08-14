@@ -10,7 +10,7 @@
     <div class="history-tip">查看更多历史消息</div>
 
     <div class="chat-head">
-      <img class="avatar" src="/unsplash/photo-1494790108377-be9c29b29330_w_80_q_80.jpg" alt="客服" />
+      <img class="avatar" :src="serviceAvatar" alt="客服" />
       <div class="bubble">
         <div class="brand">品向出行</div>
         <div class="tabs">
@@ -49,6 +49,7 @@ import { useRouter } from 'vue-router'
 import { feedbackTabs, feedbackFaqs } from '../data/mock'
 
 const router = useRouter()
+const serviceAvatar = import.meta.env.BASE_URL + 'unsplash/photo-1494790108377-be9c29b29330_w_80_q_80.jpg'
 const activeTab = ref(feedbackTabs[0])
 const text = ref('')
 
