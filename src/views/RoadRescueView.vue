@@ -35,7 +35,7 @@
 
     <!-- 地址行 -->
     <div class="address" @click="onAddress">
-      <svg class="addr-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      <svg class="addr-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
       <span class="addr-text">{{ addressText }}</span>
       <svg class="addr-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
     </div>
@@ -197,7 +197,7 @@ function onSubmit() {
   position: relative;
 }
 .tab.active {
-  color: #2563EB;
+  color: var(--brand);
   font-weight: 600;
 }
 .tab.active::after {
@@ -209,7 +209,7 @@ function onSubmit() {
   width: 24px;
   height: 3px;
   border-radius: 2px;
-  background: #2563EB;
+  background: var(--brand);
 }
 
 .map {
@@ -229,7 +229,7 @@ function onSubmit() {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #2563EB;
+  background: var(--brand);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -242,7 +242,7 @@ function onSubmit() {
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 10px solid #2563EB;
+  border-top: 10px solid var(--brand);
   filter: blur(0.3px);
 }
 .map-tip {
@@ -265,7 +265,7 @@ function onSubmit() {
   border-radius: 12px;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
 }
-.addr-icon { flex: none; }
+.addr-icon { flex: none; color: var(--brand); }
 .addr-text {
   flex: 1;
   font-size: 16px;

@@ -145,7 +145,7 @@ function onBuy() {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #333333;
+  color: var(--text);
 }
 .t {
   font-size: 15px;

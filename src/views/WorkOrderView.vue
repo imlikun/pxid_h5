@@ -98,8 +98,8 @@ function onDetail(o) {
   background: #ffffff;
   border-bottom: 1px solid #f0f0f0;
 }
-.back { position: absolute; left: 12px; display: flex; color: #333333; }
-.title { font-size: 18px; font-weight: 700; color: #333333; }
+.back { position: absolute; left: 12px; display: flex; color: var(--text); }
+.title { font-size: 18px; font-weight: 700; color: var(--text); }
 
 .tabs {
   display: flex;
@@ -111,7 +111,7 @@ function onDetail(o) {
   flex: 1;
   text-align: center;
   font-size: 14px;
-  color: #999999;
+  color: var(--text-hint);
   padding: 12px 0 10px;
   position: relative;
 }
@@ -127,7 +127,7 @@ function onDetail(o) {
   transform: translateX(-50%);
   width: 24px;
   height: 2px;
-  background: #2563EB;
+  background: var(--brand);
   border-radius: 2px;
 }
 
@@ -144,7 +144,7 @@ function onDetail(o) {
   position: absolute;
   top: 14px;
   right: 14px;
-  color: #999999;
+  color: var(--text-hint);
   display: flex;
 }
 .row1 {
@@ -153,16 +153,16 @@ function onDetail(o) {
   justify-content: space-between;
   padding-right: 26px;
 }
-.oid { font-size: 14px; color: #333333; font-weight: 600; }
-.type-status { font-size: 13px; color: #666666; }
+.oid { font-size: 14px; color: var(--text); font-weight: 600; }
+.type-status { font-size: 13px; color: var(--text-sub); }
 .st { font-style: normal; margin-left: 2px; }
-.st-blue { color: #2563EB; }
-.st-gray { color: #999999; }
-.time { font-size: 14px; color: #999999; margin-top: 4px; }
-.model { font-size: 13px; color: #666666; margin-top: 12px; }
+.st-blue { color: var(--brand); }
+.st-gray { color: var(--text-hint); }
+.time { font-size: 14px; color: var(--text-hint); margin-top: 4px; }
+.model { font-size: 13px; color: var(--text-sub); margin-top: 12px; }
 .summary {
   font-size: 14px;
-  color: #333333;
+  color: var(--text);
   margin-top: 8px;
   line-height: 1.5;
 }
@@ -179,11 +179,11 @@ function onDetail(o) {
 }
 .btn-cancel {
   background: #ffffff;
-  color: #999999;
+  color: var(--text-hint);
   border: 1px solid #dddddd;
 }
 .btn-detail {
-  background: #333333;
+  background: var(--text);
   color: #ffffff;
 }
 .empty {

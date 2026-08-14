@@ -115,7 +115,7 @@ function onQuick(q) {
 .tab {
   font-size: 18px;
   font-weight: 400;
-  color: #666666;
+  color: var(--text-sub);
   line-height: 1.2;
 }
 .tab.active {

@@ -115,9 +115,9 @@ function onHeadset() {
   background: #ffffff;
   border-bottom: 1px solid #f0f0f0;
 }
-.back { position: absolute; left: 12px; display: flex; color: #333333; }
-.title { font-size: 17px; font-weight: 600; color: #333333; }
-.headset { position: absolute; right: 14px; display: flex; color: #999999; }
+.back { position: absolute; left: 12px; display: flex; color: var(--text); }
+.title { font-size: 17px; font-weight: 600; color: var(--text); }
+.headset { position: absolute; right: 14px; display: flex; color: var(--text-hint); }
 
 .body { padding: 16px 12px; }
 .head {
@@ -125,8 +125,8 @@ function onHeadset() {
   border-radius: 12px;
   padding: 14px;
 }
-.oid { font-size: 15px; font-weight: 600; color: #333333; }
-.ctime { font-size: 13px; color: #999999; margin-top: 4px; }
+.oid { font-size: 15px; font-weight: 600; color: var(--text); }
+.ctime { font-size: 13px; color: var(--text-hint); margin-top: 4px; }
 
 .steps {
   display: flex;
@@ -146,22 +146,22 @@ function onHeadset() {
   height: 26px;
   border-radius: 50%;
   background: #eeeeee;
-  color: #999999;
+  color: var(--text-hint);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
   z-index: 2;
 }
-.step.done .dot { background: #2563EB; color: #ffffff; }
-.step.current .dot { background: #2563EB; color: #ffffff; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15); }
+.step.done .dot { background: var(--brand); color: #ffffff; }
+.step.current .dot { background: var(--brand); color: #ffffff; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15); }
 .sname {
   font-size: 12px;
-  color: #999999;
+  color: var(--text-hint);
   margin-top: 8px;
   text-align: center;
 }
-.step.done .sname, .step.current .sname { color: #2563EB; }
+.step.done .sname, .step.current .sname { color: var(--brand); }
 .line {
   position: absolute;
   top: 13px;
@@ -171,7 +171,7 @@ function onHeadset() {
   background: #eeeeee;
   z-index: 1;
 }
-.line.on { background: #2563EB; }
+.line.on { background: var(--brand); }
 
 .info {
   margin-top: 16px;
@@ -192,10 +192,10 @@ function onHeadset() {
   width: 76px;
   flex: none;
   font-size: 13px;
-  color: #999999;
+  color: var(--text-hint);
 }
 .field.col .k { margin-bottom: 6px; }
-.field .v { font-size: 14px; color: #333333; flex: 1; line-height: 1.5; }
+.field .v { font-size: 14px; color: var(--text); flex: 1; line-height: 1.5; }
 .fee { color: #e53935; font-weight: 600; }
 .imgs { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }
 .fimg { width: 84px; height: 84px; border-radius: 8px; object-fit: cover; }
@@ -206,7 +206,7 @@ function onHeadset() {
   justify-content: center;
   gap: 6px;
   margin: 24px 0 8px;
-  color: #999999;
+  color: var(--text-hint);
   font-size: 14px;
 }
 .like-num.on { color: #e53935; }

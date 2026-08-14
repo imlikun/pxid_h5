@@ -184,7 +184,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .tab {
   font-size: 16px;
-  color: #666666;
+  color: var(--text-sub);
   font-weight: 400;
   line-height: 1.2;
 }
@@ -230,18 +230,18 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   padding: 0 12px;
 }
 .sicon {
-  color: #999999;
+  color: var(--text-hint);
   display: flex;
   align-items: center;
 }
 .sinput {
   flex: 1;
   font-size: 14px;
-  color: #333333;
+  color: var(--text);
   background: transparent;
 }
 .sinput::placeholder {
-  color: #999999;
+  color: var(--text-hint);
 }
 .banner {
   margin: 16px 14px 0;
@@ -277,12 +277,12 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 .quick__icon {
   width: 20px;
   height: 20px;
-  color: #333333;
+  color: var(--text);
 }
 .quick__label {
   font-size: 14px;
   line-height: 1;
-  color: #333333;
+  color: var(--text);
 }
 .filter {
   display: flex;
@@ -299,7 +299,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .chip {
   font-size: 16px;
-  color: #666666;
+  color: var(--text-sub);
   line-height: 1;
 }
 .chip.active {
@@ -307,7 +307,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
   font-weight: 700;
 }
 .sort {
-  color: #999999;
+  color: var(--text-hint);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -362,7 +362,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .section-more {
   font-size: 13px;
-  color: #999999;
+  color: var(--text-hint);
 }
 .acts {
   padding: 0 12px;
@@ -391,7 +391,7 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .act__title {
   font-size: 14px;
-  color: #333333;
+  color: var(--text);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -400,12 +400,12 @@ function onActivity(a) { router.push('/activity/' + a.id) }
 }
 .act__date {
   font-size: 12px;
-  color: #999999;
+  color: var(--text-hint);
   margin-top: 6px;
 }
 .act__btn {
   flex: none;
-  background: #333333;
+  background: var(--text);
   color: #ffffff;
   border-radius: 6px;
   padding: 7px 12px;

@@ -94,7 +94,7 @@ function goFaqDetail(f) {
 .eicon {
   width: 26px;
   height: 26px;
-  color: #333333;
+  color: var(--text);
 }
 .elabel {
   font-size: 13px;
@@ -115,7 +115,7 @@ function goFaqDetail(f) {
 }
 .block-title .more {
   font-size: 12px;
-  color: #999999;
+  color: var(--text-hint);
   font-weight: 400;
 }
 .faq-list {

@@ -82,7 +82,7 @@ function goCheckout() {
 <style scoped>
 .cart {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--bg);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 .topbar {
@@ -164,7 +164,7 @@ function goCheckout() {
 }
 .empty button {
   margin-top: 14px;
-  background: #548eff;
+  background: var(--brand-light);
   color: #fff;
   border-radius: 20px;
   padding: 8px 18px;

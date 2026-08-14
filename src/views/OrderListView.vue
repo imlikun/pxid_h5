@@ -86,7 +86,7 @@ function detail(o) {
 </script>
 
 <style scoped>
-.orders { min-height: 100vh; background: #f5f5f5; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+.orders { min-height: 100vh; background: var(--bg); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 .topbar {
   display: flex;
   align-items: center;
@@ -133,7 +133,7 @@ function detail(o) {
 .o-id { font-size: 13px; color: #666; }
 .o-status { font-size: 13px; font-weight: 600; }
 .s-pay { color: #f59e0b; }
-.s-ship { color: #548eff; }
+.s-ship { color: var(--brand-light); }
 .s-sent { color: #34a853; }
 .s-done { color: #999; }
 .o-time { margin-top: 4px; font-size: 12px; color: #bbb; }

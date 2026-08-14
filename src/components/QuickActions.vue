@@ -41,10 +41,10 @@ defineEmits(['tap'])
 .qicon {
   width: 22px;
   height: 22px;
-  color: #333333;
+  color: var(--text);
 }
 .qlabel {
   font-size: 13px;
-  color: #333333;
+  color: var(--text);
 }
 </style>

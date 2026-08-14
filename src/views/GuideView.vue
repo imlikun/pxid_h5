@@ -66,8 +66,8 @@ function go(kind) {
 <style scoped>
 .page { min-height: 100vh; background: #efefef; padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
 .nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: #ffffff; }
-.back { position: absolute; left: 12px; display: flex; color: #333333; }
-.title { font-size: 17px; font-weight: 600; color: #333333; }
+.back { position: absolute; left: 12px; display: flex; color: var(--text); }
+.title { font-size: 17px; font-weight: 600; color: var(--text); }
 .hero { position: relative; margin: 12px; border-radius: 12px; overflow: hidden; background: #e9e9e9; }
 .hero__img { width: 100%; height: 220px; object-fit: cover; display: block; }
 .model-pick { position: absolute; left: 12px; top: 12px; background: rgba(0,0,0,.55); color: #fff; border: none; border-radius: 16px; padding: 6px 12px; font-size: 13px; display: flex; align-items: center; gap: 4px; }
@@ -81,5 +81,5 @@ function go(kind) {
 .picker { background: #fff; width: 100%; border-radius: 16px 16px 0 0; padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); animation: rise .2s ease; }
 @keyframes rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .picker__item { text-align: center; padding: 14px; font-size: 15px; color: #333; }
-.picker__item.active { color: #2563eb; font-weight: 600; }
+.picker__item.active { color: var(--brand); font-weight: 600; }
 </style>

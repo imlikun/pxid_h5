@@ -124,11 +124,11 @@ function onMsg(m) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #333333;
+  color: var(--text);
 }
 .cat__label {
   font-size: 13px;
-  color: #333333;
+  color: var(--text);
 }
 .list {
   padding: 0 12px;
@@ -166,11 +166,11 @@ function onMsg(m) {
 }
 .time {
   font-size: 13px;
-  color: #999999;
+  color: var(--text-hint);
 }
 .summary {
   font-size: 14px;
-  color: #666666;
+  color: var(--text-sub);
   margin-top: 4px;
 }
 </style>

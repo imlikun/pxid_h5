@@ -55,8 +55,8 @@ function onSend() {
 .title { font-size: 17px; font-weight: 600; color: #333; }
 .tabs { display: flex; background: #fff; border-bottom: 1px solid #f0f0f0; }
 .tab { flex: 1; text-align: center; padding: 12px 0; font-size: 14px; color: #666; position: relative; }
-.tab.active { color: #2563eb; font-weight: 600; }
-.tab.active::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 0; width: 32px; height: 2px; background: #2563eb; border-radius: 2px; }
+.tab.active { color: var(--brand); font-weight: 600; }
+.tab.active::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 0; width: 32px; height: 2px; background: var(--brand); border-radius: 2px; }
 .faq-list { flex: 1; background: #fff; }
 .faq { display: flex; align-items: center; gap: 12px; padding: 16px 12px; border-bottom: 1px solid #f5f5f5; }
 .faq__no { color: #999; font-size: 14px; width: 18px; }
@@ -64,5 +64,5 @@ function onSend() {
 .faq__arrow { color: #ccc; font-size: 20px; }
 .input-bar { display: flex; gap: 8px; padding: 10px 12px; background: #fff; border-top: 1px solid #f0f0f0; }
 .input { flex: 1; border: 1px solid #eee; border-radius: 18px; padding: 8px 14px; font-size: 14px; background: #f7f7f7; outline: none; }
-.send { background: #2563eb; color: #fff; border: none; border-radius: 18px; padding: 0 18px; font-size: 14px; }
+.send { background: var(--brand); color: #fff; border: none; border-radius: 18px; padding: 0 18px; font-size: 14px; }
 </style>

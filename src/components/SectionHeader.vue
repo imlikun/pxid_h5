@@ -40,6 +40,6 @@ defineEmits(['more'])
 }
 .more {
   font-size: 13px;
-  color: #999999;
+  color: var(--text-hint);
 }
 </style>

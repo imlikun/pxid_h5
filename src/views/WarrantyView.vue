@@ -177,11 +177,11 @@ function pickModel(m) {
   border-bottom: 1px solid #f2f2f2;
 }
 .model-pop-item:last-child { border-bottom: none; }
-.model-pop-item.on { color: #2563EB; font-weight: 600; }
+.model-pop-item.on { color: var(--brand); font-weight: 600; }
 
 .table-card {
   margin: 0 12px 12px;
-  background: #f5f5f5;
+  background: var(--bg);
   border-radius: 10px;
   overflow: hidden;
 }

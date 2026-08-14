@@ -72,7 +72,7 @@ function goFilter() {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: #f5f5f5; padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
+.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
 .nav {
   height: 48px;
   display: flex;
@@ -134,7 +134,7 @@ function goFilter() {
   height: 18px;
   border-radius: 4px;
   background: #eaf2ff;
-  color: #548eff;
+  color: var(--brand-light);
   font-size: 11px;
   font-weight: 700;
   display: flex;

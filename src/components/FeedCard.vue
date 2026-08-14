@@ -43,7 +43,7 @@ function go() {
 .fcard__title {
   padding: 10px 10px 0;
   font-size: 14px;
-  color: #333333;
+  color: var(--text);
   line-height: 1.45;
   min-height: 42px;
   display: -webkit-box;
@@ -72,7 +72,7 @@ function go() {
 }
 .name {
   font-size: 12px;
-  color: #666666;
+  color: var(--text-sub);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -82,7 +82,7 @@ function go() {
   align-items: center;
   gap: 3px;
   font-size: 12px;
-  color: #999999;
+  color: var(--text-hint);
   flex: none;
 }
 .like__num {

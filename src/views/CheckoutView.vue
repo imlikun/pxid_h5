@@ -110,7 +110,7 @@ async function onSubmit() {
 <style scoped>
 .checkout {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--bg);
   padding-bottom: calc(84px + env(safe-area-inset-bottom));
 }
 .topbar {
