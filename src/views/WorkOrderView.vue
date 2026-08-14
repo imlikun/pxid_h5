@@ -22,15 +22,16 @@
     <div class="list">
       <div v-for="o in filtered" :key="o.id" class="card">
         <span class="headset" @click="onHeadset(o)">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M4 14h2v4H4zM18 14h2v4h-2z"/></svg>
+          <IconSvg name="headset" :size="20" />
         </span>
-        <div class="row1">
-          <span class="oid">{{ o.id }}</span>
-          <span class="type-status">{{ o.type }} · <i :class="['st', statusClass(o.status)]">{{ o.status }}</i></span>
+        <div class="row-id">工单编号：{{ o.id }}</div>
+        <div class="row-meta">
+          <span class="time">{{ o.time }}</span>
+          <span class="type">{{ o.type }}</span>
+          <span class="status" :class="statusClass(o.status)">{{ o.status }}</span>
         </div>
-        <div class="time">{{ o.time }}</div>
-        <div class="model">车型：{{ o.model }}</div>
-        <div class="summary">{{ summaryLabel(o) }}：{{ o.summary }}</div>
+        <div class="row-model">车辆型号：{{ o.model }}</div>
+        <div class="row-summary">{{ summaryLabel(o) }}：{{ o.summary }}</div>
         <div class="actions">
           <button
             v-if="o.canCancel"
@@ -51,6 +52,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { workOrderTabs, workOrderStatusMap, workOrders } from '../data/mock'
 import bridge from '../bridge'
+import IconSvg from '../components/IconSvg.vue'
 
 const router = useRouter()
 const tabs = workOrderTabs
@@ -71,11 +73,11 @@ function summaryLabel(o) {
   return '报修问题'
 }
 function onHeadset(o) {
-  bridge.call('openNative', { target: 'service.contact', orderId: o.id })
+  bridge.openNative({ target: 'service.contact', orderId: o.id })
 }
 function onCancel(o) {
   console.log('cancel order:', o.id)
-  bridge.call('openNative', { target: 'service.cancelOrder', orderId: o.id })
+  bridge.openNative({ target: 'service.cancelOrder', orderId: o.id })
 }
 function onDetail(o) {
   router.push(`/service/workorders/${o.id}`)
@@ -85,7 +87,7 @@ function onDetail(o) {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--bg);
   padding-top: env(safe-area-inset-top);
   padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
 }
@@ -95,8 +97,8 @@ function onDetail(o) {
   align-items: center;
   justify-content: center;
   position: relative;
-  background: #ffffff;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
 .back { position: absolute; left: 12px; display: flex; color: var(--text); }
 .title { font-size: 18px; font-weight: 700; color: var(--text); }
@@ -104,8 +106,8 @@ function onDetail(o) {
 .tabs {
   display: flex;
   padding: 0 12px;
-  background: #ffffff;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
 .tab {
   flex: 1;
@@ -116,7 +118,7 @@ function onDetail(o) {
   position: relative;
 }
 .tab.active {
-  color: #000000;
+  color: var(--text);
   font-weight: 700;
 }
 .tab.active::after {
@@ -134,7 +136,7 @@ function onDetail(o) {
 .list { padding: 12px; }
 .card {
   position: relative;
-  background: #ffffff;
+  background: var(--card);
   border-radius: var(--radius);
   padding: 14px;
   margin-bottom: 16px;
@@ -147,48 +149,56 @@ function onDetail(o) {
   color: var(--text-hint);
   display: flex;
 }
-.row1 {
+.row-id { font-size: 15px; color: var(--text); font-weight: 600; }
+.row-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-right: 26px;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
 }
-.oid { font-size: 14px; color: var(--text); font-weight: 600; }
-.type-status { font-size: 13px; color: var(--text-sub); }
-.st { font-style: normal; margin-left: 2px; }
+.row-meta .time { color: var(--text-hint); }
+.row-meta .type { color: var(--text-sub); }
+.row-meta .status { font-weight: 500; }
 .st-blue { color: var(--brand); }
 .st-gray { color: var(--text-hint); }
-.time { font-size: 14px; color: var(--text-hint); margin-top: 4px; }
-.model { font-size: 13px; color: var(--text-sub); margin-top: 12px; }
-.summary {
+.row-model {
+  font-size: 14px;
+  color: var(--text-sub);
+  margin-top: 12px;
+}
+.row-summary {
   font-size: 14px;
   color: var(--text);
-  margin-top: 8px;
+  margin-top: 6px;
   line-height: 1.5;
 }
 .actions {
   display: flex;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 .btn {
-  font-size: 15px;
+  flex: 1;
+  font-size: 14px;
   border-radius: 8px;
-  padding: 8px 18px;
+  padding: 10px 0;
   border: none;
 }
 .btn-cancel {
-  background: #ffffff;
+  background: var(--card);
   color: var(--text-hint);
-  border: 1px solid #dddddd;
+  border: 1px solid var(--line);
 }
 .btn-detail {
-  background: var(--text);
+  background: #2F2F2F;
   color: #ffffff;
 }
 .empty {
   text-align: center;
-  color: #bbbbbb;
+  color: var(--text-hint);
   padding: 60px 0;
   font-size: 14px;
 }

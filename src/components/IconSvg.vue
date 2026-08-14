@@ -81,6 +81,35 @@
       <path d="M9 10h6" />
     </g>
 
+    <!-- 工单进度：创建 -->
+    <g v-else-if="name === 'clipboard'">
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z" />
+    </g>
+
+    <!-- 工单进度：检测开始 -->
+    <g v-else-if="name === 'search'">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
+    </g>
+
+    <!-- 工单进度：完工提交 -->
+    <g v-else-if="name === 'check-circle'">
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 5-5" />
+    </g>
+
+    <!-- 定位/地址 -->
+    <g v-else-if="name === 'location'">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </g>
+
+    <!-- 点赞 -->
+    <g v-else-if="name === 'thumbs-up'" fill="currentColor" stroke="none">
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3z" />
+    </g>
+
     <!-- 热购榜单 -->
     <g v-else-if="name === 'flame'">
       <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.7-3.5-1-6 1-8 2.5 2.5 5 5.5 5 9.5a6.5 6.5 0 0 1-13 0c0-2.5 1.5-4 3.5-5.5 0 3 1 5 2 9.5z" />

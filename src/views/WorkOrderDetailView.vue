@@ -6,19 +6,24 @@
       </span>
       <span class="title">工单详情</span>
       <span class="headset" @click="onHeadset">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M4 14h2v4H4zM18 14h2v4h-2z"/></svg>
+        <IconSvg name="headset" :size="20" />
       </span>
     </div>
 
     <div v-if="detail" class="body">
       <!-- 头部：编号 + 时间 -->
-      <div class="head">
-        <div class="oid">工单编号：{{ detail.id }}</div>
-        <div class="ctime">创建时间 {{ detail.time }}</div>
+      <div class="card head">
+        <div class="head-row">
+          <span class="oid">工单编号：{{ detail.id }}</span>
+          <span class="headset-inline" @click="onHeadset">
+            <IconSvg name="headset" :size="18" />
+          </span>
+        </div>
+        <div class="ctime">{{ detail.time }}</div>
       </div>
 
       <!-- 进度节点 -->
-      <div class="steps">
+      <div class="card steps">
         <div
           v-for="(s, i) in detail.steps"
           :key="s.name"
@@ -26,21 +31,29 @@
           :class="{ done: s.done, current: s.current }"
         >
           <div class="dot">
-            <svg v-if="s.done && !s.current" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-            <span v-else>{{ i + 1 }}</span>
+            <IconSvg :name="s.icon" :size="16" />
           </div>
           <div class="sname">{{ s.name }}</div>
           <div v-if="i < detail.steps.length - 1" class="line" :class="{ on: s.done }"></div>
         </div>
       </div>
 
-      <!-- 信息字段（动态渲染） -->
-      <div class="info">
-        <div class="field"><span class="k">车辆型号</span><span class="v">{{ detail.model }}</span></div>
-        <div class="field"><span class="k">工单类型</span><span class="v">{{ detail.type }}</span></div>
+      <!-- 信息字段 -->
+      <div class="card info">
+        <div class="field">
+          <span class="k">车辆型号</span>
+          <span class="v">{{ detail.model }}</span>
+        </div>
+        <div class="field">
+          <span class="k">工单类型</span>
+          <span class="v">{{ detail.type }}</span>
+        </div>
 
         <template v-if="detail.faultDesc">
-          <div class="field col"><span class="k">故障描述</span><span class="v">{{ detail.faultDesc }}</span></div>
+          <div class="field col">
+            <span class="k">故障描述</span>
+            <span class="v">{{ detail.faultDesc }}</span>
+          </div>
         </template>
 
         <template v-if="detail.faultImages && detail.faultImages.length">
@@ -53,27 +66,42 @@
         </template>
 
         <template v-if="detail.maintainItems">
-          <div class="field col"><span class="k">保养项目</span><span class="v">{{ detail.maintainItems }}</span></div>
+          <div class="field col">
+            <span class="k">保养项目</span>
+            <span class="v">{{ detail.maintainItems }}</span>
+          </div>
         </template>
         <template v-if="detail.maintainAdvice">
-          <div class="field col"><span class="k">维护建议</span><span class="v">{{ detail.maintainAdvice }}</span></div>
+          <div class="field col">
+            <span class="k">维护建议</span>
+            <span class="v">{{ detail.maintainAdvice }}</span>
+          </div>
         </template>
 
-        <div class="field"><span class="k">质保判定</span><span class="v">{{ detail.warranty }}</span></div>
+        <div class="field">
+          <span class="k">质保判定</span>
+          <span class="v">{{ detail.warranty }}</span>
+        </div>
         <div class="field">
           <span class="k">费用</span>
           <span class="v fee">{{ detail.fee }}元</span>
         </div>
-        <div class="field"><span class="k">预计完成</span><span class="v">{{ detail.eta }}</span></div>
-        <div class="field col">
+        <div class="field">
+          <span class="k">预计完成时间</span>
+          <span class="v">{{ detail.eta }}</span>
+        </div>
+        <div class="field address">
           <span class="k">报修地址</span>
           <span class="v">{{ detail.address }}</span>
+          <span class="loc-icon" @click="onMap">
+            <IconSvg name="location" :size="18" />
+          </span>
         </div>
       </div>
 
       <!-- 点赞 -->
       <div class="like" @click="liked = !liked">
-        <svg viewBox="0 0 24 24" width="20" height="20" :fill="liked ? '#e53935' : 'none'" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+        <IconSvg name="thumbs-up" :size="20" :class="['like-icon', { on: liked }]" />
         <span :class="['like-num', { on: liked }]">{{ detail.likes + (liked ? 1 : 0) }}</span>
       </div>
     </div>
@@ -87,6 +115,7 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { workOrderDetails } from '../data/mock'
 import bridge from '../bridge'
+import IconSvg from '../components/IconSvg.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -95,14 +124,18 @@ const liked = ref(false)
 const detail = computed(() => workOrderDetails[route.params.id] || null)
 
 function onHeadset() {
-  bridge.call('openNative', { target: 'service.contact', orderId: route.params.id })
+  bridge.openNative({ target: 'service.contact', orderId: route.params.id })
+}
+function onMap() {
+  if (!detail.value) return
+  bridge.openMap({ lat: detail.value.lat, lng: detail.value.lng, name: detail.value.address })
 }
 </script>
 
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--bg);
   padding-top: env(safe-area-inset-top);
   padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
 }
@@ -112,27 +145,34 @@ function onHeadset() {
   align-items: center;
   justify-content: center;
   position: relative;
-  background: #ffffff;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
 .back { position: absolute; left: 12px; display: flex; color: var(--text); }
 .title { font-size: 17px; font-weight: 600; color: var(--text); }
 .headset { position: absolute; right: 14px; display: flex; color: var(--text-hint); }
 
-.body { padding: 16px 12px; }
-.head {
-  background: #f7f7f7;
+.body { padding: 12px; }
+.card {
+  background: var(--card);
   border-radius: var(--radius);
   padding: 14px;
+  margin-bottom: 12px;
+}
+.head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .oid { font-size: 15px; font-weight: 600; color: var(--text); }
-.ctime { font-size: 13px; color: var(--text-hint); margin-top: 4px; }
+.headset-inline { color: var(--text-hint); display: flex; }
+.ctime { font-size: 13px; color: var(--text-hint); margin-top: 6px; }
 
 .steps {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 24px 8px 8px;
+  padding: 18px 4px 8px;
 }
 .step {
   position: relative;
@@ -142,61 +182,60 @@ function onHeadset() {
   align-items: center;
 }
 .dot {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #eeeeee;
+  background: var(--bg);
   color: var(--text-hint);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
   z-index: 2;
 }
-.step.done .dot { background: var(--brand); color: #ffffff; }
-.step.current .dot { background: var(--brand); color: #ffffff; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15); }
+.step.done .dot { background: var(--brand-soft); color: var(--brand); }
+.step.current .dot { background: var(--brand); color: #ffffff; }
 .sname {
   font-size: 12px;
   color: var(--text-hint);
   margin-top: 8px;
   text-align: center;
 }
-.step.done .sname, .step.current .sname { color: var(--brand); }
+.step.done .sname, .step.current .sname { color: var(--text); }
 .line {
   position: absolute;
-  top: 13px;
+  top: 16px;
   left: 50%;
   width: 100%;
   height: 2px;
-  background: #eeeeee;
+  background: var(--line);
   z-index: 1;
 }
-.line.on { background: var(--brand); }
+.line.on { background: var(--brand-light); }
 
-.info {
-  margin-top: 16px;
-  background: #ffffff;
-  border-radius: var(--radius);
-  border: 1px solid #f0f0f0;
-  overflow: hidden;
-}
+.info { padding: 0 14px; }
 .field {
   display: flex;
   align-items: center;
-  padding: 13px 14px;
-  border-bottom: 1px solid #f5f5f5;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
 }
 .field:last-child { border-bottom: none; }
 .field.col { flex-direction: column; align-items: flex-start; }
 .field .k {
-  width: 76px;
+  width: 80px;
   flex: none;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-hint);
 }
 .field.col .k { margin-bottom: 6px; }
 .field .v { font-size: 14px; color: var(--text); flex: 1; line-height: 1.5; }
-.fee { color: #e53935; font-weight: 600; }
+.fee { color: var(--price); font-weight: 600; }
+.address .v { padding-right: 6px; }
+.loc-icon {
+  color: var(--brand);
+  display: flex;
+  flex: none;
+}
 .imgs { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }
 .fimg { width: 84px; height: 84px; border-radius: 8px; object-fit: cover; }
 
@@ -205,10 +244,12 @@ function onHeadset() {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin: 24px 0 8px;
+  margin: 8px 0;
   color: var(--text-hint);
   font-size: 14px;
 }
-.like-num.on { color: #e53935; }
-.notfound { text-align: center; color: #bbbbbb; padding: 80px 0; }
+.like-icon { color: var(--text-hint); }
+.like-icon.on { color: var(--price); }
+.like-num.on { color: var(--price); }
+.notfound { text-align: center; color: var(--text-hint); padding: 80px 0; }
 </style>
