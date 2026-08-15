@@ -10,44 +10,50 @@
     </div>
 
     <div class="body">
-      <textarea
-        class="content"
-        v-model="content"
-        placeholder="分享你的骑行日常、改装心得或活动体验…&#10;用 #车型# 标记车型，如 #MOTA Z3#"
-        maxlength="1000"
-      />
-      <div class="counter">{{ content.length }}/1000</div>
+      <div class="card input-wrap">
+        <textarea
+          class="content"
+          v-model="content"
+          placeholder="分享你的骑行日常、改装心得或活动体验…&#10;用 #车型# 标记车型，如 #MOTA Z3#"
+          maxlength="1000"
+        />
+        <div class="counter">{{ content.length }}/1000</div>
+      </div>
 
       <!-- 车型选择 -->
-      <div class="label">关联车型</div>
-      <div class="chips">
-        <span
-          v-for="m in carModels"
-          :key="m"
-          class="chip"
-          :class="{ active: carModel === m }"
-          @click="carModel = m"
-          >{{ m }}</span
-        >
+      <div class="card section">
+        <div class="label">关联车型</div>
+        <div class="chips">
+          <span
+            v-for="m in carModels"
+            :key="m"
+            class="chip"
+            :class="{ active: carModel === m }"
+            @click="carModel = m"
+            >{{ m }}</span
+          >
+        </div>
       </div>
 
       <!-- 图片选择（本地图库，无后端上传） -->
-      <div class="label">添加图片</div>
-      <div class="gallery">
-        <div
-          v-for="g in gallery"
-          :key="g"
-          class="gitem"
-          :class="{ on: selected.includes(g) }"
-          @click="toggle(g)"
-        >
-          <img :src="imgBase + g" alt="" />
-          <span v-if="selected.includes(g)" class="tick">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-          </span>
+      <div class="card section">
+        <div class="label">添加图片</div>
+        <div class="gallery">
+          <div
+            v-for="g in gallery"
+            :key="g"
+            class="gitem"
+            :class="{ on: selected.includes(g) }"
+            @click="toggle(g)"
+          >
+            <img :src="imgBase + g" alt="" />
+            <span v-if="selected.includes(g)" class="tick">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </span>
+          </div>
         </div>
+        <div class="hint">预览态图片取自本地图库；接入后端后改为上传。</div>
       </div>
-      <div class="hint">预览态图片取自本地图库；接入后端后改为上传。</div>
     </div>
 
     <transition name="fade">
@@ -146,58 +152,83 @@ function onPublish() {
   z-index: 10;
 }
 .back {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text);
+  border-radius: 50%;
+}
+.back:active {
+  background: var(--bg-press);
 }
 .title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text);
 }
 .post {
-  border: none;
-  background: var(--brand);
-  color: #fff;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text-sub);
   font-size: 14px;
-  padding: 7px 16px;
-  border-radius: 18px;
-  opacity: 0.4;
+  font-weight: 500;
+  height: 32px;
+  padding: 0 18px;
+  border-radius: 12px;
+  transition: all 0.15s ease;
 }
 .post.active {
-  opacity: 1;
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
 }
 .post:disabled {
   pointer-events: none;
 }
 .body {
-  padding: 14px 16px 24px;
+  padding: 16px;
+}
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.input-wrap {
+  position: relative;
 }
 .content {
   width: 100%;
-  min-height: 130px;
+  min-height: 140px;
   border: none;
   outline: none;
   resize: none;
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.65;
   color: var(--text);
   background: transparent;
   font-family: inherit;
 }
+.content::placeholder {
+  color: var(--text-hint);
+}
 .counter {
   text-align: right;
   font-size: 12px;
-  color: var(--text-hint);
+  color: var(--text-sub);
+  margin-top: 8px;
+  line-height: 1;
+}
+.section {
+  margin-top: 4px;
 }
 .label {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text);
-  margin: 18px 0 10px;
+  margin: 0 0 12px;
 }
 .chips {
   display: flex;
@@ -207,27 +238,34 @@ function onPublish() {
 .chip {
   font-size: 13px;
   color: var(--text-sub);
-  background: var(--card);
+  background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 6px 12px;
+  border-radius: 18px;
+  padding: 7px 14px;
+  transition: all 0.12s ease;
+}
+.chip:active {
+  transform: scale(0.96);
 }
 .chip.active {
   color: #fff;
   background: var(--brand);
   border-color: var(--brand);
+  font-weight: 500;
 }
 .gallery {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 .gitem {
   position: relative;
   aspect-ratio: 1 / 1;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   border: 2px solid transparent;
+  cursor: pointer;
+  background: var(--bg);
 }
 .gitem.on {
   border-color: var(--brand);
@@ -238,22 +276,31 @@ function onPublish() {
   object-fit: cover;
   display: block;
 }
+.gitem.on::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(77, 124, 255, 0.22);
+  pointer-events: none;
+}
 .tick {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 20px;
-  height: 20px;
+  right: 6px;
+  bottom: 6px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--brand);
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
 }
 .hint {
   font-size: 12px;
   color: var(--text-hint);
-  margin-top: 10px;
+  margin-top: 12px;
+  line-height: 1.5;
 }
 .toast {
   position: fixed;
