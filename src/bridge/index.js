@@ -18,6 +18,9 @@ function logMock(name, payload) {
 
 // 默认 mock 实现（原生未注入时使用）
 const mockBridge = {
+  // 标记：当前是 mock，不是真实原生桥。Flutter 注入的真实实现应带 isNative: true
+  isNative: false,
+
   // 获取登录态 token（返回 Promise<string>）
   getToken() {
     logMock('getToken')
@@ -110,6 +113,8 @@ export const bridge = {
   get isEmbed() {
     return isEmbed
   },
+  // 是否真实原生桥（Flutter 注入的实现 isNative===true；mock 为 false）
+  isNative: () => window.PXIDBridge && window.PXIDBridge.isNative === true,
   getToken: () => window.PXIDBridge.getToken(),
   navigateTo: (t) => window.PXIDBridge.navigateTo(t),
   requestPurchase: (p) => window.PXIDBridge.requestPurchase(p),

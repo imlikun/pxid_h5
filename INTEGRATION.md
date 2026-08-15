@@ -29,12 +29,12 @@
 | path | 触发场景 | 业务流 |
 | --- | --- | --- |
 | `login` | 缺失登录时跳转原生登录（决策 4） | 全局登录 Gate |
-| `discover/publish` | 发现页「＋」发布（决策 1，H5 降级提示） | 发布 |
+| `discover/publish` | 发现页「＋」发布：原生拉起发布器；H5 预览兜底路由 `/publish` | 发布 |
 | `purchase/customize` | 立即定制 / 车型详情「立即定制」（决策 2/8） | 购车 |
 | `vehicle/<id>` | 车型卡 / 动态车型标签（决策 8） | 购车 |
 | `feed/interact?type=like&id=<id>` | 点赞 | 互动 |
 | `feed/follow?id=<id>` | 关注作者 | 互动 |
-| `share/feed?id=<id>` | 分享 | 互动 |
+| `share/feed?id=<id>` | 分享：原生拉起分享面板；H5 预览兜底 Web Share / 复制链接 | 互动 |
 | `address/list` | 结算页选地址 | 下单 |
 | `manual/download?model=<m>` | 说明书下载 | 服务 |
 | `vehicle/check?model=<m>` | 车辆体检 | 服务 |

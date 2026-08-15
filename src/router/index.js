@@ -30,6 +30,7 @@ import VehicleDetailView from '../views/VehicleDetailView.vue'
 import CustomizeView from '../views/CustomizeView.vue'
 import SearchView from '../views/SearchView.vue'
 import PointsView from '../views/PointsView.vue'
+import PublishView from '../views/PublishView.vue'
 
 // 用 hash 路由：WebView 内加载任意域名/本地文件都不会 404，无需服务端 rewrite
 const routes = [
@@ -87,6 +88,7 @@ const routes = [
   { path: '/purchase/customize', name: 'customize', component: CustomizeView, meta: { hideTabBar: true, title: '购车定制' } },
   { path: '/search', name: 'search', component: SearchView, meta: { hideTabBar: true, title: '搜索' } },
   { path: '/points', name: 'points', component: PointsView, meta: { hideTabBar: true, title: '我的积分' } },
+  { path: '/publish', name: 'publish', component: PublishView, meta: { hideTabBar: true, title: '发布动态' } },
 ]
 
 export default createRouter({

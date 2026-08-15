@@ -324,8 +324,30 @@ async function onFollow() {
 async function onShare() {
   const ok = await requireLogin()
   if (!ok) return
-  bridge.openNative('share/feed?id=' + id.value)
-  showToast('已唤起分享')
+  // 原生环境：拉起原生分享面板（契约 openNative('share/feed?id=')）
+  if (bridge.isNative()) {
+    bridge.openNative('share/feed?id=' + id.value)
+    showToast('已唤起分享')
+    return
+  }
+  // H5 预览：Web Share API / 复制链接，保证可真实分享
+  const url = location.origin + location.pathname + '#/feed/' + id.value
+  const title = (item.value && item.value.title) || 'PXID 内容'
+  const text = (item.value && item.value.content ? item.value.content : '').slice(0, 60)
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text, url })
+      return
+    } catch (e) {
+      if (e && e.name === 'AbortError') return // 用户取消，不降级
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url)
+    showToast('链接已复制，去分享吧')
+  } catch (e) {
+    showToast('分享链接：' + url)
+  }
 }
 function onActivitySignup() {
   bridge.requestPurchase({ type: 'activity', id: id.value })

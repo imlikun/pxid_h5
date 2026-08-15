@@ -16,6 +16,8 @@ export const discoverQuick = [
 export const recommendFilters = ['全部', 'MOTA Z3', 'PX-4', 'CoolPlay PX-2']
 export const dynamicFilters = ['最新', 'MOTA Z3', 'PX-4', 'CoolPlay PX-2']
 export const plazaFilters = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6']
+// 发布页车型选择（pxid.com 真实在售型号）
+export const carModels = ['MOTA Z3', 'PX-4', 'CoolPlay PX-2', 'MOTA Z1', 'Urban 03', 'P5', 'P1', 'H10', 'M2', 'Z3']
 
 export const feedItems = [
   // ① 官方新品发布（带种草商品卡）
