@@ -119,10 +119,11 @@ function onBuy() {
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 .topbar {
+  height: calc(48px + env(safe-area-inset-top));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px;
+  padding: env(safe-area-inset-top) 12px 0;
   background: #fff;
   position: sticky;
   top: 0;

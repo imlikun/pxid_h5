@@ -89,7 +89,7 @@ function onDetail(o) {
   min-height: 100vh;
   background: var(--bg);
   padding-top: env(safe-area-inset-top);
-  padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .nav {
   height: 48px;

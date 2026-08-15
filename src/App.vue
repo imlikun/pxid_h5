@@ -6,7 +6,7 @@
       </keep-alive>
     </router-view>
 
-    <!-- 独立预览用的底部导航；嵌入原生 App 时由 Flutter 提供，自动隐藏 -->
+    <!-- 仅独立预览时显示底部导航：URL 带 ?standalone=1；嵌入原生 App 时由 Flutter 提供原生 tab -->
     <DemoTabBar v-if="showTabBar" />
   </div>
 </template>

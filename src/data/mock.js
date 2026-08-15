@@ -268,12 +268,12 @@ export const products = [
 export const pointsBalance = 0
 
 export const pointsProducts = [
-  { id: 'pp-1', name: 'PXID 原装充电器 48V', tags: ['原厂正品', '快充'], price: 299, points: 2990, cover: 'unsplash/photo-1593941707882-a5bba14938c7_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/charger-48v' },
-  { id: 'pp-2', name: '骑行头盔 一体成型', tags: ['安全认证', '透气'], price: 399, points: 3990, cover: 'unsplash/photo-1505705694340-019e1e335916_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/helmet' },
-  { id: 'pp-3', name: '智能中控屏 P1', tags: ['原装适配', 'GPS'], price: 1299, points: 12990, cover: 'unsplash/photo-1493238792000-8113da705763_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/smart-display-p1' },
-  { id: 'pp-4', name: '车尾储物包', tags: ['防水', '大容量'], price: 129, points: 1290, cover: 'unsplash/photo-1532298229144-0ec0c57515c7_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/tail-bag' },
-  { id: 'pp-5', name: '防晒冰丝袖套', tags: ['UPF50+', '凉感'], price: 59, points: 590, cover: 'unsplash/photo-1517649763962-0c623066013b_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/ice-sleeves' },
-  { id: 'pp-6', name: '蓝牙控车模块', tags: ['即插即用', 'APP联动'], price: 299, points: 2990, cover: 'unsplash/photo-1518770660439-4636190af475_w_300_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/bluetooth-module' },
+  { id: 'pp-1', name: 'PXID 原装充电器 48V', tags: ['原厂正品', '快充'], price: 299, points: 2990, cover: 'unsplash/photo-1593941707882-a5bba14938c7_w_600_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/charger-48v' },
+  { id: 'pp-2', name: '骑行头盔 一体成型', tags: ['安全认证', '透气'], price: 399, points: 3990, cover: 'unsplash/photo-1505705694340-019e1e335916_w_600_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/helmet' },
+  { id: 'pp-3', name: '智能中控屏 P1', tags: ['原装适配', 'GPS'], price: 1299, points: 12990, cover: 'unsplash/photo-1493238792000-8113da705763_w_600_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/smart-display-p1' },
+  { id: 'pp-4', name: '车尾储物包', tags: ['防水', '大容量'], price: 129, points: 1290, cover: 'unsplash/photo-1532298229144-0ec0c57515c7_w_600_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/tail-bag' },
+  { id: 'pp-5', name: '防晒冰丝袖套', tags: ['UPF50+', '凉感'], price: 59, points: 590, cover: 'unsplash/photo-1517649763962-0c623066013b_w_600_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/ice-sleeves' },
+  { id: 'pp-6', name: '蓝牙控车模块', tags: ['即插即用', 'APP联动'], price: 299, points: 2990, cover: 'unsplash/photo-1518770660439-4636190af475_w_600_q_80.jpg', shopUrl: 'https://shop.pxid.com/products/bluetooth-module' },
 ]
 
 // ---------------- 服务（售后 hub）----------------
@@ -461,9 +461,9 @@ export const workOrderDetails = {
     type: '报修',
     faultDesc: '刹车失灵，制动距离明显变长',
     faultImages: [
-      'unsplash/photo-1558618666-fcd25c85cd64_w_300_q_80.jpg',
+      'unsplash/photo-1558618666-fcd25c85cd64_w_600_q_80.jpg',
       'feed_r1.jpg',
-      'unsplash/photo-1571068316344-75bc76f77890_w_300_q_80.jpg',
+      'unsplash/photo-1571068316344-75bc76f77890_w_600_q_80.jpg',
     ],
     warranty: '质保内',
     fee: 0,

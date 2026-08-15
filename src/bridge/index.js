@@ -8,7 +8,8 @@
 // 接入细节见仓库根目录 INTEGRATION.md
 // ============================================================
 
-const isEmbed = new URLSearchParams(location.search).has('embed')
+// 默认按“嵌入原生 App”处理，H5 不渲染底部 tab；浏览器独立预览时加 ?standalone=1
+const isEmbed = !new URLSearchParams(location.search).has('standalone')
 
 function logMock(name, payload) {
   // eslint-disable-next-line no-console

@@ -378,11 +378,11 @@ function showToast(msg) {
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 .topbar {
-  height: 48px;
+  height: calc(48px + env(safe-area-inset-top));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
+  padding: env(safe-area-inset-top) 12px 0;
   position: sticky;
   top: 0;
   background: var(--card);
