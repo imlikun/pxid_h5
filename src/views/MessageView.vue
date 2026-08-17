@@ -21,7 +21,7 @@
 
     <!-- 消息分类 -->
     <div class="categories">
-      <div v-for="(c, i) in messageCategories" :key="c.key" class="cat fade-up press" :class="'stagger-' + ((i % 10) + 1)" @click="onCat(c)">
+      <div v-for="(c, i) in messageCategories" :key="c.key" class="cat fade-up press pop" :class="'stagger-' + ((i % 10) + 1)" @click="onCat(c)">
         <div class="cat__icon">
           <IconSvg :name="c.icon" :size="24" stroke="1.8" />
         </div>
@@ -135,19 +135,31 @@ function onMsg(m) {
   animation: badgePulse 1.8s ease-out infinite;
 }
 .cat {
-  transition: transform 0.12s ease, background 0.18s ease;
+  transition: background 0.18s ease;
   border-radius: 12px;
   padding: 6px 0;
 }
 .cat:active {
-  transform: scale(0.95);
-  background: var(--bg-press, rgba(0, 0, 0, 0.04));
+  background: rgba(0, 0, 0, 0.06);
+}
+.cat__icon {
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.cat:active .cat__icon {
+  transform: scale(0.88);
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand);
 }
 .item {
-  transition: background 0.18s ease;
+  transition: background 0.18s ease, transform 0.18s ease;
+  border-radius: 10px;
+  margin: 0 -6px;
+  padding: 14px 6px;
 }
 .item:active {
-  background: var(--bg-press, rgba(0, 0, 0, 0.04));
+  background: rgba(0, 0, 0, 0.06);
+  transform: translateX(2px);
 }
 .categories {
   display: grid;

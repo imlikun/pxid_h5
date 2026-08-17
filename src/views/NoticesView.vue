@@ -1,7 +1,7 @@
 <template>
   <div class="notices">
-    <div class="nav">
-      <span class="back" @click="goBack">
+    <div class="nav fade-up">
+      <span class="back press" @click="goBack">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       </span>
       <span class="title">官方公告</span>
@@ -9,7 +9,7 @@
     </div>
 
     <!-- 召回强提醒横幅：存在未确认召回公告时置顶 -->
-    <div v-if="recallOpen" class="recall-bar" @click="toDetail(recallOpen.id)">
+    <div v-if="recallOpen" class="recall-bar fade-up stagger-1 press" @click="toDetail(recallOpen.id)">
       <span class="rb-tag">召回</span>
       <span class="rb-text">您有一条车辆召回通知待确认，点击查看</span>
       <span class="rb-arrow">&gt;</span>
@@ -17,10 +17,10 @@
 
     <div class="list">
       <div
-        v-for="n in list"
+        v-for="(n, i) in list"
         :key="n.id"
-        class="row"
-        :class="{ unread: !n.isRead }"
+        class="row fade-up press"
+        :class="[{ unread: !n.isRead }, 'stagger-' + ((i % 10) + 2)]"
         @click="toDetail(n.id)"
       >
         <span v-if="!n.isRead" class="dot"></span>
@@ -142,4 +142,25 @@ function goBack() {
 .row.unread .tt { font-weight: 700; }
 .line2 { font-size: 12px; color: var(--text-hint); margin-top: 6px; }
 .arrow { color: var(--text-hint); font-size: 14px; }
+.recall-bar:active { transform: scale(0.98); }
+.row {
+  transition: transform 0.12s ease, background 0.18s ease;
+}
+.row:active {
+  transform: scale(0.98);
+  background: var(--bg-press, rgba(0, 0, 0, 0.05));
+}
+.back {
+  transition: transform 0.12s ease, background 0.18s ease;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.back:active {
+  transform: scale(0.92);
+  background: var(--bg-press, rgba(0, 0, 0, 0.05));
+}
 </style>
