@@ -8,7 +8,7 @@
 
     <div class="card">
       <div class="row"><span>订单编号</span><span class="mono">{{ orderId }}</span></div>
-      <div class="row"><span>实付金额</span><span class="price">¥{{ total }}</span></div>
+      <div class="row"><span>实付金额</span><span class="price">{{ fmtTotal }}</span></div>
     </div>
 
     <div class="btns">
@@ -19,12 +19,22 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
-const orderId = route.query.id || '—'
+const orderId = route.query.orderId || route.query.id || '—'
 const total = route.query.total || '0'
+const currency = route.query.currency || 'USD'
+
+const fmtTotal = computed(() => {
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(Number(total))
+  } catch (e) {
+    return currency + ' ' + total
+  }
+})
 
 function goFeatured() {
   router.replace('/featured')

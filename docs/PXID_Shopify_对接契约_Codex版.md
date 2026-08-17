@@ -6,7 +6,21 @@
 
 ---
 
-## 0. 你必须交付的清单（checklist）
+## 0. 完整购买流程（先看这节，理解你在链路里的位置）
+
+```
+[App 内] 用户浏览商品列表 / 详情（数据 = 你的店铺 /products.json）
+   → H5 选规格加购物车 → 确认订单页 → 点「提交订单」
+[Flutter 原生] 拿购物车行 → 调你的店铺 Storefront cartCreate（带 buyerIdentity 预填邮箱/地址）
+   → 拿到 checkoutUrl → 在 App 内 WebView 打开 Shopify 结账页
+[Shopify 店铺 = 你] 地址 / 国际运费 / 关税 / 支付 / 出单 / 发货 / 退款 —— 全部在这边完成
+   → 支付完成 → return_to 回弹回 App
+[App 内] 「支付成功」页（订单号）；二期经 webhook 同步订单进我们库
+```
+
+**你在整条链路里的职责：店铺本身（商品 / 结账 / 支付 / 发货）。** 你要交付的清单见下。
+
+## 0.1 你必须交付的清单（checklist）
 
 - [ ] 每个国家店铺创建 **Storefront API token**（scope 见 §1），交给 Flutter 兄弟。
 - [ ] 商品 Collection handle **跨店统一**（§2）。
@@ -45,9 +59,16 @@
 
 ## 3. 结账回弹 return_to
 
-Shopify 结账完成 / 取消后需回到 App。配置 checkout 的 `return_to` = `pxid://checkout/done`（或你们与 Flutter 约定的 scheme）。
+Shopify 结账完成 / 取消后需回到 App。配置 checkout 的 `return_to` = `pxid://checkout/done`（或你们与 Flutter 约定的 scheme），**支付完成时请带上订单号**：`pxid://checkout/done?orderId=<shopify_order_id>`（App 内「支付成功」页据此显示真实订单号）。
 
-H5 在 WebView 内打开 `checkoutUrl`，Flutter 监听该 scheme 关闭 WebView 并展示订单确认页。
+H5 在 WebView 内打开 `checkoutUrl`，Flutter 监听该 scheme 关闭 WebView 并 resolve 给 H5。
+
+### 3.1 买家身份预填（buyerIdentity，你只需知道、不用做）
+
+Flutter 在 `cartCreate` 时会把 App 登录用户的 `email / phone / countryCode / 收货地址` 放进 `buyerIdentity`，Shopify 结账页会**预填**这些信息——**这是预填，不是登录 Shopify 账号**，用户无需 Shopify 密码（游客结账）。请确保：
+- **不要关闭 guest checkout**（Shopify 默认开启，勿改）。
+- 结账页不要强推「创建账号 / 登录」，允许游客直接付。
+- 订单按 `email` 落到该店 customer——**请保证 `order.email` 原样保存**，这是我们二期按 email 关联 App 用户的唯一依据。
 
 ---
 

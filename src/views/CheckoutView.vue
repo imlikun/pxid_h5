@@ -26,10 +26,10 @@
         <img class="g-cover" :src="it.cover" :alt="it.name" />
         <div class="g-mid">
           <div class="g-name">{{ it.name }}</div>
-          <div class="g-spec">{{ it.tag || '原厂配件' }}</div>
+          <div class="g-spec">{{ it.spec || it.tag || '原厂配件' }}</div>
         </div>
         <div class="g-right">
-          <div class="g-price">¥{{ it.price }}</div>
+          <div class="g-price">{{ fmt(it.price, it.currency) }}</div>
           <div class="g-qty">x{{ it.qty }}</div>
         </div>
       </div>
@@ -39,20 +39,21 @@
     <div class="amount">
       <div class="a-row">
         <span>商品金额</span>
-        <span>¥{{ checkedTotal }}</span>
+        <span>{{ fmt(checkedTotal, cur) }}</span>
       </div>
       <div class="a-row">
         <span>运费</span>
-        <span>免运费</span>
+        <span>以 Shopify 结算为准</span>
       </div>
       <div class="a-row">
         <span>优惠</span>
-        <span>-¥0</span>
+        <span>-{{ fmt(0, cur) }}</span>
       </div>
       <div class="a-row a-total">
-        <span>实付款</span>
-        <span class="a-price">¥{{ checkedTotal }}</span>
+        <span>预估实付</span>
+        <span class="a-price">{{ fmt(checkedTotal, cur) }}</span>
       </div>
+      <div class="a-note">运费 / 关税 / 最终金额以 Shopify 结账页为准</div>
     </div>
 
     <!-- 提交订单 -->
@@ -65,7 +66,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { checkedItems, checkedTotal, removeFromCart } from '../store/cart'
 import bridge from '../bridge'
@@ -79,6 +80,18 @@ const address = {
   detail: '江苏省淮安市 清江浦区 深圳东路 18 号 4 号厂房第三层',
 }
 
+// 币种：取购物车第一件的 currency（同一国店同一币种）
+const cur = computed(() => (checkedItems.value[0] && checkedItems.value[0].currency) || 'USD')
+
+function fmt(v, c) {
+  const cc = c || cur.value
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: cc }).format(v)
+  } catch (e) {
+    return cc + ' ' + v
+  }
+}
+
 function onAddr() {
   // 地址管理留原生：bridge 唤起
   bridge.openNative('address/list')
@@ -89,19 +102,25 @@ async function onSubmit() {
   submitting.value = true
   // Headless 终态：把购物车行交给原生（Flutter），由原生调该国店 Storefront cartCreate
   // 生成 checkoutUrl → WebView 打开 Shopify 结账 → return_to 回弹。
-  // lines: { variantId, quantity }；mock 预览无真 checkoutUrl 时兜底开第一个 shopUrl
+  // lines: { variantId, quantity }；variantId 缺失（mock/未同步）时原生兜底开 shopUrl
   const lines = checkedItems.value.map((i) => ({
     variantId: i.variantId || null,
     quantity: i.qty,
     shopUrl: i.shopUrl,
     name: i.name,
   }))
-  const ok = await bridge.openCheckout(lines)
+  const res = await bridge.openCheckout(lines)
   submitting.value = false
+  // 兼容原生返回：boolean（true=已回弹）或 { ok, orderId }
+  const ok = res === true || (res && res.ok === true)
   if (ok) {
+    const orderId = (res && res.orderId) || ''
     // 支付回弹后清空已结算项；订单状态由 Shopify webhook 同步（见 5.4）
     checkedItems.value.forEach((i) => removeFromCart(i.id))
-    router.replace({ path: '/order/success', query: { total: checkedTotal.value } })
+    router.replace({
+      path: '/order/success',
+      query: { total: checkedTotal.value, orderId, currency: cur.value },
+    })
   }
 }
 </script>
@@ -185,6 +204,13 @@ async function onSubmit() {
 .a-row:last-child { border-bottom: none; }
 .a-total { color: #1a1a1a; font-weight: 600; }
 .a-price { color: #e53935; font-weight: 700; font-size: 18px; }
+.a-note {
+  padding: 8px 0 12px;
+  font-size: 11px;
+  color: #999;
+  text-align: right;
+  line-height: 1.5;
+}
 
 .submit {
   position: fixed;
