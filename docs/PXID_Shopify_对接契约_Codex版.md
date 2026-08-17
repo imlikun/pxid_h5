@@ -1,7 +1,7 @@
 # PXID × Shopify 对接契约（Codex 友好版）
 
-> 读者：**Shopify 店铺开发同学（用 Codex 实现）**
-> 目的：本文件是 Shopify 侧对接的**唯一对齐依据**。照此实现，我们的 App（H5 + Flutter 原生）即可拉到商品、完成购买闭环。
+> 读者：**Shopify 店铺开发同学（用 Codex 实现）**  
+> 目的：本文件是 Shopify 侧对接的**唯一对齐依据**。照此实现，我们的 App（H5 + Flutter 原生）即可拉到商品、完成购买闭环。  
 > 两方：我们（App 团队：H5 前端 + Flutter 原生，结账编排在 Flutter 原生完成，无独立后端）/ **Shopify（你这边，每国一个独立店铺）**。
 
 ---
@@ -40,7 +40,7 @@
 - `unauthenticated_read_collections`
 - `cart`（用于 `cartCreate` 生成结账链接）
 
-将生成的 **Storefront API access token** 文本交给 Flutter 兄弟（**切勿进入前端 / H5**）。
+将生成的 **Storefront API access token** 文本交给 Flutter 兄弟（**切勿进入前端 / H5**）。  
 每个国家店铺各发一个，对应 Flutter 原生配置里的 `{ country: token }`。
 
 ---
@@ -49,11 +49,13 @@
 
 我们按 handle 拉取分区，请严格使用以下 handle（新增分区先与我们对齐再上架）：
 
-| handle | 含义 |
-| --- | --- |
-| `spring` | 踏春装备 |
+| handle    | 含义    |
+| --------- | ----- |
+| `spring`  | 踏春装备  |
 | `p1parts` | P1 配件 |
-| `points` | 积分商城 |
+| `points`  | 积分商城  |
+
+
 
 ---
 
@@ -66,6 +68,7 @@ H5 在 WebView 内打开 `checkoutUrl`，Flutter 监听该 scheme 关闭 WebView
 ### 3.1 买家身份预填（buyerIdentity，你只需知道、不用做）
 
 Flutter 在 `cartCreate` 时会把 App 登录用户的 `email / phone / countryCode / 收货地址` 放进 `buyerIdentity`，Shopify 结账页会**预填**这些信息——**这是预填，不是登录 Shopify 账号**，用户无需 Shopify 密码（游客结账）。请确保：
+
 - **不要关闭 guest checkout**（Shopify 默认开启，勿改）。
 - 结账页不要强推「创建账号 / 登录」，允许游客直接付。
 - 订单按 `email` 落到该店 customer——**请保证 `order.email` 原样保存**，这是我们二期按 email 关联 App 用户的唯一依据。
@@ -165,15 +168,15 @@ Flutter 在 `cartCreate` 时会把 App 登录用户的 `email / phone / countryC
 
 ### 8.2 字段说明与规则
 
-| 字段 | 类型 | 必填 | 规则 |
-| --- | --- | --- | --- |
-| `summary` | string | ✅ | ≤ 40 字，一句话卖点，用于详情页顶部简介 |
-| `highlights` | string[] | ✅ | 3-5 条，每条 ≤ 20 字，用于详情页亮点胶囊 |
-| `sections[].title` | string | ✅ | 分段标题 |
-| `sections[].body` | string | ✅ | 段落正文，支持 `<br>` |
-| `sections[].image` | string(url) | ⭕ | 分段配图，建议 ≤ 1MB、宽 ≥ 800 |
-| `sections[].specs` | { k, v }[] | ⭕ | 规格参数表，每段 4-8 行；与 `variants[].sku/title` 不冲突 |
-| `video` | string(url) | ⭕ | 商品演示视频 mp4 链接，可选 |
+| 字段                 | 类型          | 必填 | 规则                                          |
+| ------------------ | ----------- | -- | ------------------------------------------- |
+| `summary`          | string      | ✅  | ≤ 40 字，一句话卖点，用于详情页顶部简介                      |
+| `highlights`       | string[]    | ✅  | 3-5 条，每条 ≤ 20 字，用于详情页亮点胶囊                   |
+| `sections[].title` | string      | ✅  | 分段标题                                        |
+| `sections[].body`  | string      | ✅  | 段落正文，支持 `<br>`                              |
+| `sections[].image` | string(url) | ⭕  | 分段配图，建议 ≤ 1MB、宽 ≥ 800                       |
+| `sections[].specs` | { k, v }[]  | ⭕  | 规格参数表，每段 4-8 行；与 `variants[].sku/title` 不冲突 |
+| `video`            | string(url) | ⭕  | 商品演示视频 mp4 链接，可选                            |
 
 ### 8.3 Codex 实现要点
 
