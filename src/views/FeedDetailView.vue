@@ -185,6 +185,15 @@
   <transition name="fade">
     <div v-if="toast" class="toast">{{ toast }}</div>
   </transition>
+
+  <!-- 底部分享面板（H5 兜底） -->
+  <ShareSheet
+    v-model="showShare"
+    :title="shareTitle"
+    :desc="shareDesc"
+    :url="shareUrl"
+    @share="handleShare"
+  />
 </template>
 
 <script setup>
@@ -193,6 +202,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { feedItems, activities, moments, commentSeed } from '../data/mock'
 import { requireLogin } from '../utils/auth'
 import bridge from '../bridge'
+import ShareSheet from '../components/ShareSheet.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -218,6 +228,11 @@ const toast = ref('')
 let toastTimer = null
 const commentsBox = ref(null)
 const commentInput = ref(null)
+const showShare = ref(false)
+
+const shareUrl = computed(() => location.origin + location.pathname + '#/feed/' + id.value)
+const shareTitle = computed(() => (item.value && item.value.title) || 'PXID 内容')
+const shareDesc = computed(() => (item.value && item.value.content ? item.value.content : '').slice(0, 60))
 
 if (item.value) {
   liked.value = !!item.value.isLiked
@@ -330,23 +345,48 @@ async function onShare() {
     showToast('已唤起分享')
     return
   }
-  // H5 预览：Web Share API / 复制链接，保证可真实分享
-  const url = location.origin + location.pathname + '#/feed/' + id.value
-  const title = (item.value && item.value.title) || 'PXID 内容'
-  const text = (item.value && item.value.content ? item.value.content : '').slice(0, 60)
-  if (navigator.share) {
+  // H5 预览 / appin.site：弹出主流 App 风格底部分享面板
+  showShare.value = true
+}
+
+async function handleShare({ channel }) {
+  showShare.value = false
+  if (channel === 'link') {
     try {
-      await navigator.share({ title, text, url })
-      return
+      await navigator.clipboard.writeText(shareUrl.value)
+      showToast('链接已复制')
     } catch (e) {
-      if (e && e.name === 'AbortError') return // 用户取消，不降级
+      showToast('分享链接：' + shareUrl.value)
     }
+    return
   }
+  if (channel === 'more' && navigator.share) {
+    try {
+      await navigator.share({
+        title: shareTitle.value,
+        text: shareDesc.value,
+        url: shareUrl.value,
+      })
+    } catch (e) {
+      if (e && e.name === 'AbortError') return
+      fallbackCopy()
+    }
+    return
+  }
+  // 微信好友 / 朋友圈：H5 浏览器无法直接调起微信，走复制链接兜底
   try {
-    await navigator.clipboard.writeText(url)
-    showToast('链接已复制，去分享吧')
+    await navigator.clipboard.writeText(shareUrl.value)
+    showToast('链接已复制，请在微信中粘贴分享')
   } catch (e) {
-    showToast('分享链接：' + url)
+    showToast('分享链接：' + shareUrl.value)
+  }
+}
+function fallbackCopy() {
+  try {
+    navigator.clipboard.writeText(shareUrl.value)
+    showToast('链接已复制')
+  } catch (e) {
+    showToast('分享链接：' + shareUrl.value)
   }
 }
 function onActivitySignup() {
