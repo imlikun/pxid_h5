@@ -1,16 +1,16 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">新手指导视频</span>
     </div>
 
     <div class="list">
-      <div v-for="v in guideVideos" :key="v.id" class="video">
+      <div v-for="v in guideVideos" :key="v.id" class="video fade-up" :class="'stagger-' + ((guideVideos.indexOf(v) % 10) + 1)">
         <div class="video__t">{{ v.title }}</div>
-        <div class="player" @click="onPlay(v)">
+        <div class="player press" @click="onPlay(v)">
           <div class="player__mask">视频将在预览时播放</div>
           <div class="player__bar">
             <IconSvg class="play" name="play" :size="12" />

@@ -1,17 +1,17 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="goBack">
+      <span class="back press" @click="goBack">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">{{ model }} 产品说明书</span>
-      <span class="dl" @click="onDownload">
+      <span class="dl press" @click="onDownload">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
       </span>
     </div>
 
     <div class="doc">
-      <div v-for="s in manualSections" :key="s.page" class="sec">
+      <div v-for="s in manualSections" :key="s.page" class="sec fade-up" :class="'stagger-' + ((manualSections.indexOf(s) % 10) + 1)">
         <div class="sec__head">
           <span class="sec__page">{{ s.page }}</span>
           <span class="sec__title">{{ s.title }}</span>

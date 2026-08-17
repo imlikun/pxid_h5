@@ -87,14 +87,10 @@ const mockBridge = {
   // 原生实现（Flutter）：拿 lines 调该国店 Storefront `cartCreate`（buyerIdentity 带 App 登录身份预填），
   //   得到 checkoutUrl 后在 WebView 内打开 Shopify 结账；监听 return_to（pxid://checkout/done）回弹 App。
   //   lines 元素：{ variantId: 'gid://shopify/ProductVariant/xxx', quantity: 1 }
-  // mock 兜底：预览环境没真 checkoutUrl，直接开第一个商品的 shopUrl 模拟跳转
+  // mock 兜底（独立预览）：返回 true 让 H5 走订单完成流程；不外跳商品页（避免预览时弹陌生标签）
   openCheckout(lines) {
     logMock('openCheckout', lines)
-    if (!isEmbed()) {
-      const first = (lines && lines[0]) || {}
-      const url = first.shopUrl || 'https://shop.pxid.com/'
-      window.open(url, '_blank')
-    }
+    return Promise.resolve(true)
   },
 
   // 打开原生页面（如车型选择 / 绑定车辆）

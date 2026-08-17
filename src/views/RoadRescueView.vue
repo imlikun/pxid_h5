@@ -2,7 +2,7 @@
   <div class="page">
     <!-- 顶部导航 -->
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">道路救援</span>
@@ -12,7 +12,7 @@
     </div>
 
     <!-- 地图区域（约 60%，原生能力，此处占位） -->
-    <div class="map" @click="onMap">
+    <div class="map fade-up stagger-1" @click="onMap">
       <div class="map-marker">
         <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff">
           <path d="M5.5 12.5l3-1 2 2 3-3 1.5 1.5a3 3 0 11-1.4 1.4L14 12l-3 3-2-2-2 1.5z"/>
@@ -23,7 +23,7 @@
     </div>
 
     <!-- 双 Tab -->
-    <div class="tabs">
+    <div class="tabs fade-up stagger-2">
       <div
         v-for="t in tabs"
         :key="t.key"
@@ -34,14 +34,14 @@
     </div>
 
     <!-- 地址行 -->
-    <div class="address" @click="onAddress">
+    <div class="address press fade-up stagger-3" @click="onAddress">
       <svg class="addr-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
       <span class="addr-text">{{ addressText }}</span>
       <svg class="addr-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
     </div>
 
     <!-- 表单（每个字段独立卡片） -->
-    <div class="field" @click="showTime = !showTime">
+    <div class="field press fade-up stagger-4" @click="showTime = !showTime">
       <span class="f-label">救援时间</span>
       <span class="f-value">{{ rescueTime }}</span>
       <svg class="f-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#7F7F7F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
@@ -50,7 +50,7 @@
       </div>
     </div>
 
-    <div class="field">
+    <div class="field fade-up stagger-5">
       <span class="f-label">联系电话</span>
       <input
         v-model="phone"
@@ -61,7 +61,7 @@
       />
     </div>
 
-    <div class="field field--area">
+    <div class="field field--area fade-up stagger-6">
       <span class="f-label">故障描述</span>
       <textarea
         v-model="desc"
@@ -74,8 +74,8 @@
     </div>
 
     <!-- 吸底按钮 -->
-    <div class="footer">
-      <button class="submit" @click="onSubmit">发起救援</button>
+    <div class="footer fade-up stagger-7">
+      <button class="submit pop press" @click="onSubmit">发起救援</button>
     </div>
 
     <!-- 轻提示 -->

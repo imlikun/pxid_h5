@@ -1,24 +1,24 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">车辆体检</span>
     </div>
 
     <!-- 当前车辆 -->
-    <div class="vehicle">
+    <div class="vehicle fade-up stagger-1">
       <div class="v-img"><IconSvg name="scooter" :size="40" /></div>
       <div class="v-info">
         <div class="v-model">PXID {{ vehicle.model }}</div>
         <div class="v-meta">已绑定 {{ vehicle.days }} 天 · 累计 {{ vehicle.km }} km</div>
       </div>
-      <button class="v-switch" @click="switchVehicle">切换</button>
+      <button class="v-switch press" @click="switchVehicle">切换</button>
     </div>
 
     <!-- 体检结果 -->
-    <div class="card">
+    <div class="card fade-up stagger-2">
       <div class="card-head">
         <span class="ch-title">系统体检</span>
         <span class="ch-time">{{ lastCheck }}</span>
@@ -41,7 +41,7 @@
       </div>
     </div>
 
-    <button class="start" :disabled="checking" @click="startCheck">
+    <button class="start pop press" :disabled="checking" @click="startCheck">
       {{ checking ? '体检中…' : '开始远程体检' }}
     </button>
     <p class="hint">远程体检由车载模块回传数据，结果仅供参考；异常项建议预约到店检测。</p>

@@ -1,14 +1,14 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">我的工单</span>
     </div>
 
     <!-- 状态 tab -->
-    <div class="tabs">
+    <div class="tabs fade-up stagger-1">
       <div
         v-for="t in tabs"
         :key="t"
@@ -20,8 +20,8 @@
 
     <!-- 工单卡片 -->
     <div class="list">
-      <div v-for="o in filtered" :key="o.id" class="card">
-        <span class="headset" @click="onHeadset(o)">
+      <div v-for="o in filtered" :key="o.id" class="card fade-up" :class="'stagger-' + ((filtered.indexOf(o) % 10) + 1)">
+        <span class="headset press" @click="onHeadset(o)">
           <IconSvg name="headset" :size="20" />
         </span>
         <div class="row-id">工单编号：{{ o.id }}</div>
@@ -35,10 +35,10 @@
         <div class="actions">
           <button
             v-if="o.canCancel"
-            class="btn btn-cancel"
+            class="btn btn-cancel press"
             @click="onCancel(o)"
           >取消工单</button>
-          <button class="btn btn-detail" @click="onDetail(o)">查看详情</button>
+          <button class="btn btn-detail press pop" @click="onDetail(o)">查看详情</button>
         </div>
       </div>
 

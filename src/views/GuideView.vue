@@ -1,26 +1,26 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">使用指南</span>
     </div>
 
-    <div class="hero">
+    <div class="hero fade-up stagger-1">
       <img class="hero__img" :src="guideVehicleImg[model]" alt="" />
-      <button class="model-pick" @click="showPicker = true">
+      <button class="model-pick press" @click="showPicker = true">
         {{ model }} <span class="caret">▼</span>
       </button>
     </div>
 
-    <div class="entries">
-      <div class="entry" @click="go('video')">
+    <div class="entries fade-up stagger-2">
+      <div class="entry press" @click="go('video')">
         <span class="entry__icon"><IconSvg name="play-circle" :size="22" /></span>
         <span class="entry__t">新手指导视频</span>
         <span class="entry__arrow">›</span>
       </div>
-      <div class="entry" @click="go('manual')">
+      <div class="entry press" @click="go('manual')">
         <span class="entry__icon"><IconSvg name="book-open" :size="22" /></span>
         <span class="entry__t">产品资料</span>
         <span class="entry__arrow">›</span>

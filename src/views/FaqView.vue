@@ -2,18 +2,18 @@
   <div class="page">
     <!-- 顶部：常见问题 + 筛选 -->
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       </span>
       <span class="title">常见问题</span>
-      <span class="filter-btn" @click="goFilter">
+      <span class="filter-btn press" @click="goFilter">
         <span class="filter-label">筛选</span>
         <span v-if="activeTagCount > 0" class="filter-badge">{{ activeTagCount }}</span>
       </span>
     </div>
 
     <!-- 搜索框 -->
-    <div class="search">
+    <div class="search fade-up stagger-1">
       <span class="sicon">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </span>
@@ -22,7 +22,7 @@
 
     <!-- 列表：每条 Q+A 独立卡片 -->
     <div class="list">
-      <div v-for="f in filteredFaqs" :key="f.id" class="card" @click="go(f)">
+      <div v-for="f in filteredFaqs" :key="f.id" class="card press fade-up" :class="'stagger-' + ((filteredFaqs.indexOf(f) % 10) + 1)" @click="go(f)">
         <div class="q-row">
           <span class="q">Q</span>
           <span class="q-txt">{{ f.q }}</span>
