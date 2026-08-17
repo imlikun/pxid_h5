@@ -61,10 +61,30 @@
       </div>
     </div>
 
-    <!-- 商品介绍 -->
-    <div class="block fade-up stagger-5" v-if="product.body_html">
+    <!-- 商品介绍（body_html 优先；为空时用 options/tags 自动拼一份规格卡，保证任何商品都有内容） -->
+    <div class="block fade-up stagger-5">
       <div class="block__title">商品介绍</div>
-      <div class="desc" v-html="safeHtml(product.body_html)"></div>
+      <div v-if="product.body_html" class="desc" v-html="safeHtml(product.body_html)"></div>
+      <div v-else class="specs">
+        <div v-if="product.options && product.options.length" class="specs__row">
+          <span class="specs__k">可选规格</span>
+          <span class="specs__v">
+            <span v-for="(o, i) in product.options" :key="i" class="specs__chip">
+              {{ o.name }}：{{ o.values.join(' / ') }}
+            </span>
+          </span>
+        </div>
+        <div v-if="product.tags && product.tags.length" class="specs__row">
+          <span class="specs__k">标签</span>
+          <span class="specs__v">
+            <span v-for="t in product.tags" :key="t" class="specs__chip">{{ t }}</span>
+          </span>
+        </div>
+        <div class="specs__row">
+          <span class="specs__k">商品 ID</span>
+          <span class="specs__v">{{ product.id }}</span>
+        </div>
+      </div>
     </div>
 
     <div class="gap"></div>
@@ -88,7 +108,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchProduct } from '../api/shop'
 import { addToCart } from '../store/cart'
@@ -127,7 +147,6 @@ function optionAvailable(opt, val) {
   if (!product.value || !product.value.variants) return true
   const sel = { ...selectedOption.value, [opt.name]: val }
   const names = (product.value.options || []).map((o) => o.name)
-  const idx = names.indexOf(opt.name)
   return product.value.variants.some((v) => {
     return names.every((n) => {
       const i = names.indexOf(n)
@@ -199,19 +218,22 @@ function onBuy() {
   router.push('/cart/checkout')
 }
 
-onMounted(async () => {
-  const id = route.params.id
+// 路由 id 变化时重新加载（keep-alive 下 onMounted 只跑一次，必须用 watch 跟路由）
+async function load(id) {
+  product.value = null
+  selectedOption.value = {}
+  gIdx.value = 0
+  qty.value = 1
   product.value = await fetchProduct(id)
   if (product.value) {
-    // 默认选中每个 option 的第一个可用值
     const sel = {}
     ;(product.value.options || []).forEach((o) => {
-      const first = o.values.find((val) => true)
-      sel[o.name] = first
+      sel[o.name] = o.values[0]
     })
     selectedOption.value = sel
   }
-})
+}
+watch(() => route.params.id, (id) => load(id), { immediate: true })
 </script>
 
 <style scoped>
@@ -219,6 +241,9 @@ onMounted(async () => {
   min-height: 100vh;
   background: var(--bg);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  max-width: 420px;
+  margin: 0 auto;
+  background: #fff;
 }
 .topbar {
   height: calc(48px + env(safe-area-inset-top));
@@ -398,6 +423,38 @@ onMounted(async () => {
 .desc :deep(img) { max-width: 100%; border-radius: 8px; }
 .desc :deep(h1), .desc :deep(h2), .desc :deep(h3) { font-size: 15px; color: var(--text); margin: 10px 0 6px; }
 .desc :deep(ul) { padding-left: 18px; margin: 0 0 8px; }
+
+/* body_html 为空时的规格参数卡（保证任何商品都有内容） */
+.specs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.specs__row {
+  display: flex;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.specs__k {
+  flex: none;
+  width: 72px;
+  color: var(--text-sub);
+}
+.specs__v {
+  flex: 1;
+  color: var(--text);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.specs__chip {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
 
 .gap {
   height: 10px;
