@@ -9,6 +9,7 @@
 | 方法 | 签名 | 说明 |
 | --- | --- | --- |
 | `getToken` | `() => Promise<string>` | 获取登录态 token；缺失即未登录 |
+| `getLocale` | `() => Promise<{locale,country,currency}>` | 获取当前定位（语言/国家/货币）；详见《多国定位与 i18n 对接规范》 |
 | `navigateTo` | `(tab: string) => void` | 切换到原生底部 tab：`discover` / `featured` / `purchase` / `service` / `profile` |
 | `openNative` | `(path: string) => void` | 打开原生页面（见下方约定） |
 | `requestPurchase` | `(payload) => Promise<boolean>` | 拉起原生购买/下单；resolve 支付结果 |
@@ -48,6 +49,7 @@
 | `points/guide` | 积分页「玩转积分」banner | 积分 |
 | `points/mall` | 积分页「更多」跳转积分商城 | 积分 |
 | `points/exchange?id=<id>` | 积分商品「兑换」 | 积分 |
+| `settings/language` | 语言/地区切换：拉起原生设置页；H5 预览可本地切换前端文案 | 多国 |
 
 ## H5 兜底页（预览 / 无原生时）
 
@@ -75,8 +77,10 @@ H5 这边已全部完成并推送到 `origin/master` 与 `gitlab/main`，构建�
 - 注入后 H5 自动跳过 `mockBridge`（代码判断 `if (!window.PXIDBridge) window.PXIDBridge = mockBridge`）。
 - 所有方法请保证异步安全；`getToken` / `requestPurchase` 返回 Promise。
 
-### 2. 必须实现的 7 个方法（签名见「调用出口」表）
-`getToken` / `navigateTo` / `openNative` / `requestPurchase` / `callPhone` / `openMap` / `openShopify`
+### 2. 必须实现的方法（签名见「调用出口」表）
+`getToken` / `getLocale` / `navigateTo` / `openNative` / `requestPurchase` / `callPhone` / `openMap` / `openShopify`
+
+- `getLocale`：返回当前 `{ locale, country, currency }`（如 `{locale:'zh-CN',country:'CN',currency:'CNY'}`）；H5 启动时调用一次初始化多语言与货币格式。未注入时 H5 用默认 `zh-CN/CN/CNY`。详见《多国定位与 i18n 对接规范》。
 
 - `getToken`：返回当前登录 token；**未登录返回空串**，H5 的登录 Gate（`auth.js`）会据此调 `openNative('login')`。
 - `navigateTo(tab)`：tab 取值 `discover` / `featured` / `purchase` / `service` / `profile`，对应原生底部 5 个 tab。
