@@ -135,8 +135,12 @@ async function onSubmit() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px;
+  padding: env(safe-area-inset-top) 12px 12px;
+  height: calc(48px + env(safe-area-inset-top));
   background: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 .back { display: flex; width: 32px; color: #333; }
 .sp { width: 32px; }

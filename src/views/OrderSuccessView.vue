@@ -51,8 +51,7 @@ function goOrders() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 90px;
-  padding: 90px 24px 0;
+  padding: calc(90px + env(safe-area-inset-top)) 24px 0;
 }
 .icon {
   width: 84px;

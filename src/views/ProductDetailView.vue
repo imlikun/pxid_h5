@@ -9,7 +9,7 @@
 
     <!-- 主图轮播 + 缩略图 -->
     <div class="gallery fade-up stagger-1">
-      <div class="g-main">
+      <div class="g-main" @touchstart.passive="onTouchStart" @touchend="onTouchEnd">
         <img v-if="gallery[gIdx]" :src="gallery[gIdx]" :alt="product.name" />
         <div class="g-count">{{ gIdx + 1 }} / {{ gallery.length }}</div>
       </div>
@@ -190,6 +190,31 @@ function showToast(msg) {
 
 function changeQty(d) {
   qty.value = Math.max(1, qty.value + d)
+}
+
+// 主图手指滑动切换（左滑下一张 / 右滑上一张）
+let touchStartX = 0
+let touchStartY = 0
+function onTouchStart(e) {
+  touchStartX = e.touches[0].clientX
+  touchStartY = e.touches[0].clientY
+}
+function onTouchEnd(e) {
+  const dx = e.changedTouches[0].clientX - touchStartX
+  const dy = e.changedTouches[0].clientY - touchStartY
+  // 横向滑动距离 > 40px 且不被纵向滚动主导，判定为切换手势
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+    if (dx < 0) nextImg()
+    else prevImg()
+  }
+}
+function nextImg() {
+  if (!gallery.value.length) return
+  gIdx.value = (gIdx.value + 1) % gallery.value.length
+}
+function prevImg() {
+  if (!gallery.value.length) return
+  gIdx.value = (gIdx.value - 1 + gallery.value.length) % gallery.value.length
 }
 
 function goBack() {
