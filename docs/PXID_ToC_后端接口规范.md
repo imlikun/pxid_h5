@@ -134,27 +134,52 @@ body：
 
 ---
 
-## 5. 精选 / 商城
+## 5. 精选 / 商城（Shopify 代理）
 
-> 商城与 **Shopify 打通**：H5 仅展示商品，用户点击「去购买」调 `bridge.openShopify(product.shopUrl)` 跳 Shopify 完成购买，**H5 不自建购物车/结算/订单流**（见 §11 边界）。因此：
-> - 若你们后端做商品聚合，提供下方接口；
-> - 否则商品数据维持 Shopify feed，无需后端接口。
+> 商城与 **Shopify 打通**。**约定：由 Java 后端做 Shopify 代理**——后端调用 Shopify Storefront API（GraphQL）拉取商品/价格/币种，归一化为下方 `Product` 结构下发给 H5；H5 仅展示，用户点击「去购买」调 `bridge.openShopify(product.shopUrl)` 跳 Shopify 完成购买与结算，**H5 不自建购物车/订单流**（见 §11 边界）。该约定与整体架构一致：Java 为数据源、多国定位由 Java 处理、H5 只负责展示。
 
+### 5.0 Shopify 侧前置（运维 / 后端）
+- 在 Shopify 后台创建 **Storefront API 访问令牌**，scope 至少包含：
+  `unauthenticated_read_product_listings`、`unauthenticated_read_collections`、`unauthenticated_read_product_inventory`（如需库存）。
+- 规划 Collection（对应 H5 的 `collection` 字段），建议 handle：
+  - `spring`（踏春装备）、`p1parts`（P1 配件）、`points`（积分商城）等。
+- 商品在线页 URL 即 `shopUrl`（如 `https://shop.pxid.com/products/cap-men`），购买/结算继续走 Shopify 收银台。
+
+### 5.1 Java 代理实现要点
+- 新增商品聚合模块，内部用 GraphQL 调 Storefront API；**结果缓存 5–15min**（目录不常变，避免打爆 Shopify 配额）。
+- 多国：取 Flutter 经 H5 下发的 `lang` / `country`（见《多国定位 i18n 对接规范》），注入 Storefront 查询的 `@inContext(country: $country, language: $lang)` 指令，返回对应**币种与翻译**。
+- 归一化映射（Shopify → 本规范 `Product`）：
+
+| Shopify 字段 | Product 字段 | 说明 |
+| --- | --- | --- |
+| `id` / `handle` | `id` | 用数字 id 或 handle |
+| `title` | `name` | |
+| `priceRange.minVariantPrice.amount` | `price` | 同时取 `currencyCode` → `currency` |
+| `compareAtPrice` | `origin` | 无则空 |
+| `images[0].url` | `cover` | 完整 URL |
+| `tags` / 自定义元字段 | `tag` | 主标签 |
+| `totalInventory` 或忽略 | `sales` | Shopify 无原生销量，可用库存近似或置 0 |
+| `collections` handle | `collection` | |
+| 在线商品页 | `shopUrl` | |
+
+### 5.2 商品列表
 #### GET /products
-query：`collection`（如 `spring` / `p1parts`，对齐 `mock.collections`）
-**响应 data.list（对齐 `mock.products`）：**
+query：`collection`（如 `spring` / `p1parts` / `points`，可选）、`page`、`pageSize`
+**响应 data.list（对齐 `mock.products`，新增 `currency`）：**
 ```json
-[{ "id": 1, "name": "鸭舌帽 男士", "price": 280, "origin": 399, "cover": "https://cdn.pxid.com/p/1.jpg", "tag": "踏春装备", "sales": 1203, "collection": "spring", "shopUrl": "https://shop.pxid.com/products/cap-men" }]
+[{ "id": 1, "name": "鸭舌帽 男士", "price": 280, "origin": 399, "currency": "CNY", "cover": "https://cdn.pxid.com/p/1.jpg", "tag": "踏春装备", "sales": 1203, "collection": "spring", "shopUrl": "https://shop.pxid.com/products/cap-men" }]
 ```
+> `currency`：多国场景返回对应币种代码（CNY / USD / EUR …），H5 按它渲染符号，不再写死 ¥。
 #### GET /products/{id}
-返回单条商品。
+返回单条商品（字段同上，可含 `images[]`、`description` 供详情页）。
 
-#### GET /orders（订单查询，可选）
+### 5.3 订单查询（可选）
+#### GET /orders
 仅查询用户在 Shopify 侧的订单，对齐 `mock.orders`：
 ```json
-[{ "id": "PX20260812003", "time": "2026-08-12T15:22:00+08:00", "status": "已发货", "items": [{ "name": "原装后轮 适配P1", "cover": "https://cdn.pxid.com/p/2.jpg", "price": 6800, "qty": 1 }], "total": 6800 }]
+[{ "id": "PX20260812003", "time": "2026-08-12T15:22:00+08:00", "status": "已发货", "currency": "CNY", "items": [{ "name": "原装后轮 适配P1", "cover": "https://cdn.pxid.com/p/2.jpg", "price": 6800, "qty": 1 }], "total": 6800 }]
 ```
-> 下单/支付走原生 `requestPurchase`（调 Shopify 收银台），**不经你们后端**（见 §11）。
+> 下单/支付走 `openShopify`（调 Shopify 收银台），**不经你们后端**（见 §11）。
 
 ---
 
