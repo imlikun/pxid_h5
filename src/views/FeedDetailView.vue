@@ -2,17 +2,17 @@
   <div class="detail" v-if="item">
     <!-- 顶部 -->
     <div class="topbar">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       </span>
       <span class="t">{{ isActivity ? '活动详情' : '内容详情' }}</span>
-      <span class="share" @click="onShare">
+      <span class="share press" @click="onShare">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
       </span>
     </div>
 
     <!-- 作者卡 -->
-    <div class="author">
+    <div class="author fade-up stagger-1">
       <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
       <div class="meta">
         <div class="name">
@@ -23,14 +23,14 @@
       </div>
       <button
         v-if="!isOfficial"
-        class="follow"
+        class="follow press"
         :class="{ followed }"
         @click="onFollow"
       >{{ followed ? '已关注' : '+ 关注' }}</button>
     </div>
 
     <!-- 标题 -->
-    <h1 class="title">{{ item.title }}</h1>
+    <h1 class="title fade-up stagger-2">{{ item.title }}</h1>
 
     <!-- 活动报名卡 -->
     <div v-if="isActivity" class="signup">
@@ -42,11 +42,11 @@
         <span class="signup__k">活动地点</span>
         <span class="signup__v">PXID 体验店 / 线上同步</span>
       </div>
-      <button class="signup__btn" @click="onActivitySignup">立即报名</button>
+      <button class="signup__btn press" @click="onActivitySignup">立即报名</button>
     </div>
 
     <!-- 图片九宫格 -->
-    <div class="gallery" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
+    <div class="gallery fade-up stagger-3" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
       <img
         v-for="(img, i) in images"
         :key="i"
@@ -59,7 +59,7 @@
     </div>
 
     <!-- 正文富文本 -->
-    <div class="content">
+    <div class="content fade-up stagger-4">
       <span
         v-for="(seg, i) in segments"
         :key="i"
@@ -69,7 +69,7 @@
     </div>
 
     <!-- 标签 / 车型 -->
-    <div class="tags" v-if="tagList.length">
+    <div class="tags fade-up stagger-5" v-if="tagList.length">
       <span
         v-for="(tg, i) in tagList"
         :key="i"
@@ -80,7 +80,7 @@
     </div>
 
     <!-- 种草商品卡 -->
-    <div v-if="item.productCard" class="prod" @click="onProductCard">
+    <div v-if="item.productCard" class="prod fade-up stagger-6 press" @click="onProductCard">
       <img class="prod__img" :src="item.productCard.cover" :alt="item.productCard.name" />
       <div class="prod__info">
         <div class="prod__name">{{ item.productCard.name }}</div>
@@ -90,7 +90,7 @@
     </div>
 
     <!-- 评论区 -->
-    <div class="comments" ref="commentsBox">
+    <div class="comments fade-up stagger-7" ref="commentsBox">
       <div class="comments__head">评论（{{ commentCount }}）</div>
       <div v-if="comments.length === 0" class="comments__empty">暂无评论，来抢沙发~</div>
       <div v-for="c in comments" :key="c.id" class="cmt">
@@ -100,7 +100,7 @@
           <div class="cmt__text">{{ c.content }}</div>
           <div class="cmt__foot">
             <span class="cmt__time">{{ c.time }}</span>
-            <span class="cmt__like" :class="{ liked: c.isLiked }" @click="onCommentLike(c)">
+            <span class="cmt__like pop" :class="{ liked: c.isLiked }" @click="onCommentLike(c)">
               <svg viewBox="0 0 24 24" width="14" height="14" :fill="c.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
               <span>{{ c.likes }}</span>
             </span>
@@ -124,18 +124,18 @@
           placeholder="说点什么…"
           @keyup.enter="submitComment"
         />
-        <button class="cinput__send" @click="submitComment">发送</button>
+        <button class="cinput__send press" @click="submitComment">发送</button>
       </div>
     </div>
 
     <!-- 相关推荐 -->
-    <div class="related" v-if="related.length">
+    <div class="related fade-up stagger-8" v-if="related.length">
       <div class="related__head">相关推荐</div>
       <div class="related__grid">
         <div
           v-for="r in related"
           :key="r.id"
-          class="rcard"
+          class="rcard press"
           @click="router.push('/feed/' + r.id)"
         >
           <img class="rcard__img" :src="r.cover" :alt="r.title" />
@@ -163,19 +163,19 @@
 
   <!-- 底部互动栏 -->
   <div v-if="item" class="actions">
-    <button class="act" :class="{ liked }" @click="onLike">
+    <button class="act pop press" :class="{ liked, on: liked }" @click="onLike">
       <svg viewBox="0 0 24 24" width="22" height="22" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
       <span>{{ likeCount }}</span>
     </button>
-    <button class="act" @click="onCommentBtn">
+    <button class="act pop press" @click="onCommentBtn">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
       <span>{{ commentCount }}</span>
     </button>
-    <button class="act" :class="{ collected }" @click="onCollect">
+    <button class="act pop press" :class="{ collected, on: collected }" @click="onCollect">
       <svg viewBox="0 0 24 24" width="22" height="22" :fill="collected ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
       <span>{{ collected ? '已收藏' : '收藏' }}</span>
     </button>
-    <button class="act" @click="onShare">
+    <button class="act pop press" @click="onShare">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
       <span>分享</span>
     </button>

@@ -1,21 +1,21 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">工单详情</span>
-      <span class="headset" @click="onHeadset">
+      <span class="headset press" @click="onHeadset">
         <IconSvg name="headset" :size="20" />
       </span>
     </div>
 
     <div v-if="detail" class="body">
       <!-- 头部：编号 + 时间 -->
-      <div class="card head">
+      <div class="card head fade-up stagger-1">
         <div class="head-row">
           <span class="oid">工单编号：{{ detail.id }}</span>
-          <span class="headset-inline" @click="onHeadset">
+          <span class="headset-inline press" @click="onHeadset">
             <IconSvg name="headset" :size="18" />
           </span>
         </div>
@@ -23,7 +23,7 @@
       </div>
 
       <!-- 进度节点 -->
-      <div class="card steps">
+      <div class="card steps fade-up stagger-2">
         <div
           v-for="(s, i) in detail.steps"
           :key="s.name"
@@ -39,7 +39,7 @@
       </div>
 
       <!-- 信息字段 -->
-      <div class="card info">
+      <div class="card info fade-up stagger-3">
         <div class="field">
           <span class="k">车辆型号</span>
           <span class="v">{{ detail.model }}</span>
@@ -100,7 +100,7 @@
       </div>
 
       <!-- 点赞 -->
-      <div class="like" @click="liked = !liked">
+      <div class="like fade-up stagger-4 pop" @click="liked = !liked">
         <IconSvg name="thumbs-up" :size="20" :class="['like-icon', { on: liked }]" />
         <span :class="['like-num', { on: liked }]">{{ detail.likes + (liked ? 1 : 0) }}</span>
       </div>

@@ -1,7 +1,7 @@
 <template>
   <div class="ndetail">
     <div class="nav">
-      <span class="back" @click="onBack">
+      <span class="back press" @click="onBack">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       </span>
       <span class="title">公告详情</span>
@@ -9,25 +9,25 @@
     </div>
 
     <div v-if="item" class="body">
-      <div class="head">
+      <div class="head fade-up stagger-1">
         <span class="tag" :class="'tag--' + item.type">{{ typeLabel(item.type) }}</span>
         <h1 class="title">{{ item.title }}</h1>
         <div class="meta">{{ item.publisher }} · 发布于 {{ item.publishTime }}</div>
         <div class="meta">生效时间：{{ item.effectiveTime }}</div>
       </div>
-      <div class="content">{{ item.content }}</div>
+      <div class="content fade-up stagger-2">{{ item.content }}</div>
 
-      <div v-if="item.forceAck && !item.isRead" class="ack-tip">
+      <div v-if="item.forceAck && !item.isRead" class="ack-tip fade-up stagger-3">
         该公告涉及您车辆的安全与使用，请阅读并点击"已知悉"后继续。
       </div>
     </div>
 
     <!-- 召回强提醒：未确认时底部固定"已知悉"，禁用返回 -->
     <div v-if="item && item.forceAck && !item.isRead" class="footer">
-      <button class="ack-btn" @click="ack">我已悉知</button>
+      <button class="ack-btn press" @click="ack">我已悉知</button>
     </div>
     <div v-else class="footer">
-      <button class="back-btn" @click="onBack">返回</button>
+      <button class="back-btn press" @click="onBack">返回</button>
     </div>
   </div>
 </template>

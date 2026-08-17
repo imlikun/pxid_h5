@@ -13,11 +13,12 @@
         >
       </div>
       <div class="topacts">
-        <span class="act act--add" @click="onAdd">
+        <span class="act act--add float-in press" @click="onAdd">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         </span>
-        <span class="act act--bell" @click="onNotice">
+        <span class="act act--bell press" @click="onNotice">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span v-if="noticeUnread > 0" class="bell-badge badge-pulse"></span>
         </span>
       </div>
     </div>
@@ -60,7 +61,7 @@
         <span
           v-for="f in currentFilters"
           :key="f"
-          class="chip"
+          class="chip chip-bounce"
           :class="{ active: activeFilter === f }"
           @click="activeFilter = f"
           >{{ f }}</span
@@ -298,7 +299,19 @@ function showToast(msg) {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
+.bell-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--price);
+  z-index: 2;
+}
+.act--add { transform-origin: center; }
 .search {
   margin: 10px 16px 0;
   height: 40px;

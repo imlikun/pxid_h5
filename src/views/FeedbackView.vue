@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">在线客服</span>
@@ -9,7 +9,7 @@
 
     <div class="history-tip">查看更多历史消息</div>
 
-    <div class="chat-head">
+    <div class="chat-head fade-up stagger-1">
       <img class="avatar" :src="serviceAvatar" alt="客服" />
       <div class="bubble">
         <div class="brand">品向出行</div>

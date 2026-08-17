@@ -1,14 +1,14 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">问题详情</span>
     </div>
 
     <div class="body" v-if="faq">
-      <div class="card">
+      <div class="card fade-up stagger-1">
         <div class="q-block">
           <span class="q">Q</span>
           <h2 class="q-title">{{ faq.q }}</h2>
@@ -19,7 +19,7 @@
         </div>
       </div>
 
-      <div class="like" @click="liked = !liked">
+      <div class="like fade-up stagger-2 pop" @click="liked = !liked">
         <IconSvg name="thumbs-up" :size="20" :class="['like-icon', { on: liked }]" />
         <span class="like-label">对我有用</span>
         <span :class="['like-num', { on: liked }]">{{ faq.likes + (liked ? 1 : 0) }}</span>

@@ -2,16 +2,16 @@
   <div class="detail" v-if="product">
     <!-- 顶栏 -->
     <div class="topbar">
-      <span class="back" @click="goBack">←</span>
+      <span class="back press" @click="goBack">←</span>
       <span class="t">{{ product.name }}</span>
-      <span class="cart" @click="goCart"><IconSvg name="shopping-cart" :size="22" /></span>
+      <span class="cart press" @click="goCart"><IconSvg name="shopping-cart" :size="22" /></span>
     </div>
 
     <!-- 主图 -->
-    <img class="cover" :src="product.cover" :alt="product.name" />
+    <img class="cover fade-up stagger-1" :src="product.cover" :alt="product.name" />
 
     <!-- 信息 -->
-    <div class="info">
+    <div class="info fade-up stagger-2">
       <div class="name">{{ product.name }}</div>
       <div class="price-row">
         <span class="price">¥{{ product.price }}</span>
@@ -22,13 +22,13 @@
     </div>
 
     <!-- 规格选择 -->
-    <div class="block">
+    <div class="block fade-up stagger-3">
       <div class="block__title">规格</div>
       <div class="opts">
         <span
           v-for="(s, i) in specs"
           :key="i"
-          class="opt"
+          class="opt chip-bounce"
           :class="{ active: activeSpec === i }"
           @click="activeSpec = i"
           >{{ s }}</span
@@ -37,21 +37,21 @@
     </div>
 
     <!-- 数量 -->
-    <div class="block">
+    <div class="block fade-up stagger-4">
       <div class="block__title">数量</div>
       <div class="qty">
-        <button @click="changeQty(-1)">－</button>
+        <button class="press" @click="changeQty(-1)">－</button>
         <span>{{ qty }}</span>
-        <button @click="changeQty(1)">＋</button>
+        <button class="press" @click="changeQty(1)">＋</button>
       </div>
     </div>
 
     <div class="gap"></div>
 
     <!-- 底部操作 -->
-    <div class="actions">
-      <button class="btn btn--cart" @click="onAddCart">去 Shopify 加购</button>
-      <button class="btn btn--buy" @click="onBuy">去 Shopify 购买</button>
+    <div class="actions fade-up stagger-5">
+      <button class="btn btn--cart pop press" @click="onAddCart">去 Shopify 加购</button>
+      <button class="btn btn--buy pop press" @click="onBuy">去 Shopify 购买</button>
     </div>
 
     <!-- toast -->
@@ -62,7 +62,7 @@
 
   <div class="empty" v-else>
     <p>商品不存在</p>
-    <button @click="goBack">返回</button>
+    <button class="press" @click="goBack">返回</button>
   </div>
 </template>
 

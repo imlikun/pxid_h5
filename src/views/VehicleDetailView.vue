@@ -1,16 +1,16 @@
 <template>
   <div class="page">
     <div class="nav">
-      <span class="back" @click="router.back()">
+      <span class="back press" @click="router.back()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </span>
       <span class="title">车型详情</span>
     </div>
 
     <div v-if="car" class="body">
-      <img class="cover" :src="coverUrl" :alt="car.name" />
-      <div class="name">{{ car.name }}</div>
-      <div class="specs">
+      <img class="cover fade-up stagger-1" :src="coverUrl" :alt="car.name" />
+      <div class="name fade-up stagger-2">{{ car.name }}</div>
+      <div class="specs fade-up stagger-3">
         <div class="spec"><span>续航</span><b>80 km</b></div>
         <div class="spec"><span>最高时速</span><b>25 km/h</b></div>
         <div class="spec"><span>最大载重</span><b>150 kg</b></div>
@@ -21,7 +21,7 @@
     <div v-else class="notfound">未找到该车型</div>
 
     <div class="footer">
-      <button class="buy" @click="onCustomize">立即定制</button>
+      <button class="buy press" @click="onCustomize">立即定制</button>
     </div>
   </div>
 </template>

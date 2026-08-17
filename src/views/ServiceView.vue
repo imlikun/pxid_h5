@@ -3,7 +3,7 @@
     <!-- 顶部标题 -->
     <div class="topbar">
       <div class="title">服务</div>
-      <span class="headset" @click="goFeedback">
+      <span class="headset press" @click="goFeedback">
         <IconSvg name="headset" :size="24" />
       </span>
     </div>
