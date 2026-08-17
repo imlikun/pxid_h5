@@ -6,20 +6,35 @@
       </keep-alive>
     </router-view>
 
-    <!-- 仅独立预览时显示底部导航：URL 带 ?standalone=1；嵌入原生 App 时由 Flutter 提供原生 tab -->
+    <!-- 浏览器直接打开（含线上预览）显示底部导航；Flutter 注入真实桥后自动隐藏（原生 tab 接管） -->
     <DemoTabBar v-if="showTabBar" />
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import DemoTabBar from './components/DemoTabBar.vue'
 import { bridge } from './bridge'
 
-const isEmbed = bridge.isEmbed
+// 是否嵌入原生：仅 Flutter 注入真实桥（isNative===true）时为嵌入模式。
+// 用 ref 响应式判断——Flutter 在 WebView 加载 H5 后注入桥，启动后可能才变为嵌入。
+const isEmbed = ref(bridge.isEmbed)
 const route = useRoute()
-const showTabBar = computed(() => !isEmbed && !route.meta.hideTabBar)
+const showTabBar = computed(() => !isEmbed.value && !route.meta.hideTabBar)
+
+onMounted(() => {
+  // Flutter 注入真实桥（isNative 置 true）后，H5 立即切换为嵌入模式（隐藏 demo tab）
+  const t = setInterval(() => {
+    const cur = bridge.isEmbed
+    if (cur !== isEmbed.value) {
+      isEmbed.value = cur
+      if (cur) clearInterval(t)
+    }
+  }, 300)
+  // 兜底：30s 后停止轮询
+  setTimeout(() => clearInterval(t), 30000)
+})
 </script>
 
 <style scoped>

@@ -8,8 +8,12 @@
 // 接入细节见仓库根目录 INTEGRATION.md
 // ============================================================
 
-// 默认按“嵌入原生 App”处理，H5 不渲染底部 tab；浏览器独立预览时加 ?standalone=1
-const isEmbed = !new URLSearchParams(location.search).has('standalone')
+// 是否「嵌入原生 App」：只有 Flutter 注入真实桥（isNative === true）才算嵌入模式，
+// 此时 H5 不渲染底部 tab（由原生 tab 接管）。
+// 浏览器直接打开（含线上预览 appin.site）一律为独立预览：显示底部 tab、走 H5 兜底。
+function isEmbed() {
+  return !!(window.PXIDBridge && window.PXIDBridge.isNative === true)
+}
 
 function logMock(name, payload) {
   // eslint-disable-next-line no-console
@@ -31,7 +35,7 @@ const mockBridge = {
   navigateTo(tab) {
     logMock('navigateTo', tab)
     // 独立预览下用路由兜底，便于在浏览器里演示
-    if (!isEmbed && window.__router) {
+    if (!isEmbed() && window.__router) {
       window.__router.push('/' + tab)
     }
   },
@@ -45,7 +49,7 @@ const mockBridge = {
   // 拨打电话（走原生拨号）
   callPhone(phone) {
     logMock('callPhone', phone)
-    if (!isEmbed) window.location.href = 'tel:' + phone
+    if (!isEmbed()) window.location.href = 'tel:' + phone
   },
 
   // 打开地图导航
@@ -53,7 +57,7 @@ const mockBridge = {
   // 独立预览（手机浏览器直接打开）：按 UA 跳高德(Android) / 苹果地图(iOS) 的 Web URI，实现真调起导航
   openMap({ lat, lng, name }) {
     logMock('openMap', { lat, lng, name })
-    if (!isEmbed) {
+    if (!isEmbed()) {
       const q = encodeURIComponent(name || '')
       const ua = navigator.userAgent
       if (/iPhone|iPad|iPod/i.test(ua)) {
@@ -76,7 +80,7 @@ const mockBridge = {
   // 原生实现：在 WebView / 外部浏览器打开该 URL；mock 直接新标签打开便于预览
   openShopify(url) {
     logMock('openShopify', url)
-    if (!isEmbed) window.open(url, '_blank')
+    if (!isEmbed()) window.open(url, '_blank')
   },
 
   // 去 Shopify 结账（Headless 终态：自有购物车 → 原生 cartCreate → WebView 打开 checkoutUrl）
@@ -86,7 +90,7 @@ const mockBridge = {
   // mock 兜底：预览环境没真 checkoutUrl，直接开第一个商品的 shopUrl 模拟跳转
   openCheckout(lines) {
     logMock('openCheckout', lines)
-    if (!isEmbed) {
+    if (!isEmbed()) {
       const first = (lines && lines[0]) || {}
       const url = first.shopUrl || 'https://shop.pxid.com/'
       window.open(url, '_blank')
@@ -97,7 +101,7 @@ const mockBridge = {
   openNative(path) {
     logMock('openNative', path)
     // H5 预览兜底：把几个有 H5 等价页的原生标识映射到同名路由，浏览器里也能走通链路
-    if (!isEmbed && window.__router) {
+    if (!isEmbed() && window.__router) {
       const map = (p) => {
         let m
         if ((m = p.match(/^vehicle\/(P\d+)/))) return '/vehicle/' + m[1]
@@ -119,13 +123,13 @@ export function initBridge() {
   if (!window.PXIDBridge) {
     window.PXIDBridge = mockBridge
   }
-  window.__PXID_EMBED__ = isEmbed
+  window.__PXID_EMBED__ = isEmbed()
 }
 
 // 统一出口：业务代码只调用这里，无需关心当前是 mock 还是原生
 export const bridge = {
   get isEmbed() {
-    return isEmbed
+    return isEmbed()
   },
   // 是否真实原生桥（Flutter 注入的实现 isNative===true；mock 为 false）
   isNative: () => window.PXIDBridge && window.PXIDBridge.isNative === true,
