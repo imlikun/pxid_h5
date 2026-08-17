@@ -68,7 +68,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { checkedItems, checkedTotal, removeFromCart } from '../store/cart'
-import { orders } from '../data/mock'
 import bridge from '../bridge'
 
 const router = useRouter()
@@ -88,21 +87,21 @@ function onAddr() {
 async function onSubmit() {
   if (checkedItems.value.length === 0 || submitting.value) return
   submitting.value = true
-  const now = new Date()
-  const pad = (n) => String(n).padStart(2, '0')
-  const order = {
-    orderId: 'PX' + Date.now().toString().slice(-10),
-    time: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
-    status: '待发货',
-    items: checkedItems.value.map((i) => ({ name: i.name, cover: i.cover, price: i.price, qty: i.qty })),
-    total: checkedTotal.value,
-  }
-  const ok = await bridge.requestPurchase({ orderId: order.orderId, items: order.items, total: order.total })
+  // Headless 终态：把购物车行交给原生（Flutter），由原生调该国店 Storefront cartCreate
+  // 生成 checkoutUrl → WebView 打开 Shopify 结账 → return_to 回弹。
+  // lines: { variantId, quantity }；mock 预览无真 checkoutUrl 时兜底开第一个 shopUrl
+  const lines = checkedItems.value.map((i) => ({
+    variantId: i.variantId || null,
+    quantity: i.qty,
+    shopUrl: i.shopUrl,
+    name: i.name,
+  }))
+  const ok = await bridge.openCheckout(lines)
   submitting.value = false
   if (ok) {
-    orders.unshift(order)
+    // 支付回弹后清空已结算项；订单状态由 Shopify webhook 同步（见 5.4）
     checkedItems.value.forEach((i) => removeFromCart(i.id))
-    router.replace({ path: '/order/success', query: { id: order.orderId, total: order.total } })
+    router.replace({ path: '/order/success', query: { total: checkedTotal.value } })
   }
 }
 </script>

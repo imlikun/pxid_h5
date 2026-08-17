@@ -50,8 +50,8 @@
 
     <!-- 底部操作 -->
     <div class="actions fade-up stagger-5">
-      <button class="btn btn--cart pop press" @click="onAddCart">去 Shopify 加购</button>
-      <button class="btn btn--buy pop press" @click="onBuy">去 Shopify 购买</button>
+      <button class="btn btn--cart pop press" @click="onAddCart">加入购物车</button>
+      <button class="btn btn--buy pop press" @click="onBuy">去结算</button>
     </div>
 
     <!-- toast -->
@@ -70,6 +70,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { products } from '../data/mock'
+import { addToCart } from '../store/cart'
 import { bridge } from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
 
@@ -80,6 +81,8 @@ const product = computed(() =>
   products.find((p) => String(p.id) === String(route.params.id))
 )
 
+// 规格选择：Shopify 商品有 variants/options 时由接口下发，这里按 mock 简化。
+// 结账时选中的规格 → variantId 映射（见 docs/PXID_Shopify_结账桥接_Flutter版.md）
 const specs = ['标准版', '旗舰版', 'Pro 套装']
 const activeSpec = ref(0)
 const qty = ref(1)
@@ -98,17 +101,17 @@ function goBack() {
   router.back()
 }
 function goCart() {
-  bridge.openShopify('https://shop.pxid.com/cart')
+  router.push('/cart')
 }
 function onAddCart() {
   if (!product.value) return
-  bridge.openShopify(product.value.shopUrl)
-  showToast('正在前往 Shopify…')
+  addToCart({ ...product.value, spec: specs[activeSpec.value], currency: product.value.currency || 'CNY' }, qty.value)
+  showToast('已加入购物车')
 }
 function onBuy() {
   if (!product.value) return
-  bridge.openShopify(product.value.shopUrl)
-  showToast('正在前往 Shopify…')
+  addToCart({ ...product.value, spec: specs[activeSpec.value], currency: product.value.currency || 'CNY' }, qty.value)
+  router.push('/cart/checkout')
 }
 </script>
 

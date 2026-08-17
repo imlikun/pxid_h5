@@ -15,7 +15,8 @@
 | `requestPurchase` | `(payload) => Promise<boolean>` | 拉起原生购买/下单；resolve 支付结果 |
 | `callPhone` | `(phone: string) => void` | 拨号 |
 | `openMap` | `({lat, lng, name}) => void` | 地图导航 |
-| `openShopify` | `(url: string) => void` | 打开 Shopify 商品/页面（商城与 Shopify 打通，H5 仅展示、点击跳 Shopify 购买） |
+| `openShopify` | `(url: string) => void` | 打开 Shopify 商品/页面（外链兜底：详情页、公告链接等） |
+| `openCheckout` | `(lines) => Promise<boolean>` | **去 Shopify 结账（Headless 终态核心）**：原生拿 lines 调该国店 Storefront `cartCreate` 生成 `checkoutUrl` → WebView 打开 Shopify 结账 → `return_to` 回弹。详见《Shopify 结账桥接（Flutter 版）》 |
 
 ## `openNative` 约定（重要）
 
@@ -63,10 +64,10 @@
 
 ## 商城（精选 / 积分好物）与 Shopify 打通
 
-- ToC App **只在前台展示商品数据**（图片、名称、价格来自 Shopify 商品 feed / 接口，预览期用 `mock.products` / `mock.pointsProducts` 等价字段）。
-- 用户点击商品 / 「去购买」时，调用 `bridge.openShopify(product.shopUrl)` 跳转到 Shopify 完成购买；H5 **不自建购物车 / 结算 / 订单流**。
-- 商品数据需携带 `shopUrl`（Shopify 商品页地址）。预览期 mock 用 `https://shop.pxid.com/products/<handle>` 占位。
-- 原生侧 `openShopify` 实现：在 WebView 或外部浏览器打开该 URL，并保留返回能力。
+- **Headless 终态（2026-08-17 定）**：商品数据来自 Shopify（经 Storefront API，mock 期用 `mock.products` 等价字段）；H5 做**自有商品详情页 + 自有购物车 + 自有确认订单页**。
+- 用户点「去结算」→ H5 调 `bridge.openCheckout(lines)`（`lines: [{variantId, quantity, shopUrl, name}]`）→ **原生（Flutter）调该国店 Storefront `cartCreate`** 生成 `checkoutUrl`（带 App 登录身份 buyerIdentity 预填）→ WebView 打开 Shopify 结账 → 支付后 `return_to` 回弹 App。
+- 详细原生实现见 `docs/PXID_Shopify_结账桥接_Flutter版.md`；Shopify 店铺侧要求见 `docs/PXID_Shopify_对接契约_Codex版.md`。
+- 商品数据需携带 `shopUrl`（Shopify 商品页地址）与 `variantId`（结账必传，mock 期可空、原生兜底开商品页）。
 
 ## Flutter 接入清单（联调前必读）
 
@@ -78,14 +79,15 @@ H5 这边已全部完成并推送到 `origin/master` 与 `gitlab/main`，构建�
 - 所有方法请保证异步安全；`getToken` / `requestPurchase` 返回 Promise。
 
 ### 2. 必须实现的方法（签名见「调用出口」表）
-`getToken` / `getLocale` / `navigateTo` / `openNative` / `requestPurchase` / `callPhone` / `openMap` / `openShopify`
+`getToken` / `getLocale` / `navigateTo` / `openNative` / `requestPurchase` / `callPhone` / `openMap` / `openShopify` / `openCheckout`
 
 - `getLocale`：返回当前 `{ locale, country, currency }`（如 `{locale:'zh-CN',country:'CN',currency:'CNY'}`）；H5 启动时调用一次初始化多语言与货币格式。未注入时 H5 用默认 `zh-CN/CN/CNY`。详见《多国定位与 i18n 对接规范》。
 
 - `getToken`：返回当前登录 token；**未登录返回空串**，H5 的登录 Gate（`auth.js`）会据此调 `openNative('login')`。
 - `navigateTo(tab)`：tab 取值 `discover` / `featured` / `purchase` / `service` / `profile`，对应原生底部 5 个 tab。
 - `openNative(path)`：解析「已用标识一览」表里的 `module/action?param=value` 字符串，路由到对应原生页。
-- `openShopify(url)`：在 WebView/外部浏览器打开商品 URL，保留返回。
+- `openShopify(url)`：在 WebView/外部浏览器打开商品 URL，保留返回（外链兜底）。
+- `openCheckout(lines)`：**商城结算唯一入口**——拿 `[{variantId, quantity}]` 调该国店 Storefront `cartCreate`（buyerIdentity 带 App 登录 email 预填）→ 得 `checkoutUrl` → WebView 打开 → 监听 `pxid://checkout/done` 回弹并 resolve(true)；失败 resolve(false)。完整实现见 `docs/PXID_Shopify_结账桥接_Flutter版.md`。
 
 ### 3. 登录闭环（重点）
 - H5 在缺失 token 时调 `openNative('login')` → 原生拉起登录页。
