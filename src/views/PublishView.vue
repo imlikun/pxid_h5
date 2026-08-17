@@ -138,15 +138,14 @@ function onPublish() {
   padding-bottom: env(safe-area-inset-bottom);
 }
 .topbar {
-  height: calc(48px + env(safe-area-inset-top));
+  height: calc(44px + env(safe-area-inset-top));
   padding-top: env(safe-area-inset-top);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-left: 12px;
-  padding-right: 12px;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
+  padding-left: 16px;
+  padding-right: 16px;
+  background: var(--bg);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -170,13 +169,13 @@ function onPublish() {
 }
 .post {
   border: 1px solid var(--line);
-  background: var(--card);
+  background: #fff;
   color: var(--text-sub);
   font-size: 14px;
   font-weight: 500;
-  height: 32px;
-  padding: 0 18px;
-  border-radius: 12px;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 10px;
   transition: all 0.15s ease;
 }
 .post.active {
@@ -198,6 +197,7 @@ function onPublish() {
 }
 .input-wrap {
   position: relative;
+  background: #fff;
 }
 .content {
   width: 100%;
