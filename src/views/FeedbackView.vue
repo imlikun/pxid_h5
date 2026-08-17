@@ -26,10 +26,20 @@
     </div>
 
     <div v-if="filteredFaqs.length" class="faq-list">
-      <div v-for="(f, i) in filteredFaqs" :key="f.id" class="faq" @click="goFaq(f)">
-        <span class="faq__no">{{ i + 1 }}</span>
-        <span class="faq__q">{{ f.q }}</span>
-        <span class="faq__arrow">›</span>
+      <div v-for="(f, i) in filteredFaqs" :key="f.id" class="faq-wrap fade-up" :class="'stagger-' + (((i + 1) % 10))">
+        <div class="faq press" :class="{ on: expandedId === f.id }" @click="toggleFaq(f.id)">
+          <span class="faq__no">{{ i + 1 }}</span>
+          <span class="faq__q">{{ f.q }}</span>
+          <span class="faq__arrow">{{ expandedId === f.id ? '－' : '＋' }}</span>
+        </div>
+        <transition name="faq">
+          <div v-if="expandedId === f.id" class="faq__a">
+            <span class="faq__a-q">Q</span>
+            <span class="faq__a-qtxt">{{ f.q }}</span>
+            <span class="faq__a-a">A</span>
+            <span class="faq__a-atxt">{{ f.a }}</span>
+          </div>
+        </transition>
       </div>
     </div>
     <div v-else class="empty">暂无该分类问题，试试其他分类或输入描述</div>
@@ -52,6 +62,7 @@ const router = useRouter()
 const serviceAvatar = import.meta.env.BASE_URL + 'unsplash/photo-1494790108377-be9c29b29330_w_80_q_80.jpg'
 const activeTab = ref(feedbackTabs[0])
 const text = ref('')
+const expandedId = ref(null) // 客服 FAQ 内联展开：一次只展开一条
 
 const filteredFaqs = computed(() =>
   feedbackFaqs.filter((f) => f.category === activeTab.value)
@@ -62,9 +73,9 @@ function onSend() {
   console.log('[feedback] send:', text.value)
   text.value = ''
 }
-function goFaq(f) {
-  // 可跳转 FAQ 详情
-  router.push('/service/faq/' + f.id)
+function toggleFaq(id) {
+  // 客服场景：点击行内联展开答案，不再跳详情页（避免反馈/FAQ 数据源错位）
+  expandedId.value = expandedId.value === id ? null : id
 }
 </script>
 
@@ -89,11 +100,48 @@ function goFaq(f) {
 .tab.active { color: var(--brand); font-weight: 600; }
 .tab.active::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 0; width: 32px; height: 2px; background: var(--brand); border-radius: 2px; }
 .faq-list { flex: 1; background: var(--card); margin: 0 12px; border-radius: var(--radius); overflow: hidden; }
-.faq { display: flex; align-items: center; gap: 12px; padding: 16px 12px; border-bottom: 1px solid var(--line); }
-.faq:last-child { border-bottom: none; }
+.faq-wrap { border-bottom: 1px solid var(--line); }
+.faq-wrap:last-child { border-bottom: none; }
+.faq { display: flex; align-items: center; gap: 12px; padding: 16px 12px; }
+.faq.on { background: var(--bg); }
 .faq__no { color: var(--text-hint); font-size: 14px; width: 18px; }
 .faq__q { flex: 1; font-size: 14px; color: var(--text); }
-.faq__arrow { color: var(--text-hint); font-size: 20px; }
+.faq__arrow { color: var(--brand); font-size: 18px; font-weight: 600; width: 16px; text-align: center; }
+
+/* 内联展开答案 */
+.faq__a {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  column-gap: 10px;
+  row-gap: 6px;
+  padding: 0 12px 14px;
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.faq__a-q, .faq__a-a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 1px;
+}
+.faq__a-q { background: var(--brand); }
+.faq__a-a { background: #d1d5db; }
+.faq__a-qtxt, .faq__a-atxt { color: var(--text-sub); }
+
+/* accordion transition */
+.faq-enter-active,
+.faq-leave-active { transition: opacity 0.18s ease, max-height 0.22s ease; overflow: hidden; }
+.faq-enter-from,
+.faq-leave-to { opacity: 0; max-height: 0; }
+.faq-enter-to,
+.faq-leave-from { opacity: 1; max-height: 360px; }
 .empty { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--text-hint); padding: 40px 20px; text-align: center; }
 .input-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); }
 .grid-icon { color: var(--text-hint); display: flex; }
