@@ -61,30 +61,37 @@
       </div>
     </div>
 
-    <!-- 商品介绍（body_html 优先；为空时用 options/tags 自动拼一份规格卡，保证任何商品都有内容） -->
+    <!-- 商品介绍（结构化 intro 优先，body_html 兜底，最后显示"待完善"占位） -->
     <div class="block fade-up stagger-5">
       <div class="block__title">商品介绍</div>
-      <div v-if="product.body_html" class="desc" v-html="safeHtml(product.body_html)"></div>
-      <div v-else class="specs">
-        <div v-if="product.options && product.options.length" class="specs__row">
-          <span class="specs__k">可选规格</span>
-          <span class="specs__v">
-            <span v-for="(o, i) in product.options" :key="i" class="specs__chip">
-              {{ o.name }}：{{ o.values.join(' / ') }}
-            </span>
-          </span>
+
+      <!-- 结构化介绍：summary / highlights / specs / sections -->
+      <template v-if="product.intro">
+        <div v-if="product.intro.summary" class="intro__summary">{{ product.intro.summary }}</div>
+        <ul v-if="product.intro.highlights && product.intro.highlights.length" class="intro__chips">
+          <li v-for="(h, i) in product.intro.highlights" :key="i" class="intro__chip">{{ h }}</li>
+        </ul>
+        <div v-if="product.intro.sections && product.intro.sections.length" class="intro__sections">
+          <div v-for="(s, i) in product.intro.sections" :key="i" class="intro__sec">
+            <div class="intro__sec-title">{{ s.title }}</div>
+            <div v-if="s.body" class="intro__sec-body">{{ s.body }}</div>
+            <img v-if="s.image" class="intro__sec-img" :src="s.image" :alt="s.title" />
+            <div v-if="s.specs && s.specs.length" class="intro__specs">
+              <div v-for="sp in s.specs" :key="sp.k" class="intro__specs-row">
+                <span class="intro__specs-k">{{ sp.k }}</span>
+                <span class="intro__specs-v">{{ sp.v }}</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div v-if="product.tags && product.tags.length" class="specs__row">
-          <span class="specs__k">标签</span>
-          <span class="specs__v">
-            <span v-for="t in product.tags" :key="t" class="specs__chip">{{ t }}</span>
-          </span>
-        </div>
-        <div class="specs__row">
-          <span class="specs__k">商品 ID</span>
-          <span class="specs__v">{{ product.id }}</span>
-        </div>
-      </div>
+        <video v-if="product.intro.video" class="intro__video" controls :src="product.intro.video"></video>
+      </template>
+
+      <!-- 兜底：原始 body_html 富文本（兼容老数据） -->
+      <div v-else-if="product.body_html" class="desc" v-html="safeHtml(product.body_html)"></div>
+
+      <!-- 最后兜底 -->
+      <div v-else class="intro__empty">商品介绍待完善</div>
     </div>
 
     <div class="gap"></div>
@@ -241,9 +248,10 @@ watch(() => route.params.id, (id) => load(id), { immediate: true })
   min-height: 100vh;
   background: var(--bg);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
-  max-width: 420px;
-  margin: 0 auto;
-  background: #fff;
+  /* 全宽铺满：与底部按钮栏左右对齐，避免电脑预览时"中右块"视觉错位 */
+  max-width: 100%;
+  margin: 0;
+  background: var(--bg);
 }
 .topbar {
   height: calc(48px + env(safe-area-inset-top));
@@ -456,16 +464,102 @@ watch(() => route.params.id, (id) => load(id), { immediate: true })
   font-size: 12px;
 }
 
+/* 结构化商品介绍（按 Codex 契约 §8 渲染） */
+.intro__summary {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.intro__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.intro__chip {
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-radius: 16px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.intro__sections {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 4px;
+}
+.intro__sec-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.intro__sec-body {
+  font-size: 13px;
+  color: var(--text-sub);
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+.intro__sec-img {
+  width: 100%;
+  border-radius: 10px;
+  margin: 8px 0;
+  display: block;
+}
+.intro__specs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 0.5px solid var(--line);
+  background: var(--bg);
+  margin-top: 8px;
+}
+.intro__specs-row {
+  display: flex;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--line);
+}
+.intro__specs-row:last-child { border-bottom: none; }
+.intro__specs-k {
+  flex: none;
+  width: 92px;
+  color: var(--text-sub);
+}
+.intro__specs-v {
+  flex: 1;
+  color: var(--text);
+}
+.intro__video {
+  width: 100%;
+  border-radius: 10px;
+  margin-top: 12px;
+  background: #000;
+}
+.intro__empty {
+  font-size: 13px;
+  color: var(--text-sub);
+  padding: 20px 0;
+  text-align: center;
+}
+
 .gap {
   height: 10px;
 }
 .actions {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   bottom: 0;
   width: 100%;
-  max-width: 420px;
   display: flex;
   gap: 10px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));

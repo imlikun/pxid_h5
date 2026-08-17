@@ -103,3 +103,70 @@ H5 在 WebView 内打开 `checkoutUrl`，Flutter 监听该 scheme 关闭 WebView
 - `cartCreate` 的 `merchandiseId` 用 `gid://shopify/ProductVariant/{variant_id}`，`variant_id` 来自商品 `variants` 接口。
 - 多币种由「每国一个店」决定，**不要**在单个店里做 Markets 切换；Flutter 原生会按用户地区访问对应国的店。
 - 任何新增接口 / 字段，先同步我们（App 团队），避免 H5 解析失败。
+
+---
+
+## 8. 商品介绍结构化字段（Codex 必填，H5 按此渲染）
+
+> 现成 `body_html` 太简陋（一行英文），H5 无法拼出像样的商品介绍页。请按下方 **JSON 结构** 在每个商品的 **Metafield**（命名空间 `custom`，键 `intro`，类型 `json`）里填一份**结构化介绍**，H5 端会按此渲染富详情页。`products.json` 公开端点不带 metafield，请用 Storefront API 查询时一并返回此字段；H5 通过 `bridge.openCheckout` 同源链路（Flutter 原生 Storefront）拉到 H5（详见 `PXID_Shopify_结账桥接_Flutter版.md`）。
+
+### 8.1 字段定义（必填，结构稳定）
+
+```json
+{
+  "intro": {
+    "summary":  "一句话卖点（≤ 40 字）",
+    "highlights": [
+      "亮点 1（≤ 20 字）",
+      "亮点 2",
+      "亮点 3",
+      "亮点 4（3-5 条为宜）"
+    ],
+    "sections": [
+      {
+        "title": "分段标题",
+        "body":  "段落正文（1-3 句，可含简单 <br>）",
+        "image": "https://cdn.shopify.com/.../xxx.jpg",
+        "specs": [
+          { "k": "电机",     "v": "250W 高速无刷" },
+          { "k": "电池",     "v": "48V 10Ah 锂电池" },
+          { "k": "续航",     "v": "纯电 40km / 助力 60km" },
+          { "k": "充电时间", "v": "4-6 小时" },
+          { "k": "最大载重", "v": "120 kg" },
+          { "k": "整车重量", "v": "21 kg" }
+        ]
+      }
+    ],
+    "video": "https://cdn.shopify.com/.../demo.mp4"
+  }
+}
+```
+
+### 8.2 字段说明与规则
+
+| 字段 | 类型 | 必填 | 规则 |
+| --- | --- | --- | --- |
+| `summary` | string | ✅ | ≤ 40 字，一句话卖点，用于详情页顶部简介 |
+| `highlights` | string[] | ✅ | 3-5 条，每条 ≤ 20 字，用于详情页亮点胶囊 |
+| `sections[].title` | string | ✅ | 分段标题 |
+| `sections[].body` | string | ✅ | 段落正文，支持 `<br>` |
+| `sections[].image` | string(url) | ⭕ | 分段配图，建议 ≤ 1MB、宽 ≥ 800 |
+| `sections[].specs` | { k, v }[] | ⭕ | 规格参数表，每段 4-8 行；与 `variants[].sku/title` 不冲突 |
+| `video` | string(url) | ⭕ | 商品演示视频 mp4 链接，可选 |
+
+### 8.3 Codex 实现要点
+
+1. **每个商品都要填** `custom.intro` metafield（即使内容少，也要有 `summary` + 1 个 `sections`，避免 H5 出现空白）。
+2. 同一商品的多语言版本在 metafield 里存多套（命名空间 `custom.locale`，键 `intro_<lang>`，如 `intro_en` / `intro_zh`），H5 按 `getLocale()` 取对应版本；缺语言时回退店铺默认语言。
+3. Storefront API 查询示例（Codex 自测用）：
+   ```graphql
+   query {
+     product(handle: "p4") {
+       title
+       variants(first: 10) { edges { node { id available title } } }
+       intro: metafield(namespace: "custom", key: "intro") { value }
+       introEn: metafield(namespace: "custom", key: "intro_en") { value }
+     }
+   }
+   ```
+4. H5 端已经按本规范做好结构化渲染（`ProductDetailView.vue` 的 `.intro` 区块），拿到 `intro` JSON 直接显示富详情页；拿不到时回退 `body_html`，body_html 为空显示占位"商品介绍待完善"。

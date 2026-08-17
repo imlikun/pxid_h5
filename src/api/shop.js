@@ -46,7 +46,7 @@ function normalize(p, { domain, currency }) {
   const tags = (p.tags || []).join(' ').toLowerCase()
   // 分区映射（对齐 mock.collection）：bike/电动自行车 → spring（踏春），其余配件 → p1parts
   const collection = /bike|ebike|scooter|electric/.test(type + ' ' + tags) ? 'spring' : 'p1parts'
-  return {
+  const base = {
     id: String(p.id),
     handle: p.handle,
     name: p.title,
@@ -61,6 +61,7 @@ function normalize(p, { domain, currency }) {
     collection,
     shopUrl: `https://${domain}/products/${p.handle}`,
     body_html: p.body_html || '',
+    intro: null, // 结构化介绍（Codex 契约 §8）；products.json 公开端点不返回，由 Storefront API metafield 提供
     options: (p.options || []).map((o) => ({ name: o.name, values: o.values })),
     variants: (p.variants || []).map((v) => ({
       id: String(v.id),
@@ -71,6 +72,48 @@ function normalize(p, { domain, currency }) {
       option1: v.option1 || '',
     })),
   }
+  // demo：折叠车（handle=p4）注入一份结构化介绍，验证 H5 渲染流程
+  // 上线后由 Shopify 兄弟按 Codex 契约 §8 在 metafield (custom.intro) 提供真实数据
+  if (p.handle === 'p4') {
+    base.intro = {
+      summary: '20 寸轻量折叠电助力车，城市通勤 + 户外骑行一车搞定。',
+      highlights: [
+        '5 秒折叠，地铁 / 办公室 / 后备箱轻松放',
+        '250W 高效电机，48V 锂电池',
+        '续航 40-60km，纯电 + 助力双模式',
+        'LED 仪表 + 机械碟刹，安全可靠',
+      ],
+      sections: [
+        {
+          title: '便携折叠',
+          body: '6061 铝合金一体车架，5 秒三步折叠，折叠后体积仅 0.3 m³，地铁、办公室、汽车后备箱轻松放入。',
+          image: imgs[1] || imgs[0] || '',
+        },
+        {
+          title: '动力性能',
+          body: '250W 高速无刷电机 + 48V 10Ah 可拆卸锂电池，最高时速 25 km/h，纯电续航 40 km，助力续航 60 km。',
+          specs: [
+            { k: '电机', v: '250W 高速无刷' },
+            { k: '电池', v: '48V 10Ah 锂电池' },
+            { k: '续航', v: '纯电 40km / 助力 60km' },
+            { k: '充电时间', v: '4-6 小时' },
+            { k: '最大载重', v: '120 kg' },
+            { k: '整车重量', v: '21 kg' },
+          ],
+        },
+        {
+          title: '安全配置',
+          body: '前后机械碟刹 + EABS 断电刹车，LED 大灯 + 尾灯，夜间骑行更安心。',
+          specs: [
+            { k: '刹车', v: '前后机械碟刹 + EABS' },
+            { k: '灯光', v: 'LED 大灯 + 尾灯' },
+            { k: '仪表', v: 'LCD 多功能显示' },
+          ],
+        },
+      ],
+    }
+  }
+  return base
 }
 
 // ---- 拉取：优先真实店铺，失败回落 mock ----
