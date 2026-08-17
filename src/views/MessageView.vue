@@ -1,19 +1,19 @@
 <template>
   <div class="message">
     <!-- 顶部导航 -->
-    <div class="topbar">
+    <div class="topbar fade-up">
       <div class="left">
-        <span class="back" @click="goBack">
+        <span class="back press" @click="goBack">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         </span>
         <span class="title">消息</span>
       </div>
       <div class="right">
-        <span class="act">
+        <span class="act press">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <span v-if="unread > 0" class="m-badge"></span>
         </span>
-        <span class="act">
+        <span class="act press">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         </span>
       </div>
@@ -21,7 +21,7 @@
 
     <!-- 消息分类 -->
     <div class="categories">
-      <div v-for="c in messageCategories" :key="c.key" class="cat" @click="onCat(c)">
+      <div v-for="(c, i) in messageCategories" :key="c.key" class="cat fade-up press" :class="'stagger-' + ((i % 10) + 1)" @click="onCat(c)">
         <div class="cat__icon">
           <IconSvg :name="c.icon" :size="24" stroke="1.8" />
         </div>
@@ -31,7 +31,7 @@
 
     <!-- 消息列表 -->
     <div class="list">
-      <div v-for="m in messages" :key="m.id" class="item" @click="onMsg(m)">
+      <div v-for="(m, i) in messages" :key="m.id" class="item fade-up press" :class="'stagger-' + ((i % 10) + 5)" @click="onMsg(m)">
         <div class="avatar">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#bbb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
         </div>
@@ -125,6 +125,29 @@ function onMsg(m) {
   padding: 0 2px;
   border-radius: 4px;
   background: var(--price);
+}
+.m-badge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--price);
+  animation: badgePulse 1.8s ease-out infinite;
+}
+.cat {
+  transition: transform 0.12s ease, background 0.18s ease;
+  border-radius: 12px;
+  padding: 6px 0;
+}
+.cat:active {
+  transform: scale(0.95);
+  background: var(--bg-press, rgba(0, 0, 0, 0.04));
+}
+.item {
+  transition: background 0.18s ease;
+}
+.item:active {
+  background: var(--bg-press, rgba(0, 0, 0, 0.04));
 }
 .categories {
   display: grid;

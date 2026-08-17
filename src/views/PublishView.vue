@@ -1,16 +1,16 @@
 <template>
   <div class="publish">
     <!-- 顶部：返回 + 发布 -->
-    <div class="topbar">
-      <span class="back" @click="goBack">
+    <div class="topbar fade-up">
+      <span class="back press" @click="goBack">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       </span>
       <span class="title">发布动态</span>
-      <button class="post" :class="{ active: canPost }" :disabled="!canPost" @click="onPublish">发布</button>
+      <button class="post press pop" :class="{ active: canPost }" :disabled="!canPost" @click="onPublish">发布</button>
     </div>
 
     <div class="body">
-      <div class="card input-wrap">
+      <div class="card input-wrap fade-up stagger-1 focus-lift">
         <textarea
           class="content"
           v-model="content"
@@ -21,13 +21,13 @@
       </div>
 
       <!-- 车型选择 -->
-      <div class="card section">
+      <div class="card section fade-up stagger-2">
         <div class="label">关联车型</div>
         <div class="chips">
           <span
             v-for="m in carModels"
             :key="m"
-            class="chip"
+            class="chip chip-bounce"
             :class="{ active: carModel === m }"
             @click="carModel = m"
             >{{ m }}</span
@@ -36,13 +36,13 @@
       </div>
 
       <!-- 图片选择（本地图库，无后端上传） -->
-      <div class="card section">
+      <div class="card section fade-up stagger-3">
         <div class="label">添加图片</div>
         <div class="gallery">
           <div
             v-for="g in gallery"
             :key="g"
-            class="gitem"
+            class="gitem press"
             :class="{ on: selected.includes(g) }"
             @click="toggle(g)"
           >
