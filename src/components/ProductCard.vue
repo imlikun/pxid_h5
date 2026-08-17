@@ -3,22 +3,33 @@
     <img class="pcard__cover" :src="product.cover" :alt="product.name" />
     <div class="pcard__name">{{ product.name }}</div>
     <div class="pcard__price">
-      <span class="price">¥{{ product.price }}</span>
-      <span v-if="product.origin" class="origin">¥{{ product.origin }}</span>
+      <span class="price">{{ fmt(product.price) }}</span>
+      <span v-if="product.origin" class="origin">{{ fmt(product.origin) }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { bridge } from '../bridge'
+import { useRouter } from 'vue-router'
 
 const props = defineProps({
   product: { type: Object, required: true },
 })
 
+const router = useRouter()
+
+function fmt(v) {
+  const c = props.product.currency || 'USD'
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: c }).format(v)
+  } catch (e) {
+    return c + ' ' + v
+  }
+}
+
 function go() {
-  // 商城与 Shopify 打通：H5 仅展示，点击跳 Shopify 购买
-  bridge.openShopify(props.product.shopUrl)
+  // 商城 Headless：点商品进站内详情页（真实 Shopify 数据），结账才跳 Shopify
+  router.push('/product/' + (props.product.handle || props.product.id))
 }
 </script>
 

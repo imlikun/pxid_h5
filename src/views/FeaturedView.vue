@@ -79,12 +79,13 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
-import { featuredQuick, products } from '../data/mock'
+import { featuredQuick } from '../data/mock'
+import { fetchProducts } from '../api/shop'
 
 const router = useRouter()
 const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
@@ -96,9 +97,15 @@ const topTabs = [
 ]
 const activeTab = ref('rec')
 
-const hotProducts = computed(() => products.slice(0, 4))
-const springProducts = computed(() => products.filter((p) => p.collection === 'spring'))
-const bikeProducts = computed(() => products.filter((p) => p.collection === 'p1parts'))
+// 商品数据：真实 Shopify（每国店），失败回落 mock
+const allProducts = ref([])
+onMounted(async () => {
+  allProducts.value = await fetchProducts()
+})
+
+const hotProducts = computed(() => allProducts.value.slice(0, 4))
+const springProducts = computed(() => allProducts.value.filter((p) => p.collection === 'spring'))
+const bikeProducts = computed(() => allProducts.value.filter((p) => p.collection === 'p1parts'))
 
 function onQuick(q) {
   if (q.key === 'hot') {
