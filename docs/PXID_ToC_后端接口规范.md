@@ -134,52 +134,86 @@ body：
 
 ---
 
-## 5. 精选 / 商城（Shopify 代理）
+## 5. 精选 / 商城（Headless Shopify 终态）
 
-> 商城与 **Shopify 打通**。**约定：由 Java 后端做 Shopify 代理**——后端调用 Shopify Storefront API（GraphQL）拉取商品/价格/币种，归一化为下方 `Product` 结构下发给 H5；H5 仅展示，用户点击「去购买」调 `bridge.openShopify(product.shopUrl)` 跳 Shopify 完成购买与结算，**H5 不自建购物车/订单流**（见 §11 边界）。该约定与整体架构一致：Java 为数据源、多国定位由 Java 处理、H5 只负责展示。
+> **三方架构（2026-08-17 终审，落地依据）**
+> - **三个独立 owner**：Flutter 兄弟（原生 / 地区注入）、Java 兄弟（H5 数据后端 + Shopify 代理 + 结账编排 + webhook 接收）、**Shopify 兄弟（独立店铺，用 Codex 编写，详见 `PXID_Shopify_对接契约_Codex版.md`）**。
+> - **多国 = 每国一个 Shopify 店铺**（非 Markets / `@inContext`）。App 账号与地区 1:1 对应到某国店铺；多币种由「选对店」解决——Java 按 Flutter 注入的 `country` 路由到对应店铺的 Storefront（域名 + token 在 Java 侧按地区配置，见 5.1）。
+> - **购买逻辑边界（已确认）**：H5 做浏览 / 列表 / 自有商品详情 / 自有加购 / 自有「确认订单」页；点「去支付」→ Java `POST /shopify/checkout` 用该国店 Storefront `cartCreate` 生成 `checkoutUrl` → Flutter 在 WebView 打开 → Shopify 负责地址 / 国际运费 / 关税 / 支付 / 出单 / 发货 / 退款；`return_to` 回弹 App。订单经 Shopify `orders` webhook 同步进我们 DB，App 内「我的订单」读取（见 5.4 / 5.5）。
 
-### 5.0 Shopify 侧前置（运维 / 后端）
-- 在 Shopify 后台创建 **Storefront API 访问令牌**，scope 至少包含：
-  `unauthenticated_read_product_listings`、`unauthenticated_read_collections`、`unauthenticated_read_product_inventory`（如需库存）。
-- 规划 Collection（对应 H5 的 `collection` 字段），建议 handle：
-  - `spring`（踏春装备）、`p1parts`（P1 配件）、`points`（积分商城）等。
-- 商品在线页 URL 即 `shopUrl`（如 `https://shop.pxid.com/products/cap-men`），购买/结算继续走 Shopify 收银台。
+### 5.0 Shopify 侧前置（Shopify 兄弟，按 Codex 契约实现）
+- 每个国家店铺创建 **Storefront API 令牌**，scope 至少：`unauthenticated_read_product_listings`、`unauthenticated_read_collections`、`cart`（用于 `cartCreate`）。令牌交给 Java（见契约文档）。
+- Collection handle **跨店统一**（便于 Java 按 handle 拉取）：`spring`（踏春）、`p1parts`（P1 配件）、`points`（积分商城）等。
+- 商品在线页 URL 即 `shopUrl`（如 `https://{country-store}/products/ant5`）。
+- 结账 `return_to` 配为 App scheme（如 `pxid://checkout/done`），用于支付后回弹。
+- 注册 webhook：`orders/create` + `orders/updated` → 指向 Java 接收端点（HMAC 校验）。
+- 运费区 / 承运商 + 跨境电车（锂电）运输规则按目标国配置。
 
 ### 5.1 Java 代理实现要点
-- 新增商品聚合模块，内部用 GraphQL 调 Storefront API；**结果缓存 5–15min**（目录不常变，避免打爆 Shopify 配额）。
-- 多国：取 Flutter 经 H5 下发的 `lang` / `country`（见《多国定位 i18n 对接规范》），注入 Storefront 查询的 `@inContext(country: $country, language: $lang)` 指令，返回对应**币种与翻译**。
+- **地区 → 店铺路由**：维护配置 `country/region → { shopifyDomain, storefrontToken }`。`country` 取自 Flutter 注入（见《多国定位 i18n 对接规范》）。
+- 商品聚合：Storefront GraphQL 拉取，**缓存 5–15min**（目录不常变）；返回该国店默认币种（无需 `@inContext`）。
 - 归一化映射（Shopify → 本规范 `Product`）：
 
 | Shopify 字段 | Product 字段 | 说明 |
 | --- | --- | --- |
-| `id` / `handle` | `id` | 用数字 id 或 handle |
+| `id` / `handle` | `id` | |
 | `title` | `name` | |
 | `priceRange.minVariantPrice.amount` | `price` | 同时取 `currencyCode` → `currency` |
 | `compareAtPrice` | `origin` | 无则空 |
 | `images[0].url` | `cover` | 完整 URL |
-| `tags` / 自定义元字段 | `tag` | 主标签 |
-| `totalInventory` 或忽略 | `sales` | Shopify 无原生销量，可用库存近似或置 0 |
+| `tags` / 元字段 | `tag` | 主标签 |
+| 忽略 | `sales` | Shopify 无原生销量，置 0 或库存近似 |
 | `collections` handle | `collection` | |
 | 在线商品页 | `shopUrl` | |
+| `variants[]`（id / title / price / availableForSale / selectedOptions） | `variants` | **新增**，结账必传 `variantId` |
+| `options[]`（name / values） | `options` | **新增**，前端动态渲染规格选择 |
 
 ### 5.2 商品列表
 #### GET /products
-query：`collection`（如 `spring` / `p1parts` / `points`，可选）、`page`、`pageSize`
-**响应 data.list（对齐 `mock.products`，新增 `currency`）：**
+query：`collection`（如 `spring` / `p1parts` / `points`，可选）、`country`（可选，缺省用登录地区）、`page`、`pageSize`
+**响应 data.list（对齐 `mock.products`，新增 `currency` / `variants` / `options`）：**
 ```json
-[{ "id": 1, "name": "鸭舌帽 男士", "price": 280, "origin": 399, "currency": "CNY", "cover": "https://cdn.pxid.com/p/1.jpg", "tag": "踏春装备", "sales": 1203, "collection": "spring", "shopUrl": "https://shop.pxid.com/products/cap-men" }]
+[{
+  "id": 1, "name": "鸭舌帽 男士", "price": 280, "origin": 399, "currency": "CNY",
+  "cover": "https://cdn.pxid.com/p/1.jpg", "tag": "踏春装备", "sales": 0,
+  "collection": "spring", "shopUrl": "https://shop.pxid.com/products/cap-men",
+  "options": [{ "name": "颜色", "values": ["黑", "白"] }],
+  "variants": [{ "id": "gid://shopify/ProductVariant/43810663202975", "title": "黑", "price": 280, "available": true, "selectedOptions": { "颜色": "黑" } }]
+}]
 ```
-> `currency`：多国场景返回对应币种代码（CNY / USD / EUR …），H5 按它渲染符号，不再写死 ¥。
+> `currency`：随店铺所在国返回（CNY / USD / EUR …），H5 按它渲染符号，不再写死 ¥。
 #### GET /products/{id}
-返回单条商品（字段同上，可含 `images[]`、`description` 供详情页）。
+返回单条商品（含 `images[]`、`description`、`variants`、`options` 供详情页渲染规格选择）。
 
-### 5.3 订单查询（可选）
+### 5.3 结账编排（核心新增）
+#### POST /shopify/checkout
+> H5「去支付」调用。Java 用该国店 Storefront `cartCreate`，入参用户购物车行（variantId + 数量），**先复校验价 / 库存**，返回 `checkoutUrl`。
+body：
+```json
+{ "lines": [ { "variantId": "gid://shopify/ProductVariant/43810663202975", "quantity": 1 } ] }
+```
+**响应 data：**
+```json
+{ "checkoutUrl": "https://{country-store}/cart/.../checkout/..." }
+```
+> 失败（缺货 / 下架 / 价格漂移）：返回 `code ≠ 0` + `message`（如「该规格暂不可购」），H5 据此提示用户。
+> H5 拿到 `checkoutUrl` 后调 `bridge.openShopify(checkoutUrl)`（Flutter 在 WebView 内打开 Shopify 结账）。
+
+### 5.4 订单同步（webhook 接收）
+#### POST /shopify/webhook/orders
+> Shopify 兄弟配置 `orders/create` + `orders/updated` 推送到此端点。**必须 HMAC 校验**（`X-Shopify-Hmac-Sha256`，密钥双方约定）。
+body：Shopify order JSON（含 `id` / `email` / `financial_status` / `fulfillment_status` / `line_items` / `total_price`）。Java 落库（按 `email` 关联用户），供「我的订单」读取。
+
+### 5.5 我的订单（读）
 #### GET /orders
-仅查询用户在 Shopify 侧的订单，对齐 `mock.orders`：
+数据来自 5.4 同步的库（非直接查 Shopify），对齐 `mock.orders`：
 ```json
 [{ "id": "PX20260812003", "time": "2026-08-12T15:22:00+08:00", "status": "已发货", "currency": "CNY", "items": [{ "name": "原装后轮 适配P1", "cover": "https://cdn.pxid.com/p/2.jpg", "price": 6800, "qty": 1 }], "total": 6800 }]
 ```
-> 下单/支付走 `openShopify`（调 Shopify 收银台），**不经你们后端**（见 §11）。
+> 售后 / 退款在 Shopify 处理，App 仅展示状态 + 外链 Shopify 订单页。
+
+### 5.6 积分商城
+积分兑换仍走 `POST /points/exchange`（§6）；若需跳 Shopify 礼品卡 / 折扣，则一并返回 `shopUrl`。
 
 ---
 
@@ -319,8 +353,8 @@ H5 的部分能力**不直接 fetch 后端**，而是调 `openNative(...)` 交�
 | FAQ / 门店 / 工单查询 / 消息 / 积分 / 搜索 / 上传 | H5 直接 fetch | §4–§10 |
 | **发帖** | H5→`openNative('discover/publish')`→原生发布器 | 原生调 **POST /feed** |
 | **分享** | H5→`openNative('share/feed?id=')`→原生分享面板 | 无后端（原生处理） |
-| **商品购买** | H5→`openShopify(shopUrl)` | 跳 Shopify，**不经你们后端** |
-| **下单/支付** | H5→`requestPurchase`→原生收银台 | 调 Shopify，**不经你们后端** |
+| **商品购买 / 结账** | H5 自有购物车 → `POST /shopify/checkout` → `openShopify(checkoutUrl)`（Flutter WebView 打开 Shopify 结账）；订单经 webhook 同步 | Java 实现 `/shopify/checkout` + webhook 接收；Shopify 负责支付 / 出单 |
+| **支付** | 随「商品购买 / 结账」在 Shopify 收银台完成 | Shopify 负责，**不经你们后端** |
 | **道路救援提交** | H5→`openNative('rescue/submit')`→原生 | 原生调 **POST /rescue** |
 | **购车定制提交** | H5→`openNative('buy/customize')`→原生 | 原生调 **POST /customize** |
 | **工单联系/取消** | H5→`openNative('service/cancelOrder?orderId=')`→原生 | 原生调 **POST /work-orders/{id}/cancel** |
@@ -357,7 +391,9 @@ H5 的部分能力**不直接 fetch 后端**，而是调 `openNative(...)` 交�
 | POST | /notices/{id}/ack | 公告确认 | H5 |
 | GET | /products | 商品列表 | H5/Shopify 聚合 |
 | GET | /products/{id} | 商品详情 | H5 |
-| GET | /orders | 订单查询 | H5 |
+| GET | /orders | 我的订单（读，来自 webhook 同步） | H5 |
+| POST | /shopify/checkout | 结账编排→checkoutUrl | H5 |
+| POST | /shopify/webhook/orders | 订单 webhook 接收（HMAC） | Shopify |
 | GET | /points/balance | 积分余额 | H5 |
 | GET | /points/products | 积分商城 | H5 |
 | POST | /points/exchange | 积分兑换 | H5 |
