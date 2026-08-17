@@ -1,5 +1,5 @@
 <template>
-  <div class="moment" @click="open">
+  <div class="moment press" @click="open">
     <div class="m-head">
       <img class="m-avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
       <div class="m-meta">

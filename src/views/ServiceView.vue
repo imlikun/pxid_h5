@@ -11,9 +11,10 @@
     <!-- 6 个服务入口（单张白卡） -->
     <div class="grid">
       <div
-        v-for="s in serviceEntries"
+        v-for="(s, i) in serviceEntries"
         :key="s.key"
-        class="entry"
+        class="entry fade-up press"
+        :class="'stagger-' + ((i % 10) + 1)"
         @click="onEntry(s)"
       >
         <IconSvg class="eicon" :name="s.icon" :size="26" />
@@ -23,12 +24,18 @@
 
     <!-- 附近门店 -->
     <SectionHeader title="附近门店" more="更多" @more="goStores" />
-    <StoreCard :store="nearbyStore" />
+    <StoreCard :store="nearbyStore" class="fade-up stagger-5" />
 
     <!-- 常见问题 -->
     <SectionHeader title="常见问题" more="更多" @more="goFaqList" />
     <div class="faq-list">
-      <FaqItem v-for="f in faqs.slice(0, 4)" :key="f.id" :faq="f" @click="goFaqDetail(f)" />
+      <FaqItem
+        v-for="(f, i) in faqs.slice(0, 4)"
+        :key="f.id"
+        :faq="f"
+        :class="['fade-up', 'stagger-' + ((i % 10) + 6)]"
+        @click="goFaqDetail(f)"
+      />
     </div>
   </div>
 </template>

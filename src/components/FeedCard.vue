@@ -1,5 +1,5 @@
 <template>
-  <div class="fcard" @click="go">
+  <div class="fcard press" @click="go">
     <img class="fcard__cover" :src="item.cover" :alt="item.title" />
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">

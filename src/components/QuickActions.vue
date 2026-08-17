@@ -3,7 +3,7 @@
     <div
       v-for="q in items"
       :key="q.key"
-      class="qitem"
+      class="qitem press"
       @click="$emit('tap', q)"
     >
       <IconSvg class="qicon" :name="q.icon" :size="22" />

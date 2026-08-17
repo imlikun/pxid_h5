@@ -6,7 +6,7 @@
         <span
           v-for="t in tabs"
           :key="t"
-          class="tab"
+          class="tab tab-bounce"
           :class="{ active: activeTab === t }"
           @click="setTab(t)"
           >{{ t }}</span
@@ -40,7 +40,13 @@
         />
       </div>
       <div class="quick">
-        <div v-for="q in discoverQuick" :key="q.key" class="quick__item" @click="onQuick(q)">
+        <div
+        v-for="(q, i) in discoverQuick"
+        :key="q.key"
+        class="quick__item fade-up press"
+        :class="'stagger-' + ((i % 10) + 1)"
+        @click="onQuick(q)"
+      >
           <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
           <IconSvg class="quick__icon" :name="q.icon" :size="22" />
           <div class="quick__label">{{ q.label }}</div>
@@ -68,13 +74,23 @@
     <!-- 推荐：双列网格 -->
     <div v-if="activeTab === '推荐'" class="content">
       <div class="grid2">
-        <FeedCard v-for="it in recommendList" :key="it.id" :item="it" />
+        <FeedCard
+          v-for="(it, i) in recommendList"
+          :key="it.id"
+          :item="it"
+          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+        />
       </div>
     </div>
 
     <!-- 动态：独立 UGC 流（单列卡片） -->
     <div v-else-if="activeTab === '动态'" class="content">
-      <MomentCard v-for="it in dynamicList" :key="it.id" :item="it" />
+      <MomentCard
+        v-for="(it, i) in dynamicList"
+        :key="it.id"
+        :item="it"
+        :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+      />
       <div v-if="dynamicList.length === 0" class="empty-tab">暂无该车型动态</div>
     </div>
 
@@ -82,9 +98,10 @@
     <div v-else-if="activeTab === '广场'" class="content">
       <div class="grid3">
         <div
-          v-for="p in plazaShowcase"
+          v-for="(p, i) in plazaShowcase"
           :key="p.id"
-          class="showcase"
+          class="showcase fade-up press"
+          :class="'stagger-' + ((i % 10) + 1)"
           @click="onShowcase(p)"
         >
           <img class="showcase__img" :src="p.cover" :alt="p.name" />
@@ -97,9 +114,10 @@
       </div>
       <div class="acts">
         <div
-          v-for="a in activities"
+          v-for="(a, i) in activities"
           :key="a.id"
-          class="activity"
+          class="activity fade-up press"
+          :class="'stagger-' + ((i % 10) + 1)"
           @click="onActivity(a)"
         >
           <img class="act__img" :src="a.cover" :alt="a.title" />
@@ -240,13 +258,16 @@ function showToast(msg) {
 }
 .tabs {
   display: flex;
-  gap: 13px;
+  align-items: center;
+  gap: 16px;
 }
 .tab {
   font-size: 16px;
   color: var(--text-sub);
   font-weight: 400;
   line-height: 1.2;
+  transform-origin: bottom center;
+  transform: scale(0.96);
 }
 .tab.active {
   color: #000000;
@@ -281,13 +302,13 @@ function showToast(msg) {
 .search {
   margin: 10px 16px 0;
   height: 40px;
-  background: #ffffff;
-  border: 1px solid #E0E0E0;
-  border-radius: var(--radius-lg);
+  background: #F0F1F3;
+  border: none;
+  border-radius: var(--radius-pill);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 0 14px;
 }
 .sicon {
   color: var(--text-hint);

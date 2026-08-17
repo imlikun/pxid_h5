@@ -6,7 +6,7 @@
         <span
           v-for="t in topTabs"
           :key="t.key"
-          class="tab"
+          class="tab tab-bounce"
           :class="{ active: activeTab === t.key }"
           @click="activeTab = t.key"
           >{{ t.label }}</span
@@ -30,13 +30,23 @@
       <!-- 热购榜单 -->
       <SectionHeader title="热购榜单" />
       <div class="grid2">
-        <ProductCard v-for="p in hotProducts" :key="p.id" :product="p" />
+        <ProductCard
+          v-for="(p, i) in hotProducts"
+          :key="p.id"
+          :product="p"
+          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+        />
       </div>
 
       <!-- 踏春装备 | 限时直降 -->
       <SectionHeader title="踏春装备" sub="限时直降" more="更多" @more="activeTab = 'spring'" />
       <div class="grid2">
-        <ProductCard v-for="p in springProducts" :key="p.id" :product="p" />
+        <ProductCard
+          v-for="(p, i) in springProducts"
+          :key="p.id"
+          :product="p"
+          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+        />
       </div>
     </template>
 
@@ -44,7 +54,12 @@
     <template v-else-if="activeTab === 'spring'">
       <SectionHeader title="踏春装备" sub="限时直降" more="更多" />
       <div class="grid2">
-        <ProductCard v-for="p in springProducts" :key="p.id" :product="p" />
+        <ProductCard
+          v-for="(p, i) in springProducts"
+          :key="p.id"
+          :product="p"
+          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+        />
       </div>
     </template>
 
@@ -52,7 +67,12 @@
     <template v-else>
       <SectionHeader title="Bikes" sub="车型原厂配件" />
       <div class="grid2">
-        <ProductCard v-for="p in bikeProducts" :key="p.id" :product="p" />
+        <ProductCard
+          v-for="(p, i) in bikeProducts"
+          :key="p.id"
+          :product="p"
+          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+        />
       </div>
     </template>
   </div>
@@ -111,13 +131,15 @@ function onQuick(q) {
 .tabs {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 .tab {
   font-size: 16px;
   font-weight: 400;
   color: var(--text-sub);
   line-height: 1.2;
+  transform-origin: bottom center;
+  transform: scale(0.96);
 }
 .tab.active {
   color: var(--text);

@@ -1,5 +1,5 @@
 <template>
-  <div class="pcard" @click="go">
+  <div class="pcard press" @click="go">
     <img class="pcard__cover" :src="product.cover" :alt="product.name" />
     <div class="pcard__name">{{ product.name }}</div>
     <div class="pcard__price">
