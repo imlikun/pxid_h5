@@ -103,3 +103,29 @@ export async function fetchFeedDetail(id) {
   const all = [...publishState.list, ...moments, ...feedItems]
   return all.find((i) => String(i.id) === String(id)) || null
 }
+
+// ---- 点赞 ----
+export async function likeFeed(id) {
+  if (!FEED_API) return { ok: false }
+  try {
+    await request('/feed/' + id + '/like', { method: 'POST', body: {} })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e.message || '操作失败' }
+  }
+}
+
+// ---- 评论 ----
+export async function commentFeed(id, text) {
+  if (!FEED_API) return { ok: false }
+  try {
+    // 后端评论字段名是 content（非 text）
+    const data = await request('/feed/' + id + '/comment', {
+      method: 'POST',
+      body: { content: text },
+    })
+    return { ok: true, data }
+  } catch (e) {
+    return { ok: false, message: e.message || '评论失败' }
+  }
+}

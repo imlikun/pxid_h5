@@ -197,11 +197,12 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick } from 'vue'
+import { computed, ref, nextTick, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { feedItems, activities, moments, commentSeed } from '../data/mock'
 import { publishState } from '../store/publish'
 import { requireLogin } from '../utils/auth'
+import { fetchFeedDetail, likeFeed, commentFeed } from '../api/feed'
 import bridge from '../bridge'
 import ShareSheet from '../components/ShareSheet.vue'
 
@@ -211,11 +212,26 @@ const defaultAvatar = 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg'
 
 const isActivity = computed(() => route.path.startsWith('/activity'))
 const id = computed(() => route.params.id)
-const item = computed(() => {
-  // 详情池：官方内容 + 我的发布（localStorage 持久化），确保发帖后能点进详情
-  const pool = isActivity.value ? activities : [...feedItems, ...moments, ...publishState.list]
-  return pool.find((i) => String(i.id) === String(id.value)) || null
-})
+const item = ref(null)
+async function loadItem() {
+  // 优先真实后端（含用户动态），查不到再兜底 mock 池
+  const real = await fetchFeedDetail(id.value)
+  if (real) {
+    item.value = real
+  } else {
+    const pool = isActivity.value ? activities : [...feedItems, ...moments, ...publishState.list]
+    item.value = pool.find((i) => String(i.id) === String(id.value)) || null
+  }
+  if (item.value) {
+    liked.value = !!item.value.isLiked
+    likeCount.value = item.value.likes || 0
+    followed.value = !!item.value.followed
+    const seed = commentSeed[item.value.id] || []
+    comments.value = seed.map((c) => ({ ...c, replies: (c.replies || []).map((r) => ({ ...r })) }))
+  }
+}
+onMounted(loadItem)
+watch(id, loadItem)
 
 const isOfficial = computed(() => isActivity.value || (item.value && item.value.kind === 'official'))
 
@@ -235,14 +251,6 @@ const showShare = ref(false)
 const shareUrl = computed(() => location.origin + location.pathname + '#/feed/' + id.value)
 const shareTitle = computed(() => (item.value && item.value.title) || 'PXID 内容')
 const shareDesc = computed(() => (item.value && item.value.content ? item.value.content : '').slice(0, 60))
-
-if (item.value) {
-  liked.value = !!item.value.isLiked
-  likeCount.value = item.value.likes || 0
-  followed.value = !!item.value.followed
-  const seed = commentSeed[item.value.id] || []
-  comments.value = seed.map((c) => ({ ...c, replies: (c.replies || []).map((r) => ({ ...r })) }))
-}
 
 const commentCount = computed(() => {
   let n = comments.value.length
@@ -320,10 +328,15 @@ function onTopic(t) {
 
 // 互动：点赞 / 收藏 / 关注 / 分享（均走登录 Gate）
 async function onLike() {
-  const ok = await requireLogin()
-  if (!ok) return
-  liked.value = !liked.value
-  likeCount.value += liked.value ? 1 : -1
+  // 当前匿名体系：点赞免登录（与发帖一致）；接入登录态后改回 requireLogin 门控
+  const willLike = !liked.value
+  liked.value = willLike
+  likeCount.value += willLike ? 1 : -1
+  const res = await likeFeed(id.value)
+  if (!res.ok) {
+    liked.value = !willLike
+    likeCount.value += willLike ? -1 : 1
+  }
   bridge.openNative('feed/interact?type=like&id=' + id.value)
 }
 async function onCollect() {
@@ -408,10 +421,10 @@ function onCommentBtn() {
     commentInput.value && commentInput.value.focus()
   })
 }
-function submitComment() {
+async function submitComment() {
   const text = commentText.value.trim()
   if (!text) return
-  comments.value.unshift({
+  const tmp = {
     id: 'me' + Date.now(),
     author: '我',
     avatar: '',
@@ -420,9 +433,15 @@ function submitComment() {
     likes: 0,
     isLiked: false,
     replies: [],
-  })
+  }
+  comments.value.unshift(tmp)
   commentText.value = ''
   showToast('评论成功')
+  const res = await commentFeed(id.value, text)
+  if (!res.ok) {
+    comments.value = comments.value.filter((c) => c.id !== tmp.id)
+    showToast('评论失败，请重试')
+  }
 }
 function onCommentLike(c) {
   c.isLiked = !c.isLiked

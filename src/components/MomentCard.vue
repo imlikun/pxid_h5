@@ -51,6 +51,7 @@ import { useRouter } from 'vue-router'
 import bridge from '../bridge'
 import { defaultAvatar } from '../data/mock'
 import { requireLogin } from '../utils/auth'
+import { likeFeed } from '../api/feed'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -77,10 +78,17 @@ function onCar(model) {
   bridge.openNative('vehicle/' + model)
 }
 async function onLike() {
-  const ok = await requireLogin()
-  if (!ok) return
-  liked.value = !liked.value
-  likeCount.value += liked.value ? 1 : -1
+  // 当前匿名体系：点赞免登录（与发帖一致）；接入登录态后改回 requireLogin 门控
+  const willLike = !liked.value
+  liked.value = willLike
+  likeCount.value += willLike ? 1 : -1
+  const res = await likeFeed(props.item.id)
+  if (!res.ok) {
+    // 后端失败 → 回滚本地状态
+    liked.value = !willLike
+    likeCount.value += willLike ? -1 : 1
+  }
+  // 原生桥通知（App 内同步，H5 兜底无操作）
   bridge.openNative('feed/interact?type=like&id=' + props.item.id)
 }
 async function onFollow() {
