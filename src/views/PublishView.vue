@@ -23,16 +23,7 @@
       <!-- 车型选择 -->
       <div class="card section fade-up stagger-2">
         <div class="label">关联车型</div>
-        <div class="chips">
-          <span
-            v-for="m in carModels"
-            :key="m"
-            class="chip chip-bounce"
-            :class="{ active: carModel === m }"
-            @click="carModel = m"
-            >{{ m }}</span
-          >
-        </div>
+        <ModelDropdown v-model="carModel" :options="carModels" placeholder="选择车型" />
       </div>
 
       <!-- 用户图片上传 -->
@@ -66,6 +57,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { carModels } from '../data/mock'
 import { publishFeed, getDeviceId } from '../api/feed'
+import ModelDropdown from '../components/ModelDropdown.vue'
 import bridge from '../bridge'
 
 const router = useRouter()

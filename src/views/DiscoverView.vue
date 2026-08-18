@@ -67,16 +67,7 @@
 
     <!-- 车型筛选：仅推荐/动态显示（推荐=全部、动态=最新；广场无筛选条，与设计稿一致） -->
     <div v-if="activeTab !== '广场'" class="filter">
-      <div class="chips">
-        <span
-          v-for="f in currentFilters"
-          :key="f"
-          class="chip chip-bounce"
-          :class="{ active: activeFilter === f }"
-          @click="activeFilter = f"
-          >{{ f }}</span
-        >
-      </div>
+      <ModelDropdown v-model="activeFilter" :options="currentFilters" placeholder="选择车型" />
       <span class="sort" @click="onSort">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m11 12 4 4 4-4"/><path d="M15 20V4"/></svg>
       </span>
@@ -156,6 +147,7 @@ import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
 import IconSvg from '../components/IconSvg.vue'
+import ModelDropdown from '../components/ModelDropdown.vue'
 import {
   discoverTabs,
   discoverQuick,
