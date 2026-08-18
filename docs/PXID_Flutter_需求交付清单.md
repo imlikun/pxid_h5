@@ -11,14 +11,14 @@
 | --- | --- | --- |
 | 发现（推荐/广场/动态） | H5（我们） | 通过 JS Bridge 通信（见 INTEGRATION.md） |
 | 精选（商城） | H5 + Shopify | 实现 `openCheckout` 结账桥（第 3 项） |
-| 服务 | 待定（对比后定） | 做原生版供对比（我们各自做、自行对比，不列入交付项） |
+| 服务 | **原生（Flutter，已定）** | 由你做原生版即可，H5 侧已彻底移除该模块（tab 入口删除 + 路由屏蔽），无需对比、无需交付 |
 
 ## 二、必须知道的约定（必读，详见各自文档）
 
 1. **JS Bridge**：WebView 加载 H5 前注入 `window.PXIDBridge`，`isNative: true` 标记。方法清单见 `INTEGRATION.md`。
 2. **商城结账**：`openCheckout(lines)` 契约见 `PXID_Shopify_结账桥接_Flutter版.md`（cartCreate → checkoutUrl → WebView → return_to）。
 3. **多国定位**：`getLocale()` 返回 `{locale,country,currency}`，结账按 `country` 路由到对应国店铺。
-4. **服务模块**：实现范围与我们 H5 一致，我们各自做、自行对比，无需向你交付。
+4. **服务模块**：已定由你做原生版。我们 H5 侧已彻底移除该模块（tab 入口删除 + 路由屏蔽 `/service`），不再提供 H5 版服务，无需对比、无需向你交付。
 
 ---
 
