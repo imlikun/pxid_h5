@@ -97,9 +97,9 @@ const router = createRouter({
   routes,
 })
 
-// 嵌入原生 App 时屏蔽 H5 服务模块：服务由 Flutter 原生版提供，H5 不暴露，便于与原生对比
+// 服务模块已由 Flutter 原生版提供，H5 侧彻底屏蔽（tab 入口已移除 + 路由级拦截），任何环境都进不去 /service
 router.beforeEach((to, from, next) => {
-  if (to.path.startsWith('/service') && bridge.isEmbed) {
+  if (to.path.startsWith('/service')) {
     next('/discover')
     return
   }
