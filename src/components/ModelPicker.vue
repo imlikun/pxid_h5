@@ -89,20 +89,28 @@ onUnmounted(() => { document.body.style.overflow = '' })
 <style scoped>
 .mp {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.mp::-webkit-scrollbar { display: none; }
 .mp-chip {
   font-size: 13px;
   color: var(--text-sub);
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 18px;
-  padding: 7px 14px;
+  padding: 6px 12px;
   transition: all 0.12s ease;
   user-select: none;
   cursor: pointer;
+  flex: none;
 }
 .mp-chip:active { transform: scale(0.96); }
 .mp-chip.on {
