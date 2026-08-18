@@ -167,6 +167,7 @@ import {
 import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
 import { fetchFeeds } from '../api/feed'
+import { hasHotUpdate } from '../utils/hotUpdate'
 import bridge from '../bridge'
 
 const router = useRouter()
@@ -358,6 +359,11 @@ async function onTouchEnd() {
 async function doRefresh() {
   if (refreshing.value) return
   refreshing.value = true
+  // 热更新：线上有新版 JS/CSS 包（样式/逻辑改动）→ 整页重载拉新包；否则只刷数据
+  if (await hasHotUpdate()) {
+    location.reload()
+    return
+  }
   try {
     if (activeTab.value === '推荐') {
       await refreshRecommend()

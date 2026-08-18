@@ -96,6 +96,7 @@ import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
 import { featuredQuick } from '../data/mock'
 import { fetchProducts } from '../api/shop'
+import { hasHotUpdate } from '../utils/hotUpdate'
 
 const router = useRouter()
 const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
@@ -158,6 +159,11 @@ async function onTouchEnd() {
 async function doRefresh() {
   if (refreshing.value) return
   refreshing.value = true
+  // 热更新：线上有新版 JS/CSS 包（样式/逻辑改动）→ 整页重载拉新包；否则只刷数据
+  if (await hasHotUpdate()) {
+    location.reload()
+    return
+  }
   try {
     await refreshFeatured()
   } catch (e) {
