@@ -1,7 +1,7 @@
 # PXID ToC App · 迁移 / 服务模块交接 / 热更新对接文档
 
-> 读者：**Flutter 原生开发同学**
-> 目的：本文对齐三件事：① H5 三个模块（发现/精选/服务）迁移到公司服务器需要的环境；② 服务模块已由原生接管，H5 侧已屏蔽；③ 三个模块的热更新方案。请按本文执行。
+> 读者：**H5 团队内部执行（勿外发 Flutter 兄弟）**
+> 目的：本文对齐三件事：① H5 三个模块（发现/精选/服务）迁移到公司服务器需要的环境；② 服务模块原生接管 + H5 侧 tab/路由策略；③ 三个模块的热更新方案。外部对接只发 `PXID_Flutter_需求交付清单.md`。
 > 关联文档：`PXID_ToC_后端接口规范.md`（后端契约）、`PXID_Shopify_结账桥接_Flutter版.md`（商城结账）、`INTEGRATION.md`（JS Bridge 契约）。
 
 ---
@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 发现（推荐/广场/动态） | **H5（我们）** | 列表/详情为 H5；**发帖/动态归我们**（后端 `pxid-feed-server` 保留，迁公司服务器后换域名） |
 | 精选（商城） | H5 + Shopify | H5 展示 + 结账编排（`openCheckout` 原生实现），数据来自 Shopify（见 Codex 契约） |
-| 服务 | **待定** | **先看 Flutter 原生实现效果，再决定用 H5 的还是原生的**（当前 H5 实现保留，暂不屏蔽） |
+| 服务 | **原生（Flutter）** | H5 侧：浏览器预览保留服务 tab（ServiceView 占位页），App 嵌入模式拦截 `/service` 屏蔽，与原生版对比后定稿 |
 
 ---
 
@@ -25,7 +25,7 @@ H5 是 **Vue3 + Vite 构建的纯静态站**，构建产物 `dist/` 只需 **任
 | --- | --- |
 | 静态服务器 | Nginx / Caddy / 对象存储 CDN 均可（无需 Node 运行时） |
 | HTTPS | 必需（App WebView 强制 https，且 Service Worker/地理位置依赖） |
-| 域名 | 如 `h5.pxid.com`（需可公网访问、证书） |
+| 域名 | **待定**（公司服务器环境确认后定，如 `h5.pxid.com`；当前预览用 `appin.site/nav/pxid-h5/`） |
 | 部署方式 | 上传 `dist/` 到站点根目录即可，构建命令：`npm install && npm run build` |
 
 > 注意：H5 使用 hash 路由（`#/`），静态托管无需 rewrite 规则。
@@ -33,7 +33,7 @@ H5 是 **Vue3 + Vite 构建的纯静态站**，构建产物 `dist/` 只需 **任
 ### 1.3 链接关系（谁连谁，务必对齐）
 
 ```
-[App WebView] ──加载──> H5 静态站（如 https://h5.pxid.com/）
+[App WebView] ──加载──> H5 静态站（如 https://<最终H5域名>/）
      │
      ├─ H5 内页面跳转/数据 ──> 后端接口（如 https://api.pxid.com/pxid/v1）
      │
@@ -41,7 +41,7 @@ H5 是 **Vue3 + Vite 构建的纯静态站**，构建产物 `dist/` 只需 **任
 ```
 
 **需要你确认/填写的三个地址**（H5 侧是常量，改一处即可，见下方）：
-1. **H5 域名**：`https://h5.pxid.com/`（Flutter 加载这个 URL 的 `index.html`，或打 zip 走本地+远程）
+1. **H5 域名**：`https://<最终H5域名>/`（Flutter 加载这个 URL 的 `index.html`，或打 zip 走本地+远程）
 2. **后端 API 域名**：`https://api.pxid.com/pxid/v1`（H5 调 `GET/POST /feed` 等）
 3. **发帖后端域名**：`https://pxid-api.appin.site`（当前临时，迁公司服务器后换成公司的，如 `https://api.pxid.com`）
 
@@ -54,23 +54,23 @@ H5 是 **Vue3 + Vite 构建的纯静态站**，构建产物 `dist/` 只需 **任
 | # | 检查项 | 现状/动作 | 迁移时 |
 | --- | --- | --- | --- |
 | 1 | **H5 资源路径** | `index.html` 用 `./assets/xxx`（相对路径）+ hash 路由（`#/`） | ✅ 任意子路径/域名都能跑，**无需 rewrite 规则** |
-| 2 | **后端 CORS** | 已放行 `*`（非白名单也回 `*`） | ✅ 新域名直接通，**无需改** |
-| 3 | **FEED_API 硬编码** | `src/api/feed.js` 写死 `https://pxid-api.appin.site` | ⚠️ **必须改成公司后端域名**（如 `https://api.pxid.com`），改完 `npm run build` |
-| 4 | **后端数据库** | SQLite `feed.db`（WAL 模式，含 -shm/-wal 文件） | ⚠️ **三件套一起拷**（feed.db + feed.db-shm + feed.db-wal），漏了 -wal 会丢最近数据 |
-| 5 | **后端环境** | Node ≥18 + pm2 + better-sqlite3 | ⚠️ 公司服务器需装：`node`、`pm2`、`npm install better-sqlite3`（**必须原生编译**，装系统 build-essential/gcc） |
-| 6 | **HTTPS 证书** | 现用 Let's Encrypt（acme.sh HTTP-01） | ⚠️ 新域名需重新签（DNS 先解析到公司服务器 + 80 端口外网可达），流程同 `pxid-api.appin.site` |
-| 7 | **nginx 反代** | 后端 8700 端口，nginx 反代 `/` | ⚠️ 公司服务器复制该 vhost 配置，改 server_name + 证书路径 |
-| 8 | **图片资源** | mock 图是相对路径（`unsplash/...`）随 dist 走 | ✅ 无需处理 |
-| 9 | **Shopify 商城** | `shop.js` 直连 `marsantsx.com`（CORS 已验证 `*`） | ✅ 与迁移无关，保持直连 |
-| 10 | **发帖 bridge** | H5 发帖走 `openNative('discover/publish')`（原生接管） | ✅ 无需改；预览态 mock 兜底保留 |
-| 11 | **环境未知项** | 公司服务器 OS/是否宝塔/有无 Nginx/Node | ⚠️ 先跑 §5 排查清单，环境就绪前**不要动线上** |
-| 12 | **回滚预案** | 迁移期间线上 H5 不动（仍 appin.site） | ✅ 新域名验证通过后再切 Flutter 加载地址；失败随时回退 |
+| 2 | **后端 CORS** | 已放行 `*` | ✅ 新域名直接通，**无需改** |
+| 3 | **FEED_API 硬编码** | `src/api/feed.js` 写死 `https://pxid-api.appin.site` | ⚠️ **必须改成公司后端域名** |
+| 4 | **后端数据库** | SQLite `feed.db` | ⚠️ **三件套一起拷**（feed.db + feed.db-shm + feed.db-wal） |
+| 5 | **后端环境** | Node ≥18 + pm2 + better-sqlite3 | ⚠️ 公司服务器需装：`node`、`pm2`、`better-sqlite3`（原生编译） |
+| 6 | **HTTPS 证书** | 现用 Let's Encrypt | ⚠️ 新域名需重新签 |
+| 7 | **nginx 反代** | 后端 8700 端口 | ⚠️ 复制 vhost 配置 |
+| 8 | **图片资源** | 相对路径随 dist | ✅ |
+| 9 | **Shopify 商城** | `shop.js` 直连 `marsantsx.com` | ✅ |
+| 10 | **发帖 bridge** | `openNative('discover/publish')` | ✅ |
+| 11 | **环境未知项** | 公司服务器 OS/宝塔/Nginx/Node | ⚠️ 先跑 §5 排查清单 |
+| 12 | **回滚预案** | 迁移期间线上 H5 不动（仍 appin.site） | ✅ |
 
 ### 1.2 后端服务（如有，按需）
 | 项 | 要求 |
 | --- | --- |
-| Node.js | ≥ 18（当前开发用 20） |
-| 进程守护 | pm2（`pm2 start server.js --name pxid-feed`） |
+| Node.js | ≥ 18 |
+| 进程守护 | pm2 |
 | 数据库 | SQLite（better-sqlite3，单文件 `feed.db`，零运维） |
 | 反代 | Nginx 反代到 Node 端口 |
 | 域名 | 如 `api.pxid.com`，HTTPS |
@@ -79,23 +79,32 @@ H5 是 **Vue3 + Vite 构建的纯静态站**，构建产物 `dist/` 只需 **任
 
 ---
 
-## 2. 服务模块交接（状态：待定，先对比再决定）
+## 2. 服务模块交接（状态：H5 占位 + App 内屏蔽，原生版对比中）
 
-### 2.1 当前决定（2026-08-18）
-**先看 Flutter 原生实现的样子，再决定服务模块用 H5 的还是原生的。** 当前 H5 服务实现**保留不屏蔽**（ServiceView 原样可用）。
+### 2.1 当前决定（2026-08-18 定稿）
+服务模块最终由 **Flutter 原生版** 提供。H5 侧策略（已落地，提交 ae77ea9）：
+- **浏览器预览**（线上 appin.site，mock 桥 `isEmbed=false`）：底部 5 个 tab 全在，含「服务」入口；点进去当前是 `ServiceView` 占位页（"服务模块已由 App 原生提供"）。
+- **App 嵌入模式**（Flutter 注入真实桥 `isEmbed=true`）：底部 tab 整体隐藏（原生 tab 接管）；且 `router.beforeEach` 拦截 `/service` 及子路由 → 重定向 `/discover`，H5 服务完全不暴露，留给原生对比。
 
-### 2.2 对比维度（等 Flutter 原生版出来对比）
-| 维度 | H5 版（现有） | Flutter 原生版（待提供） |
+### 2.2 对比维度（与原生版出来后对比）
+| 维度 | H5 版（现有，占位） | Flutter 原生版（待提供） |
 | --- | --- | --- |
 | 视觉一致性 | 与发现/精选统一（tokens.css） | 需对齐同一规范 |
-| 功能完整性 | 6 入口 + 门店 + 常见问题 + 各子页 | 待 Flutter 确认 |
+| 功能完整性 | 占位页（6 入口说明） | 道路救援/使用指南/车辆体检/意见反馈/三包/门店/工单/FAQ |
 | 数据接口 | 后端规范 §7 | 同一套接口 |
-| 更新成本 | 热更新即改（方案 B） | 需发版 |
+| 更新成本 | 热更新即改 | 需发版 |
 
-### 2.3 若最终选原生
-- H5 `ServiceView.vue` 改为占位页（本次已备好，未启用）。
-- 服务子路由 `/service/*` 文件保留但无入口。
-- 原生实现清单：道路救援、使用指南（视频/说明书）、车辆体检、意见反馈、三包政策、附近门店、我的工单/详情、常见问题/筛选/详情，接口按后端规范 §7。
+### 2.3 若后续要恢复 H5 真实服务页
+- 当前 `ServiceView.vue` 为占位页（021ce9c 降级）。如浏览器预览也要看真实 H5 服务，回退 021ce9c 对该文件的改动即可，`/service` 路由与子页文件均保留。
+- 原生实现清单（参考）：道路救援、使用指南（视频/说明书）、车辆体检、意见反馈、三包政策、附近门店、我的工单/详情、常见问题/筛选/详情，接口按后端规范 §7。
+
+### 2.4 Bridge 落地状态（截至 2026-08-18 Flutter 回复）
+Flutter 侧 9 方法现状：
+- ✅ 已实现：getToken / navigateTo / openNative(框架，6 条真路由) / callPhone / openMap / openShopify
+- ⚠️ 占位：requestPurchase（返回 false，待接 Java 后端）
+- ❌ 阻塞未实现：**getLocale** / **onLocaleChange** / **openCheckout**（后两者依赖 getLocale 先落地）
+- openNative 24 条标识：6 条已真路由（login / vehicle/bind / rescue/submit / search / service/workorders / service/workorder/detail / service/feedback），18 条 AppToast 占位（H5 均有兜底路由）
+- openCheckout 预计 330~470 行 Flutter 代码，≤3 天；前置：getLocale + 每国 Shopify 店铺映射表
 
 ---
 
@@ -105,7 +114,7 @@ H5 是 **Vue3 + Vite 构建的纯静态站**，构建产物 `dist/` 只需 **任
 发现/精选/服务三个模块的资源需要**不发版 App 也能更新**（改文案、修 bug、加活动页）。
 
 ### 3.2 现状
-H5 已确认是**打包进 App 本地**（Flutter 加载本地资源），这导致每次改 H5 都要重新发版。
+Flutter 当前用 **本地 assets 打包 + 127.0.0.1 tiny HTTP 服务**加载（非 file://，避免 ES Module CORS 白屏）；且 `AppPageMode.kUseNativeDiscoverFeaturedService=true` 时 H5 容器未激活（线上走 Flutter 原生三 Tab）。
 
 ### 3.3 推荐方案（改动最小、稳定）：本地兜底 + 远程覆盖
 
@@ -116,9 +125,9 @@ H5 已确认是**打包进 App 本地**（Flutter 加载本地资源），这导
    - 首次启动：加载内置 `assets/h5/`；
    - 有远程新包：下载 → 解压到 `应用文档目录/h5_cache/` → 下次启动加载缓存目录；
    - 网络失败：继续用当前已有（内置或缓存）。
-2. **版本比对**：启动时 GET `https://h5.pxid.com/version.json`，响应：
+2. **版本比对**：启动时 GET `https://<最终H5域名>/version.json`，响应：
    ```json
-   { "version": 12, "url": "https://h5.pxid.com/dist.zip", "md5": "..." }
+   { "version": 12, "url": "https://<最终H5域名>/dist.zip", "md5": "..." }
    ```
    与本地缓存版本号比较，`version > 本地` 才下载。
 3. **下载与校验**：下载 `dist.zip`（H5 构建产物 zip 打包），校验 MD5 一致后解压覆盖缓存目录；失败不切换、保留旧版。
@@ -131,7 +140,7 @@ H5 已确认是**打包进 App 本地**（Flutter 加载本地资源），这导
 4. 上传 `dist.zip` + `version.json` 到站点目录（可配 CDN）。
 
 ### 3.4 备选方案（更省事但能力弱）
-- **方案 B：改加载方式为线上 URL**——WebView 直接加载 `https://h5.pxid.com/`，天然热更新，无需版本管理；缺点：弱网下加载慢、完全依赖网络（若产品可接受，推荐此方案，改动仅一行 URL）。
+- **方案 B：改加载方式为线上 URL**——WebView 直接加载 `https://<最终H5域名>/`，天然热更新，无需版本管理；缺点：弱网下加载慢、完全依赖网络（若产品可接受，推荐此方案，改动仅一行 URL）。
 - **方案 C：App 热更新框架**（如 mPaaS/自有 RN 热更）——与本项目纯 Web 不符，不推荐。
 
 ### 3.5 热更新推送流程（谁出包、谁上传、App 怎么拿）
@@ -141,7 +150,7 @@ H5 已确认是**打包进 App 本地**（Flutter 加载本地资源），这导
 ① 出包（开发/我这边）：npm run build → dist/
 ② 打 zip：cd dist && zip -r ../dist.zip .
 ③ 算 MD5：md5sum dist.zip
-④ 更新 version.json：{ "version": 12, "url": "https://h5.pxid.com/dist.zip", "md5": "..." }（version 每次 +1）
+④ 更新 version.json：{ "version": 12, "url": "https://<最终H5域名>/dist.zip", "md5": "..." }（version 每次 +1）
 ⑤ 上传：dist.zip + version.json 推到公司服务器站点根目录（可套 CDN）
 ⑥ App 端（Flutter）：启动时 GET version.json → 版本号 > 本地缓存 → 下载 zip → 校验 MD5 → 解压覆盖 → 下次 WebView 加载新包
 ```
@@ -157,33 +166,41 @@ H5 已确认是**打包进 App 本地**（Flutter 加载本地资源），这导
 **发布工具（可选）**：可以把 ①②③④⑤ 打包成一个 `deploy.sh` 脚本放仓库根目录，我这边已按这个流程出包；Flutter 只负责 ⑥ App 端逻辑。
 
 ### 3.6 推荐结论（已定案 2026-08-18）
-**选方案 B（线上 URL 加载）**：WebView 直接加载 `https://h5.pxid.com/`，发布即生效、零版本管理。H5 侧无需任何改动（本身无版本概念）。
+**目标方案 B（线上 URL 加载）**：WebView 直接加载 `https://<最终H5域名>/`，发布即生效、零版本管理。H5 侧无需任何改动。
+- **当前实际**：Flutter 用本地 assets 打包 + 127.0.0.1 tiny HTTP 服务；`kUseNativeDiscoverFeaturedService=true` 时 H5 容器未激活（线上走 Flutter 原生三 Tab）。
+- **切方案 B 改动量**：仅 `H5TabContainer._loadEntry()` 一行换 `loadRequest('https://<域名>/index.html#/{tab}?embed=1')`；域名 + HTTPS 就绪后同步 Flutter 即切换。
+- 域名 `h5.pxid.com` 为占位，**待公司服务器环境确认后定**（见 §5）。
 
 ---
 
-## 4. 本次 H5 变更摘要
+## 4. 本次 H5 变更摘要（截至 2026-08-18）
 
-- `ServiceView.vue`：改为「服务模块已由原生接管」占位页。
+- `ServiceView.vue`：改为「服务模块已由 App 原生提供」占位页（021ce9c 降级）。
+- `DemoTabBar.vue`：恢复 service tab（之前误删），浏览器预览 5 tab 全在（ae77ea9）。
+- `router/index.js`：加 `beforeEach` 守卫，App 嵌入模式（`isEmbed`）下 `/service` 及子路由 → 重定向 `/discover`（ae77ea9）。
+- `App.vue`：原 `isEmbed` 逻辑满足 App 内 tab 全隐藏。
 - 服务子路由页面文件保留但无入口。
 - 发现页/精选页不受影响。
 
-## 5. 待你确认 / 待办
+## 5. 待确认 / 待办
 
-1. **服务模块**：等 Flutter 原生版效果出来，按 §2.2 对比后拍板用谁的。
-2. **迁移环境**：先探公司服务器（另一台 ECS）有什么——跑一遍下面排查清单反馈结果，再定装什么、迁什么：
+1. **服务模块**：H5 占位 + App 内屏蔽策略已定（§2.1）；等 Flutter 原生版出来按 §2.2 对比最终拍板。
+2. **迁移环境**：公司服务器（另一台 ECS，非 appin.site）尚未探测——跑下面排查清单反馈结果，再定装什么、迁什么：
    ```bash
-   # 公司服务器上执行
    cat /etc/os-release | head -2        # 系统版本
    which nginx node npm pm2 mysql redis 2>/dev/null   # 已装环境
    nginx -v 2>/dev/null; node -v 2>/dev/null          # 版本
    ls /www/wwwroot/ 2>/dev/null          # 宝塔站点目录
    ls /etc/nginx/conf.d/ 2>/dev/null | head            # nginx 配置
    ```
-3. **域名/HTTPS**：H5 域名（如 h5.pxid.com）、后端域名（如 api.pxid.com）是否已解析到公司服务器、有没有证书。
+3. **域名/HTTPS**：H5 域名（如 h5.pxid.com，**待定**）、后端域名（如 api.pxid.com）是否已解析到公司服务器、有没有证书。
 4. **发帖后端**：pxid-feed-server 迁公司服务器后，`src/api/feed.js` 的 `FEED_API` 换成新域名即可（H5 侧就这一处）。
+5. **需 H5 侧同步 Flutter 的 2 点前置（阻塞其开发）**：
+   - Java 后端 `GET /user/me` + `PUT /user/locale` 是否就绪？（getLocale 用户偏好持久化依赖）
+   - 每国 Shopify 店铺映射表 `countryCode → { storefrontAccessToken, myshopify 域名 }`（先 CN/US/DE/JP 四组）提供给 Flutter。
 
 ---
 
 ## 6. 给 Flutter 兄弟的文档（已拆分）
 
-**给 Flutter 的单独文档**：`PXID_Flutter_需求交付清单.md`——只有 4 项交付物（加载方式确认 / 服务原生版 / bridge 清单 / openCheckout 状态），他不看本文档。**转发那封即可。**
+**给 Flutter 的单独文档**：`PXID_Flutter_需求交付清单.md`——只 3 项交付物（WebView 加载方式 / JS Bridge 实现确认 / openCheckout 状态），他不看本文档。**转发那封即可。**
