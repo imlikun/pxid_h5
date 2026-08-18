@@ -49,6 +49,23 @@ H5 是 **Vue3 + Vite 构建的纯静态站**，构建产物 `dist/` 只需 **任
 - `src/api/feed.js` → `const FEED_API = 'https://...'`（发帖/动态后端）
 - 其余接口按 `PXID_ToC_后端接口规范.md` §1 Base URL 约定
 
+### 1.4 迁移前复核清单（2026-08-18 已过一遍，务必逐项做）
+
+| # | 检查项 | 现状/动作 | 迁移时 |
+| --- | --- | --- | --- |
+| 1 | **H5 资源路径** | `index.html` 用 `./assets/xxx`（相对路径）+ hash 路由（`#/`） | ✅ 任意子路径/域名都能跑，**无需 rewrite 规则** |
+| 2 | **后端 CORS** | 已放行 `*`（非白名单也回 `*`） | ✅ 新域名直接通，**无需改** |
+| 3 | **FEED_API 硬编码** | `src/api/feed.js` 写死 `https://pxid-api.appin.site` | ⚠️ **必须改成公司后端域名**（如 `https://api.pxid.com`），改完 `npm run build` |
+| 4 | **后端数据库** | SQLite `feed.db`（WAL 模式，含 -shm/-wal 文件） | ⚠️ **三件套一起拷**（feed.db + feed.db-shm + feed.db-wal），漏了 -wal 会丢最近数据 |
+| 5 | **后端环境** | Node ≥18 + pm2 + better-sqlite3 | ⚠️ 公司服务器需装：`node`、`pm2`、`npm install better-sqlite3`（**必须原生编译**，装系统 build-essential/gcc） |
+| 6 | **HTTPS 证书** | 现用 Let's Encrypt（acme.sh HTTP-01） | ⚠️ 新域名需重新签（DNS 先解析到公司服务器 + 80 端口外网可达），流程同 `pxid-api.appin.site` |
+| 7 | **nginx 反代** | 后端 8700 端口，nginx 反代 `/` | ⚠️ 公司服务器复制该 vhost 配置，改 server_name + 证书路径 |
+| 8 | **图片资源** | mock 图是相对路径（`unsplash/...`）随 dist 走 | ✅ 无需处理 |
+| 9 | **Shopify 商城** | `shop.js` 直连 `marsantsx.com`（CORS 已验证 `*`） | ✅ 与迁移无关，保持直连 |
+| 10 | **发帖 bridge** | H5 发帖走 `openNative('discover/publish')`（原生接管） | ✅ 无需改；预览态 mock 兜底保留 |
+| 11 | **环境未知项** | 公司服务器 OS/是否宝塔/有无 Nginx/Node | ⚠️ 先跑 §5 排查清单，环境就绪前**不要动线上** |
+| 12 | **回滚预案** | 迁移期间线上 H5 不动（仍 appin.site） | ✅ 新域名验证通过后再切 Flutter 加载地址；失败随时回退 |
+
 ### 1.2 后端服务（如有，按需）
 | 项 | 要求 |
 | --- | --- |
