@@ -128,7 +128,7 @@ function onQuick(q) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(env(safe-area-inset-top) + 10px) 12px 6px;
+  padding: calc(env(safe-area-inset-top) + 14px) 12px 8px;
   position: sticky;
   top: 0;
   background: #ffffff;
