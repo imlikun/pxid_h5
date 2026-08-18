@@ -122,14 +122,13 @@ function onQuick(q) {
 .featured {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px 6px;
+  padding: calc(env(safe-area-inset-top) + 10px) 12px 6px;
   position: sticky;
   top: 0;
   background: #ffffff;
