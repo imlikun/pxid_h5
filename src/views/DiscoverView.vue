@@ -1,27 +1,37 @@
 <template>
   <div class="discover">
-    <!-- 顶部：三 tab + 操作 -->
-    <div class="topbar">
-      <div class="tabs">
-        <span
-          v-for="t in tabs"
-          :key="t"
-          class="tab tab-bounce"
-          :class="{ active: activeTab === t }"
-          @click="setTab(t)"
-          >{{ t }}</span
-        >
-      </div>
-      <div class="topacts">
-        <span class="act act--add float-in press" @click="onAdd">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-        </span>
-        <span class="act act--bell press" @click="onNotice">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-          <span v-if="noticeUnread > 0" class="bell-badge badge-pulse"></span>
-        </span>
-      </div>
+<!-- 顶部：三 tab + 操作 -->
+  <div class="topbar">
+    <div class="tabs">
+      <span
+        v-for="t in tabs"
+        :key="t"
+        class="tab tab-bounce"
+        :class="{ active: activeTab === t }"
+        @click="setTab(t)"
+        >{{ t }}</span
+      >
     </div>
+    <div class="topacts">
+      <span class="act act--add float-in press" @click="onAdd">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      </span>
+      <span class="act act--bell press" @click="onNotice">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span v-if="noticeUnread > 0" class="bell-badge badge-pulse"></span>
+      </span>
+    </div>
+  </div>
+
+  <!-- 下拉刷新指示器（手机 WebView 必需） -->
+  <div
+    class="pull-indicator"
+    :class="{ pulling: pulling, ready: pullReady, refreshing: refreshing }"
+    :style="{ transform: pulling && !refreshing ? `translateX(-50%) translateY(${pullDelta - 8}px)` : 'translateX(-50%) translateY(-8px)' }"
+  >
+    <div class="pull-spinner" v-if="refreshing || pulling"></div>
+    <span class="pull-text">{{ refreshing ? '刷新中…' : (pullReady ? '释放刷新' : '下拉刷新') }}</span>
+  </div>
 
     <!-- 搜索：推荐/广场显示 -->
     <div v-if="activeTab !== '动态'" class="search" @click="onSearch">
@@ -242,8 +252,9 @@ onMounted(() => {
     )
     io.observe(dynamicSentinel.value)
   }
+  attachPullRefresh()
 })
-onUnmounted(() => { if (io) io.disconnect() })
+onUnmounted(() => { if (io) io.disconnect(); teardownPullRefresh() })
 // 发布后自动刷新动态流（新增内容立即可见）
 watch(
   () => publishState.list.length,
@@ -309,6 +320,78 @@ function showToast(msg) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 1600)
 }
+
+// ===== 下拉刷新（手机 WebView 必备） =====
+const PULL_THRESHOLD = 60 // 释放触发阈值（像素）
+const pulling = ref(false)
+const pullReady = ref(false)
+const pullDelta = ref(0)
+const refreshing = ref(false)
+let pullStartY = 0
+let touchAttached = false
+
+function onTouchStart(e) {
+  if (refreshing.value) return
+  // 已在内容顶部才响应下拉，避免与正常滚动冲突
+  if ((window.scrollY || document.documentElement.scrollTop || 0) > 4) {
+    pulling.value = false
+    return
+  }
+  pullStartY = e.touches[0].clientY
+  pulling.value = true
+  pullReady.value = false
+  pullDelta.value = 0
+}
+function onTouchMove(e) {
+  if (!pulling.value || refreshing.value) return
+  const y = e.touches[0].clientY
+  const delta = y - pullStartY
+  if (delta <= 0) { pulling.value = false; return }
+  // 阻尼：超过阈值后增速放缓
+  pullDelta.value = Math.min(delta * 0.45, PULL_THRESHOLD * 1.4)
+  pullReady.value = pullDelta.value >= PULL_THRESHOLD
+}
+async function onTouchEnd() {
+  if (!pulling.value) return
+  pulling.value = false
+  if (pullReady.value) await doRefresh()
+  pullDelta.value = 0
+  pullReady.value = false
+}
+async function doRefresh() {
+  if (refreshing.value) return
+  refreshing.value = true
+  try {
+    if (activeTab.value === '推荐') {
+      await refreshRecommend()
+    } else if (activeTab.value === '动态') {
+      await refreshDynamic()
+    } else if (activeTab.value === '广场') {
+      // 广场目前是 mock（后端无车型/活动接口），下拉给视觉反馈 + 弹回原始数据
+      await new Promise((r) => setTimeout(r, 300))
+    }
+  } catch (e) {
+    /* swallow; 数据保持原状 */
+  } finally {
+    // 至少展示 350ms spinner，避免一闪而过
+    await new Promise((r) => setTimeout(r, 350))
+    refreshing.value = false
+  }
+}
+function attachPullRefresh() {
+  if (touchAttached) return
+  document.addEventListener('touchstart', onTouchStart, { passive: true })
+  document.addEventListener('touchmove', onTouchMove, { passive: true })
+  document.addEventListener('touchend', onTouchEnd, { passive: true })
+  touchAttached = true
+}
+function teardownPullRefresh() {
+  if (!touchAttached) return
+  document.removeEventListener('touchstart', onTouchStart)
+  document.removeEventListener('touchmove', onTouchMove)
+  document.removeEventListener('touchend', onTouchEnd)
+  touchAttached = false
+}
 </script>
 
 <style scoped>
@@ -324,6 +407,43 @@ function showToast(msg) {
   justify-content: space-between;
   padding: 14px 16px 8px;
   background: #ffffff;
+}
+/* 下拉刷新指示器 */
+.pull-indicator {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-sub);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.pull-indicator.pulling,
+.pull-indicator.refreshing {
+  opacity: 1;
+}
+.pull-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #e5e7eb;
+  border-top-color: var(--brand, #f97316);
+  border-radius: 50%;
+  animation: pull-spin 0.8s linear infinite;
+}
+@keyframes pull-spin {
+  to { transform: rotate(360deg); }
+}
+.pull-text {
+  font-weight: 500;
 }
 .tabs {
   display: flex;
