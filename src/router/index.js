@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { bridge } from '../bridge'
 import DiscoverView from '../views/DiscoverView.vue'
 import FeaturedView from '../views/FeaturedView.vue'
 import ServiceView from '../views/ServiceView.vue'
@@ -91,7 +92,18 @@ const routes = [
   { path: '/publish', name: 'publish', component: PublishView, meta: { hideTabBar: true, title: '发布动态' } },
 ]
 
-export default createRouter({
+const router = createRouter({
   history: createWebHashHistory(),
   routes,
 })
+
+// 嵌入原生 App 时屏蔽 H5 服务模块：服务由 Flutter 原生版提供，H5 不暴露，便于与原生对比
+router.beforeEach((to, from, next) => {
+  if (to.path.startsWith('/service') && bridge.isEmbed) {
+    next('/discover')
+    return
+  }
+  next()
+})
+
+export default router
