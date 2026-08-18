@@ -65,7 +65,7 @@ export async function publishFeed(payload) {
   }
   // 兜底：本地发布（预览态），作者为我
   const text = (payload.content || '').trim()
-  const cm = payload.carModel || 'P1'
+  const cm = payload.carModel || ''
   const newMoment = {
     id: 'U' + Date.now(),
     itemType: 'moment',

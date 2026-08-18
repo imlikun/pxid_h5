@@ -2,6 +2,8 @@
 // Mock 数据 —— 仅用于演示，后续接你们 API 时整文件替换即可
 // ============================================================
 
+import { CAR_MODEL_LABELS } from './carModels'
+
 // ---------------- 发现（社区流）----------------
 export const discoverTabs = ['推荐', '动态', '广场']
 
@@ -12,12 +14,12 @@ export const discoverQuick = [
   { key: 'points', label: '积分兑换', icon: 'gift' },
 ]
 
-// 三个 tab 各自的车型筛选（推荐/动态 用 PXID 真实在售型号；广场=P1-P6）
-export const recommendFilters = ['全部', 'MOTA Z3', 'PX-4', 'CoolPlay PX-2']
-export const dynamicFilters = ['最新', 'MOTA Z3', 'PX-4', 'CoolPlay PX-2']
-export const plazaFilters = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6']
-// 发布页车型选择（pxid.com 真实在售型号）
-export const carModels = ['MOTA Z3', 'PX-4', 'CoolPlay PX-2', 'MOTA Z1', 'Urban 03', 'P5', 'P1', 'H10', 'M2', 'Z3']
+// 三个 tab 各自的车型筛选（统一用 PXID 真实在售型号）
+export const recommendFilters = ['全部', ...CAR_MODEL_LABELS]
+export const dynamicFilters = ['最新', ...CAR_MODEL_LABELS]
+export const plazaFilters = [...CAR_MODEL_LABELS]
+// 发布页车型选择（PXID 真实在售型号）
+export const carModels = [...CAR_MODEL_LABELS]
 
 export const feedItems = [
   // ① 官方新品发布（带种草商品卡）
@@ -162,14 +164,19 @@ export const feedItems = [
   },
 ]
 
-// 广场：车型展示 P1-P6（封面取自设计稿 广场/ 子目录原图）
+// 广场：车型展示（统一用 PXID 真实在售型号；封面暂用本地占位图，接 Shopify 后替换为真实商品图）
 export const plazaShowcase = [
-  { id: 'P1', name: 'P1', cover: 'plaza_p1.jpg', itemType: 'buy-vehicle' },
-  { id: 'P2', name: 'P2', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
-  { id: 'P3', name: 'P3', cover: 'plaza_p3.jpg', itemType: 'buy-vehicle' },
-  { id: 'P4', name: 'P4', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
-  { id: 'P5', name: 'P5', cover: 'plaza_p5.jpg', itemType: 'buy-vehicle' },
-  { id: 'P6', name: 'P6', cover: 'plaza_p6.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P5', name: '电摩 P5', cover: 'plaza_p1.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P8', name: '电摩 P8', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P7', name: '电摩 P7', cover: 'plaza_p3.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P6', name: '电助力 P6', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P5', name: '电助力 P5', cover: 'plaza_p5.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P4', name: '电助力 P4', cover: 'plaza_p6.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P2', name: '电助力 P2', cover: 'feed_r1.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-F2', name: '滑板车 F2', cover: 'feed_r2.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-F1', name: '滑板车 F1', cover: 'feed_d1.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-P1', name: '滑板车 P1', cover: 'feed_d2.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-P3', name: '滑板车 P3', cover: 'feed_d3.jpg', itemType: 'buy-vehicle' },
 ]
 
 // 广场：热门活动 2 条（封面按 广场/ 子目录文件顺序：(7)→活动1、base→活动2）

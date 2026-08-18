@@ -35,24 +35,23 @@
         </div>
       </div>
 
-      <!-- 图片选择（本地图库，无后端上传） -->
+      <!-- 用户图片上传 -->
       <div class="card section fade-up stagger-3">
         <div class="label">添加图片</div>
-        <div class="gallery">
-          <div
-            v-for="g in gallery"
-            :key="g"
-            class="gitem press"
-            :class="{ on: selected.includes(g) }"
-            @click="toggle(g)"
-          >
-            <img :src="imgBase + g" alt="" />
-            <span v-if="selected.includes(g)" class="tick">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <div class="uploader">
+          <div v-for="(src, i) in selected" :key="i" class="gitem">
+            <img :src="src" alt="" />
+            <span class="del press" @click="removeImage(i)">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </span>
           </div>
+          <div v-if="selected.length < 9" class="gitem add press" @click="pickImages">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            <span class="add-txt">{{ selected.length }}/9</span>
+          </div>
         </div>
-        <div class="hint">预览态图片取自本地图库；接入后端后改为上传。</div>
+        <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="onFiles" />
+        <div class="hint">最多 9 张，单张自动压缩至 ≤1MB；预览态以 base64 提交，接后端后改直传。</div>
       </div>
     </div>
 
@@ -66,24 +65,81 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { carModels } from '../data/mock'
-import { publishGallery } from '../store/publish'
 import { publishFeed, getDeviceId } from '../api/feed'
 import bridge from '../bridge'
 
 const router = useRouter()
-const imgBase = import.meta.env.BASE_URL
-const gallery = publishGallery
 
 const content = ref('')
 const carModel = ref('')
-const selected = ref([])
+const selected = ref([]) // base64 data-uri 列表
+const fileInput = ref(null)
+
+const MAX_IMAGES = 9
+const MAX_BYTES = 1024 * 1024 // 压缩目标 ≤1MB
 
 const canPost = computed(() => content.value.trim().length > 0)
 
-function toggle(g) {
-  const i = selected.value.indexOf(g)
-  if (i >= 0) selected.value.splice(i, 1)
-  else if (selected.value.length < 9) selected.value.push(g)
+// 选图：触发隐藏 file input
+function pickImages() {
+  fileInput.value && fileInput.value.click()
+}
+
+async function onFiles(e) {
+  const files = Array.from(e.target.files || [])
+  e.target.value = '' // 允许重复选同一文件
+  for (const f of files) {
+    if (selected.value.length >= MAX_IMAGES) {
+      showToast('最多 ' + MAX_IMAGES + ' 张')
+      break
+    }
+    try {
+      const dataUrl = await fileToCompressedDataURL(f)
+      selected.value.push(dataUrl)
+    } catch (err) {
+      showToast('图片读取失败')
+    }
+  }
+}
+
+function removeImage(i) {
+  selected.value.splice(i, 1)
+}
+
+// file → 等比缩放（最长边 ≤1280）+ JPEG 渐进压缩至 ≤1MB
+function fileToCompressedDataURL(file) {
+  return new Promise((resolve, reject) => {
+    if (!file.type || !file.type.startsWith('image/')) return reject(new Error('not-image'))
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error)
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('decode'))
+      img.onload = () => {
+        const max = 1280
+        let { width, height } = img
+        if (width > max || height > max) {
+          const scale = max / Math.max(width, height)
+          width = Math.round(width * scale)
+          height = Math.round(height * scale)
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        let q = 0.82
+        let out = canvas.toDataURL('image/jpeg', q)
+        while (out.length > MAX_BYTES && q > 0.4) {
+          q -= 0.1
+          out = canvas.toDataURL('image/jpeg', q)
+        }
+        resolve(out)
+      }
+      img.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  })
 }
 
 function goBack() {
@@ -110,7 +166,7 @@ async function onPublish() {
   const res = await publishFeed({
     content: content.value.trim(),
     images: selected.value.slice(),
-    carModel: carModel.value || 'P1',
+    carModel: carModel.value,
     tags: carModel.value ? [carModel.value] : [],
     nickname: '我',
     deviceId: getDeviceId(),
@@ -246,7 +302,7 @@ async function onPublish() {
   border-color: var(--brand);
   font-weight: 500;
 }
-.gallery {
+.uploader {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
@@ -256,12 +312,8 @@ async function onPublish() {
   aspect-ratio: 1 / 1;
   border-radius: 12px;
   overflow: hidden;
-  border: 2px solid transparent;
   cursor: pointer;
   background: var(--bg);
-}
-.gitem.on {
-  border-color: var(--brand);
 }
 .gitem img {
   width: 100%;
@@ -269,26 +321,34 @@ async function onPublish() {
   object-fit: cover;
   display: block;
 }
-.gitem.on::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(77, 124, 255, 0.22);
-  pointer-events: none;
+.gitem.add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--text-hint);
+  border: 1.5px dashed var(--line);
+  background: var(--bg);
 }
-.tick {
+.gitem.add:active { background: var(--bg-press); }
+.add-txt {
+  font-size: 12px;
+  color: var(--text-hint);
+}
+.del {
   position: absolute;
-  right: 6px;
-  bottom: 6px;
+  top: 5px;
+  right: 5px;
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--brand);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
 }
+.del:active { background: rgba(0, 0, 0, 0.7); }
 .hint {
   font-size: 12px;
   color: var(--text-hint);
