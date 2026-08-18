@@ -202,17 +202,15 @@ function onQuick(q) {
 .featured {
   min-height: 100vh;
   background: var(--bg);
+  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(env(safe-area-inset-top) + 14px) 12px 8px;
-  position: sticky;
-  top: 0;
+  padding: 14px 16px 8px;
   background: #ffffff;
-  z-index: 10;
 }
 .tabs {
   display: flex;
@@ -228,7 +226,7 @@ function onQuick(q) {
   transform: scale(0.96);
 }
 .tab.active {
-  color: var(--text);
+  color: #000000;
   font-weight: 700;
 }
 .search-ico {
