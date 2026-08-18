@@ -138,7 +138,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
@@ -150,13 +150,13 @@ import {
   dynamicFilters,
   plazaFilters,
   feedItems,
-  moments,
   plazaShowcase,
   activities,
   notices,
 } from '../data/mock'
 import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
+import { fetchFeeds } from '../api/feed'
 import bridge from '../bridge'
 
 const router = useRouter()
@@ -178,30 +178,38 @@ const recommendList = computed(() => {
   if (f === '全部' || f === '最新') return feedItems
   return feedItems.filter((i) => i.filter === f)
 })
-// 动态：已发布(H5态) + 官方 moments，按车型筛选，最新=全部
-const dynamicList = computed(() => {
-  const all = [...publishState.list, ...moments]
-  const f = activeFilter.value
-  if (f === '最新') return all
-  return all.filter((i) => i.carModel === f)
-})
-
-// 官方公告未读数（驱动发现页快捷区红点）
-const noticeUnread = computed(() => notices.filter((n) => !n.isRead).length)
-
-function setTab(t) {
-  activeTab.value = t
-  activeFilter.value = defaultsByTab[t]
-  if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
+// 动态：真实数据源（fetchFeeds：我的发布 + 官方 moments，localStorage 持久化）
+const dynamicAll = ref([])
+async function refreshDynamic() {
+  dynamicAll.value = await fetchFeeds('dynamic')
 }
-
-// 发布后自动切到「动态」tab 展示新内容
 onMounted(() => {
+  refreshDynamic()
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab)
     publishState.pendingTab = null
   }
 })
+// 发布后自动刷新动态流（新增内容立即可见）
+watch(
+  () => publishState.list.length,
+  () => refreshDynamic()
+)
+const dynamicList = computed(() => {
+  const f = activeFilter.value
+  if (f === '最新') return dynamicAll.value
+  return dynamicAll.value.filter((i) => i.carModel === f)
+})
+
+// 官方公告未读数（驱动发现页快捷区红点）
+const noticeUnread = computed(() => notices.filter((n) => !n.isRead).length)
+
+// 发布后自动切到「动态」tab 展示新内容
+function setTab(t) {
+  activeTab.value = t
+  activeFilter.value = defaultsByTab[t]
+  if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
+}
 
 function onAdd() {
   // 原生环境：拉起原生发布器（契约 openNative('discover/publish')）

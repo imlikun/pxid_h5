@@ -65,8 +65,9 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { carModels, defaultAvatar } from '../data/mock'
-import { publishGallery, addMoment } from '../store/publish'
+import { carModels } from '../data/mock'
+import { publishGallery } from '../store/publish'
+import { publishFeed } from '../api/feed'
 import bridge from '../bridge'
 
 const router = useRouter()
@@ -98,35 +99,26 @@ function showToast(m) {
   t = setTimeout(() => (toast.value = ''), 1600)
 }
 
-function onPublish() {
+async function onPublish() {
   if (!canPost.value) return
   // 原生环境：交由原生发布器承载（保持契约一致）
   if (bridge.isNative()) {
     bridge.openNative('discover/publish?content=' + encodeURIComponent(content.value.trim()))
     return
   }
-  const text = content.value.trim()
-  const cm = carModel.value || 'P1'
-  const newMoment = {
-    id: 'U' + Date.now(),
-    itemType: 'moment',
-    author: '我',
-    avatar: defaultAvatar,
-    title: text.slice(0, 20) || '我的动态',
-    content: text,
+  // H5 预览：走数据层发布（后端就绪调 POST /feed；当前 localStorage 持久化，刷新不丢）
+  const res = await publishFeed({
+    content: content.value.trim(),
     images: selected.value.slice(),
-    tags: cm ? [cm] : [],
-    carModel: cm,
-    likes: 0,
-    isLiked: false,
-    comments: 0,
-    time: '刚刚',
-    followed: false,
-    focusCar: cm,
+    carModel: carModel.value || 'P1',
+    tags: carModel.value ? [carModel.value] : [],
+  })
+  if (res.ok) {
+    showToast('已发布')
+    setTimeout(() => router.push('/discover'), 600)
+  } else {
+    showToast(res.message || '发布失败')
   }
-  addMoment(newMoment, '动态')
-  showToast('已发布')
-  setTimeout(() => router.push('/discover'), 600)
 }
 </script>
 

@@ -200,6 +200,7 @@
 import { computed, ref, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { feedItems, activities, moments, commentSeed } from '../data/mock'
+import { publishState } from '../store/publish'
 import { requireLogin } from '../utils/auth'
 import bridge from '../bridge'
 import ShareSheet from '../components/ShareSheet.vue'
@@ -209,10 +210,11 @@ const router = useRouter()
 const defaultAvatar = 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg'
 
 const isActivity = computed(() => route.path.startsWith('/activity'))
-const id = computed(() => Number(route.params.id))
+const id = computed(() => route.params.id)
 const item = computed(() => {
-  const pool = isActivity.value ? activities : [...feedItems, ...moments]
-  return pool.find((i) => i.id === id.value) || null
+  // 详情池：官方内容 + 我的发布（localStorage 持久化），确保发帖后能点进详情
+  const pool = isActivity.value ? activities : [...feedItems, ...moments, ...publishState.list]
+  return pool.find((i) => String(i.id) === String(id.value)) || null
 })
 
 const isOfficial = computed(() => isActivity.value || (item.value && item.value.kind === 'official'))
