@@ -92,7 +92,10 @@
         :item="it"
         :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
       />
-      <div v-if="dynamicList.length === 0" class="empty-tab">暂无该车型动态</div>
+      <div v-if="dynamicList.length === 0 && !dynamicLoading" class="empty-tab">暂无该车型动态</div>
+      <div ref="dynamicSentinel"></div>
+      <div v-if="dynamicLoading" class="loadmore">加载中…</div>
+      <div v-else-if="dynamicNoMore && dynamicList.length" class="loadmore">没有更多了</div>
     </div>
 
     <!-- 广场：车型展示 + 热门活动 -->
@@ -138,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
@@ -180,16 +183,48 @@ const recommendList = computed(() => {
 })
 // 动态：真实数据源（fetchFeeds：我的发布 + 官方 moments，localStorage 持久化）
 const dynamicAll = ref([])
+const dynamicPage = ref(1)
+const dynamicLoading = ref(false)
+const dynamicNoMore = ref(false)
+const sortMode = ref('最新') // 最新 | 最热
+const PAGE_SIZE = 10
 async function refreshDynamic() {
-  dynamicAll.value = await fetchFeeds('dynamic')
+  dynamicPage.value = 1
+  dynamicNoMore.value = false
+  dynamicAll.value = await fetchFeeds('dynamic', { offset: 0, limit: PAGE_SIZE })
 }
+async function loadMoreDynamic() {
+  if (dynamicLoading.value || dynamicNoMore.value) return
+  dynamicLoading.value = true
+  try {
+    const next = await fetchFeeds('dynamic', { offset: dynamicPage.value * PAGE_SIZE, limit: PAGE_SIZE })
+    if (!next || next.length < PAGE_SIZE) dynamicNoMore.value = true
+    if (next && next.length) {
+      dynamicAll.value = [...dynamicAll.value, ...next]
+      dynamicPage.value++
+    }
+  } catch (e) {
+    dynamicNoMore.value = true
+  } finally {
+    dynamicLoading.value = false
+  }
+}
+let io = null
 onMounted(() => {
   refreshDynamic()
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab)
     publishState.pendingTab = null
   }
+  if (dynamicSentinel.value) {
+    io = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMoreDynamic() },
+      { rootMargin: '200px' }
+    )
+    io.observe(dynamicSentinel.value)
+  }
 })
+onUnmounted(() => { if (io) io.disconnect() })
 // 发布后自动刷新动态流（新增内容立即可见）
 watch(
   () => publishState.list.length,
@@ -197,8 +232,10 @@ watch(
 )
 const dynamicList = computed(() => {
   const f = activeFilter.value
-  if (f === '最新') return dynamicAll.value
-  return dynamicAll.value.filter((i) => i.carModel === f)
+  let list = dynamicAll.value
+  if (f !== '最新') list = list.filter((i) => i.carModel === f)
+  if (sortMode.value === '最热') list = [...list].sort((a, b) => (b.likes || 0) - (a.likes || 0))
+  return list
 })
 
 // 官方公告未读数（驱动发现页快捷区红点）
@@ -228,12 +265,15 @@ function onQuick(q) {
   if (q.key === 'points') { router.push('/points'); return }
   console.log('quick tap:', q.key)
 }
-function onSort() { console.log('sort tap') }
+function onSort() {
+  sortMode.value = sortMode.value === '最新' ? '最热' : '最新'
+  showToast('已按' + sortMode.value + '排序')
+}
 function onShowcase(p) {
   // 决策 8：车型卡跳购车车型页（原生承载）
   bridge.openNative('vehicle/' + p.id)
 }
-function onMoreActivity() { console.log('more activity') }
+function onMoreActivity() { showToast('活动中心即将上线') }
 function onActivity(a) { router.push('/activity/' + a.id) }
 
 const keyword = ref('')
@@ -242,6 +282,7 @@ function onSearch() {
   bridge.openNative('search?q=' + encodeURIComponent(keyword.value.trim()))
 }
 
+const dynamicSentinel = ref(null)
 const toast = ref('')
 let toastTimer = null
 function showToast(msg) {
@@ -545,4 +586,5 @@ function showToast(msg) {
 }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+.loadmore { text-align: center; color: var(--text-sub); font-size: 13px; padding: 16px 0; }
 </style>
