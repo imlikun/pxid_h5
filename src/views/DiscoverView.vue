@@ -198,11 +198,14 @@ async function loadMoreDynamic() {
   dynamicLoading.value = true
   try {
     const next = await fetchFeeds('dynamic', { offset: dynamicPage.value * PAGE_SIZE, limit: PAGE_SIZE })
-    if (!next || next.length < PAGE_SIZE) dynamicNoMore.value = true
-    if (next && next.length) {
-      dynamicAll.value = [...dynamicAll.value, ...next]
-      dynamicPage.value++
-    }
+    if (!next || next.length === 0) { dynamicNoMore.value = true; return }
+    // 后端 offset 分页目前未生效（返回重复数据），前端按 id 去重兜底，避免无限重复加载
+    const exist = new Set(dynamicAll.value.map((i) => i.id))
+    const fresh = next.filter((i) => !exist.has(i.id))
+    if (fresh.length === 0) { dynamicNoMore.value = true; return }
+    dynamicAll.value = [...dynamicAll.value, ...fresh]
+    dynamicPage.value++
+    if (fresh.length < PAGE_SIZE) dynamicNoMore.value = true
   } catch (e) {
     dynamicNoMore.value = true
   } finally {
