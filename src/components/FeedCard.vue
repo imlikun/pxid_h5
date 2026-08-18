@@ -1,6 +1,6 @@
 <template>
   <div class="fcard press" @click="go">
-    <img class="fcard__cover" :src="item.cover" :alt="item.title" />
+    <img class="fcard__cover" :src="item.cover || (item.images && item.images[0]) || defaultAvatar" :alt="item.title" />
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
       <div class="author">

@@ -175,11 +175,26 @@ const activeTab = ref('推荐')
 const activeFilter = ref('全部')
 
 const currentFilters = computed(() => filtersByTab[activeTab.value])
-// 推荐：聚合 feedItems（按车型筛选）
+// 推荐：优先真实数据源 fetchFeeds('recommend')；首屏/失败兜底 feedItems（mock）
+const recommendAll = ref(feedItems)
+const recommendLoading = ref(false)
+async function refreshRecommend() {
+  recommendLoading.value = true
+  try {
+    const data = await fetchFeeds('recommend')
+    if (data && data.length) recommendAll.value = data
+  } catch (e) {
+    /* 保留 feedItems 兜底 */
+  } finally {
+    recommendLoading.value = false
+  }
+}
 const recommendList = computed(() => {
   const f = activeFilter.value
-  if (f === '全部' || f === '最新') return feedItems
-  return feedItems.filter((i) => i.filter === f)
+  const list = recommendAll.value
+  if (f === '全部' || f === '最新') return list
+  // 真实 item 用 carModel，mock 用 filter，二者值一致（车型名）
+  return list.filter((i) => i.carModel === f || i.filter === f)
 })
 // 动态：真实数据源（fetchFeeds：我的发布 + 官方 moments，localStorage 持久化）
 const dynamicAll = ref([])
@@ -214,6 +229,7 @@ async function loadMoreDynamic() {
 }
 let io = null
 onMounted(() => {
+  refreshRecommend()
   refreshDynamic()
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab)
