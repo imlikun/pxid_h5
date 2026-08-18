@@ -184,25 +184,6 @@ H5 已确认是**打包进 App 本地**（Flutter 加载本地资源），这导
 
 ---
 
-## 6. 给 Flutter 兄弟的需求交付清单（我们主导，他按单交付）
+## 6. 给 Flutter 兄弟的文档（已拆分）
 
-> 迁移/部署由**我们（App 团队）**主导执行；Flutter 不写文档、不主导，只需**按下面清单交付 4 样东西**。
-
-### 6.1 交付清单（按优先级）
-
-| # | 要什么 | 格式/标准 | 验收方式 | 给谁 |
-| --- | --- | --- | --- | --- |
-| 1 | **WebView 加载方式确认** | 告知当前加载的是本地打包还是线上 URL；若是本地，改一行指向 `https://h5.pxid.com/`（域名以最终确认为准） | 浏览器打开该 URL 能看到三个模块首页 | 坤哥 |
-| 2 | **服务模块原生版效果**（供对比） | 按 §2.3 清单做 6 入口 + 子页，视觉对齐 tokens.css | 截图/录屏给坤哥，按 §2.2 对比后拍板用谁的 | 坤哥 |
-| 3 | **JS Bridge 方法清单确认** | 已实现的方法对照 `INTEGRATION.md` 勾选：getToken / getLocale / navigateTo / openNative / openShopify / openCheckout / callPhone / openMap | 逐个回"已实现/未实现"即可 | 坤哥 |
-| 4 | **商城结账 openCheckout 状态** | 是否已按 `PXID_Shopify_结账桥接_Flutter版.md` §1 实现 cartCreate → checkoutUrl → WebView → return_to | 回"已完成/进行中/未开始" | 坤哥 |
-
-### 6.2 明确的边界（防止扯皮）
-- **我们负责**：H5 三个模块开发/更新、后端（发帖 pxid-feed-server）、迁移部署、域名证书、热更新方案、与 Shopify 契约。
-- **Flutter 负责**：上表 4 项交付物；其余不参与。
-- **不需要 Flutter 做的**：不写迁移文档、不搭服务器、不碰 Shopify 店铺配置（那是对接文档另给 Shopify 兄弟）。
-
-### 6.3 交付时间建议
-- #1（加载方式）与 #3（bridge 清单）：**本周内**答复，阻塞迁移排期。
-- #2（服务模块对比）：**按他节奏**，不阻塞其他模块。
-- #4（openCheckout）：**与商城联调并行**。
+**给 Flutter 的单独文档**：`PXID_Flutter_需求交付清单.md`——只有 4 项交付物（加载方式确认 / 服务原生版 / bridge 清单 / openCheckout 状态），他不看本文档。**转发那封即可。**
