@@ -13,9 +13,10 @@
 
 import { publishState, addMoment } from '../store/publish'
 import { moments, feedItems, defaultAvatar } from '../data/mock'
+import { getDeviceId } from '../utils/device'
 
-// 后端就绪后改为真实地址，如 'https://api.pxid.com/pxid/v1'
-const FEED_API = ''
+// 后端就绪后改为真实地址（2026-08-18 已上线 pxid-api.appin.site）
+const FEED_API = 'https://pxid-api.appin.site'
 
 async function request(path, { method = 'GET', body } = {}) {
   const res = await fetch(FEED_API + path, {
@@ -85,6 +86,9 @@ export async function publishFeed(payload) {
   addMoment(newMoment, '动态')
   return { ok: true, id: newMoment.id }
 }
+
+// ---- 获取当前设备 ID（简化鉴权用），转交上层 ----
+export { getDeviceId }
 
 // ---- 详情 ----
 export async function fetchFeedDetail(id) {

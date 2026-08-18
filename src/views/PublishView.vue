@@ -67,7 +67,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { carModels } from '../data/mock'
 import { publishGallery } from '../store/publish'
-import { publishFeed } from '../api/feed'
+import { publishFeed, getDeviceId } from '../api/feed'
 import bridge from '../bridge'
 
 const router = useRouter()
@@ -112,6 +112,8 @@ async function onPublish() {
     images: selected.value.slice(),
     carModel: carModel.value || 'P1',
     tags: carModel.value ? [carModel.value] : [],
+    nickname: '我',
+    deviceId: getDeviceId(),
   })
   if (res.ok) {
     showToast('已发布')
