@@ -91,7 +91,7 @@ onUnmounted(() => { document.body.style.overflow = '' })
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
   overflow-x: auto;
@@ -101,16 +101,17 @@ onUnmounted(() => { document.body.style.overflow = '' })
 }
 .mp::-webkit-scrollbar { display: none; }
 .mp-chip {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-sub);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 6px 12px;
+  border-radius: 16px;
+  padding: 5px 10px;
   transition: all 0.12s ease;
   user-select: none;
   cursor: pointer;
   flex: none;
+  white-space: nowrap;
 }
 .mp-chip:active { transform: scale(0.96); }
 .mp-chip.on {

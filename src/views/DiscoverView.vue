@@ -71,11 +71,8 @@
         v-model="activeFilter"
         :options="currentFilters.slice(1)"
         :reset-label="currentFilters[0]"
-        :visible-count="4"
+        :visible-count="5"
       />
-      <span class="sort" @click="onSort">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m11 12 4 4 4-4"/><path d="M15 20V4"/></svg>
-      </span>
     </div>
 
     <!-- 推荐：双列网格 -->
@@ -292,10 +289,6 @@ function onQuick(q) {
   if (q.key === 'custom') { bridge.openNative('purchase/customize'); return }
   if (q.key === 'points') { router.push('/points'); return }
   console.log('quick tap:', q.key)
-}
-function onSort() {
-  sortMode.value = sortMode.value === '最新' ? '最热' : '最新'
-  showToast('已按' + sortMode.value + '排序')
 }
 function onShowcase(p) {
   // 决策 8：车型卡跳购车车型页（原生承载）

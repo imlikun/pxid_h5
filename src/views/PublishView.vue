@@ -23,7 +23,7 @@
       <!-- 车型选择 -->
       <div class="card section fade-up stagger-2">
         <div class="label">关联车型</div>
-        <ModelPicker v-model="carModel" :options="carModels" :visible-count="4" placeholder="选择车型" />
+        <ModelPicker v-model="carModel" :options="carModels" :visible-count="5" placeholder="选择车型" />
       </div>
 
       <!-- 用户图片上传 -->
