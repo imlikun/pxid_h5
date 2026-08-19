@@ -1,5 +1,15 @@
 <template>
   <div class="detail" v-if="item">
+    <!-- 下拉刷新指示器（手机 WebView 必需） -->
+    <div
+      class="pull-indicator"
+      :class="{ pulling: pulling, ready: pullReady, refreshing: refreshing }"
+      :style="{ transform: pulling && !refreshing ? `translateX(-50%) translateY(${pullDelta - 8}px)` : 'translateX(-50%) translateY(-8px)' }"
+    >
+      <div class="pull-spinner" v-if="refreshing || pulling"></div>
+      <span class="pull-text">{{ refreshing ? '刷新中…' : (pullReady ? '释放刷新' : '下拉刷新') }}</span>
+    </div>
+
     <!-- 顶部 -->
     <div class="topbar">
       <span class="back press" @click="router.back()">
@@ -197,12 +207,13 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick, onMounted, watch } from 'vue'
+import { computed, ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { feedItems, activities, moments, commentSeed } from '../data/mock'
 import { publishState } from '../store/publish'
 import { requireLogin } from '../utils/auth'
 import { fetchFeedDetail, likeFeed, commentFeed, fetchComments } from '../api/feed'
+import { hasHotUpdate } from '../utils/hotUpdate'
 import bridge from '../bridge'
 import ShareSheet from '../components/ShareSheet.vue'
 
@@ -236,8 +247,12 @@ async function loadItem() {
     }
   }
 }
-onMounted(loadItem)
+onMounted(() => {
+  loadItem()
+  attachPullRefresh()
+})
 watch(id, loadItem)
+onUnmounted(teardownPullRefresh)
 
 const isOfficial = computed(() => isActivity.value || (item.value && item.value.kind === 'official'))
 
@@ -461,6 +476,73 @@ function showToast(msg) {
   toast.value = msg
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 1600)
+}
+
+// ---- 下拉刷新：拉取最新评论 + 点赞数；线上有新版 JS/CSS 则整页重载 ----
+const PULL_THRESHOLD = 60
+const pulling = ref(false)
+const pullReady = ref(false)
+const pullDelta = ref(0)
+const refreshing = ref(false)
+let touchAttached = false
+let pullStartY = 0
+function onTouchStart(e) {
+  if (refreshing.value) return
+  if ((window.scrollY || document.documentElement.scrollTop || 0) > 4) {
+    pulling.value = false
+    return
+  }
+  pullStartY = e.touches[0].clientY
+  pulling.value = true
+  pullReady.value = false
+  pullDelta.value = 0
+}
+function onTouchMove(e) {
+  if (!pulling.value || refreshing.value) return
+  const y = e.touches[0].clientY
+  const delta = y - pullStartY
+  if (delta <= 0) { pulling.value = false; return }
+  pullDelta.value = Math.min(delta * 0.45, PULL_THRESHOLD * 1.4)
+  pullReady.value = pullDelta.value >= PULL_THRESHOLD
+}
+async function onTouchEnd() {
+  if (!pulling.value) return
+  pulling.value = false
+  if (pullReady.value) await doRefresh()
+  pullDelta.value = 0
+  pullReady.value = false
+}
+async function doRefresh() {
+  if (refreshing.value) return
+  refreshing.value = true
+  // 有新版（样式/逻辑改动）→ 整页重载拉新包，否则只刷数据
+  if (await hasHotUpdate()) {
+    location.reload()
+    return
+  }
+  try {
+    // 重新拉取详情（点赞数等）+ 后端评论列表，保证看到别人新发的评论
+    await loadItem()
+  } catch (e) {
+    /* 保持原状 */
+  } finally {
+    await new Promise((r) => setTimeout(r, 350))
+    refreshing.value = false
+  }
+}
+function attachPullRefresh() {
+  if (touchAttached) return
+  document.addEventListener('touchstart', onTouchStart, { passive: true })
+  document.addEventListener('touchmove', onTouchMove, { passive: true })
+  document.addEventListener('touchend', onTouchEnd, { passive: true })
+  touchAttached = true
+}
+function teardownPullRefresh() {
+  if (!touchAttached) return
+  document.removeEventListener('touchstart', onTouchStart)
+  document.removeEventListener('touchmove', onTouchMove)
+  document.removeEventListener('touchend', onTouchEnd)
+  touchAttached = false
 }
 </script>
 
@@ -751,4 +833,39 @@ function showToast(msg) {
 }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* 下拉刷新指示器（位于 sticky 顶栏下方） */
+.pull-indicator {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 54px);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-sub);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.pull-indicator.pulling,
+.pull-indicator.refreshing {
+  opacity: 1;
+}
+.pull-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #e5e7eb;
+  border-top-color: var(--brand, #f97316);
+  border-radius: 50%;
+  animation: pull-spin 0.8s linear infinite;
+}
+@keyframes pull-spin {
+  to { transform: rotate(360deg); }
+}
 </style>
