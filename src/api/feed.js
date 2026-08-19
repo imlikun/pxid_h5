@@ -39,7 +39,10 @@ function normalize(item) {
 export async function fetchFeeds(tab = 'dynamic', params = {}) {
   if (FEED_API) {
     try {
-      const qs = new URLSearchParams({ tab, ...params }).toString()
+      const qsParams = { tab, ...params }
+      // 动态：关注流，传当前设备 ID 让后端按「关注 + 官方」过滤
+      if (tab === 'dynamic') qsParams.followerDevice = getDeviceId()
+      const qs = new URLSearchParams(qsParams).toString()
       const data = await request('/feed?' + qs)
       return (data.list || []).map(normalize)
     } catch (e) {
@@ -180,5 +183,52 @@ export async function fetchComments(id) {
     return list
   } catch (e) {
     return null
+  }
+}
+
+// ---- 广场热门活动（只读；运营后台可配基础活动）----
+export async function fetchActivities() {
+  if (!FEED_API) return []
+  try {
+    const data = await request('/activities')
+    return data.list || []
+  } catch (e) {
+    return []
+  }
+}
+
+// ---- 关注 / 取关 / 检查（动态关注流）----
+export async function followUser(followeeDevice) {
+  try {
+    await request('/follow', { method: 'POST', body: { followerDevice: getDeviceId(), followeeDevice } })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e.message || '关注失败' }
+  }
+}
+export async function unfollowUser(followeeDevice) {
+  try {
+    await request(`/follow?followerDevice=${encodeURIComponent(getDeviceId())}&followeeDevice=${encodeURIComponent(followeeDevice)}`, { method: 'DELETE' })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e.message || '取关失败' }
+  }
+}
+export async function checkFollow(followeeDevice) {
+  try {
+    const data = await request(`/follow/check?follower=${encodeURIComponent(getDeviceId())}&followee=${encodeURIComponent(followeeDevice)}`)
+    return !!data.following
+  } catch (e) {
+    return false
+  }
+}
+
+// ---- 举报（UGC 内容安全闭环）----
+export async function reportFeed(id, reason) {
+  try {
+    await request(`/feed/${id}/report`, { method: 'POST', body: { reason, reporterDevice: getDeviceId() } })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e.message || '举报失败' }
   }
 }

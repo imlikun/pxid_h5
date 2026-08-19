@@ -10,11 +10,16 @@
         <div class="m-time">{{ item.time }}</div>
       </div>
       <button
-        v-if="!item.followed && !isOfficial"
+        v-if="!isOfficial && !following"
         class="m-follow"
         @click.stop="onFollow"
       >+ 关注</button>
-      <span v-else-if="!isOfficial" class="m-followed" @click.stop>已关注</span>
+      <button
+        v-else-if="!isOfficial && following"
+        class="m-followed-btn"
+        @click.stop="onUnfollow"
+      >已关注</button>
+      <button v-if="!isOfficial" class="m-report" @click.stop="openReport">举报</button>
     </div>
 
     <div class="m-title">{{ item.title }}</div>
@@ -45,16 +50,25 @@
         </span>
       </div>
     </div>
+
+    <!-- 举报理由浮层 -->
+    <div v-if="showReport" class="report-mask" @click.stop="showReport = false">
+      <div class="report-sheet" @click.stop>
+        <div class="report-title">举报内容</div>
+        <button v-for="r in reportReasons" :key="r" class="report-opt" @click.stop="submitReport(r)">{{ r }}</button>
+        <button class="report-cancel" @click.stop="showReport = false">取消</button>
+      </div>
+    </div>
+    <div v-if="toastMsg" class="m-toast">{{ toastMsg }}</div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import bridge from '../bridge'
 import { defaultAvatar } from '../data/mock'
-import { requireLogin } from '../utils/auth'
-import { likeFeed } from '../api/feed'
+import { likeFeed, followUser, unfollowUser, checkFollow, reportFeed } from '../api/feed'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -64,6 +78,14 @@ const router = useRouter()
 const liked = ref(!!props.item.isLiked)
 const likeCount = ref(props.item.likes || 0)
 const isOfficial = computed(() => props.item.kind === 'official')
+
+// 关注状态（后端驱动；官方帖无关注）
+const following = ref(false)
+onMounted(async () => {
+  if (!isOfficial.value && props.item.deviceId) {
+    following.value = await checkFollow(props.item.deviceId)
+  }
+})
 
 const cols = computed(() => {
   const n = props.item.images ? props.item.images.length : 0
@@ -82,24 +104,44 @@ function onCar(model) {
   bridge.openNative('vehicle/' + model)
 }
 async function onLike() {
-  // 当前匿名体系：点赞免登录（与发帖一致）；接入登录态后改回 requireLogin 门控
   const willLike = !liked.value
   liked.value = willLike
   likeCount.value += willLike ? 1 : -1
   const res = await likeFeed(props.item.id)
   if (!res.ok) {
-    // 后端失败 → 回滚本地状态
     liked.value = !willLike
     likeCount.value += willLike ? -1 : 1
   }
-  // 原生桥通知（App 内同步，H5 兜底无操作）
   bridge.openNative('feed/interact?type=like&id=' + props.item.id)
 }
 async function onFollow() {
-  const ok = await requireLogin()
-  if (!ok) return
-  props.item.followed = true
+  if (!props.item.deviceId) return
+  const res = await followUser(props.item.deviceId)
+  if (res.ok) following.value = true
   bridge.openNative('feed/follow?id=' + props.item.id)
+}
+async function onUnfollow() {
+  if (!props.item.deviceId) return
+  const res = await unfollowUser(props.item.deviceId)
+  if (res.ok) following.value = false
+}
+
+// ---- 举报（UGC 内容安全闭环）----
+const showReport = ref(false)
+const reportReasons = ['辱骂攻击', '广告导流', '不实信息', '色情低俗', '其他']
+const toastMsg = ref('')
+let toastTimer = null
+function toast(m) {
+  toastMsg.value = m
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toastMsg.value = ''), 1600)
+}
+function openReport() { showReport.value = true }
+async function submitReport(reason) {
+  const res = await reportFeed(props.item.id, reason)
+  showReport.value = false
+  bridge.openNative('feed/report?id=' + props.item.id + '&reason=' + encodeURIComponent(reason))
+  toast(res.ok ? '举报已提交，感谢反馈' : (res.message || '举报失败'))
 }
 </script>
 
@@ -110,6 +152,7 @@ async function onFollow() {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   padding: 12px;
   margin: 0 12px 12px;
+  position: relative;
 }
 .m-head {
   display: flex;
@@ -146,10 +189,23 @@ async function onFollow() {
   border-radius: var(--radius-pill);
   padding: 5px 12px;
 }
-.m-followed {
+.m-followed-btn {
   flex: none;
   font-size: 13px;
   color: var(--text-hint);
+  background: #f0f1f3;
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+}
+.m-report {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-hint);
+  background: transparent;
+  border: 1px solid #e0e0e0;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  margin-left: 6px;
 }
 .m-title {
   font-size: 15px;
@@ -202,4 +258,64 @@ async function onFollow() {
   color: var(--text-hint);
 }
 .m-act.liked { color: var(--price); }
+
+/* 举报浮层 */
+.report-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.report-sheet {
+  width: 100%;
+  max-width: 480px;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 8px 0 16px;
+}
+.report-title {
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-hint);
+  padding: 12px 0;
+}
+.report-opt {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 15px;
+  color: var(--text);
+  background: #fff;
+  padding: 14px 0;
+  border: none;
+  border-top: 1px solid #f0f1f3;
+}
+.report-cancel {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 15px;
+  color: var(--text-sub);
+  font-weight: 600;
+  background: #fff;
+  padding: 14px 0;
+  margin-top: 8px;
+  border: none;
+  border-top: 1px solid #f0f1f3;
+}
+.m-toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  z-index: 100;
+}
 </style>

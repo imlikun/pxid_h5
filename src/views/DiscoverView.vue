@@ -58,14 +58,15 @@
       </div>
       <div class="quick">
         <div
-        v-for="(q, i) in discoverQuick"
-        :key="q.key"
-        class="quick__item fade-up press"
-        :class="'stagger-' + ((i % 10) + 1)"
-        @click="onQuick(q)"
-      >
+          v-for="(q, i) in quickItems"
+          :key="q.key"
+          class="quick__item fade-up press"
+          :class="'stagger-' + ((i % 10) + 1)"
+          @click="onQuick(q)"
+        >
           <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
-          <IconSvg class="quick__icon" :name="q.icon" :size="22" />
+          <img v-if="q.icon && q.icon.startsWith('http')" :src="q.icon" class="quick__icon" />
+          <IconSvg v-else class="quick__icon" :name="q.icon || 'star'" :size="22" />
           <div class="quick__label">{{ q.label }}</div>
         </div>
       </div>
@@ -111,7 +112,7 @@
     <div v-else-if="activeTab === '广场'" class="content">
       <div class="grid3">
         <div
-          v-for="(p, i) in plazaShowcase"
+          v-for="(p, i) in plazaModels"
           :key="p.id"
           class="showcase fade-up press"
           :class="'stagger-' + ((i % 10) + 1)"
@@ -127,7 +128,7 @@
       </div>
       <div class="acts">
         <div
-          v-for="(a, i) in activities"
+          v-for="(a, i) in activitiesLive"
           :key="a.id"
           class="activity fade-up press"
           :class="'stagger-' + ((i % 10) + 1)"
@@ -167,9 +168,10 @@ import {
   activities,
   notices,
 } from '../data/mock'
+import { CAR_MODELS } from '../data/carModels'
 import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
-import { fetchFeeds, fetchBanners } from '../api/feed'
+import { fetchFeeds, fetchBanners, fetchPlazaGrid, fetchActivities } from '../api/feed'
 import { hasHotUpdate } from '../utils/hotUpdate'
 import bridge from '../bridge'
 
@@ -177,6 +179,22 @@ const router = useRouter()
 const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
 const banners = ref([]) // 运营后台配置的 Banner（真实接口，fallback 到静态图）
 const tabs = discoverTabs
+// 推荐页快捷区：运营后台可配（/plaza-grid），无配置时 fallback 到固定 4 项
+const plazaGrid = ref([])
+const quickItems = computed(() =>
+  plazaGrid.value.length
+    ? plazaGrid.value.map((g) => ({ key: String(g.id), label: g.title, icon: g.icon || '', url: g.url }))
+    : discoverQuick
+)
+// 广场车型宫格：以真实 CAR_MODELS 驱动（displayLabel 系列前缀），封面占位图沿用 plazaShowcase
+const plazaModels = computed(() =>
+  CAR_MODELS.map((m) => {
+    const old = plazaShowcase.find((o) => o.id === m.id)
+    return { id: m.id, name: m.displayLabel, cover: old ? old.cover : '' }
+  })
+)
+// 广场热门活动：运营后台可配（/activities），无配置时 fallback mock
+const activitiesLive = ref([])
 const filtersByTab = {
   推荐: recommendFilters,
   动态: dynamicFilters,
@@ -245,6 +263,9 @@ onMounted(() => {
   refreshDynamic()
   // 拉取运营后台配置的 Banner（后台改了前端即刻生效）
   fetchBanners().then((r) => { if (r && r.length) banners.value = r })
+  // 拉取运营后台配置的四宫格快捷入口 + 广场热门活动（真实接口，fallback mock）
+  fetchPlazaGrid().then((r) => { if (r && r.length) plazaGrid.value = r })
+  fetchActivities().then((r) => { if (r && r.length) activitiesLive.value = r })
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab)
     publishState.pendingTab = null
@@ -293,6 +314,8 @@ function onAdd() {
 }
 function onNotice() { router.push('/message') }
 function onQuick(q) {
+  // 运营后台配置的四宫格入口：有跳转 URL 直接走
+  if (q.url) { bridge.openNative(q.url); return }
   if (q.key === 'notice') { router.push('/notices'); return }
   // 决策 2：立即定制归口购车定制页（原生承载）
   if (q.key === 'custom') { bridge.openNative('purchase/customize'); return }
