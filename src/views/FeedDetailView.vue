@@ -168,15 +168,6 @@
     <div class="empty__txt">加载中…</div>
   </div>
 
-  <!-- 空态（确认查不到才显示） -->
-  <div v-else class="empty">
-    <div class="empty__icon">
-      <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
-    </div>
-    <div class="empty__txt">内容不存在或已下架</div>
-    <button class="empty__back" @click="router.back()">返回</button>
-  </div>
-
   <!-- 底部互动栏 -->
   <div v-if="item" class="actions">
     <button class="act pop press" :class="{ liked, on: liked }" @click="onLike">
@@ -810,13 +801,6 @@ function teardownPullRefresh() {
   animation: empty-spin 0.8s linear infinite;
 }
 @keyframes empty-spin { to { transform: rotate(360deg); } }
-.empty__back {
-  font-size: 14px;
-  color: var(--brand);
-  background: var(--brand-soft);
-  border-radius: var(--radius-pill);
-  padding: 7px 20px;
-}
 
 /* 底部互动栏 */
 .actions {
