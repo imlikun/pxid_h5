@@ -3,15 +3,18 @@
     <div class="m-head">
       <img class="m-avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
       <div class="m-meta">
-        <div class="m-name">{{ item.author }}</div>
+        <div class="m-name">
+          {{ item.author }}
+          <span v-if="isOfficial" class="m-official">官方</span>
+        </div>
         <div class="m-time">{{ item.time }}</div>
       </div>
       <button
-        v-if="!item.followed"
+        v-if="!item.followed && !isOfficial"
         class="m-follow"
         @click.stop="onFollow"
       >+ 关注</button>
-      <span v-else class="m-followed" @click.stop>已关注</span>
+      <span v-else-if="!isOfficial" class="m-followed" @click.stop>已关注</span>
     </div>
 
     <div class="m-title">{{ item.title }}</div>
@@ -60,6 +63,7 @@ const router = useRouter()
 
 const liked = ref(!!props.item.isLiked)
 const likeCount = ref(props.item.likes || 0)
+const isOfficial = computed(() => props.item.kind === 'official')
 
 const cols = computed(() => {
   const n = props.item.images ? props.item.images.length : 0
@@ -122,6 +126,18 @@ async function onFollow() {
 .m-meta { flex: 1; min-width: 0; }
 .m-name { font-size: 14px; font-weight: 600; color: var(--text); }
 .m-time { font-size: 12px; color: var(--text-hint); margin-top: 2px; }
+.m-official {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand);
+  border-radius: 4px;
+  padding: 1px 6px;
+  vertical-align: middle;
+  transform: translateY(-1px);
+}
 .m-follow {
   flex: none;
   font-size: 13px;

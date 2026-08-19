@@ -1,6 +1,7 @@
 <template>
   <div class="fcard press" @click="go">
     <img class="fcard__cover" :src="item.cover || (item.images && item.images[0]) || defaultAvatar" :alt="item.title" />
+    <span v-if="isOfficial" class="fcard__badge">官方</span>
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
       <div class="author">
@@ -16,7 +17,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { defaultAvatar } from '../data/mock'
 import { likeFeed } from '../api/feed'
@@ -27,6 +28,7 @@ const props = defineProps({
 const router = useRouter()
 const liked = ref(!!props.item.isLiked)
 const likeCount = ref(props.item.likes || 0)
+const isOfficial = computed(() => props.item.kind === 'official')
 
 async function onLike() {
   const willLike = !liked.value
@@ -49,6 +51,19 @@ function go() {
   background: transparent;
   border-radius: var(--radius);
   overflow: hidden;
+  position: relative;
+}
+.fcard__badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand);
+  border-radius: 4px;
+  padding: 2px 7px;
+  z-index: 2;
 }
 .fcard__cover {
   width: 100%;

@@ -130,6 +130,28 @@ export async function commentFeed(id, text) {
   }
 }
 
+// ---- 发现页运营配置（Banner / 广场四宫格）----
+// GET /banners（公开，status='on'）→ data.list
+// GET /plaza-grid（公开，status='on'）→ data.list
+export async function fetchBanners() {
+  if (!FEED_API) return []
+  try {
+    const data = await request('/banners')
+    return data.list || []
+  } catch (e) {
+    return []
+  }
+}
+export async function fetchPlazaGrid() {
+  if (!FEED_API) return []
+  try {
+    const data = await request('/plaza-grid')
+    return data.list || []
+  } catch (e) {
+    return []
+  }
+}
+
 // ---- 评论列表（跨端一致的关键）----
 // 后端 GET /feed/{id}/comments → data.list
 // 失败时返回 null，由调用方回落到本地 seed

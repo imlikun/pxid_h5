@@ -44,11 +44,17 @@
     <!-- Banner + 快捷入口：仅推荐页 -->
     <template v-if="activeTab === '推荐'">
       <div class="banner">
-        <img
-          class="banner__img"
-          :src="bannerImg"
-          alt="Banner"
-        />
+        <div class="banner__scroll" v-if="banners.length">
+          <a
+            v-for="b in banners"
+            :key="b.id"
+            class="banner__item press"
+            @click="onBanner(b)"
+          >
+            <img class="banner__img" :src="b.image" :alt="b.title" />
+          </a>
+        </div>
+        <img v-else class="banner__img" :src="bannerImg" alt="Banner" />
       </div>
       <div class="quick">
         <div
@@ -163,12 +169,13 @@ import {
 } from '../data/mock'
 import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
-import { fetchFeeds } from '../api/feed'
+import { fetchFeeds, fetchBanners } from '../api/feed'
 import { hasHotUpdate } from '../utils/hotUpdate'
 import bridge from '../bridge'
 
 const router = useRouter()
 const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
+const banners = ref([]) // 运营后台配置的 Banner（真实接口，fallback 到静态图）
 const tabs = discoverTabs
 const filtersByTab = {
   推荐: recommendFilters,
@@ -236,6 +243,8 @@ let io = null
 onMounted(() => {
   refreshRecommend()
   refreshDynamic()
+  // 拉取运营后台配置的 Banner（后台改了前端即刻生效）
+  fetchBanners().then((r) => { if (r && r.length) banners.value = r })
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab)
     publishState.pendingTab = null
@@ -301,6 +310,10 @@ const keyword = ref('')
 function onSearch() {
   // 搜索（决策相关）：原生承载；H5 兜底跳 /search 并带 q
   bridge.openNative('search?q=' + encodeURIComponent(keyword.value.trim()))
+}
+function onBanner(b) {
+  // 运营后台 Banner 点击跳转（url 为空则无动作）
+  if (b.url) bridge.openNative(b.url)
 }
 
 const dynamicSentinel = ref(null)
@@ -532,6 +545,19 @@ function teardownPullRefresh() {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.banner__scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.banner__scroll::-webkit-scrollbar { display: none; }
+.banner__item {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
 }
 .quick {
   display: grid;
