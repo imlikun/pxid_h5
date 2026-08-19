@@ -51,7 +51,7 @@
             class="banner__item press"
             @click="onBanner(b)"
           >
-            <img class="banner__img" :src="b.image" :alt="b.title" />
+            <img class="banner__img" :src="b.image || bannerImg" :alt="b.title" />
           </a>
         </div>
         <img v-else class="banner__img" :src="bannerImg" alt="Banner" />
