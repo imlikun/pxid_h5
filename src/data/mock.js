@@ -165,18 +165,19 @@ export const feedItems = [
 ]
 
 // 广场：车型展示（统一用 PXID 真实在售型号；按代号字母序 F1 F2 P1 P2 P3 P4 P5 P5 P6 P7 P8；封面暂用本地占位图，接 Shopify 后替换为真实商品图）
+// 广场车型宫格：name 用 displayLabel（摩P5/助P5…），与 CAR_MODEL_LABELS 一致
 export const plazaShowcase = [
-  { id: 'scooter-F1', name: 'F1', cover: 'plaza_p1.jpg', itemType: 'buy-vehicle' },
-  { id: 'scooter-F2', name: 'F2', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
-  { id: 'scooter-P1', name: 'P1', cover: 'plaza_p3.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P2', name: 'P2', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
-  { id: 'scooter-P3', name: 'P3', cover: 'plaza_p5.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P4', name: 'P4', cover: 'plaza_p6.jpg', itemType: 'buy-vehicle' },
-  { id: 'motorcycle-P5', name: 'P5', cover: 'feed_r1.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P5', name: 'P5', cover: 'feed_r2.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P6', name: 'P6', cover: 'feed_r3.jpg', itemType: 'buy-vehicle' },
-  { id: 'motorcycle-P7', name: 'P7', cover: 'feed_d1.jpg', itemType: 'buy-vehicle' },
-  { id: 'motorcycle-P8', name: 'P8', cover: 'feed_d2.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-F1', name: '板F1', cover: 'plaza_p1.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-F2', name: '板F2', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-P1', name: '板P1', cover: 'plaza_p3.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P2', name: '助P2', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-P3', name: '板P3', cover: 'plaza_p5.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P4', name: '助P4', cover: 'plaza_p6.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P5', name: '摩P5', cover: 'feed_r1.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P5', name: '助P5', cover: 'feed_r2.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P6', name: '助P6', cover: 'feed_r3.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P7', name: '摩P7', cover: 'feed_d1.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P8', name: '摩P8', cover: 'feed_d2.jpg', itemType: 'buy-vehicle' },
 ]
 
 // 广场：热门活动 2 条（封面按 广场/ 子目录文件顺序：(7)→活动1、base→活动2）
