@@ -162,7 +162,13 @@
     </div>
   </div>
 
-  <!-- 空态 -->
+  <!-- 加载中（先渲染，避免空态闪现） -->
+  <div v-else-if="loading" class="empty">
+    <div class="empty__spinner"></div>
+    <div class="empty__txt">加载中…</div>
+  </div>
+
+  <!-- 空态（确认查不到才显示） -->
   <div v-else class="empty">
     <div class="empty__icon">
       <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
@@ -213,6 +219,7 @@ import { feedItems, activities, moments, commentSeed } from '../data/mock'
 import { publishState } from '../store/publish'
 import { requireLogin } from '../utils/auth'
 import { fetchFeedDetail, likeFeed, commentFeed, fetchComments } from '../api/feed'
+import { getFeedCache } from '../store/feedCache'
 import { hasHotUpdate } from '../utils/hotUpdate'
 import bridge from '../bridge'
 import ShareSheet from '../components/ShareSheet.vue'
@@ -224,27 +231,36 @@ const defaultAvatar = 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg'
 const isActivity = computed(() => route.path.startsWith('/activity'))
 const id = computed(() => route.params.id)
 const item = ref(null)
+const loading = ref(true)
 async function loadItem() {
-  // 优先真实后端（含用户动态），查不到再兜底 mock 池
-  const real = await fetchFeedDetail(id.value)
-  if (real) {
-    item.value = real
-  } else {
-    const pool = isActivity.value ? activities : [...feedItems, ...moments, ...publishState.list]
-    item.value = pool.find((i) => String(i.id) === String(id.value)) || null
-  }
-  if (item.value) {
-    liked.value = !!item.value.isLiked
-    likeCount.value = item.value.likes || 0
-    followed.value = !!item.value.followed
-    // 优先后端评论列表（跨端一致），失败/无数据回落本地 seed
-    const remote = await fetchComments(id.value)
-    if (remote !== null) {
-      comments.value = remote
-    } else {
-      const seed = commentSeed[item.value.id] || []
-      comments.value = seed.map((c) => ({ ...c, replies: (c.replies || []).map((r) => ({ ...r })) }))
+  // 列表点击已写入瞬时缓存：先零延迟渲染，避免「内容不存在」空态闪现
+  const cached = getFeedCache(id.value)
+  if (cached) item.value = cached
+  loading.value = true
+  try {
+    // 优先真实后端（含用户动态），查不到再兜底 mock 池
+    const real = await fetchFeedDetail(id.value)
+    if (real) {
+      item.value = real
+    } else if (!item.value) {
+      const pool = isActivity.value ? activities : [...feedItems, ...moments, ...publishState.list]
+      item.value = pool.find((i) => String(i.id) === String(id.value)) || null
     }
+    if (item.value) {
+      liked.value = !!item.value.isLiked
+      likeCount.value = item.value.likes || 0
+      followed.value = !!item.value.followed
+      // 优先后端评论列表（跨端一致），失败/无数据回落本地 seed
+      const remote = await fetchComments(id.value)
+      if (remote !== null) {
+        comments.value = remote
+      } else {
+        const seed = commentSeed[item.value.id] || []
+        comments.value = seed.map((c) => ({ ...c, replies: (c.replies || []).map((r) => ({ ...r })) }))
+      }
+    }
+  } finally {
+    loading.value = false
   }
 }
 onMounted(() => {
@@ -785,6 +801,15 @@ function teardownPullRefresh() {
   background: var(--bg);
 }
 .empty__txt { font-size: 15px; }
+.empty__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e5e7eb;
+  border-top-color: var(--brand, #f97316);
+  border-radius: 50%;
+  animation: empty-spin 0.8s linear infinite;
+}
+@keyframes empty-spin { to { transform: rotate(360deg); } }
 .empty__back {
   font-size: 14px;
   color: var(--brand);

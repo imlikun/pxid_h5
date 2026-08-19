@@ -34,6 +34,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { defaultAvatar } from '../data/mock'
 import { likeFeed, reportFeed } from '../api/feed'
+import { setFeedCache } from '../store/feedCache'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -55,6 +56,7 @@ async function onLike() {
 }
 
 function go() {
+  setFeedCache(props.item.id, props.item)
   router.push('/feed/' + props.item.id)
 }
 

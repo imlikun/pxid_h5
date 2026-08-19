@@ -69,6 +69,7 @@ import { useRouter } from 'vue-router'
 import bridge from '../bridge'
 import { defaultAvatar } from '../data/mock'
 import { likeFeed, followUser, unfollowUser, checkFollow, reportFeed } from '../api/feed'
+import { setFeedCache } from '../store/feedCache'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -95,6 +96,7 @@ const cols = computed(() => {
 })
 
 function open() {
+  setFeedCache(props.item.id, props.item)
   router.push('/feed/' + props.item.id)
 }
 function onPreview(img) {
