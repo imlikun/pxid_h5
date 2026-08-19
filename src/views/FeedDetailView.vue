@@ -202,7 +202,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { feedItems, activities, moments, commentSeed } from '../data/mock'
 import { publishState } from '../store/publish'
 import { requireLogin } from '../utils/auth'
-import { fetchFeedDetail, likeFeed, commentFeed } from '../api/feed'
+import { fetchFeedDetail, likeFeed, commentFeed, fetchComments } from '../api/feed'
 import bridge from '../bridge'
 import ShareSheet from '../components/ShareSheet.vue'
 
@@ -226,8 +226,14 @@ async function loadItem() {
     liked.value = !!item.value.isLiked
     likeCount.value = item.value.likes || 0
     followed.value = !!item.value.followed
-    const seed = commentSeed[item.value.id] || []
-    comments.value = seed.map((c) => ({ ...c, replies: (c.replies || []).map((r) => ({ ...r })) }))
+    // 优先后端评论列表（跨端一致），失败/无数据回落本地 seed
+    const remote = await fetchComments(id.value)
+    if (remote !== null) {
+      comments.value = remote
+    } else {
+      const seed = commentSeed[item.value.id] || []
+      comments.value = seed.map((c) => ({ ...c, replies: (c.replies || []).map((r) => ({ ...r })) }))
+    }
   }
 }
 onMounted(loadItem)
@@ -441,6 +447,10 @@ async function submitComment() {
   if (!res.ok) {
     comments.value = comments.value.filter((c) => c.id !== tmp.id)
     showToast('评论失败，请重试')
+  } else {
+    // 拉取服务端最新评论列表，保证不同客户端看到同一份
+    const remote = await fetchComments(id.value)
+    if (remote !== null) comments.value = remote
   }
 }
 function onCommentLike(c) {

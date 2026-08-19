@@ -129,3 +129,34 @@ export async function commentFeed(id, text) {
     return { ok: false, message: e.message || '评论失败' }
   }
 }
+
+// ---- 评论列表（跨端一致的关键）----
+// 后端 GET /feed/{id}/comments → data.list
+// 失败时返回 null，由调用方回落到本地 seed
+export async function fetchComments(id) {
+  if (!FEED_API) return null
+  try {
+    const data = await request('/feed/' + id + '/comments')
+    const list = (data.list || []).map((c) => ({
+      id: c.id,
+      author: c.author,
+      avatar: c.avatar || '',
+      content: c.content,
+      time: c.createdAt || c.time || '',
+      likes: c.likes || 0,
+      isLiked: !!c.isLiked,
+      replies: (c.replies || []).map((r) => ({
+        id: r.id,
+        author: r.author,
+        avatar: r.avatar || '',
+        content: r.content,
+        time: r.createdAt || r.time || '',
+        likes: r.likes || 0,
+        isLiked: !!r.isLiked,
+      })),
+    }))
+    return list
+  } catch (e) {
+    return null
+  }
+}
