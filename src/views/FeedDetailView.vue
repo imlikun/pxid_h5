@@ -1,23 +1,21 @@
 <template>
   <div class="detail" v-if="item">
     <!-- 顶部 -->
-    <div class="topbar">
-      <span class="back press" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </span>
-      <span class="t">{{ isActivity ? '活动详情' : '内容详情' }}</span>
-      <span class="share press" @click="onShare">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-      </span>
-    </div>
+    <TopBar sticky :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
+      <template #right>
+        <span class="share press" @click="onShare">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+        </span>
+      </template>
+    </TopBar>
 
     <!-- 作者卡 -->
     <div class="author fade-up stagger-1">
       <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
       <div class="meta">
         <div class="name">
-          {{ item.author || 'PXID 官方' }}
-          <span v-if="isOfficial" class="badge-official">官方</span>
+          {{ item.author || t('feed.author.official') }}
+          <span v-if="isOfficial" class="badge-official">{{ t('feed.badge.official') }}</span>
         </div>
         <div class="time">{{ item.time || item.date }}</div>
       </div>
@@ -26,7 +24,7 @@
         class="follow press"
         :class="{ followed }"
         @click="onFollow"
-      >{{ followed ? '已关注' : '+ 关注' }}</button>
+      >{{ followed ? t('feed.follow.following') : t('feed.follow.follow') }}</button>
     </div>
 
     <!-- 标题 -->
@@ -35,14 +33,14 @@
     <!-- 活动报名卡 -->
     <div v-if="isActivity" class="signup">
       <div class="signup__row">
-        <span class="signup__k">活动时间</span>
+        <span class="signup__k">{{ t('feed.signup.time') }}</span>
         <span class="signup__v">{{ item.date }}</span>
       </div>
       <div class="signup__row">
-        <span class="signup__k">活动地点</span>
-        <span class="signup__v">PXID 体验店 / 线上同步</span>
+        <span class="signup__k">{{ t('feed.signup.place') }}</span>
+        <span class="signup__v">{{ t('feed.signup.placeVal') }}</span>
       </div>
-      <button class="signup__btn press" @click="onActivitySignup">立即报名</button>
+      <button class="signup__btn press" @click="onActivitySignup">{{ t('feed.signup.btn') }}</button>
     </div>
 
     <!-- 图片九宫格 -->
@@ -86,13 +84,13 @@
         <div class="prod__name">{{ item.productCard.name }}</div>
         <div class="prod__price">¥{{ item.productCard.price }}</div>
       </div>
-      <span class="prod__go">去看看 &gt;</span>
+      <span class="prod__go">{{ t('feed.goView') }} &gt;</span>
     </div>
 
     <!-- 评论区 -->
     <div class="comments fade-up stagger-7" ref="commentsBox">
-      <div class="comments__head">评论（{{ commentCount }}）</div>
-      <div v-if="comments.length === 0" class="comments__empty">暂无评论，来抢沙发~</div>
+      <div class="comments__head">{{ t('feed.commentsCount', { n: commentCount }) }}</div>
+      <div v-if="comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
       <div v-for="c in comments" :key="c.id" class="cmt">
         <img class="cmt__avatar" :src="c.avatar || defaultAvatar" :alt="c.author" />
         <div class="cmt__main">
@@ -105,13 +103,6 @@
               <span>{{ c.likes }}</span>
             </span>
           </div>
-          <!-- 楼中楼 -->
-          <div v-if="c.replies && c.replies.length" class="replies">
-            <div v-for="r in c.replies" :key="r.id" class="reply">
-              <span class="reply__name">{{ r.author }}：</span>
-              <span class="reply__text">{{ r.content }}</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -121,16 +112,16 @@
           ref="commentInput"
           v-model="commentText"
           class="cinput__field"
-          placeholder="说点什么…"
+          :placeholder="t('feed.inputPlaceholder')"
           @keyup.enter="submitComment"
         />
-        <button class="cinput__send press" @click="submitComment">发送</button>
+        <button class="cinput__send press" @click="submitComment">{{ t('feed.send') }}</button>
       </div>
     </div>
 
     <!-- 相关推荐 -->
     <div class="related fade-up stagger-8" v-if="related.length">
-      <div class="related__head">相关推荐</div>
+      <div class="related__head">{{ t('feed.related') }}</div>
       <div class="related__grid">
         <div
           v-for="r in related"
@@ -152,13 +143,19 @@
     </div>
   </div>
 
-  <!-- 空态 -->
+  <!-- 加载中（切帖/首屏先显示，避免闪“内容不存在或已下架”空态） -->
+  <div v-else-if="loading" class="loading">
+    <div class="loading__spin"></div>
+    <div class="loading__txt">{{ t('common.loading') }}</div>
+  </div>
+
+  <!-- 空态（仅加载完成且内容确实为空才显示） -->
   <div v-else class="empty">
     <div class="empty__icon">
       <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
     </div>
-    <div class="empty__txt">内容不存在或已下架</div>
-    <button class="empty__back" @click="router.back()">返回</button>
+    <div class="empty__txt">{{ t('feed.notFound') }}</div>
+    <button class="empty__back" @click="router.back()">{{ t('feed.back') }}</button>
   </div>
 
   <!-- 底部互动栏 -->
@@ -173,11 +170,11 @@
     </button>
     <button class="act pop press" :class="{ collected, on: collected }" @click="onCollect">
       <svg viewBox="0 0 24 24" width="22" height="22" :fill="collected ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-      <span>{{ collected ? '已收藏' : '收藏' }}</span>
+      <span>{{ collected ? t('feed.collect.collected') : t('feed.collect.collect') }}</span>
     </button>
     <button class="act pop press" @click="onShare">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-      <span>分享</span>
+      <span>{{ t('feed.share') }}</span>
     </button>
   </div>
 
@@ -188,24 +185,26 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick } from 'vue'
+import { computed, ref, nextTick, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { feedItems, activities, moments, commentSeed } from '../data/mock'
+import { activities } from '../data/mock'
 import { requireLogin } from '../utils/auth'
 import bridge from '../bridge'
+import { t } from '../i18n'
+import TopBar from '../components/TopBar.vue'
 
 const route = useRoute()
 const router = useRouter()
 const defaultAvatar = 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg'
 
+const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
+
 const isActivity = computed(() => route.path.startsWith('/activity'))
 const id = computed(() => Number(route.params.id))
-const item = computed(() => {
-  const pool = isActivity.value ? activities : [...feedItems, ...moments]
-  return pool.find((i) => i.id === id.value) || null
-})
 
-const isOfficial = computed(() => isActivity.value || (item.value && item.value.kind === 'official'))
+// 真实数据源（从接口拉取，activity 从 mock 取）
+const item = ref(null)
+const loading = ref(true)
 
 // 状态
 const liked = ref(false)
@@ -219,12 +218,66 @@ let toastTimer = null
 const commentsBox = ref(null)
 const commentInput = ref(null)
 
-if (item.value) {
-  liked.value = !!item.value.isLiked
-  likeCount.value = item.value.likes || 0
-  followed.value = !!item.value.followed
-  const seed = commentSeed[item.value.id] || []
-  comments.value = seed.map((c) => ({ ...c, replies: (c.replies || []).map((r) => ({ ...r })) }))
+// 从接口/mock 加载详情并初始化状态
+// 因 App.vue 用 <keep-alive> 缓存所有页面，切不同 id 时组件被复用 → 必须监听路由重载，否则“永远同一片”
+async function load() {
+  item.value = null
+  loading.value = true
+  if (isActivity.value) {
+    item.value = activities.find((i) => i.id === id.value) || null
+  } else {
+    try {
+      const r = await fetch(`${API_BASE}/feed/${id.value}`)
+      const j = await r.json()
+      if (j.code === 0 && j.data) {
+        item.value = j.data
+        liked.value = !!j.data.isLiked
+        likeCount.value = j.data.likes || 0
+        followed.value = !!j.data.followed
+      }
+    } catch (e) { /* keep null → show empty */ }
+    if (item.value) await loadComments(id.value)
+  }
+  loading.value = false
+}
+
+onMounted(load)
+// 同一个组件实例下，/feed/:id 或 /activity/:id 变化都重新拉详情
+watch(() => route.fullPath, load)
+
+// 拉取真实评论列表
+async function loadComments(fid) {
+  try {
+    const r = await fetch(`${API_BASE}/feed/${fid}/comments`)
+    const j = await r.json()
+    if (j.code === 0 && j.data) {
+      comments.value = (j.data.list || []).map((c) => ({
+        id: c.id,
+        author: c.author,
+        avatar: c.avatar,
+        content: c.content,
+        time: formatCommentTime(c.createdAt),
+        likes: 0,
+        isLiked: false,
+      }))
+    }
+  } catch (e) { /* 评论拉取失败不阻断详情 */ }
+}
+
+// 评论时间友好化（兼容秒/毫秒时间戳与字符串）
+function formatCommentTime(ts) {
+  if (!ts) return ''
+  let d
+  if (typeof ts === 'number') d = new Date(ts < 1e12 ? ts * 1000 : ts)
+  else d = new Date(ts)
+  if (isNaN(d.getTime())) return String(ts)
+  const diff = (Date.now() - d.getTime()) / 1000
+  if (diff < 60) return t('feed.time.justNow')
+  if (diff < 3600) return t('feed.time.minutesAgo', { n: Math.floor(diff / 60) })
+  const pad = (n) => String(n).padStart(2, '0')
+  if (d.toDateString() === new Date().toDateString())
+    return pad(d.getHours()) + ':' + pad(d.getMinutes())
+  return `${d.getMonth() + 1}-${pad(d.getDate())}`
 }
 
 const commentCount = computed(() => {
@@ -247,13 +300,8 @@ const gridCols = computed(() => {
   return 3
 })
 
-// 相关推荐：其余 feed + moments
-const related = computed(() => {
-  if (!item.value) return []
-  return [...feedItems, ...moments]
-    .filter((i) => i.id !== item.value.id)
-    .slice(0, 4)
-})
+// 相关推荐：暂不展示（后续可从 /feed?tab=recommend 取同车型）
+const related = ref([])
 
 // 富文本分段：#车型# / @用户 可点
 const segments = computed(() => {
@@ -301,25 +349,39 @@ function onTopic(t) {
   console.log('tap topic:', t)
 }
 
-// 互动：点赞 / 收藏 / 关注 / 分享（均走登录 Gate）
+// 互动：点赞 / 收藏 / 关注 / 分享
 async function onLike() {
-  const ok = await requireLogin()
-  if (!ok) return
-  liked.value = !liked.value
-  likeCount.value += liked.value ? 1 : -1
-  bridge.openNative('feed/interact?type=like&id=' + id.value)
+  // 乐观更新 + 真实落库（生产环境 requireAuth，需带登录态 token）
+  const next = !liked.value
+  liked.value = next
+  likeCount.value += next ? 1 : -1
+  try {
+    const token = await bridge.getAuthToken()
+    const r = await fetch(`${API_BASE}/feed/${id.value}/like`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ liked: next }),
+    })
+    const j = await r.json()
+    if (j.code === 0 && j.data) {
+      liked.value = !!j.data.isLiked
+      likeCount.value = j.data.likes
+    }
+  } catch (e) {
+    showToast(t('feed.toast.likeFail'))
+  }
 }
 async function onCollect() {
   const ok = await requireLogin()
   if (!ok) return
   collected.value = !collected.value
-  showToast(collected.value ? '已收藏' : '已取消收藏')
+  showToast(collected.value ? t('feed.toast.collected') : t('feed.toast.uncollected'))
 }
 async function onFollow() {
   const ok = await requireLogin()
   if (!ok) return
   followed.value = !followed.value
-  showToast(followed.value ? '已关注' : '已取消关注')
+  showToast(followed.value ? t('feed.toast.followed') : t('feed.toast.unfollowed'))
 }
 async function onShare() {
   const ok = await requireLogin()
@@ -327,12 +389,12 @@ async function onShare() {
   // 原生环境：拉起原生分享面板（契约 openNative('share/feed?id=')）
   if (bridge.isNative()) {
     bridge.openNative('share/feed?id=' + id.value)
-    showToast('已唤起分享')
+    showToast(t('feed.toast.shareLaunched'))
     return
   }
   // H5 预览：Web Share API / 复制链接，保证可真实分享
   const url = location.origin + location.pathname + '#/feed/' + id.value
-  const title = (item.value && item.value.title) || 'PXID 内容'
+  const title = (item.value && item.value.title) || t('feed.shareTitle')
   const text = (item.value && item.value.content ? item.value.content : '').slice(0, 60)
   if (navigator.share) {
     try {
@@ -344,14 +406,14 @@ async function onShare() {
   }
   try {
     await navigator.clipboard.writeText(url)
-    showToast('链接已复制，去分享吧')
+    showToast(t('feed.toast.linkCopied'))
   } catch (e) {
-    showToast('分享链接：' + url)
+    showToast(t('feed.toast.shareLink') + url)
   }
 }
 function onActivitySignup() {
   bridge.requestPurchase({ type: 'activity', id: id.value })
-  showToast('已打开报名')
+  showToast(t('feed.toast.signupOpen'))
 }
 function onProductCard() {
   const p = item.value && item.value.productCard
@@ -366,21 +428,38 @@ function onCommentBtn() {
     commentInput.value && commentInput.value.focus()
   })
 }
-function submitComment() {
+async function submitComment() {
   const text = commentText.value.trim()
   if (!text) return
-  comments.value.unshift({
-    id: 'me' + Date.now(),
-    author: '我',
-    avatar: '',
-    content: text,
-    time: '刚刚',
-    likes: 0,
-    isLiked: false,
-    replies: [],
-  })
-  commentText.value = ''
-  showToast('评论成功')
+  const [profile, token] = await Promise.all([
+    bridge.getUserInfo().catch(() => ({ nickname: t('feed.me'), avatar: '' })),
+    bridge.getAuthToken(),
+  ])
+  try {
+    const r = await fetch(`${API_BASE}/feed/${id.value}/comment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ content: text, nickname: profile.nickname, avatar: profile.avatar }),
+    })
+    const j = await r.json()
+    if (j.code === 0 && j.data) {
+      comments.value.unshift({
+        id: j.data.id,
+        author: j.data.author,
+        avatar: j.data.avatar,
+        content: j.data.content,
+        time: formatCommentTime(j.data.createdAt),
+        likes: 0,
+        isLiked: false,
+      })
+      commentText.value = ''
+      showToast(t('feed.toast.commentOk'))
+      return
+    }
+    showToast(j.msg || t('feed.toast.commentFail'))
+  } catch (e) {
+    showToast(t('feed.toast.commentFail'))
+  }
 }
 function onCommentLike(c) {
   c.isLiked = !c.isLiked
@@ -399,20 +478,7 @@ function showToast(msg) {
   background: var(--bg);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
-.topbar {
-  height: calc(48px + env(safe-area-inset-top));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: env(safe-area-inset-top) 12px 0;
-  position: sticky;
-  top: 0;
-  background: var(--card);
-  z-index: 10;
-  border-bottom: 1px solid var(--line);
-}
-.back, .share { display: flex; color: var(--text); }
-.t { font-size: 17px; font-weight: 600; color: var(--text); }
+.share { display: flex; color: var(--text); }
 
 /* 作者卡 */
 .author {
@@ -574,14 +640,6 @@ function showToast(msg) {
 .cmt__time { font-size: 12px; color: var(--text-hint); }
 .cmt__like { display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--text-hint); }
 .cmt__like.liked { color: var(--price); }
-.replies {
-  margin-top: 10px;
-  background: #f6f7f9;
-  border-radius: var(--radius);
-  padding: 8px 10px;
-}
-.reply { font-size: 13px; color: #444; line-height: 1.6; }
-.reply__name { color: var(--brand); font-weight: 500; }
 
 .cinput {
   display: flex;
@@ -619,6 +677,28 @@ function showToast(msg) {
 .rcard__foot { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 10px; }
 .rcard__author { font-size: 11px; color: var(--text-hint); }
 .rcard__like { display: flex; align-items: center; gap: 2px; font-size: 11px; color: var(--text-hint); }
+
+/* 加载中 */
+.loading {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--text-hint);
+  background: var(--bg);
+}
+.loading__spin {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #ececef;
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.loading__txt { font-size: 14px; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* 空态 */
 .empty {

@@ -1,20 +1,18 @@
 <template>
   <div class="publish">
     <!-- 顶部：返回 + 发布 -->
-    <div class="topbar">
-      <span class="back" @click="goBack">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </span>
-      <span class="title">发布动态</span>
-      <button class="post" :class="{ active: canPost }" :disabled="!canPost" @click="onPublish">发布</button>
-    </div>
+    <TopBar sticky :title="t('publish.title')" :back="goBack">
+      <template #right>
+        <button class="post" :class="{ active: canPost && !uploading }" :disabled="!canPost || uploading" @click="onPublish">{{ t('publish.post') }}</button>
+      </template>
+    </TopBar>
 
     <div class="body">
       <div class="card input-wrap">
         <textarea
           class="content"
           v-model="content"
-          placeholder="分享你的骑行日常、改装心得或活动体验…&#10;用 #车型# 标记车型，如 #MOTA Z3#"
+          :placeholder="t('publish.placeholder')"
           maxlength="1000"
         />
         <div class="counter">{{ content.length }}/1000</div>
@@ -22,7 +20,7 @@
 
       <!-- 车型选择 -->
       <div class="card section">
-        <div class="label">关联车型</div>
+        <div class="label">{{ t('publish.carModel') }}</div>
         <div class="chips">
           <span
             v-for="m in carModels"
@@ -35,24 +33,29 @@
         </div>
       </div>
 
-      <!-- 图片选择（本地图库，无后端上传） -->
+      <!-- 图片上传（真实上传 /feed/upload，jpg/png/webp 白名单，≤9 张） -->
       <div class="card section">
-        <div class="label">添加图片</div>
+        <div class="label">{{ t('publish.images') }}</div>
         <div class="gallery">
           <div
-            v-for="g in gallery"
-            :key="g"
-            class="gitem"
-            :class="{ on: selected.includes(g) }"
-            @click="toggle(g)"
+            v-for="(g, i) in picked"
+            :key="i"
+            class="gitem on"
           >
-            <img :src="imgBase + g" alt="" />
-            <span v-if="selected.includes(g)" class="tick">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            <img :src="g.url" alt="" />
+            <span class="tick" @click="removePick(i)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </span>
+            <span v-if="g.uploading" class="upmask">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             </span>
           </div>
+          <div v-if="picked.length < 9" class="gitem add" @click="pickFiles">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          </div>
         </div>
-        <div class="hint">预览态图片取自本地图库；接入后端后改为上传。</div>
+        <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" @change="onPick" />
+        <div class="hint">{{ uploading ? t('publish.uploading') : t('publish.uploadTip') }}</div>
       </div>
     </div>
 
@@ -65,24 +68,66 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { carModels, defaultAvatar } from '../data/mock'
-import { publishGallery, addMoment } from '../store/publish'
+import { carModels } from '../data/mock'
 import bridge from '../bridge'
+import { t } from '../i18n'
+import TopBar from '../components/TopBar.vue'
+
+const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
 const router = useRouter()
-const imgBase = import.meta.env.BASE_URL
-const gallery = publishGallery
+const fileInput = ref(null)
 
 const content = ref('')
 const carModel = ref('')
-const selected = ref([])
+// 已选图片：{ file, url(本地预览), uploadedUrl, uploading }
+const picked = ref([])
+const uploading = ref(false)
 
-const canPost = computed(() => content.value.trim().length > 0)
+const canPost = computed(() => content.value.trim().length > 0 && !uploading.value)
 
-function toggle(g) {
-  const i = selected.value.indexOf(g)
-  if (i >= 0) selected.value.splice(i, 1)
-  else if (selected.value.length < 9) selected.value.push(g)
+// 选图（≤9 张，jpg/png/webp）
+function pickFiles() {
+  fileInput.value && fileInput.value.click()
+}
+function onPick(e) {
+  const files = Array.from(e.target.files || [])
+  const remain = 9 - picked.value.length
+  files.slice(0, remain).forEach((f) => {
+    picked.value.push({ file: f, url: URL.createObjectURL(f), uploadedUrl: '', uploading: false })
+  })
+  e.target.value = ''
+}
+
+function removePick(i) {
+  const g = picked.value[i]
+  if (g.url.startsWith('blob:')) URL.revokeObjectURL(g.url)
+  picked.value.splice(i, 1)
+}
+
+// 逐张上传 /feed/upload（requireAuth，jpg/png/webp 白名单，单张≤5MB）
+async function uploadImages() {
+  const token = await bridge.getToken()
+  if (!token) throw new Error('NO_TOKEN')
+  const pending = picked.value.filter((g) => !g.uploadedUrl)
+  if (!pending.length) return
+  for (const g of pending) {
+    g.uploading = true
+    const fd = new FormData()
+    fd.append('images', g.file)
+    const r = await fetch(API_BASE + '/feed/upload', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: fd,
+    })
+    const j = await r.json()
+    if (j.code === 0 && j.data && j.data.urls && j.data.urls.length) {
+      g.uploadedUrl = j.data.urls[0]
+    } else {
+      throw new Error(j.message || 'UPLOAD_FAIL')
+    }
+    g.uploading = false
+  }
 }
 
 function goBack() {
@@ -91,42 +136,59 @@ function goBack() {
 }
 
 const toast = ref('')
-let t = null
+let toastTimer = null
 function showToast(m) {
   toast.value = m
-  clearTimeout(t)
-  t = setTimeout(() => (toast.value = ''), 1600)
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toast.value = ''), 1600)
 }
 
-function onPublish() {
+async function onPublish() {
   if (!canPost.value) return
-  // 原生环境：交由原生发布器承载（保持契约一致）
+  // 原生环境：交由原生发布器承载（契约一致，图片在原生侧处理）
   if (bridge.isNative()) {
     bridge.openNative('discover/publish?content=' + encodeURIComponent(content.value.trim()))
     return
   }
-  const text = content.value.trim()
-  const cm = carModel.value || 'P1'
-  const newMoment = {
-    id: 'U' + Date.now(),
-    itemType: 'moment',
-    author: '我',
-    avatar: defaultAvatar,
-    title: text.slice(0, 20) || '我的动态',
-    content: text,
-    images: selected.value.slice(),
-    tags: cm ? [cm] : [],
-    carModel: cm,
-    likes: 0,
-    isLiked: false,
-    comments: 0,
-    time: '刚刚',
-    followed: false,
-    focusCar: cm,
+  uploading.value = true
+  try {
+    // 1) 先传图
+    await uploadImages()
+    const images = picked.value.map((g) => g.uploadedUrl).filter(Boolean)
+    // 2) 带 token + 当前地区发帖
+    const token = await bridge.getToken()
+    if (!token) { showToast(t('publish.needLogin')); uploading.value = false; return }
+    let region = 'US'
+    try {
+      const reg = await bridge.getRegion()
+      if (['CN', 'BR', 'US'].includes(String(reg).toUpperCase())) region = String(reg).toUpperCase()
+    } catch (e) { /* 默认 US */ }
+    const cm = carModel.value || ''
+    const r = await fetch(API_BASE + '/feed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        content: content.value.trim(),
+        images,
+        carModel: cm,
+        tags: cm ? [cm] : [],
+        region,
+        nickname: '骑友',
+        deviceId: await bridge.getDeviceId(),
+      }),
+    })
+    const j = await r.json()
+    uploading.value = false
+    if (j.code === 0) {
+      showToast(t('publish.success'))
+      setTimeout(() => router.push('/discover'), 600)
+    } else {
+      showToast(j.message || t('publish.fail'))
+    }
+  } catch (e) {
+    uploading.value = false
+    showToast(e.message === 'NO_TOKEN' ? t('publish.needLogin') : t('publish.fail'))
   }
-  addMoment(newMoment, '动态')
-  showToast('已发布')
-  setTimeout(() => router.push('/discover'), 600)
 }
 </script>
 
@@ -136,36 +198,6 @@ function onPublish() {
   background: var(--bg);
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-}
-.topbar {
-  height: calc(44px + env(safe-area-inset-top));
-  padding-top: env(safe-area-inset-top);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-left: 16px;
-  padding-right: 16px;
-  background: var(--bg);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.back {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text);
-  border-radius: 50%;
-}
-.back:active {
-  background: var(--bg-press);
-}
-.title {
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--text);
 }
 .post {
   border: 1px solid var(--line);
@@ -266,6 +298,26 @@ function onPublish() {
   border: 2px solid transparent;
   cursor: pointer;
   background: var(--bg);
+}
+.gitem.add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-hint);
+  border: 1.5px dashed var(--line);
+  background: var(--bg);
+}
+.gitem.add:active {
+  background: var(--bg-press);
+}
+.upmask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 .gitem.on {
   border-color: var(--brand);

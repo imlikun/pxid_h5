@@ -1,16 +1,14 @@
 <template>
   <div class="page">
     <!-- 顶部：常见问题 + 筛选 -->
-    <div class="nav">
-      <span class="back" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </span>
-      <span class="title">常见问题</span>
-      <span class="filter-btn" @click="goFilter">
-        <span class="filter-label">筛选</span>
-        <span v-if="activeTagCount > 0" class="filter-badge">{{ activeTagCount }}</span>
-      </span>
-    </div>
+    <TopBar title="常见问题">
+      <template #right>
+        <span class="filter-btn" @click="goFilter">
+          <span class="filter-label">筛选</span>
+          <span v-if="activeTagCount > 0" class="filter-badge">{{ activeTagCount }}</span>
+        </span>
+      </template>
+    </TopBar>
 
     <!-- 搜索框 -->
     <div class="search">
@@ -41,6 +39,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { faqs } from '../data/mock'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -75,26 +74,14 @@ function goFilter() {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-}
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
+.page { min-height: 100vh; background: var(--bg); padding-bottom: env(safe-area-inset-bottom); }
 .filter-btn {
-  position: absolute;
-  right: 16px;
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 14px;
   color: var(--text);
+  padding: 4px 6px;
 }
 .filter-badge {
   background: var(--text);

@@ -11,6 +11,37 @@
 // 默认按“嵌入原生 App”处理，H5 不渲染底部 tab；浏览器独立预览时加 ?standalone=1
 const isEmbed = !new URLSearchParams(location.search).has('standalone')
 
+// H5 预览/mock 模式下向后端申请匿名 token 的地址
+const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
+let _cachedToken = null
+let _tokenPromise = null
+
+async function fetchAnonymousToken() {
+  if (_cachedToken) return _cachedToken
+  if (_tokenPromise) return _tokenPromise
+  _tokenPromise = (async () => {
+    try {
+      // 安全：/auth/token 由服务端生成 deviceId，前端不再自报（P0-1 根因修复，防自签他人身份）
+      const r = await fetch(`${API_BASE}/auth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!r.ok) throw new Error('HTTP ' + r.status)
+      const json = await r.json()
+      const token = json.data && json.data.token
+      if (token) _cachedToken = token
+      return token || 'mock-token-standalone'
+    } catch (e) {
+      console.warn('[PXIDBridge:mock] fetch /auth/token failed, fallback to dummy token', e.message || e)
+      return 'mock-token-standalone'
+    } finally {
+      _tokenPromise = null
+    }
+  })()
+  return _tokenPromise
+}
+
 function logMock(name, payload) {
   // eslint-disable-next-line no-console
   console.log(`[PXIDBridge:mock] ${name}`, payload ?? '')
@@ -22,9 +53,49 @@ const mockBridge = {
   isNative: false,
 
   // 获取登录态 token（返回 Promise<string>）
+  // H5 预览/mock 模式：向后端 /auth/token 申请 HMAC 签名 token，失败则回退 dummy token
   getToken() {
     logMock('getToken')
-    return Promise.resolve('mock-token-standalone')
+    return fetchAnonymousToken()
+  },
+
+  // 取当前地区（CN/BR/US）；真机由 Flutter 注入真实值；H5 预览默认 US（美国视图）
+  getRegion() {
+    logMock('getRegion')
+    return Promise.resolve('US')
+  },
+
+  // 取当前语言（zh/en/pt）；真机由 Flutter 注入真实值；H5 预览默认中文
+  getLocale() {
+    logMock('getLocale')
+    return Promise.resolve('zh')
+  },
+
+  // 设备唯一 ID（封禁维度）；真机由 Flutter 注入真实设备 ID；H5 预览生成稳定匿名 ID
+  getDeviceId() {
+    logMock('getDeviceId')
+    try {
+      let id = localStorage.getItem('pxid_device_id')
+      if (!id) {
+        id = 'h5-' + Math.random().toString(36).slice(2, 12)
+        localStorage.setItem('pxid_device_id', id)
+      }
+      return Promise.resolve(id)
+    } catch (e) {
+      return Promise.resolve('h5-anon')
+    }
+  },
+
+  // 取当前登录用户信息（昵称/头像），用于评论/互动带身份
+  // 真机由 Flutter 注入真实实现；H5 预览用默认游客态
+  getUserInfo() {
+    logMock('getUserInfo')
+    // M-MVP1 订单归属需要 email：真机由 Flutter 注入真实用户 email；H5 预览用测试值
+    return Promise.resolve({
+      nickname: '我',
+      avatar: 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg',
+      email: 'guest@pxid.app',
+    })
   },
 
   // 切换到原生底部 tab：'discover' | 'featured' | 'purchase' | 'service' | 'profile'
@@ -116,6 +187,23 @@ export const bridge = {
   // 是否真实原生桥（Flutter 注入的实现 isNative===true；mock 为 false）
   isNative: () => window.PXIDBridge && window.PXIDBridge.isNative === true,
   getToken: () => window.PXIDBridge.getToken(),
+  // 统一登录态 token：真机优先 getUserInfo 注入的登录 token，回退 getToken()（mock/匿名）
+  // 修复：真机 getToken() 未必返回登录 token，但登录态经 getUserInfo 注入 → 评论/点赞统一走这里
+  getAuthToken: async () => {
+    try {
+      const u = await window.PXIDBridge.getUserInfo()
+      if (u && u.token) return u.token
+    } catch (e) { /* 真机未实现 getUserInfo 时回退 */ }
+    try {
+      const t = await window.PXIDBridge.getToken()
+      if (t) return t
+    } catch (e) { /* 原生未注入时回退 */ }
+    return null
+  },
+  getUserInfo: () => window.PXIDBridge.getUserInfo(),
+  getRegion: () => window.PXIDBridge.getRegion(),
+  getDeviceId: () => window.PXIDBridge.getDeviceId(),
+  getLocale: () => window.PXIDBridge.getLocale(),
   navigateTo: (t) => window.PXIDBridge.navigateTo(t),
   requestPurchase: (p) => window.PXIDBridge.requestPurchase(p),
   callPhone: (p) => window.PXIDBridge.callPhone(p),

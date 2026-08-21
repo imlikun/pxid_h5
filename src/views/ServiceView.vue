@@ -1,12 +1,13 @@
 <template>
   <div class="service">
     <!-- 顶部标题 -->
-    <div class="topbar">
-      <div class="title">服务</div>
-      <span class="headset press" @click="goFeedback">
-        <IconSvg name="headset" :size="24" />
-      </span>
-    </div>
+    <TopBar sticky title="服务" :show-back="false">
+      <template #right>
+        <span class="headset press" @click="goFeedback">
+          <IconSvg name="headset" :size="24" />
+        </span>
+      </template>
+    </TopBar>
 
     <!-- 6 个服务入口（单张白卡） -->
     <div class="grid">
@@ -46,6 +47,7 @@ import StoreCard from '../components/StoreCard.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import FaqItem from '../components/FaqItem.vue'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 import { serviceEntries, nearbyStore, faqs } from '../data/mock'
 
 const router = useRouter()
@@ -80,28 +82,11 @@ function goFeedback() {
 .service {
   padding-top: env(safe-area-inset-top);
 }
-.topbar {
-  padding: 16px 16px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-.title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-}
 .headset {
-  position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
   color: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 4px;
 }
 .grid {
   display: grid;

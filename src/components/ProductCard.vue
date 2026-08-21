@@ -3,22 +3,26 @@
     <img class="pcard__cover" :src="product.cover" :alt="product.name" />
     <div class="pcard__name">{{ product.name }}</div>
     <div class="pcard__price">
-      <span class="price">¥{{ product.price }}</span>
-      <span v-if="product.origin" class="origin">¥{{ product.origin }}</span>
+      <span class="price">{{ sym(product.currency) }}{{ product.price }}</span>
+      <span v-if="product.origin" class="origin">{{ sym(product.currency) }}{{ product.origin }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { bridge } from '../bridge'
+import { useRouter } from 'vue-router'
+import { sym } from '../api/shop'
 
 const props = defineProps({
   product: { type: Object, required: true },
 })
 
+const router = useRouter()
+
 function go() {
-  // 商城与 Shopify 打通：H5 仅展示，点击跳 Shopify 购买
-  bridge.openShopify(props.product.shopUrl)
+  // PRD v2：点商品进入 H5 详情页（展示详情 + 本地购物车 + 结算跳 Shopify）
+  const h = props.product.handle || props.product.id
+  router.push('/product/' + h)
 }
 </script>
 

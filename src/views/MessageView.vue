@@ -1,23 +1,17 @@
 <template>
   <div class="message">
     <!-- 顶部导航 -->
-    <div class="topbar">
-      <div class="left">
-        <span class="back" @click="goBack">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-        </span>
-        <span class="title">消息</span>
-      </div>
-      <div class="right">
+    <TopBar sticky title="消息" :back="goBack">
+      <template #right>
         <span class="act">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <span v-if="unread > 0" class="m-badge"></span>
         </span>
         <span class="act">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         </span>
-      </div>
-    </div>
+      </template>
+    </TopBar>
 
     <!-- 消息分类 -->
     <div class="categories">
@@ -52,6 +46,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { messageCategories, messages, notices } from '../data/mock'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 
@@ -65,6 +60,7 @@ function goBack() {
 }
 function onCat(c) {
   if (c.key === 'system') { router.push('/notices'); return }
+  if (c.key === 'interaction') { router.push('/interactions'); return }
   console.log('category tap:', c.key)
 }
 function onMsg(m) {
@@ -80,27 +76,10 @@ function onMsg(m) {
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  background: var(--card);
-}
 .left {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.back {
-  display: flex;
-  align-items: center;
-  color: var(--text);
-}
-.title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
 }
 .right {
   display: flex;

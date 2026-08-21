@@ -1,14 +1,12 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back" @click="goBack">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">{{ model }} 产品说明书</span>
-      <span class="dl" @click="onDownload">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
-      </span>
-    </div>
+    <TopBar :title="model + ' 产品说明书'" :back="goBack">
+      <template #right>
+        <span class="dl" @click="onDownload">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+        </span>
+      </template>
+    </TopBar>
 
     <div class="doc">
       <div v-for="s in manualSections" :key="s.page" class="sec">
@@ -27,6 +25,7 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { manualSections } from '../data/mock'
 import { bridge } from '../bridge'
+import TopBar from '../components/TopBar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -43,11 +42,8 @@ function onDownload() {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-.nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: var(--card); border-bottom: 1px solid var(--line); }
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
-.dl { position: absolute; right: 12px; display: flex; color: var(--text); }
+.page { min-height: 100vh; background: var(--bg); padding-bottom: env(safe-area-inset-bottom); }
+.dl { display: flex; color: var(--text); padding: 4px; }
 .doc { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 .sec { background: var(--card); border-radius: var(--radius); padding: 14px; }
 .sec__head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }

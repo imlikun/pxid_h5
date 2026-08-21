@@ -3,7 +3,7 @@
     <div class="m-head">
       <img class="m-avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
       <div class="m-meta">
-        <div class="m-name">{{ item.author }}</div>
+        <div class="m-name"><span v-if="item.pinned" class="m-pin">置顶</span>{{ item.author }}</div>
         <div class="m-time">{{ item.time }}</div>
       </div>
       <button
@@ -19,14 +19,16 @@
 
     <div class="m-imgs" :style="{ gridTemplateColumns: `repeat(${cols}, 1fr)` }">
       <img
-        v-for="(img, i) in item.images"
+        v-for="(img, i) in displayImages"
         :key="i"
         class="m-img"
         :class="{ single: cols === 1 }"
         :src="img"
         :alt="item.title"
         @click.stop="onPreview(img)"
+        @error="onImgErr($event)"
       />
+      <img v-if="!displayImages.length" class="m-img single" :src="FALLBACK" :alt="item.title" @error="onImgErr($event)" />
     </div>
 
     <div class="m-foot">
@@ -59,6 +61,16 @@ const router = useRouter()
 
 const liked = ref(!!props.item.isLiked)
 const likeCount = ref(props.item.likes || 0)
+
+// 图列表兜底：原 images 数组；空就放占位图（FALLBACK）防 m-imgs 区域空白
+const FALLBACK = import.meta.env.BASE_URL + 'feed_default.jpg'
+const displayImages = computed(() => {
+  const imgs = props.item && props.item.images
+  return Array.isArray(imgs) ? imgs : []
+})
+function onImgErr(e) {
+  if (e && e.target && e.target.src !== FALLBACK) e.target.src = FALLBACK
+}
 
 const cols = computed(() => {
   const n = props.item.images ? props.item.images.length : 0
@@ -113,6 +125,16 @@ async function onFollow() {
 }
 .m-meta { flex: 1; min-width: 0; }
 .m-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.m-pin {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-right: 6px;
+  font-weight: 600;
+}
 .m-time { font-size: 12px; color: var(--text-hint); margin-top: 2px; }
 .m-follow {
   flex: none;

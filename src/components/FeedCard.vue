@@ -1,6 +1,9 @@
 <template>
   <div class="fcard press" @click="go">
-    <img class="fcard__cover" :src="item.cover" :alt="item.title" />
+    <div class="fcard__coverwrap">
+      <img class="fcard__cover" :src="coverUrl" :alt="item.title" @error="onImgErr" />
+      <span v-if="item.pinned" class="fcard__pin">置顶</span>
+    </div>
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
       <div class="author">
@@ -16,6 +19,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { defaultAvatar } from '../data/mock'
 
@@ -23,6 +27,16 @@ const props = defineProps({
   item: { type: Object, required: true },
 })
 const router = useRouter()
+// 封面兜底：cover → images[0] → 静态占位图（避免 src='' 出现 broken 图）
+const FALLBACK = import.meta.env.BASE_URL + 'feed_default.jpg'
+const coverUrl = computed(() => {
+  const it = props.item || {}
+  return it.cover || (Array.isArray(it.images) && it.images[0]) || FALLBACK
+})
+function onImgErr(e) {
+  // 网络抖动/原图失效 → 换兜底（再失败也不再递归）
+  if (e && e.target && e.target.src !== FALLBACK) e.target.src = FALLBACK
+}
 
 function go() {
   router.push('/feed/' + props.item.id)
@@ -35,11 +49,26 @@ function go() {
   border-radius: var(--radius);
   overflow: hidden;
 }
+.fcard__coverwrap {
+  position: relative;
+}
 .fcard__cover {
   width: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
+}
+.fcard__pin {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 4px;
+  z-index: 2;
 }
 .fcard__title {
   padding: 10px 0 0;

@@ -1,11 +1,6 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back press" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">在线客服</span>
-    </div>
+    <TopBar title="在线客服" />
 
     <div class="history-tip">查看更多历史消息</div>
 
@@ -47,6 +42,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { feedbackTabs, feedbackFaqs } from '../data/mock'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const serviceAvatar = import.meta.env.BASE_URL + 'unsplash/photo-1494790108377-be9c29b29330_w_80_q_80.jpg'
@@ -69,10 +65,7 @@ function goFaq(f) {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); display: flex; flex-direction: column; }
-.nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: var(--card); border-bottom: 1px solid var(--line); }
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
+.page { min-height: 100vh; background: var(--bg); padding-bottom: env(safe-area-inset-bottom); display: flex; flex-direction: column; }
 .history-tip { text-align: center; font-size: 13px; color: var(--text-hint); padding: 12px 0; }
 .chat-head { display: flex; align-items: flex-start; gap: 10px; padding: 0 12px 12px; }
 .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; }

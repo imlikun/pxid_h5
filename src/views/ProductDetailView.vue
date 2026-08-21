@@ -1,43 +1,79 @@
 <template>
   <div class="detail" v-if="product">
     <!-- 顶栏 -->
-    <div class="topbar">
-      <span class="back press" @click="goBack">←</span>
-      <span class="t">{{ product.name }}</span>
-      <span class="cart press" @click="goCart"><IconSvg name="shopping-cart" :size="22" /></span>
+    <TopBar sticky :title="product.name" :back="goBack">
+      <template #right>
+        <span class="cart press" @click="goCart">
+          <IconSvg name="shopping-cart" :size="24" />
+          <span v-if="cartCount > 0" class="badge">{{ cartCount > 99 ? '99+' : cartCount }}</span>
+        </span>
+      </template>
+    </TopBar>
+
+    <!-- 图廊：横向滑动 + 圆点 -->
+    <div class="gallery" ref="gallery" @scroll="onGalleryScroll">
+      <img
+        v-for="(img, i) in product.images"
+        :key="i"
+        class="slide"
+        :src="img"
+        :alt="product.name"
+        loading="lazy"
+      />
+      <div v-if="!product.images || !product.images.length" class="slide empty-slide">无图</div>
+    </div>
+    <div class="dots" v-if="(product.images || []).length > 1">
+      <span
+        v-for="(img, i) in product.images"
+        :key="i"
+        class="dot"
+        :class="{ active: i === activeIdx }"
+      ></span>
     </div>
 
-    <!-- 主图 -->
-    <img class="cover fade-up stagger-1" :src="product.cover" :alt="product.name" />
+    <!-- 缩略图 -->
+    <div class="thumbs" v-if="(product.images || []).length > 1">
+      <img
+        v-for="(img, i) in product.images"
+        :key="i"
+        class="thumb"
+        :class="{ active: i === activeIdx }"
+        :src="img"
+        @click="jumpTo(i)"
+      />
+    </div>
 
-    <!-- 信息 -->
-    <div class="info fade-up stagger-2">
+    <!-- 信息卡 -->
+    <div class="card info">
       <div class="name">{{ product.name }}</div>
-      <div class="price-row">
-        <span class="price">¥{{ product.price }}</span>
-        <span v-if="product.origin" class="origin">¥{{ product.origin }}</span>
-        <span class="sales">已售 {{ product.sales }}</span>
+      <div class="tagline" v-if="product.tagline">{{ product.tagline }}</div>
+      <div class="meta">
+        <span v-if="product.vendor" class="pill">{{ product.vendor }}</span>
+        <span v-if="product.tag" class="pill pill--brand">{{ product.tag }}</span>
       </div>
-      <span v-if="product.tag" class="tag">{{ product.tag }}</span>
+      <div class="price-row">
+        <span class="price">{{ sym(product.currency) }}{{ displayPrice }}</span>
+        <span v-if="product.origin" class="origin">{{ sym(product.currency) }}{{ product.origin }}</span>
+      </div>
     </div>
 
-    <!-- 规格选择 -->
-    <div class="block fade-up stagger-3">
-      <div class="block__title">规格</div>
+    <!-- 规格（变体） -->
+    <div class="card" v-if="product.variants && product.variants.length">
+      <div class="block__title">选择规格</div>
       <div class="opts">
         <span
-          v-for="(s, i) in specs"
-          :key="i"
-          class="opt chip-bounce"
-          :class="{ active: activeSpec === i }"
-          @click="activeSpec = i"
-          >{{ s }}</span
-        >
+          v-for="(v, i) in product.variants"
+          :key="v.id"
+          class="opt"
+          :class="{ active: activeVariant === i, soldout: !v.available }"
+          @click="activeVariant = i"
+          >{{ v.title }}<em v-if="v.price && v.price !== product.price"> +{{ sym(product.currency) }}{{ v.price }}</em><i v-if="!v.available">缺货</i></span
+      >
       </div>
     </div>
 
-    <!-- 数量 -->
-    <div class="block fade-up stagger-4">
+    <!-- 数量（紧跟规格，决策区） -->
+    <div class="card card--inline">
       <div class="block__title">数量</div>
       <div class="qty">
         <button class="press" @click="changeQty(-1)">－</button>
@@ -46,69 +82,208 @@
       </div>
     </div>
 
-    <div class="gap"></div>
-
-    <!-- 底部操作 -->
-    <div class="actions fade-up stagger-5">
-      <button class="btn btn--cart pop press" @click="onAddCart">去 Shopify 加购</button>
-      <button class="btn btn--buy pop press" @click="onBuy">去 Shopify 购买</button>
+    <!-- 规格参数 -->
+    <div class="card" v-if="product.specs && product.specs.length">
+      <div class="block__title">规格参数</div>
+      <div class="specs">
+        <div class="spec" v-for="(s, i) in product.specs" :key="i">
+          <span class="spec__k">{{ s.label }}</span>
+          <span class="spec__v">{{ s.value }}</span>
+        </div>
+      </div>
     </div>
 
-    <!-- toast -->
+    <!-- 核心卖点（参数之后，强化购买理由） -->
+    <div class="card" v-if="product.sellingPoints && product.sellingPoints.length">
+      <div class="block__title">核心卖点</div>
+      <ul class="points">
+        <li v-for="(s, i) in product.sellingPoints" :key="i">{{ s }}</li>
+      </ul>
+    </div>
+
+    <!-- 商品描述（Shopify body_html 富文本） -->
+    <div class="card desc" v-if="product.description">
+      <div class="block__title">商品详情</div>
+      <div class="prose" v-html="product.description"></div>
+      <div class="more-link press" @click="openOrigin" v-if="product.shopUrl">
+        前往 Shopify 查看完整详情 ↗
+      </div>
+    </div>
+    <!-- 无描述时也提供入口 -->
+    <div class="card desc" v-else-if="product.shopUrl">
+      <div class="more-link press" @click="openOrigin">
+        前往 Shopify 查看完整详情 ↗
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <!-- 底部吸底操作 -->
+    <div class="actions">
+      <button class="btn btn--cart pop press" @click="onAddCart">加入购物车</button>
+      <button class="btn btn--buy pop press" @click="onBuy">立即购买</button>
+    </div>
+
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
     </transition>
   </div>
 
   <div class="empty" v-else>
-    <p>商品不存在</p>
-    <button class="press" @click="goBack">返回</button>
+    <p v-if="loading">加载中…</p>
+    <template v-else>
+      <p>{{ error || '商品不存在' }}</p>
+      <div class="empty__acts">
+        <button class="press btn--retry" @click="goBack">返回精选</button>
+        <button class="press btn--retry" @click="reload">重新加载</button>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { products } from '../data/mock'
+import { fetchProducts, fetchProductDetail, getProductByHandle, getStore, sym, API_BASE, initRegion, getRegion } from '../api/shop'
+import { addToCart, cartCount } from '../store/cart'
 import { bridge } from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 
 const route = useRoute()
 const router = useRouter()
 
-const product = computed(() =>
-  products.find((p) => String(p.id) === String(route.params.id))
-)
-
-const specs = ['标准版', '旗舰版', 'Pro 套装']
-const activeSpec = ref(0)
+const product = ref(null)
+const loading = ref(true)
+const error = ref('')
+const activeIdx = ref(0)
+const activeVariant = ref(0)
 const qty = ref(1)
 const toast = ref('')
+const gallery = ref(null)
 
+const currentVariant = computed(() => {
+  const vs = product.value && product.value.variants
+  if (vs && vs.length) return vs[activeVariant.value] || vs[0]
+  return null
+})
+const displayPrice = computed(() => {
+  if (currentVariant.value && currentVariant.value.price) return currentVariant.value.price
+  return product.value ? product.value.price : 0
+})
+
+// 因 App.vue 用 <keep-alive> 缓存所有页面，切不同商品时组件被复用 → 必须监听路由重载，否则“永远同一片”
+async function load() {
+  const handle = route.params.id
+  product.value = null
+  loading.value = true
+  error.value = ''
+  activeIdx.value = 0
+  activeVariant.value = 0
+  qty.value = 1
+  await initRegion()
+  // 1️⃣ 先用列表缓存快速首屏（含图/价/卖点/规格/描述）
+  const cached = getProductByHandle(handle)
+  if (cached) {
+    product.value = cached
+    loading.value = false
+  }
+  // 2️⃣ 缓存未命中时（直链/刷新详情页），先拉列表填充缓存
+  if (!cached) {
+    try { await fetchProducts() } catch (_) { /* 非阻塞 */ }
+    const retryCached = getProductByHandle(handle)
+    if (retryCached) {
+      product.value = retryCached
+      loading.value = false
+    }
+  }
+  // 3️⃣ 再按 Shopify 单品链接真拉完整详情（覆盖缓存，带重试）
+  try {
+    const detail = await fetchProductDetail(handle)
+    if (detail) {
+      product.value = detail
+      if (activeVariant.value >= (detail.variants || []).length) activeVariant.value = 0
+      error.value = '' // 清除之前的错误
+    } else if (!product.value) {
+      error.value = '未找到该商品'
+    }
+  } catch (e) {
+    if (!product.value) error.value = '详情加载失败，请重试'
+  }
+  loading.value = false
+}
+
+onMounted(load)
+// 同一个组件实例下，/product/:id 变化重新拉详情（含重置轮播/规格/数量）
+watch(() => route.params.id, load)
+
+function onGalleryScroll() {
+  const el = gallery.value
+  if (!el) return
+  const w = el.clientWidth
+  activeIdx.value = Math.round(el.scrollLeft / w)
+}
+function jumpTo(i) {
+  const el = gallery.value
+  if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+  activeIdx.value = i
+}
 function showToast(msg) {
   toast.value = msg
   setTimeout(() => (toast.value = ''), 1500)
 }
-
 function changeQty(d) {
   qty.value = Math.max(1, qty.value + d)
 }
-
 function goBack() {
   router.back()
 }
+async function reload() {
+  await load()
+}
 function goCart() {
-  bridge.openShopify('https://shop.pxid.com/cart')
+  router.push('/cart')
+}
+function openOrigin() {
+  if (product.value && product.value.shopUrl) bridge.openShopify(product.value.shopUrl)
 }
 function onAddCart() {
   if (!product.value) return
-  bridge.openShopify(product.value.shopUrl)
-  showToast('正在前往 Shopify…')
+  addToCart(product.value, {
+    variantId: currentVariant.value ? currentVariant.value.id : 'def',
+    variantTitle: currentVariant.value ? currentVariant.value.title : '',
+    price: displayPrice.value,
+    qty: qty.value,
+    region: 'US',
+    store: getStore(),
+  })
+  showToast('已加入购物车')
 }
-function onBuy() {
+async function onBuy() {
   if (!product.value) return
-  bridge.openShopify(product.value.shopUrl)
-  showToast('正在前往 Shopify…')
+  const vid = currentVariant.value ? currentVariant.value.id : 'def'
+  // 走后端结算接口拿 Shopify cart permalink（region/未来 Multipass 都在后端收敛）
+  try {
+    const r = await fetch(`${API_BASE}/mall-api/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variantId: vid, qty: qty.value, region: getRegion() }),
+    })
+    const j = await r.json()
+    const url = (j.data && j.data.url) || (j.url)
+    if (!url) throw new Error('empty checkout url')
+    bridge.openShopify(url)
+    showToast('正在前往 Shopify…')
+  } catch (e) {
+    // 兜底：直接拼 permalink，保证不阻塞
+    const store = getStore()
+    if (store) {
+      bridge.openShopify(`https://${store}/cart/${vid}:${qty.value}`)
+      showToast('正在前往 Shopify…')
+    } else {
+      showToast('结算失败，请重试')
+    }
+  }
 }
 </script>
 
@@ -116,87 +291,137 @@ function onBuy() {
 .detail {
   min-height: 100vh;
   background: var(--bg);
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
-}
-.topbar {
-  height: calc(48px + env(safe-area-inset-top));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: env(safe-area-inset-top) 12px 0;
-  background: #fff;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.back {
-  font-size: 18px;
-  width: 32px;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 .cart {
+  position: relative;
   width: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text);
 }
-.t {
-  font-size: 15px;
-  font-weight: 600;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #e53935;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
 }
-.cover {
+/* 图廊 */
+.gallery {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  background: #000;
+}
+.gallery::-webkit-scrollbar {
+  display: none;
+}
+.slide {
+  flex: 0 0 100%;
   width: 100%;
-  height: 320px;
+  height: 360px;
   object-fit: cover;
-  display: block;
+  scroll-snap-align: center;
 }
-.info {
+.empty-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+}
+.dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 8px 0;
+  background: #fff;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.dot.active {
+  background: var(--brand);
+  width: 16px;
+  border-radius: 3px;
+}
+.thumbs {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 10px;
+  background: #fff;
+  overflow-x: auto;
+}
+.thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid transparent;
+  flex: none;
+}
+.thumb.active {
+  border-color: var(--brand);
+}
+/* 卡片 */
+.card {
   background: #fff;
   margin-top: 10px;
   padding: 14px;
+  border-radius: 0;
 }
-.name {
-  font-size: 17px;
+.info .name {
+  font-size: 18px;
   font-weight: 700;
+  line-height: 1.4;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pill {
+  font-size: 12px;
+  color: var(--text-sub);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+.pill--brand {
+  color: var(--brand);
+  border-color: var(--brand);
+  background: var(--brand-soft);
 }
 .price-row {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 .price {
   color: var(--price);
   font-weight: 700;
-  font-size: 22px;
+  font-size: 24px;
 }
 .origin {
   color: var(--text-sub);
   font-size: 13px;
   text-decoration: line-through;
-}
-.sales {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--text-sub);
-}
-.tag {
-  display: inline-block;
-  margin-top: 8px;
-  background: var(--brand-soft);
-  color: var(--brand);
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 6px;
-}
-.block {
-  background: #fff;
-  margin-top: 10px;
-  padding: 14px;
 }
 .block__title {
   font-size: 14px;
@@ -214,7 +439,18 @@ function onBuy() {
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 7px 16px;
+  padding: 8px 16px;
+}
+.opt em {
+  font-style: normal;
+  color: var(--price);
+  font-size: 12px;
+}
+.opt i {
+  font-style: normal;
+  color: var(--text-sub);
+  font-size: 11px;
+  margin-left: 4px;
 }
 .opt.active {
   color: var(--brand);
@@ -222,14 +458,32 @@ function onBuy() {
   background: var(--brand-soft);
   font-weight: 600;
 }
-.qty {
+.opt.soldout {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+/* 数量（决策区内联） */
+.card--inline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+}
+.card--inline .block__title {
+  margin-bottom: 0;
+  font-size: 13px;
+  color: var(--text-sub);
+  flex-shrink: 0;
+}
+.card--inline .qty {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 14px;
 }
 .qty button {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--bg);
@@ -237,13 +491,124 @@ function onBuy() {
   color: var(--text);
 }
 .qty span {
-  font-size: 15px;
-  min-width: 20px;
+  font-size: 16px;
+  min-width: 24px;
   text-align: center;
 }
-.gap {
-  height: 10px;
+/* 描述富文本 */
+.desc .prose {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  word-break: break-word;
 }
+.desc .prose :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+.desc .prose :deep(p) {
+  margin: 0 0 10px;
+}
+.desc .prose :deep(h1),
+.desc .prose :deep(h2),
+.desc .prose :deep(h3) {
+  font-size: 16px;
+  margin: 14px 0 8px;
+}
+.desc .prose :deep(a) {
+  color: var(--brand);
+}
+.desc .prose :deep(ul),
+.desc .prose :deep(ol) {
+  padding-left: 20px;
+  margin: 0 0 10px;
+}
+.desc .prose :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.desc .prose :deep(td),
+.desc .prose :deep(th) {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+}
+/* 描述底部辅助链接 */
+.more-link {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.gap {
+  height: 4px;
+}
+/* 卖点 / 参数 */
+.tagline {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.points li {
+  position: relative;
+  padding-left: 22px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.points li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  font-weight: 700;
+}
+.specs {
+  display: flex;
+  flex-direction: column;
+}
+.spec {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.spec:last-child {
+  border-bottom: none;
+}
+.spec__k {
+  color: var(--text-sub);
+  flex: none;
+}
+.spec__v {
+  color: var(--text);
+  text-align: right;
+  font-weight: 500;
+}
+/* 吸底操作 */
 .actions {
   position: fixed;
   left: 50%;
@@ -296,5 +661,25 @@ function onBuy() {
   padding: 80px 20px;
   text-align: center;
   color: var(--text-sub);
+}
+.empty p {
+  margin-bottom: 20px;
+  font-size: 15px;
+}
+.empty__acts {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.btn--retry {
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.btn--retry:active {
+  background: var(--bg);
 }
 </style>

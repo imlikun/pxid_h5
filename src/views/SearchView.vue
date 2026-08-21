@@ -1,21 +1,22 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <input
-        class="sinput"
-        v-model="kw"
-        placeholder="搜索内容 / 活动 / 车型"
-        @keyup.enter="doSearch"
-      />
-      <span class="go" @click="doSearch">搜索</span>
-    </div>
+    <TopBar interactive>
+      <template #title>
+        <input
+          class="sinput"
+          v-model="kw"
+          :placeholder="t('search.placeholder')"
+          @keyup.enter="doSearch"
+        />
+      </template>
+      <template #right>
+        <span class="go" @click="doSearch">{{ t('search.go') }}</span>
+      </template>
+    </TopBar>
 
     <div class="body">
-      <div v-if="!q" class="hint">输入关键词，搜索内容、活动或车型</div>
-      <div v-else-if="results.length === 0" class="empty">没有找到「{{ q }}」相关结果</div>
+      <div v-if="!q" class="hint">{{ t('search.hint') }}</div>
+      <div v-else-if="results.length === 0" class="empty">{{ t('search.empty', { q: q }) }}</div>
       <div
         v-for="r in results"
         :key="r.key"
@@ -37,6 +38,8 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { feedItems, activities, plazaShowcase } from '../data/mock'
 import { bridge } from '../bridge'
+import { t } from '../i18n'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -50,13 +53,13 @@ const results = computed(() => {
   const list = []
   feedItems.forEach((f) => {
     const title = (f.title || f.name || '').toLowerCase()
-    if (title.includes(key)) list.push({ key: 'feed-' + f.id, type: 'feed', id: f.id, title: f.title || f.name, sub: '内容', cover: f.cover })
+    if (title.includes(key)) list.push({ key: 'feed-' + f.id, type: 'feed', id: f.id, title: f.title || f.name, sub: t('search.sub.feed'), cover: f.cover })
   })
   activities.forEach((a) => {
-    if (a.title.toLowerCase().includes(key)) list.push({ key: 'act-' + a.id, type: 'activity', id: a.id, title: a.title, sub: '活动 · ' + a.date, cover: import.meta.env.BASE_URL + a.cover })
+    if (a.title.toLowerCase().includes(key)) list.push({ key: 'act-' + a.id, type: 'activity', id: a.id, title: a.title, sub: t('search.sub.activity') + a.date, cover: import.meta.env.BASE_URL + a.cover })
   })
   plazaShowcase.forEach((p) => {
-    if (p.name.toLowerCase().includes(key)) list.push({ key: 'veh-' + p.id, type: 'vehicle', id: p.id, title: p.name, sub: '车型', cover: import.meta.env.BASE_URL + p.cover })
+    if (p.name.toLowerCase().includes(key)) list.push({ key: 'veh-' + p.id, type: 'vehicle', id: p.id, title: p.name, sub: t('search.sub.vehicle'), cover: import.meta.env.BASE_URL + p.cover })
   })
   return list
 })
@@ -68,10 +71,8 @@ function onItem(r) {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); }
-.nav { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border-bottom: 1px solid var(--line); }
-.back { display: flex; color: var(--text); flex: none; }
-.sinput { flex: 1; height: 36px; border: 1px solid var(--line); border-radius: 18px; padding: 0 14px; font-size: 14px; color: var(--text); background: var(--bg); outline: none; }
+.page { min-height: 100vh; background: var(--bg); }
+.sinput { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 18px; padding: 0 14px; font-size: 14px; color: var(--text); background: var(--bg); outline: none; }
 .go { flex: none; font-size: 14px; color: var(--brand); font-weight: 600; }
 .body { padding: 12px; }
 .hint, .empty { text-align: center; color: var(--text-hint); font-size: 13px; padding: 60px 0; }

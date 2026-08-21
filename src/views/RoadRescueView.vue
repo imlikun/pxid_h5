@@ -1,15 +1,13 @@
 <template>
   <div class="page">
     <!-- 顶部导航 -->
-    <div class="nav">
-      <span class="back" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">道路救援</span>
-      <span class="search" @click="onSearch">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      </span>
-    </div>
+    <TopBar title="道路救援">
+      <template #right>
+        <span class="search" @click="onSearch">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        </span>
+      </template>
+    </TopBar>
 
     <!-- 地图区域（约 60%，原生能力，此处占位） -->
     <div class="map" @click="onMap">
@@ -87,6 +85,7 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { bridge } from '../bridge'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 
@@ -167,20 +166,9 @@ function onSubmit() {
 .page {
   min-height: 100vh;
   background: #ffffff;
-  padding-top: env(safe-area-inset-top);
   padding-bottom: calc(76px + env(safe-area-inset-bottom));
 }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: #fff;
-}
-.back { position: absolute; left: 12px; display: flex; color: #333; }
-.title { font-size: 17px; font-weight: 600; color: #333; }
-.search { position: absolute; right: 14px; display: flex; color: #333; }
+.search { display: flex; color: #333; padding: 4px; }
 
 .tabs {
   display: flex;

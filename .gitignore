@@ -1,4 +1,11 @@
 node_modules/
 dist/
+dist.old.*/
+dist.rebuild.del.*/
 .DS_Store
 *.log
+*.bak.*
+*.bak
+shots/
+*.zip
+!.gitignore

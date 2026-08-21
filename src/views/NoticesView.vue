@@ -1,17 +1,11 @@
 <template>
   <div class="notices">
-    <div class="nav">
-      <span class="back" @click="goBack">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </span>
-      <span class="title">官方公告</span>
-      <span class="right"></span>
-    </div>
+    <TopBar :title="t('notice.title')" :back="goBack" />
 
     <!-- 召回强提醒横幅：存在未确认召回公告时置顶 -->
     <div v-if="recallOpen" class="recall-bar" @click="toDetail(recallOpen.id)">
-      <span class="rb-tag">召回</span>
-      <span class="rb-text">您有一条车辆召回通知待确认，点击查看</span>
+      <span class="rb-tag">{{ t('notice.recallTag') }}</span>
+      <span class="rb-text">{{ t('notice.recallText') }}</span>
       <span class="rb-arrow">&gt;</span>
     </div>
 
@@ -42,6 +36,8 @@
 import { reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { notices } from '../data/mock'
+import { t } from '../i18n'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 
@@ -50,8 +46,14 @@ const list = reactive(notices.map((n) => ({ ...n })))
 
 const recallOpen = computed(() => list.find((n) => n.type === 'recall' && !n.isRead) || null)
 
-function typeLabel(t) {
-  return { recall: '召回', version: '版本', activity: '活动', safety: '安全', maintain: '维护' }[t] || '公告'
+function typeLabel(type) {
+  return {
+    recall: t('notice.type.recall'),
+    version: t('notice.type.version'),
+    activity: t('notice.type.activity'),
+    safety: t('notice.type.safety'),
+    maintain: t('notice.type.maintain'),
+  }[type] || t('notice.type.default')
 }
 function toDetail(id) {
   router.push('/notice/' + id)
@@ -66,21 +68,8 @@ function goBack() {
 .notices {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  background: #ffffff;
-  position: relative;
-}
-.back { display: flex; align-items: center; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
-.right { width: 24px; }
 
 .recall-bar {
   margin: 12px;

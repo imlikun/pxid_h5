@@ -31,6 +31,8 @@ import CustomizeView from '../views/CustomizeView.vue'
 import SearchView from '../views/SearchView.vue'
 import PointsView from '../views/PointsView.vue'
 import PublishView from '../views/PublishView.vue'
+import ActivityCenterView from '../views/ActivityCenterView.vue'
+import InteractionView from '../views/InteractionView.vue'
 
 // 用 hash 路由：WebView 内加载任意域名/本地文件都不会 404，无需服务端 rewrite
 const routes = [
@@ -82,6 +84,10 @@ const routes = [
   { path: '/notice/:id', name: 'notice-detail', component: NoticeDetailView, meta: { hideTabBar: true, title: '公告详情' } },
   { path: '/feed/:id', name: 'feed-detail', component: FeedDetailView, meta: { hideTabBar: true, title: '内容详情' } },
   { path: '/activity/:id', name: 'activity-detail', component: FeedDetailView, meta: { hideTabBar: true, title: '活动详情' } },
+  { path: '/activity-center', name: 'activity-center', component: ActivityCenterView, meta: { hideTabBar: true, title: '活动中心' } },
+
+  // 互动消息中心（点赞/评论/关注/系统，自有后端 /notifications）
+  { path: '/interactions', name: 'interactions', component: InteractionView, meta: { hideTabBar: true, title: '互动消息' } },
 
   // H5 兜底页（无原生时由 bridge 兜底路由到此）
   { path: '/vehicle/:id', name: 'vehicle', component: VehicleDetailView, meta: { hideTabBar: true, title: '车型详情' } },

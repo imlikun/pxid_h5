@@ -1,11 +1,6 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">我的工单</span>
-    </div>
+    <TopBar title="我的工单" />
 
     <!-- 状态 tab -->
     <div class="tabs">
@@ -53,6 +48,7 @@ import { useRouter } from 'vue-router'
 import { workOrderTabs, workOrderStatusMap, workOrders } from '../data/mock'
 import bridge from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const tabs = workOrderTabs
@@ -88,20 +84,8 @@ function onDetail(o) {
 .page {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-}
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 18px; font-weight: 700; color: var(--text); }
 
 .tabs {
   display: flex;
