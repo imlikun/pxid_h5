@@ -18,7 +18,8 @@ import { bridge } from '../bridge'
 export async function requireLogin() {
   let token = ''
   try {
-    token = (await bridge.getToken()) || ''
+    // 优先受限 token（HMAC 鉴权链注入的 getAuthToken），回退主 token；任一存在即视为已登录
+    token = (await bridge.getAuthToken()) || (await bridge.getToken()) || ''
   } catch (e) {
     token = ''
   }

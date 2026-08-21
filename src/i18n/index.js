@@ -87,6 +87,7 @@ const messages = {
     'feed.time.daysAgo': '{n}天前',
     // 帖子详情 toast
     'feed.toast.likeFail': '点赞失败，请重试',
+    'feed.toast.followFail': '关注失败，请重试',
     'feed.toast.collected': '已收藏',
     'feed.toast.uncollected': '已取消收藏',
     'feed.toast.followed': '已关注',
@@ -242,6 +243,7 @@ const messages = {
     'feed.time.hoursAgo': '{n}h ago',
     'feed.time.daysAgo': '{n}d ago',
     'feed.toast.likeFail': 'Failed to like, please retry',
+    'feed.toast.followFail': 'Failed to follow, please retry',
     'feed.toast.collected': 'Saved',
     'feed.toast.uncollected': 'Unsaved',
     'feed.toast.followed': 'Followed',
@@ -397,6 +399,7 @@ const messages = {
     'feed.time.hoursAgo': 'há {n} h',
     'feed.time.daysAgo': 'há {n} d',
     'feed.toast.likeFail': 'Falha ao curtir, tente novamente',
+    'feed.toast.followFail': 'Falha ao seguir, tente novamente',
     'feed.toast.collected': 'Salvo',
     'feed.toast.uncollected': 'Removido',
     'feed.toast.followed': 'Seguido',

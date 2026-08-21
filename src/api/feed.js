@@ -14,14 +14,27 @@
 import { publishState, addMoment } from '../store/publish'
 import { moments, feedItems, defaultAvatar } from '../data/mock'
 import { getDeviceId } from '../utils/device'
+import bridge from '../bridge'
 
 // 后端就绪后改为真实地址（2026-08-18 已上线 pxid-api.appin.site）
 const FEED_API = 'https://pxid-api.appin.site'
 
+// 取受限 token（后端 requireAuth 校验用）；取不到也不阻塞公开读请求
+async function getAuthTokenSafe() {
+  try {
+    return (await bridge.getAuthToken()) || ''
+  } catch (e) {
+    return ''
+  }
+}
+
 async function request(path, { method = 'GET', body } = {}) {
+  const headers = { 'Content-Type': 'application/json' }
+  const tk = await getAuthTokenSafe()
+  if (tk) headers.Authorization = 'Bearer ' + tk
   const res = await fetch(FEED_API + path, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) throw new Error('HTTP ' + res.status)

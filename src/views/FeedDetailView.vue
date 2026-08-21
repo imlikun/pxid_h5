@@ -191,6 +191,7 @@ import { activities } from '../data/mock'
 import { requireLogin } from '../utils/auth'
 import bridge from '../bridge'
 import { t } from '../i18n'
+import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow } from '../api/feed'
 import TopBar from '../components/TopBar.vue'
 
 const route = useRoute()
@@ -227,13 +228,16 @@ async function load() {
     item.value = activities.find((i) => i.id === id.value) || null
   } else {
     try {
-      const r = await fetch(`${API_BASE}/feed/${id.value}`)
-      const j = await r.json()
-      if (j.code === 0 && j.data) {
-        item.value = j.data
-        liked.value = !!j.data.isLiked
-        likeCount.value = j.data.likes || 0
-        followed.value = !!j.data.followed
+      const data = await fetchFeedDetail(id.value)
+      if (data) {
+        item.value = data
+        liked.value = !!data.isLiked
+        likeCount.value = data.likes || 0
+        followed.value = !!data.followed
+        // 后端详情 followed 硬编码 false（rowToFeed:304），用 /follow/check 补真实关注态
+        if (data.deviceId) {
+          try { followed.value = await checkFollow(data.deviceId) } catch (e) {}
+        }
       }
     } catch (e) { /* keep null → show empty */ }
     if (item.value) await loadComments(id.value)
@@ -247,20 +251,10 @@ watch(() => route.fullPath, load)
 
 // 拉取真实评论列表
 async function loadComments(fid) {
+  // 统一走 api/feed.js（fetchComments 已做跨端字段归一 + 失败返回 null 回落本地 seed）
   try {
-    const r = await fetch(`${API_BASE}/feed/${fid}/comments`)
-    const j = await r.json()
-    if (j.code === 0 && j.data) {
-      comments.value = (j.data.list || []).map((c) => ({
-        id: c.id,
-        author: c.author,
-        avatar: c.avatar,
-        content: c.content,
-        time: formatCommentTime(c.createdAt),
-        likes: 0,
-        isLiked: false,
-      }))
-    }
+    const list = await fetchComments(fid)
+    if (list) comments.value = list
   } catch (e) { /* 评论拉取失败不阻断详情 */ }
 }
 
@@ -378,10 +372,27 @@ async function onCollect() {
   showToast(collected.value ? t('feed.toast.collected') : t('feed.toast.uncollected'))
 }
 async function onFollow() {
+  if (!item.value || !item.value.deviceId) {
+    showToast(t('feed.toast.followFail'))
+    return
+  }
   const ok = await requireLogin()
   if (!ok) return
-  followed.value = !followed.value
-  showToast(followed.value ? t('feed.toast.followed') : t('feed.toast.unfollowed'))
+  const next = !followed.value
+  followed.value = next
+  try {
+    // 真正落库：调后端 /follow（POST 关注 / DELETE 取关），followeeDevice = 作者 deviceId
+    const r = next
+      ? await followUser(item.value.deviceId)
+      : await unfollowUser(item.value.deviceId)
+    if (!r || !r.ok) {
+      followed.value = !next
+      showToast(t('feed.toast.followFail'))
+    }
+  } catch (e) {
+    followed.value = !next
+    showToast(t('feed.toast.followFail'))
+  }
 }
 async function onShare() {
   const ok = await requireLogin()

@@ -173,6 +173,7 @@ import { publishState } from '../store/publish'
 import bridge from '../bridge'
 import { t, initLocale, setLocale } from '../i18n'
 import { fetchUnreadCount } from '../api/notifications'
+import { fetchFeeds } from '../api/feed'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
@@ -252,16 +253,15 @@ function setTab(t) {
   if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
 }
 
-// 从 /feed 接口拉取真实数据（带地区过滤）
+// 从 /feed 接口拉取真实数据（带地区过滤）。改用统一数据层 api/feed.js：
+// 动态 tab 自动带 followerDevice → 后端返回「官方+已关注」关注流（修 H1 关注流非全局流）；
+// 归一化/错误回落统一，消除 api/feed.js 死代码（修 H2）
 async function loadFeed(tab) {
+  const key = TAB_KEY[tab] || tab
   try {
-    const url = `${API_BASE}/feed?tab=${tab}&pageSize=30&region=${currentRegion.value}`
-    const r = await fetch(url)
-    const j = await r.json()
-    if (j.code === 0 && j.data) {
-      if (tab === 'recommend') recommendData.value = j.data.list || []
-      else dynamicData.value = j.data.list || []
-    }
+    const list = await fetchFeeds(key, { region: currentRegion.value, pageSize: 30 })
+    if (tab === '推荐') recommendData.value = list
+    else dynamicData.value = list
   } catch (e) {
     loadErr.value = t('discover.loadFail')
   }
