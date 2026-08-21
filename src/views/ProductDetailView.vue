@@ -1,58 +1,79 @@
 <template>
   <div class="detail" v-if="product">
     <!-- 顶栏 -->
-    <div class="topbar">
-      <span class="back press" @click="goBack">←</span>
-      <span class="t">商品详情</span>
-      <span class="cart press" @click="goCart"><IconSvg name="shopping-cart" :size="22" /></span>
+    <TopBar sticky :title="product.name" :back="goBack">
+      <template #right>
+        <span class="cart press" @click="goCart">
+          <IconSvg name="shopping-cart" :size="24" />
+          <span v-if="cartCount > 0" class="badge">{{ cartCount > 99 ? '99+' : cartCount }}</span>
+        </span>
+      </template>
+    </TopBar>
+
+    <!-- 图廊：横向滑动 + 圆点 -->
+    <div class="gallery" ref="gallery" @scroll="onGalleryScroll">
+      <img
+        v-for="(img, i) in product.images"
+        :key="i"
+        class="slide"
+        :src="img"
+        :alt="product.name"
+        loading="lazy"
+      />
+      <div v-if="!product.images || !product.images.length" class="slide empty-slide">无图</div>
+    </div>
+    <div class="dots" v-if="(product.images || []).length > 1">
+      <span
+        v-for="(img, i) in product.images"
+        :key="i"
+        class="dot"
+        :class="{ active: i === activeIdx }"
+      ></span>
     </div>
 
-    <!-- 主图轮播 + 缩略图 -->
-    <div class="gallery fade-up stagger-1">
-      <div class="g-main" @touchstart.passive="onTouchStart" @touchend="onTouchEnd">
-        <img v-if="gallery[gIdx]" :src="gallery[gIdx]" :alt="product.name" />
-        <div class="g-count">{{ gIdx + 1 }} / {{ gallery.length }}</div>
-      </div>
-      <div v-if="gallery.length > 1" class="g-thumbs">
-        <img
-          v-for="(g, i) in gallery"
-          :key="i"
-          :src="g"
-          :class="{ on: i === gIdx }"
-          @click="gIdx = i"
-        />
-      </div>
+    <!-- 缩略图 -->
+    <div class="thumbs" v-if="(product.images || []).length > 1">
+      <img
+        v-for="(img, i) in product.images"
+        :key="i"
+        class="thumb"
+        :class="{ active: i === activeIdx }"
+        :src="img"
+        @click="jumpTo(i)"
+      />
     </div>
 
-    <!-- 信息 -->
-    <div class="info fade-up stagger-2">
-      <div v-if="product.tags && product.tags.length" class="tags">
-        <span v-for="t in product.tags.slice(0, 3)" :key="t" class="tag">{{ t }}</span>
-      </div>
+    <!-- 信息卡 -->
+    <div class="card info">
       <div class="name">{{ product.name }}</div>
+      <div class="tagline" v-if="product.tagline">{{ product.tagline }}</div>
+      <div class="meta">
+        <span v-if="product.vendor" class="pill">{{ product.vendor }}</span>
+        <span v-if="product.tag" class="pill pill--brand">{{ product.tag }}</span>
+      </div>
       <div class="price-row">
-        <span class="price">{{ fmtPrice(activeVariant ? activeVariant.price : product.price) }}</span>
-        <span v-if="product.origin" class="origin">{{ fmtPrice(product.origin) }}</span>
+        <span class="price">{{ sym(product.currency) }}{{ displayPrice }}</span>
+        <span v-if="product.origin" class="origin">{{ sym(product.currency) }}{{ product.origin }}</span>
       </div>
     </div>
 
-    <!-- 规格选择（真实 options/variants） -->
-    <div v-for="(opt, oi) in product.options" :key="oi" class="block fade-up stagger-3">
-      <div class="block__title">{{ opt.name }}</div>
+    <!-- 规格（变体） -->
+    <div class="card" v-if="product.variants && product.variants.length">
+      <div class="block__title">选择规格</div>
       <div class="opts">
         <span
-          v-for="(val, vi) in opt.values"
-          :key="vi"
-          class="opt chip-bounce"
-          :class="{ active: selectedOption[opt.name] === val, disabled: !optionAvailable(opt, val) }"
-          @click="pickOption(opt, val)"
-          >{{ val }}</span
-        >
+          v-for="(v, i) in product.variants"
+          :key="v.id"
+          class="opt"
+          :class="{ active: activeVariant === i, soldout: !v.available }"
+          @click="activeVariant = i"
+          >{{ v.title }}<em v-if="v.price && v.price !== product.price"> +{{ sym(product.currency) }}{{ v.price }}</em><i v-if="!v.available">缺货</i></span
+      >
       </div>
     </div>
 
-    <!-- 数量 -->
-    <div class="block fade-up stagger-4">
+    <!-- 数量（紧跟规格，决策区） -->
+    <div class="card card--inline">
       <div class="block__title">数量</div>
       <div class="qty">
         <button class="press" @click="changeQty(-1)">－</button>
@@ -61,343 +82,346 @@
       </div>
     </div>
 
-    <!-- 商品介绍（结构化 intro 优先，body_html 兜底，最后显示"待完善"占位） -->
-    <div class="block fade-up stagger-5">
-      <div class="block__title">商品介绍</div>
-
-      <!-- 结构化介绍：summary / highlights / specs / sections -->
-      <template v-if="product.intro">
-        <div v-if="product.intro.summary" class="intro__summary">{{ product.intro.summary }}</div>
-        <ul v-if="product.intro.highlights && product.intro.highlights.length" class="intro__chips">
-          <li v-for="(h, i) in product.intro.highlights" :key="i" class="intro__chip">{{ h }}</li>
-        </ul>
-        <div v-if="product.intro.sections && product.intro.sections.length" class="intro__sections">
-          <div v-for="(s, i) in product.intro.sections" :key="i" class="intro__sec">
-            <div class="intro__sec-title">{{ s.title }}</div>
-            <div v-if="s.body" class="intro__sec-body">{{ s.body }}</div>
-            <img v-if="s.image" class="intro__sec-img" :src="s.image" :alt="s.title" />
-            <div v-if="s.specs && s.specs.length" class="intro__specs">
-              <div v-for="sp in s.specs" :key="sp.k" class="intro__specs-row">
-                <span class="intro__specs-k">{{ sp.k }}</span>
-                <span class="intro__specs-v">{{ sp.v }}</span>
-              </div>
-            </div>
-          </div>
+    <!-- 规格参数 -->
+    <div class="card" v-if="product.specs && product.specs.length">
+      <div class="block__title">规格参数</div>
+      <div class="specs">
+        <div class="spec" v-for="(s, i) in product.specs" :key="i">
+          <span class="spec__k">{{ s.label }}</span>
+          <span class="spec__v">{{ s.value }}</span>
         </div>
-        <video v-if="product.intro.video" class="intro__video" controls :src="product.intro.video"></video>
-      </template>
+      </div>
+    </div>
 
-      <!-- 兜底：原始 body_html 富文本（兼容老数据） -->
-      <div v-else-if="product.body_html" class="desc" v-html="safeHtml(product.body_html)"></div>
+    <!-- 核心卖点（参数之后，强化购买理由） -->
+    <div class="card" v-if="product.sellingPoints && product.sellingPoints.length">
+      <div class="block__title">核心卖点</div>
+      <ul class="points">
+        <li v-for="(s, i) in product.sellingPoints" :key="i">{{ s }}</li>
+      </ul>
+    </div>
 
-      <!-- 最后兜底 -->
-      <div v-else class="intro__empty">商品介绍待完善</div>
+    <!-- 商品描述（Shopify body_html 富文本） -->
+    <div class="card desc" v-if="product.description">
+      <div class="block__title">商品详情</div>
+      <div class="prose" v-html="product.description"></div>
+      <div class="more-link press" @click="openOrigin" v-if="product.shopUrl">
+        前往 Shopify 查看完整详情 ↗
+      </div>
+    </div>
+    <!-- 无描述时也提供入口 -->
+    <div class="card desc" v-else-if="product.shopUrl">
+      <div class="more-link press" @click="openOrigin">
+        前往 Shopify 查看完整详情 ↗
+      </div>
     </div>
 
     <div class="gap"></div>
 
-    <!-- 底部操作 -->
-    <div class="actions fade-up stagger-6">
-      <button class="btn btn--cart pop press" :disabled="!buyable" @click="onAddCart">加入购物车</button>
-      <button class="btn btn--buy pop press" :disabled="!buyable" @click="onBuy">立即购买</button>
+    <!-- 底部吸底操作 -->
+    <div class="actions">
+      <button class="btn btn--cart pop press" @click="onAddCart">加入购物车</button>
+      <button class="btn btn--buy pop press" @click="onBuy">立即购买</button>
     </div>
 
-    <!-- toast -->
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
     </transition>
   </div>
 
   <div class="empty" v-else>
-    <p>商品不存在</p>
-    <button class="press" @click="goBack">返回</button>
+    <p v-if="loading">加载中…</p>
+    <template v-else>
+      <p>{{ error || '商品不存在' }}</p>
+      <div class="empty__acts">
+        <button class="press btn--retry" @click="goBack">返回精选</button>
+        <button class="press btn--retry" @click="reload">重新加载</button>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchProduct } from '../api/shop'
-import { addToCart } from '../store/cart'
+import { fetchProducts, fetchProductDetail, getProductByHandle, getStore, sym, API_BASE, initRegion, getRegion } from '../api/shop'
+import { addToCart, cartCount } from '../store/cart'
+import { bridge } from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 
 const route = useRoute()
 const router = useRouter()
 
 const product = ref(null)
-const gIdx = ref(0)
+const loading = ref(true)
+const error = ref('')
+const activeIdx = ref(0)
+const activeVariant = ref(0)
 const qty = ref(1)
 const toast = ref('')
-// 当前选中的规格（option 名 → 值），默认取每个 option 第一个值
-const selectedOption = ref({})
+const gallery = ref(null)
 
-const gallery = computed(() => (product.value && product.value.images && product.value.images.length ? product.value.images : product.value ? [product.value.cover] : []))
-
-const activeVariant = computed(() => {
-  if (!product.value || !product.value.variants || !product.value.variants.length) return null
-  const sel = selectedOption.value
-  const names = (product.value.options || []).map((o) => o.name)
-  // 多规格：匹配所有选中维度；单规格：直接取第一个变体
-  const hit = product.value.variants.find((v) => {
-    return names.every((n, i) => !sel[n] || (i === 0 ? v.option1 : i === 1 ? v.option2 : v.option3) === sel[n])
-  })
-  return hit || null
+const currentVariant = computed(() => {
+  const vs = product.value && product.value.variants
+  if (vs && vs.length) return vs[activeVariant.value] || vs[0]
+  return null
+})
+const displayPrice = computed(() => {
+  if (currentVariant.value && currentVariant.value.price) return currentVariant.value.price
+  return product.value ? product.value.price : 0
 })
 
-const buyable = computed(() => {
-  if (!product.value) return false
-  if (!activeVariant.value) return false
-  return activeVariant.value.available !== false
-})
-
-function optionAvailable(opt, val) {
-  if (!product.value || !product.value.variants) return true
-  const sel = { ...selectedOption.value, [opt.name]: val }
-  const names = (product.value.options || []).map((o) => o.name)
-  return product.value.variants.some((v) => {
-    return names.every((n) => {
-      const i = names.indexOf(n)
-      const vv = i === 0 ? v.option1 : i === 1 ? v.option2 : v.option3
-      if (n === opt.name) return vv === val
-      return !sel[n] || vv === sel[n]
-    })
-  })
-}
-
-function pickOption(opt, val) {
-  if (!optionAvailable(opt, val)) return
-  selectedOption.value = { ...selectedOption.value, [opt.name]: val }
-}
-
-function fmtPrice(v) {
-  const currency = (product.value && product.value.currency) || 'USD'
-  try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(v)
-  } catch (e) {
-    return currency + ' ' + v
+// 因 App.vue 用 <keep-alive> 缓存所有页面，切不同商品时组件被复用 → 必须监听路由重载，否则“永远同一片”
+async function load() {
+  const handle = route.params.id
+  product.value = null
+  loading.value = true
+  error.value = ''
+  activeIdx.value = 0
+  activeVariant.value = 0
+  qty.value = 1
+  await initRegion()
+  // 1️⃣ 先用列表缓存快速首屏（含图/价/卖点/规格/描述）
+  const cached = getProductByHandle(handle)
+  if (cached) {
+    product.value = cached
+    loading.value = false
   }
+  // 2️⃣ 缓存未命中时（直链/刷新详情页），先拉列表填充缓存
+  if (!cached) {
+    try { await fetchProducts() } catch (_) { /* 非阻塞 */ }
+    const retryCached = getProductByHandle(handle)
+    if (retryCached) {
+      product.value = retryCached
+      loading.value = false
+    }
+  }
+  // 3️⃣ 再按 Shopify 单品链接真拉完整详情（覆盖缓存，带重试）
+  try {
+    const detail = await fetchProductDetail(handle)
+    if (detail) {
+      product.value = detail
+      if (activeVariant.value >= (detail.variants || []).length) activeVariant.value = 0
+      error.value = '' // 清除之前的错误
+    } else if (!product.value) {
+      error.value = '未找到该商品'
+    }
+  } catch (e) {
+    if (!product.value) error.value = '详情加载失败，请重试'
+  }
+  loading.value = false
 }
 
-function safeHtml(html) {
-  // body_html 来自 Shopify 商品描述（可信源），直接渲染
-  return html
-}
+onMounted(load)
+// 同一个组件实例下，/product/:id 变化重新拉详情（含重置轮播/规格/数量）
+watch(() => route.params.id, load)
 
+function onGalleryScroll() {
+  const el = gallery.value
+  if (!el) return
+  const w = el.clientWidth
+  activeIdx.value = Math.round(el.scrollLeft / w)
+}
+function jumpTo(i) {
+  const el = gallery.value
+  if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+  activeIdx.value = i
+}
 function showToast(msg) {
   toast.value = msg
   setTimeout(() => (toast.value = ''), 1500)
 }
-
 function changeQty(d) {
   qty.value = Math.max(1, qty.value + d)
 }
-
-// 主图手指滑动切换（左滑下一张 / 右滑上一张）
-let touchStartX = 0
-let touchStartY = 0
-function onTouchStart(e) {
-  touchStartX = e.touches[0].clientX
-  touchStartY = e.touches[0].clientY
-}
-function onTouchEnd(e) {
-  const dx = e.changedTouches[0].clientX - touchStartX
-  const dy = e.changedTouches[0].clientY - touchStartY
-  // 横向滑动距离 > 40px 且不被纵向滚动主导，判定为切换手势
-  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-    if (dx < 0) nextImg()
-    else prevImg()
-  }
-}
-function nextImg() {
-  if (!gallery.value.length) return
-  gIdx.value = (gIdx.value + 1) % gallery.value.length
-}
-function prevImg() {
-  if (!gallery.value.length) return
-  gIdx.value = (gIdx.value - 1 + gallery.value.length) % gallery.value.length
-}
-
 function goBack() {
   router.back()
+}
+async function reload() {
+  await load()
 }
 function goCart() {
   router.push('/cart')
 }
-
+function openOrigin() {
+  if (product.value && product.value.shopUrl) bridge.openShopify(product.value.shopUrl)
+}
 function onAddCart() {
-  if (!buyable.value || !product.value) return
-  addToCart(
-    {
-      id: product.value.id,
-      name: product.value.name,
-      price: activeVariant.value ? activeVariant.value.price : product.value.price,
-      origin: product.value.origin,
-      cover: product.value.cover,
-      tag: product.value.tag,
-      shopUrl: product.value.shopUrl,
-      variantId: activeVariant.value ? activeVariant.value.id : null,
-      spec: activeVariant.value ? activeVariant.value.title : '',
-      currency: product.value.currency || 'USD',
-    },
-    qty.value
-  )
+  if (!product.value) return
+  addToCart(product.value, {
+    variantId: currentVariant.value ? currentVariant.value.id : 'def',
+    variantTitle: currentVariant.value ? currentVariant.value.title : '',
+    price: displayPrice.value,
+    qty: qty.value,
+    region: 'US',
+    store: getStore(),
+  })
   showToast('已加入购物车')
 }
-
-function onBuy() {
-  if (!buyable.value || !product.value) return
-  onAddCart()
-  router.push('/cart/checkout')
-}
-
-// 路由 id 变化时重新加载（keep-alive 下 onMounted 只跑一次，必须用 watch 跟路由）
-async function load(id) {
-  product.value = null
-  selectedOption.value = {}
-  gIdx.value = 0
-  qty.value = 1
-  product.value = await fetchProduct(id)
-  if (product.value) {
-    const sel = {}
-    ;(product.value.options || []).forEach((o) => {
-      sel[o.name] = o.values[0]
+async function onBuy() {
+  if (!product.value) return
+  const vid = currentVariant.value ? currentVariant.value.id : 'def'
+  // 走后端结算接口拿 Shopify cart permalink（region/未来 Multipass 都在后端收敛）
+  try {
+    const r = await fetch(`${API_BASE}/mall-api/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variantId: vid, qty: qty.value, region: getRegion() }),
     })
-    selectedOption.value = sel
+    const j = await r.json()
+    const url = (j.data && j.data.url) || (j.url)
+    if (!url) throw new Error('empty checkout url')
+    bridge.openShopify(url)
+    showToast('正在前往 Shopify…')
+  } catch (e) {
+    // 兜底：直接拼 permalink，保证不阻塞
+    const store = getStore()
+    if (store) {
+      bridge.openShopify(`https://${store}/cart/${vid}:${qty.value}`)
+      showToast('正在前往 Shopify…')
+    } else {
+      showToast('结算失败，请重试')
+    }
   }
 }
-watch(() => route.params.id, (id) => load(id), { immediate: true })
 </script>
 
 <style scoped>
 .detail {
   min-height: 100vh;
   background: var(--bg);
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
-  /* 全宽铺满：与底部按钮栏左右对齐，避免电脑预览时"中右块"视觉错位 */
-  max-width: 100%;
-  margin: 0;
-  background: var(--bg);
-}
-.topbar {
-  height: calc(48px + env(safe-area-inset-top));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: env(safe-area-inset-top) 12px 0;
-  background: #fff;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.back {
-  font-size: 18px;
-  width: 32px;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 .cart {
+  position: relative;
   width: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text);
 }
-.t {
-  font-size: 15px;
-  font-weight: 600;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #e53935;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
 }
-
-/* 图库 */
+/* 图廊 */
 .gallery {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  background: #000;
+}
+.gallery::-webkit-scrollbar {
+  display: none;
+}
+.slide {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 360px;
+  object-fit: cover;
+  scroll-snap-align: center;
+}
+.empty-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+}
+.dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 8px 0;
   background: #fff;
 }
-.g-main {
-  position: relative;
-  width: 100%;
-  height: 320px;
-  background: #f5f5f5;
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
 }
-.g-main img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+.dot.active {
+  background: var(--brand);
+  width: 16px;
+  border-radius: 3px;
 }
-.g-count {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 11px;
-  border-radius: 8px;
-  padding: 2px 8px;
-}
-.g-thumbs {
+.thumbs {
   display: flex;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 0 12px 10px;
+  background: #fff;
   overflow-x: auto;
 }
-.g-thumbs img {
-  width: 56px;
-  height: 44px;
-  object-fit: cover;
+.thumb {
+  width: 52px;
+  height: 52px;
   border-radius: 8px;
-  flex: none;
+  object-fit: cover;
   border: 2px solid transparent;
-  opacity: 0.75;
+  flex: none;
 }
-.g-thumbs img.on {
+.thumb.active {
   border-color: var(--brand);
-  opacity: 1;
 }
-
-.info {
+/* 卡片 */
+.card {
   background: #fff;
   margin-top: 10px;
   padding: 14px;
+  border-radius: 0;
 }
-.tags {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.tag {
-  background: var(--brand-soft);
-  color: var(--brand);
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-.name {
-  font-size: 17px;
+.info .name {
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.4;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pill {
+  font-size: 12px;
+  color: var(--text-sub);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+.pill--brand {
+  color: var(--brand);
+  border-color: var(--brand);
+  background: var(--brand-soft);
 }
 .price-row {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 .price {
   color: var(--price);
   font-weight: 700;
-  font-size: 22px;
+  font-size: 24px;
 }
 .origin {
   color: var(--text-sub);
   font-size: 13px;
   text-decoration: line-through;
-}
-
-.block {
-  background: #fff;
-  margin-top: 10px;
-  padding: 14px;
 }
 .block__title {
   font-size: 14px;
@@ -415,8 +439,18 @@ watch(() => route.params.id, (id) => load(id), { immediate: true })
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 7px 16px;
-  transition: transform 0.12s ease;
+  padding: 8px 16px;
+}
+.opt em {
+  font-style: normal;
+  color: var(--price);
+  font-size: 12px;
+}
+.opt i {
+  font-style: normal;
+  color: var(--text-sub);
+  font-size: 11px;
+  margin-left: 4px;
 }
 .opt.active {
   color: var(--brand);
@@ -424,18 +458,32 @@ watch(() => route.params.id, (id) => load(id), { immediate: true })
   background: var(--brand-soft);
   font-weight: 600;
 }
-.opt.disabled {
-  opacity: 0.35;
+.opt.soldout {
+  opacity: 0.5;
   text-decoration: line-through;
 }
-.qty {
+/* 数量（决策区内联） */
+.card--inline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+}
+.card--inline .block__title {
+  margin-bottom: 0;
+  font-size: 13px;
+  color: var(--text-sub);
+  flex-shrink: 0;
+}
+.card--inline .qty {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 14px;
 }
 .qty button {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--bg);
@@ -443,148 +491,131 @@ watch(() => route.params.id, (id) => load(id), { immediate: true })
   color: var(--text);
 }
 .qty span {
-  font-size: 15px;
-  min-width: 20px;
+  font-size: 16px;
+  min-width: 24px;
   text-align: center;
 }
-.desc {
+/* 描述富文本 */
+.desc .prose {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  word-break: break-word;
+}
+.desc .prose :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+.desc .prose :deep(p) {
+  margin: 0 0 10px;
+}
+.desc .prose :deep(h1),
+.desc .prose :deep(h2),
+.desc .prose :deep(h3) {
+  font-size: 16px;
+  margin: 14px 0 8px;
+}
+.desc .prose :deep(a) {
+  color: var(--brand);
+}
+.desc .prose :deep(ul),
+.desc .prose :deep(ol) {
+  padding-left: 20px;
+  margin: 0 0 10px;
+}
+.desc .prose :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.desc .prose :deep(td),
+.desc .prose :deep(th) {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+}
+/* 描述底部辅助链接 */
+.more-link {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  text-align: center;
   font-size: 13px;
   color: var(--text-sub);
-  line-height: 1.7;
 }
-.desc :deep(p) { margin: 0 0 8px; }
-.desc :deep(img) { max-width: 100%; border-radius: 8px; }
-.desc :deep(h1), .desc :deep(h2), .desc :deep(h3) { font-size: 15px; color: var(--text); margin: 10px 0 6px; }
-.desc :deep(ul) { padding-left: 18px; margin: 0 0 8px; }
-
-/* body_html 为空时的规格参数卡（保证任何商品都有内容） */
-.specs {
+.gap {
+  height: 4px;
+}
+/* 卖点 / 参数 */
+.tagline {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.specs__row {
-  display: flex;
-  align-items: flex-start;
-  font-size: 13px;
-  line-height: 1.6;
-}
-.specs__k {
-  flex: none;
-  width: 72px;
-  color: var(--text-sub);
-}
-.specs__v {
-  flex: 1;
-  color: var(--text);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.specs__chip {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 12px;
-}
-
-/* 结构化商品介绍（按 Codex 契约 §8 渲染） */
-.intro__summary {
+.points li {
+  position: relative;
+  padding-left: 22px;
   font-size: 14px;
+  line-height: 1.5;
   color: var(--text);
-  line-height: 1.6;
-  margin-bottom: 10px;
-  font-weight: 500;
 }
-.intro__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 14px;
-  padding: 0;
-  list-style: none;
-}
-.intro__chip {
+.points li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
   background: var(--brand-soft);
   color: var(--brand);
-  border-radius: 16px;
-  padding: 5px 12px;
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  font-weight: 700;
+}
+.specs {
+  display: flex;
+  flex-direction: column;
+}
+.spec {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.spec:last-child {
+  border-bottom: none;
+}
+.spec__k {
+  color: var(--text-sub);
+  flex: none;
+}
+.spec__v {
+  color: var(--text);
+  text-align: right;
   font-weight: 500;
 }
-.intro__sections {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-top: 4px;
-}
-.intro__sec-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 6px;
-}
-.intro__sec-body {
-  font-size: 13px;
-  color: var(--text-sub);
-  line-height: 1.7;
-  margin-bottom: 8px;
-}
-.intro__sec-img {
-  width: 100%;
-  border-radius: 10px;
-  margin: 8px 0;
-  display: block;
-}
-.intro__specs {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 0.5px solid var(--line);
-  background: var(--bg);
-  margin-top: 8px;
-}
-.intro__specs-row {
-  display: flex;
-  font-size: 13px;
-  padding: 10px 12px;
-  border-bottom: 0.5px solid var(--line);
-}
-.intro__specs-row:last-child { border-bottom: none; }
-.intro__specs-k {
-  flex: none;
-  width: 92px;
-  color: var(--text-sub);
-}
-.intro__specs-v {
-  flex: 1;
-  color: var(--text);
-}
-.intro__video {
-  width: 100%;
-  border-radius: 10px;
-  margin-top: 12px;
-  background: #000;
-}
-.intro__empty {
-  font-size: 13px;
-  color: var(--text-sub);
-  padding: 20px 0;
-  text-align: center;
-}
-
-.gap {
-  height: 10px;
-}
+/* 吸底操作 */
 .actions {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 0;
   width: 100%;
+  max-width: 420px;
   display: flex;
   gap: 10px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
@@ -598,7 +629,6 @@ watch(() => route.params.id, (id) => load(id), { immediate: true })
   font-size: 15px;
   font-weight: 600;
 }
-.btn:disabled { opacity: 0.4; }
 .btn--cart {
   background: var(--brand-soft);
   color: var(--brand);
@@ -631,5 +661,25 @@ watch(() => route.params.id, (id) => load(id), { immediate: true })
   padding: 80px 20px;
   text-align: center;
   color: var(--text-sub);
+}
+.empty p {
+  margin-bottom: 20px;
+  font-size: 15px;
+}
+.empty__acts {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.btn--retry {
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.btn--retry:active {
+  background: var(--bg);
 }
 </style>

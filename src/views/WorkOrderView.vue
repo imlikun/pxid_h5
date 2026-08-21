@@ -1,14 +1,9 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back press" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">我的工单</span>
-    </div>
+    <TopBar title="我的工单" />
 
     <!-- 状态 tab -->
-    <div class="tabs fade-up stagger-1">
+    <div class="tabs">
       <div
         v-for="t in tabs"
         :key="t"
@@ -20,8 +15,8 @@
 
     <!-- 工单卡片 -->
     <div class="list">
-      <div v-for="o in filtered" :key="o.id" class="card fade-up" :class="'stagger-' + ((filtered.indexOf(o) % 10) + 1)">
-        <span class="headset press" @click="onHeadset(o)">
+      <div v-for="o in filtered" :key="o.id" class="card">
+        <span class="headset" @click="onHeadset(o)">
           <IconSvg name="headset" :size="20" />
         </span>
         <div class="row-id">工单编号：{{ o.id }}</div>
@@ -35,10 +30,10 @@
         <div class="actions">
           <button
             v-if="o.canCancel"
-            class="btn btn-cancel press"
+            class="btn btn-cancel"
             @click="onCancel(o)"
           >取消工单</button>
-          <button class="btn btn-detail press pop" @click="onDetail(o)">查看详情</button>
+          <button class="btn btn-detail" @click="onDetail(o)">查看详情</button>
         </div>
       </div>
 
@@ -53,6 +48,7 @@ import { useRouter } from 'vue-router'
 import { workOrderTabs, workOrderStatusMap, workOrders } from '../data/mock'
 import bridge from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const tabs = workOrderTabs
@@ -88,20 +84,8 @@ function onDetail(o) {
 .page {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-}
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 18px; font-weight: 700; color: var(--text); }
 
 .tabs {
   display: flex;

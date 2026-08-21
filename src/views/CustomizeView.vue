@@ -1,11 +1,6 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">购车定制</span>
-    </div>
+    <TopBar title="购车定制" />
 
     <div class="body">
       <div class="group">
@@ -60,6 +55,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { customizeOptions } from '../data/mock'
 import { bridge } from '../bridge'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const opts = customizeOptions
@@ -80,10 +76,7 @@ function onSubmit() {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
-.nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: var(--card); border-bottom: 1px solid var(--line); }
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
+.page { min-height: 100vh; background: var(--bg); padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
 .body { padding: 12px; }
 .group { background: var(--card); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
 .gl { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 12px; }

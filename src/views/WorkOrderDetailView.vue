@@ -1,14 +1,12 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back press" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">工单详情</span>
-      <span class="headset press" @click="onHeadset">
-        <IconSvg name="headset" :size="20" />
-      </span>
-    </div>
+    <TopBar title="工单详情">
+      <template #right>
+        <span class="headset press" @click="onHeadset">
+          <IconSvg name="headset" :size="24" />
+        </span>
+      </template>
+    </TopBar>
 
     <div v-if="detail" class="body">
       <!-- 头部：编号 + 时间 -->
@@ -116,6 +114,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { workOrderDetails } from '../data/mock'
 import bridge from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -136,21 +135,9 @@ function onMap() {
 .page {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-}
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
-.headset { position: absolute; right: 14px; display: flex; color: var(--text-hint); }
+.headset { display: flex; color: var(--text-hint); padding: 4px; }
 
 .body { padding: 12px; }
 .card {

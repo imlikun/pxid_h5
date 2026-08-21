@@ -1,0 +1,243 @@
+<template>
+  <div class="activity-center">
+    <!-- 顶部：返回 + 标题 + 当前地区 -->
+    <TopBar sticky :title="t('activity.title')" :back="goBack">
+      <template #right>
+        <span class="top-region">{{ regionLabel }}</span>
+      </template>
+    </TopBar>
+
+    <!-- 地区切换（与发现页一致：US/CN/BR） -->
+    <div class="regionbar">
+      <span
+        v-for="r in regionOptions"
+        :key="r.code"
+        class="region-pill"
+        :class="{ on: currentRegion === r.code }"
+        @click="switchRegion(r.code)"
+        >{{ r.label }}</span
+      >
+    </div>
+
+    <div class="body">
+      <div v-if="loading" class="empty">{{ t('common.loading') }}</div>
+      <div v-else-if="!list.length" class="empty">{{ t('activity.empty') }}</div>
+      <div
+        v-for="a in list"
+        :key="a.id"
+        class="act-card press fade-up"
+        @click="goDetail(a)"
+      >
+        <img class="cover" :src="a.cover" :alt="a.title" />
+        <div class="info">
+          <div class="title2">{{ a.title }}</div>
+          <div class="meta">
+            <span v-if="dateRange(a)">{{ dateRange(a) }}</span>
+            <span v-if="a.location"> · {{ a.location }}</span>
+          </div>
+          <div class="meta2">{{ signupText(a) }}</div>
+        </div>
+        <span class="go">{{ t('activity.view') }}</span>
+      </div>
+    </div>
+
+    <transition name="fade">
+      <div v-if="toast" class="toast">{{ toast }}</div>
+    </transition>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import bridge from '../bridge'
+import { t, initLocale, setLocale } from '../i18n'
+import TopBar from '../components/TopBar.vue'
+
+const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
+
+const router = useRouter()
+const list = ref([])
+const loading = ref(false)
+
+// 地区（与发现页同一套语义：US/CN/BR）→ 语言映射
+const REGION_LOCALE = { US: 'en', CN: 'zh', BR: 'pt' }
+const regionOptions = [
+  { code: 'US', label: () => t('discover.region.global') },
+  { code: 'CN', label: () => t('discover.region.cn') },
+  { code: 'BR', label: () => t('discover.region.br') },
+]
+const currentRegion = ref('CN')
+const regionLabel = computed(() => {
+  const o = regionOptions.find((r) => r.code === currentRegion.value)
+  return o ? o.label() : currentRegion.value
+})
+
+async function load() {
+  loading.value = true
+  try {
+    const r = await fetch(`${API_BASE}/activities?region=${currentRegion.value}`)
+    const j = await r.json()
+    if (j.code === 0 && j.data) list.value = j.data.list || []
+    else list.value = []
+  } catch (e) {
+    list.value = []
+  }
+  loading.value = false
+}
+
+async function switchRegion(code) {
+  setLocale(REGION_LOCALE[code] || 'en') // 始终先对齐语言（切地区即换语言）
+  if (currentRegion.value === code) return // 已选中则不重拉数据
+  currentRegion.value = code
+  await load()
+}
+
+// 日期展示：MM-DD ~ MM-DD（跨年带年份）
+function dateRange(a) {
+  const s = String(a.startDate || a.start_date || '')
+  const e = String(a.endDate || a.end_date || '')
+  const f = (d) => {
+    const m = d.match(/^\d{4}-(\d{2})-(\d{2})/)
+    return m ? m[1] + '-' + m[2] : d
+  }
+  if (s && e && s !== e) return f(s) + ' ~ ' + f(e)
+  if (s) return f(s)
+  return ''
+}
+
+function signupText(a) {
+  const n = a.signupCount || 0
+  const q = a.quota || 0
+  if (q > 0) return `${n} / ${q}`
+  if (n > 0) return `${n} 人报名`
+  return ''
+}
+
+function goDetail(a) { router.push('/activity/' + a.id) }
+
+function goBack() {
+  if (window.history.length > 1) router.back()
+  else router.push('/discover')
+}
+
+const toast = ref('')
+
+onMounted(async () => {
+  await initLocale()
+  try {
+    const reg = await bridge.getRegion()
+    if (reg && ['CN', 'BR', 'US'].includes(String(reg).toUpperCase())) {
+      currentRegion.value = String(reg).toUpperCase()
+    }
+  } catch (e) { /* getRegion 失败则用兜底默认地区 */ }
+  // 强制按当前地区对齐语言：无论 getRegion 是否成功，语言都与当前 region 一致（兜底默认 CN=中文）
+  setLocale(REGION_LOCALE[currentRegion.value] || 'en')
+  await load()
+})
+</script>
+
+<style scoped>
+.activity-center {
+  min-height: 100vh;
+  background: var(--bg);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.top-region {
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.regionbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px 8px;
+}
+.region-pill {
+  font-size: 12px;
+  color: var(--text-sub);
+  background: #F0F1F3;
+  border-radius: 12px;
+  padding: 4px 12px;
+  line-height: 1.4;
+  transition: all 0.15s ease;
+}
+.region-pill.on {
+  color: #fff;
+  background: var(--brand);
+  font-weight: 600;
+}
+.body {
+  padding: 8px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.act-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 10px;
+}
+.cover {
+  width: 96px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius);
+  object-fit: cover;
+  flex: none;
+}
+.info {
+  flex: 1;
+  min-width: 0;
+}
+.title2 {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.meta {
+  font-size: 12px;
+  color: var(--text-hint);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.meta2 {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-top: 4px;
+}
+.go {
+  flex: none;
+  font-size: 12px;
+  color: var(--brand);
+}
+.empty {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-hint);
+  padding: 60px 0;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  z-index: 100;
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+</style>

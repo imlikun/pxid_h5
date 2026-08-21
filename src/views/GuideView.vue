@@ -1,26 +1,21 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back press" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">使用指南</span>
-    </div>
+    <TopBar title="使用指南" />
 
-    <div class="hero fade-up stagger-1">
+    <div class="hero">
       <img class="hero__img" :src="guideVehicleImg[model]" alt="" />
-      <button class="model-pick press" @click="showPicker = true">
+      <button class="model-pick" @click="showPicker = true">
         {{ model }} <span class="caret">▼</span>
       </button>
     </div>
 
-    <div class="entries fade-up stagger-2">
-      <div class="entry press" @click="go('video')">
+    <div class="entries">
+      <div class="entry" @click="go('video')">
         <span class="entry__icon"><IconSvg name="play-circle" :size="22" /></span>
         <span class="entry__t">新手指导视频</span>
         <span class="entry__arrow">›</span>
       </div>
-      <div class="entry press" @click="go('manual')">
+      <div class="entry" @click="go('manual')">
         <span class="entry__icon"><IconSvg name="book-open" :size="22" /></span>
         <span class="entry__t">产品资料</span>
         <span class="entry__arrow">›</span>
@@ -46,6 +41,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { guideModels, guideVehicleImg } from '../data/mock'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const model = ref('P1')
@@ -61,10 +57,7 @@ function go(kind) {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-.nav { height: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: var(--card); border-bottom: 1px solid var(--line); }
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
+.page { min-height: 100vh; background: var(--bg); padding-bottom: env(safe-area-inset-bottom); }
 .hero { position: relative; margin: 12px; border-radius: var(--radius); overflow: hidden; background: var(--line); }
 .hero__img { width: 100%; height: 220px; object-fit: cover; display: block; }
 .model-pick { position: absolute; left: 12px; top: 12px; background: rgba(0,0,0,.55); color: #fff; border: none; border-radius: var(--radius); padding: 6px 12px; font-size: 13px; display: flex; align-items: center; gap: 4px; }

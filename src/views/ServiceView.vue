@@ -1,74 +1,122 @@
 <template>
   <div class="service">
-    <div class="topbar">
-      <div class="title">服务</div>
+    <!-- 顶部标题 -->
+    <TopBar sticky title="服务" :show-back="false">
+      <template #right>
+        <span class="headset press" @click="goFeedback">
+          <IconSvg name="headset" :size="24" />
+        </span>
+      </template>
+    </TopBar>
+
+    <!-- 6 个服务入口（单张白卡） -->
+    <div class="grid">
+      <div
+        v-for="(s, i) in serviceEntries"
+        :key="s.key"
+        class="entry fade-up press"
+        :class="'stagger-' + ((i % 10) + 1)"
+        @click="onEntry(s)"
+      >
+        <IconSvg class="eicon" :name="s.icon" :size="26" />
+        <span class="elabel">{{ s.label }}</span>
+      </div>
     </div>
 
-    <!-- 服务模块已由 App 原生实现（Flutter 原生页面全接管），H5 不再承载 -->
-    <div class="native-box fade-up stagger-1">
-      <div class="native-icon">
-        <IconSvg name="headset" :size="40" />
-      </div>
-      <div class="native-title">服务模块已升级</div>
-      <div class="native-desc">
-        道路救援 · 使用指南 · 车辆体检 · 三包政策<br />
-        附近门店 · 我的工单 · 常见问题<br /><br />
-        以上服务已由 App 原生提供更流畅的体验，<br />
-        请使用最新版 App 访问。
-      </div>
+    <!-- 附近门店 -->
+    <SectionHeader title="附近门店" more="更多" @more="goStores" />
+    <StoreCard :store="nearbyStore" class="fade-up stagger-5" />
+
+    <!-- 常见问题 -->
+    <SectionHeader title="常见问题" more="更多" @more="goFaqList" />
+    <div class="faq-list">
+      <FaqItem
+        v-for="(f, i) in faqs.slice(0, 4)"
+        :key="f.id"
+        :faq="f"
+        :class="['fade-up', 'stagger-' + ((i % 10) + 6)]"
+        @click="goFaqDetail(f)"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
+import StoreCard from '../components/StoreCard.vue'
+import SectionHeader from '../components/SectionHeader.vue'
+import FaqItem from '../components/FaqItem.vue'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
+import { serviceEntries, nearbyStore, faqs } from '../data/mock'
+
+const router = useRouter()
+
+const entryMap = {
+  rescue: '/service/rescue',
+  guide: '/service/guide',
+  check: '/service/check',
+  feedback: '/service/feedback',
+  policy: '/service/policy',
+  workorders: '/service/workorders',
+}
+
+function onEntry(s) {
+  router.push(entryMap[s.key] || '/service')
+}
+function goStores() {
+  router.push('/service/stores')
+}
+function goFaqList() {
+  router.push('/service/faq')
+}
+function goFaqDetail(f) {
+  router.push('/service/faq/' + f.id)
+}
+function goFeedback() {
+  router.push('/service/feedback')
+}
 </script>
 
 <style scoped>
 .service {
-  min-height: 100vh;
-  background: var(--bg);
   padding-top: env(safe-area-inset-top);
 }
-.topbar {
-  padding: 16px 16px 8px;
+.headset {
+  color: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
 }
-.title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-}
-.native-box {
-  margin: 60px 24px;
-  text-align: center;
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin: 0 12px;
+  padding: 18px 0;
   background: var(--card);
-  border-radius: var(--radius-lg);
-  padding: 40px 20px;
+  border-radius: var(--radius);
 }
-.native-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: var(--brand-soft);
-  color: var(--brand);
+.entry {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  margin: 0 auto 16px;
+  gap: 8px;
+  padding: 10px 4px;
 }
-.native-title {
-  font-size: 16px;
-  font-weight: 600;
+.eicon {
+  width: 26px;
+  height: 26px;
+  color: var(--brand);
+}
+.elabel {
+  font-size: 14px;
   color: var(--text);
-  margin-bottom: 10px;
 }
-.native-desc {
-  font-size: 13px;
-  color: var(--text-sub);
-  line-height: 1.8;
+.faq-list {
+  background: var(--card);
+  margin: 0 12px 16px;
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 </style>

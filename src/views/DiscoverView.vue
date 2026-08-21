@@ -1,85 +1,92 @@
 <template>
   <div class="discover">
-<!-- 顶部：三 tab + 操作 -->
-  <div class="topbar">
-    <div class="tabs">
-      <span
-        v-for="t in tabs"
-        :key="t"
-        class="tab tab-bounce"
-        :class="{ active: activeTab === t }"
-        @click="setTab(t)"
-        >{{ t }}</span
-      >
-    </div>
-    <div class="topacts">
-      <span class="act act--add float-in press" @click="onAdd">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-      </span>
-      <span class="act act--bell press" @click="onNotice">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-        <span v-if="noticeUnread > 0" class="bell-badge badge-pulse"></span>
-      </span>
-    </div>
-  </div>
+    <!-- 顶部：三 tab + 操作 -->
+    <TopBar sticky :show-back="false">
+      <template #left>
+        <div class="tabs">
+          <span
+            v-for="t in tabs"
+            :key="t"
+            class="tab tab-bounce"
+            :class="{ active: activeTab === t }"
+            @click="setTab(t)"
+            >{{ tabLabel(t) }}</span
+          >
+        </div>
+      </template>
+      <template #right>
+        <div class="topacts">
+          <span class="act act--add float-in press" @click="onAdd">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          </span>
+          <span class="act act--bell press" @click="onNotice">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span v-if="interactionUnread > 0" class="bell-badge badge-pulse"></span>
+          </span>
+        </div>
+      </template>
+    </TopBar>
 
-  <!-- 下拉刷新指示器（手机 WebView 必需） -->
-  <div
-    class="pull-indicator"
-    :class="{ pulling: pulling, ready: pullReady, refreshing: refreshing }"
-    :style="{ transform: pulling && !refreshing ? `translateX(-50%) translateY(${pullDelta - 8}px)` : 'translateX(-50%) translateY(-8px)' }"
-  >
-    <div class="pull-spinner" v-if="refreshing || pulling"></div>
-    <span class="pull-text">{{ refreshing ? '刷新中…' : (pullReady ? '释放刷新' : '下拉刷新') }}</span>
-  </div>
+    <!-- 地区切换：CN/BR/US，切换后推荐/动态/广场活动全部按地区重拉；US 为全球公共池，三区均可见 -->
+    <div class="regionbar">
+      <span
+        v-for="r in regionOptions"
+        :key="r.code"
+        class="region-pill"
+        :class="{ on: currentRegion === r.code }"
+        @click="switchRegion(r.code)"
+        >{{ r.label }}</span
+      >
+      <span class="region-hint">{{ regionHint }}</span>
+    </div>
 
     <!-- 搜索：推荐/广场显示 -->
     <div v-if="activeTab !== '动态'" class="search" @click="onSearch">
       <span class="sicon">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </span>
-      <input class="sinput" v-model="keyword" placeholder="搜索内容/活动/车型" @keyup.enter="onSearch" @click.stop />
+      <input class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearch" @click.stop />
     </div>
 
     <!-- Banner + 快捷入口：仅推荐页 -->
     <template v-if="activeTab === '推荐'">
-      <div class="banner">
-        <div class="banner__scroll" v-if="banners.length">
-          <a
-            v-for="b in banners"
-            :key="b.id"
-            class="banner__item press"
-            @click="onBanner(b)"
-          >
-            <img class="banner__img" :src="b.image || bannerImg" :alt="b.title" />
-          </a>
-        </div>
-        <img v-else class="banner__img" :src="bannerImg" alt="Banner" />
+      <div class="banner" @click="onBanner">
+        <img
+          class="banner__img"
+          :src="bannerImg"
+          alt="Banner"
+        />
       </div>
       <div class="quick">
         <div
-          v-for="(q, i) in quickItems"
-          :key="q.key"
-          class="quick__item fade-up press"
-          :class="'stagger-' + ((i % 10) + 1)"
-          @click="onQuick(q)"
-        >
+        v-for="(q, i) in discoverQuick"
+        :key="q.key"
+        class="quick__item fade-up press"
+        :class="'stagger-' + ((i % 10) + 1)"
+        @click="onQuick(q)"
+      >
           <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
-          <img v-if="q.icon && q.icon.startsWith('http')" :src="q.icon" class="quick__icon" />
-          <IconSvg v-else class="quick__icon" :name="q.icon || 'star'" :size="22" />
-          <div class="quick__label">{{ q.label }}</div>
+          <IconSvg class="quick__icon" :name="q.icon" :size="22" />
+          <div class="quick__label">{{ t('discover.quick.' + q.key) }}</div>
         </div>
       </div>
     </template>
 
     <!-- 车型筛选：仅推荐/动态显示（推荐=全部、动态=最新；广场无筛选条，与设计稿一致） -->
     <div v-if="activeTab !== '广场'" class="filter">
-      <ModelPicker
-        v-model="activeFilter"
-        :options="currentFilters.slice(1)"
-        :reset-label="currentFilters[0]"
-        :visible-count="5"
-      />
+      <div class="chips">
+        <span
+          v-for="f in currentFilters"
+          :key="f"
+          class="chip chip-bounce"
+          :class="{ active: activeFilter === f }"
+          @click="activeFilter = f"
+          >{{ filterLabel(f) }}</span
+        >
+      </div>
+      <span class="sort" @click="onSort">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m11 12 4 4 4-4"/><path d="M15 20V4"/></svg>
+      </span>
     </div>
 
     <!-- 推荐：双列网格 -->
@@ -102,17 +109,14 @@
         :item="it"
         :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
       />
-      <div v-if="dynamicList.length === 0 && !dynamicLoading" class="empty-tab">暂无该车型动态</div>
-      <div ref="dynamicSentinel"></div>
-      <div v-if="dynamicLoading" class="loadmore">加载中…</div>
-      <div v-else-if="dynamicNoMore && dynamicList.length" class="loadmore">没有更多了</div>
+      <div v-if="dynamicList.length === 0" class="empty-tab">{{ t('discover.emptyDynamic') }}</div>
     </div>
 
     <!-- 广场：车型展示 + 热门活动 -->
     <div v-else-if="activeTab === '广场'" class="content">
       <div class="grid3">
         <div
-          v-for="(p, i) in plazaModels"
+          v-for="(p, i) in plazaShowcase"
           :key="p.id"
           class="showcase fade-up press"
           :class="'stagger-' + ((i % 10) + 1)"
@@ -123,12 +127,12 @@
         </div>
       </div>
       <div class="section-head">
-        <span class="section-title">热门活动</span>
-        <span class="section-more" @click="onMoreActivity">更多 &gt;</span>
+        <span class="section-title">{{ t('discover.hotActivities') }}</span>
+        <span class="section-more" @click="onMoreActivity">{{ t('discover.more') }} &gt;</span>
       </div>
       <div class="acts">
         <div
-          v-for="(a, i) in activitiesLive"
+          v-for="(a, i) in actList"
           :key="a.id"
           class="activity fade-up press"
           :class="'stagger-' + ((i % 10) + 1)"
@@ -137,9 +141,9 @@
           <img class="act__img" :src="a.cover" :alt="a.title" />
           <div class="act__info">
             <div class="act__title">{{ a.title }}</div>
-            <div class="act__date">{{ a.date }}</div>
+            <div class="act__date">{{ fmtDate(a) }}</div>
           </div>
-          <button class="act__btn">立即查看</button>
+          <button class="act__btn">{{ t('discover.viewNow') }}</button>
         </div>
       </div>
     </div>
@@ -151,157 +155,190 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
 import IconSvg from '../components/IconSvg.vue'
-import ModelPicker from '../components/ModelPicker.vue'
+import TopBar from '../components/TopBar.vue'
 import {
   discoverTabs,
   discoverQuick,
-  recommendFilters,
-  dynamicFilters,
   plazaFilters,
-  feedItems,
   plazaShowcase,
-  activities,
   notices,
 } from '../data/mock'
-import { CAR_MODELS } from '../data/carModels'
 import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
-import { fetchFeeds, fetchBanners, fetchPlazaGrid, fetchActivities } from '../api/feed'
-import { hasHotUpdate } from '../utils/hotUpdate'
 import bridge from '../bridge'
+import { t, initLocale, setLocale } from '../i18n'
+import { fetchUnreadCount } from '../api/notifications'
+
+const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
 const router = useRouter()
-const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
-const banners = ref([]) // 运营后台配置的 Banner（真实接口，fallback 到静态图）
+const bannerList = ref([])
+const bannerImg = computed(
+  () => (bannerList.value[0] && bannerList.value[0].image) || import.meta.env.BASE_URL + 'discover-banner.jpg'
+)
+const bannerUrl = computed(() => (bannerList.value[0] && bannerList.value[0].url) || '')
 const tabs = discoverTabs
-// 推荐页快捷区：运营后台可配（/plaza-grid），无配置时 fallback 到固定 4 项
-const plazaGrid = ref([])
-const quickItems = computed(() =>
-  plazaGrid.value.length
-    ? plazaGrid.value.map((g) => ({ key: String(g.id), label: g.title, icon: g.icon || '', url: g.url }))
-    : discoverQuick
-)
-// 广场车型宫格：以真实 CAR_MODELS 驱动（displayLabel 系列前缀），封面占位图沿用 plazaShowcase
-const plazaModels = computed(() =>
-  CAR_MODELS.map((m) => {
-    const old = plazaShowcase.find((o) => o.id === m.id)
-    return { id: m.id, name: m.displayLabel, cover: old ? old.cover : '' }
-  })
-)
-// 广场热门活动：运营后台可配（/activities），无配置时 fallback mock
-const activitiesLive = ref([])
-const filtersByTab = {
-  推荐: recommendFilters,
-  动态: dynamicFilters,
-  广场: plazaFilters,
-}
-const defaultsByTab = { 推荐: '全部', 动态: '最新', 广场: 'P1' }
 const activeTab = ref('推荐')
 const activeFilter = ref('全部')
 
-const currentFilters = computed(() => filtersByTab[activeTab.value])
-// 推荐：优先真实数据源 fetchFeeds('recommend')；首屏/失败兜底 feedItems（mock）
-const recommendAll = ref(feedItems)
-const recommendLoading = ref(false)
-async function refreshRecommend() {
-  recommendLoading.value = true
-  try {
-    const data = await fetchFeeds('recommend')
-    if (data && data.length) recommendAll.value = data
-  } catch (e) {
-    /* 保留 feedItems 兜底 */
-  } finally {
-    recommendLoading.value = false
-  }
+// ---- 地区（PRD 硬限定：CN / BR / US，3 国互不交叉）----
+const regionOptions = [
+  { code: 'US', label: t('discover.region.global') },
+  { code: 'CN', label: t('discover.region.cn') },
+  { code: 'BR', label: t('discover.region.br') },
+]
+const currentRegion = ref('CN')
+const regionHint = ref('')
+
+// tab 中文逻辑值 → i18n 展示
+const TAB_KEY = { 推荐: 'recommend', 动态: 'dynamic', 广场: 'plaza' }
+function tabLabel(tab) {
+  return t('discover.tabs.' + (TAB_KEY[tab] || tab))
 }
+// 筛选 chip 中文逻辑值 → i18n 展示（'全部'/'最新' 翻译，车型名原样）
+function filterLabel(f) {
+  if (f === '全部') return t('discover.filter.all')
+  if (f === '最新') return t('discover.filter.newest')
+  return f
+}
+
+// 真实数据源（从 /feed 接口拉取）
+const recommendData = ref([])
+const dynamicData = ref([])
+// 广场热门活动（从 /activities 接口拉取，随地区切换）
+const actList = ref([])
+const loading = ref(false)
+const loadErr = ref('')
+
+// 车型筛选 chip：从接口数据动态提取（推荐=全部+有车型的帖子去重；动态=最新+同）
+const currentFilters = computed(() => {
+  const list = activeTab.value === '推荐' ? recommendData.value : dynamicData.value
+  const cars = [...new Set(list.map((i) => i.carModel).filter(Boolean))]
+  if (activeTab.value === '推荐') return ['全部', ...cars]
+  return ['最新', ...cars]
+})
+
+// 置顶优先：pinned 的帖子排到列表最前，其余保持原顺序
+function sortPinned(list) {
+  return [...list].sort((a, b) => Number(b.pinned ? 1 : 0) - Number(a.pinned ? 1 : 0))
+}
+// 推荐：按车型筛选 + 置顶优先
 const recommendList = computed(() => {
   const f = activeFilter.value
-  const list = recommendAll.value
-  if (f === '全部' || f === '最新') return list
-  // 真实 item 用 carModel，mock 用 filter，二者值一致（车型名）
-  return list.filter((i) => i.carModel === f || i.filter === f)
+  const list = f === '全部' ? recommendData.value : recommendData.value.filter((i) => i.carModel === f)
+  return sortPinned(list)
 })
-// 动态：真实数据源（fetchFeeds：我的发布 + 官方 moments，localStorage 持久化）
-const dynamicAll = ref([])
-const dynamicPage = ref(1)
-const dynamicLoading = ref(false)
-const dynamicNoMore = ref(false)
-const sortMode = ref('最新') // 最新 | 最热
-const PAGE_SIZE = 10
-async function refreshDynamic() {
-  dynamicPage.value = 1
-  dynamicNoMore.value = false
-  dynamicAll.value = await fetchFeeds('dynamic', { offset: 0, limit: PAGE_SIZE })
-}
-async function loadMoreDynamic() {
-  if (dynamicLoading.value || dynamicNoMore.value) return
-  dynamicLoading.value = true
-  try {
-    const next = await fetchFeeds('dynamic', { offset: dynamicPage.value * PAGE_SIZE, limit: PAGE_SIZE })
-    if (!next || next.length === 0) { dynamicNoMore.value = true; return }
-    // 后端 offset 分页目前未生效（返回重复数据），前端按 id 去重兜底，避免无限重复加载
-    const exist = new Set(dynamicAll.value.map((i) => i.id))
-    const fresh = next.filter((i) => !exist.has(i.id))
-    if (fresh.length === 0) { dynamicNoMore.value = true; return }
-    dynamicAll.value = [...dynamicAll.value, ...fresh]
-    dynamicPage.value++
-    if (fresh.length < PAGE_SIZE) dynamicNoMore.value = true
-  } catch (e) {
-    dynamicNoMore.value = true
-  } finally {
-    dynamicLoading.value = false
-  }
-}
-let io = null
-onMounted(() => {
-  refreshRecommend()
-  refreshDynamic()
-  // 拉取运营后台配置的 Banner（后台改了前端即刻生效）
-  fetchBanners().then((r) => { if (r && r.length) banners.value = r })
-  // 拉取运营后台配置的四宫格快捷入口 + 广场热门活动（真实接口，fallback mock）
-  fetchPlazaGrid().then((r) => { if (r && r.length) plazaGrid.value = r })
-  fetchActivities().then((r) => { if (r && r.length) activitiesLive.value = r })
-  if (publishState.pendingTab) {
-    setTab(publishState.pendingTab)
-    publishState.pendingTab = null
-  }
-  if (dynamicSentinel.value) {
-    io = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) loadMoreDynamic() },
-      { rootMargin: '200px' }
-    )
-    io.observe(dynamicSentinel.value)
-  }
-  attachPullRefresh()
-})
-onUnmounted(() => { if (io) io.disconnect(); teardownPullRefresh() })
-// 发布后自动刷新动态流（新增内容立即可见）
-watch(
-  () => publishState.list.length,
-  () => refreshDynamic()
-)
+// 动态：按车型筛选，最新=全部 + 置顶优先
 const dynamicList = computed(() => {
   const f = activeFilter.value
-  let list = dynamicAll.value
-  if (f !== '最新') list = list.filter((i) => i.carModel === f)
-  if (sortMode.value === '最热') list = [...list].sort((a, b) => (b.likes || 0) - (a.likes || 0))
-  return list
+  const list = f === '最新' ? dynamicData.value : dynamicData.value.filter((i) => i.carModel === f)
+  return sortPinned(list)
 })
 
 // 官方公告未读数（驱动发现页快捷区红点）
 const noticeUnread = computed(() => notices.filter((n) => !n.isRead).length)
 
-// 发布后自动切到「动态」tab 展示新内容
+// 互动消息未读（真实后端计数，驱动铃铛红点）
+const interactionUnread = ref(0)
+
 function setTab(t) {
   activeTab.value = t
-  activeFilter.value = defaultsByTab[t]
+  activeFilter.value = t === '推荐' ? '全部' : '最新'
   if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
 }
+
+// 从 /feed 接口拉取真实数据（带地区过滤）
+async function loadFeed(tab) {
+  try {
+    const url = `${API_BASE}/feed?tab=${tab}&pageSize=30&region=${currentRegion.value}`
+    const r = await fetch(url)
+    const j = await r.json()
+    if (j.code === 0 && j.data) {
+      if (tab === 'recommend') recommendData.value = j.data.list || []
+      else dynamicData.value = j.data.list || []
+    }
+  } catch (e) {
+    loadErr.value = t('discover.loadFail')
+  }
+}
+
+// 广场热门活动（随地区切换）
+async function loadActivities() {
+  try {
+    const url = `${API_BASE}/activities?region=${currentRegion.value}`
+    const r = await fetch(url)
+    const j = await r.json()
+    if (j.code === 0 && j.data) actList.value = j.data.list || []
+  } catch (e) {
+    actList.value = []
+  }
+}
+
+// 活动日期展示：优先 startDate，取 MM-DD；无则空
+function fmtDate(a) {
+  const s = a.startDate || a.start_date || ''
+  const m = String(s).match(/^\d{4}-(\d{2})-(\d{2})/)
+  return m ? m[1] + '-' + m[2] : (a.date || '')
+}
+
+// 切地区：重拉推荐/动态/活动（广场车型 showcase 待 ToC 车型 API 按 region 返回）
+// 地区 → 语言联动：CN=中文、BR=葡语、US=英文（US 为全球公共池，三区均可见；CN/BR 仅本区内容）
+// 真机 Flutter getLocale 注入后，onMounted 的 initLocale 优先，手动切地区时联动覆盖
+const REGION_LOCALE = { US: 'en', CN: 'zh', BR: 'pt' }
+async function switchRegion(code) {
+  // 始终先按地区对齐语言（纠正“直接点已选项不切语言”的错位）
+  setLocale(REGION_LOCALE[code] || 'en')
+  if (currentRegion.value === code) return // 已选中则不重拉数据
+  currentRegion.value = code
+  regionHint.value = ''
+  await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities()])
+}
+
+// 发现页 banner：拉运营后台配置的 banner（status=on），点击跳 banner.url
+async function fetchBanners() {
+  try {
+    const r = await fetch(`${API_BASE}/banners`)
+    const j = await r.json()
+    if (j.code === 0) {
+      const list = (j.data && j.data.list) || j.data || []
+      bannerList.value = Array.isArray(list) ? list : []
+    }
+  } catch (e) { /* 拉取失败保持静态兜底图 */ }
+}
+function onBanner() {
+  const u = bannerUrl.value
+  if (!u) return
+  if (/^https?:\/\//i.test(u)) bridge.openShopify(u)
+  else if (u.startsWith('/')) router.push(u)
+  else bridge.openNative(u)
+}
+
+// 发布后自动切到「动态」tab 展示新内容
+onMounted(async () => {
+  await initLocale() // 先按系统语言初始化
+  try {
+    const reg = await bridge.getRegion()
+    if (reg && ['CN', 'BR', 'US'].includes(String(reg).toUpperCase())) {
+      currentRegion.value = String(reg).toUpperCase()
+    }
+  } catch (e) { /* getRegion 失败则用兜底默认地区 */ }
+  // 强制按当前地区对齐语言：无论 getRegion 是否成功，语言都与当前 region 一致（兜底默认 CN=中文）
+  setLocale(REGION_LOCALE[currentRegion.value] || 'en')
+  loading.value = true
+  await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities(), fetchBanners()])
+  loading.value = false
+  if (publishState.pendingTab) {
+    setTab(publishState.pendingTab)
+    publishState.pendingTab = null
+  }
+  // 拉取互动消息未读数（铃铛红点）
+  interactionUnread.value = await fetchUnreadCount()
+})
 
 function onAdd() {
   // 原生环境：拉起原生发布器（契约 openNative('discover/publish')）
@@ -312,21 +349,20 @@ function onAdd() {
   // H5 预览：跳转 H5 发布页，保证可真实发布
   router.push('/publish')
 }
-function onNotice() { router.push('/message') }
+function onNotice() { router.push('/interactions') }
 function onQuick(q) {
-  // 运营后台配置的四宫格入口：有跳转 URL 直接走
-  if (q.url) { bridge.openNative(q.url); return }
   if (q.key === 'notice') { router.push('/notices'); return }
   // 决策 2：立即定制归口购车定制页（原生承载）
   if (q.key === 'custom') { bridge.openNative('purchase/customize'); return }
   if (q.key === 'points') { router.push('/points'); return }
   console.log('quick tap:', q.key)
 }
+function onSort() { console.log('sort tap') }
 function onShowcase(p) {
   // 决策 8：车型卡跳购车车型页（原生承载）
   bridge.openNative('vehicle/' + p.id)
 }
-function onMoreActivity() { showToast('活动中心即将上线') }
+function onMoreActivity() { router.push('/activity-center') }
 function onActivity(a) { router.push('/activity/' + a.id) }
 
 const keyword = ref('')
@@ -334,12 +370,7 @@ function onSearch() {
   // 搜索（决策相关）：原生承载；H5 兜底跳 /search 并带 q
   bridge.openNative('search?q=' + encodeURIComponent(keyword.value.trim()))
 }
-function onBanner(b) {
-  // 运营后台 Banner 点击跳转（url 为空则无动作）
-  if (b.url) bridge.openNative(b.url)
-}
 
-const dynamicSentinel = ref(null)
 const toast = ref('')
 let toastTimer = null
 function showToast(msg) {
@@ -347,135 +378,13 @@ function showToast(msg) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 1600)
 }
-
-// ===== 下拉刷新（手机 WebView 必备） =====
-const PULL_THRESHOLD = 60 // 释放触发阈值（像素）
-const pulling = ref(false)
-const pullReady = ref(false)
-const pullDelta = ref(0)
-const refreshing = ref(false)
-let pullStartY = 0
-let touchAttached = false
-
-function onTouchStart(e) {
-  if (refreshing.value) return
-  // 已在内容顶部才响应下拉，避免与正常滚动冲突
-  if ((window.scrollY || document.documentElement.scrollTop || 0) > 4) {
-    pulling.value = false
-    return
-  }
-  pullStartY = e.touches[0].clientY
-  pulling.value = true
-  pullReady.value = false
-  pullDelta.value = 0
-}
-function onTouchMove(e) {
-  if (!pulling.value || refreshing.value) return
-  const y = e.touches[0].clientY
-  const delta = y - pullStartY
-  if (delta <= 0) { pulling.value = false; return }
-  // 阻尼：超过阈值后增速放缓
-  pullDelta.value = Math.min(delta * 0.45, PULL_THRESHOLD * 1.4)
-  pullReady.value = pullDelta.value >= PULL_THRESHOLD
-}
-async function onTouchEnd() {
-  if (!pulling.value) return
-  pulling.value = false
-  if (pullReady.value) await doRefresh()
-  pullDelta.value = 0
-  pullReady.value = false
-}
-async function doRefresh() {
-  if (refreshing.value) return
-  refreshing.value = true
-  // 热更新：线上有新版 JS/CSS 包（样式/逻辑改动）→ 整页重载拉新包；否则只刷数据
-  if (await hasHotUpdate()) {
-    location.reload()
-    return
-  }
-  try {
-    if (activeTab.value === '推荐') {
-      await refreshRecommend()
-    } else if (activeTab.value === '动态') {
-      await refreshDynamic()
-    } else if (activeTab.value === '广场') {
-      // 广场目前是 mock（后端无车型/活动接口），下拉给视觉反馈 + 弹回原始数据
-      await new Promise((r) => setTimeout(r, 300))
-    }
-  } catch (e) {
-    /* swallow; 数据保持原状 */
-  } finally {
-    // 至少展示 350ms spinner，避免一闪而过
-    await new Promise((r) => setTimeout(r, 350))
-    refreshing.value = false
-  }
-}
-function attachPullRefresh() {
-  if (touchAttached) return
-  document.addEventListener('touchstart', onTouchStart, { passive: true })
-  document.addEventListener('touchmove', onTouchMove, { passive: true })
-  document.addEventListener('touchend', onTouchEnd, { passive: true })
-  touchAttached = true
-}
-function teardownPullRefresh() {
-  if (!touchAttached) return
-  document.removeEventListener('touchstart', onTouchStart)
-  document.removeEventListener('touchmove', onTouchMove)
-  document.removeEventListener('touchend', onTouchEnd)
-  touchAttached = false
-}
 </script>
 
 <style scoped>
 .discover {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-}
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 8px;
-  background: #ffffff;
-}
-/* 下拉刷新指示器 */
-.pull-indicator {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 999px;
-  font-size: 13px;
-  color: var(--text-sub);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  z-index: 9;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.18s ease;
-}
-.pull-indicator.pulling,
-.pull-indicator.refreshing {
-  opacity: 1;
-}
-.pull-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid #e5e7eb;
-  border-top-color: var(--brand, #f97316);
-  border-radius: 50%;
-  animation: pull-spin 0.8s linear infinite;
-}
-@keyframes pull-spin {
-  to { transform: rotate(360deg); }
-}
-.pull-text {
-  font-weight: 500;
 }
 .tabs {
   display: flex;
@@ -532,6 +441,32 @@ function teardownPullRefresh() {
   z-index: 2;
 }
 .act--add { transform-origin: center; }
+.regionbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  margin-top: 4px;
+}
+.region-pill {
+  font-size: 12px;
+  color: var(--text-sub);
+  background: #F0F1F3;
+  border-radius: 12px;
+  padding: 4px 12px;
+  line-height: 1.4;
+  transition: all 0.15s ease;
+}
+.region-pill.on {
+  color: #fff;
+  background: var(--brand);
+  font-weight: 600;
+}
+.region-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-hint);
+}
 .search {
   margin: 10px 16px 0;
   height: 40px;
@@ -568,19 +503,6 @@ function teardownPullRefresh() {
   height: 100%;
   object-fit: cover;
   display: block;
-}
-.banner__scroll {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px;
-}
-.banner__scroll::-webkit-scrollbar { display: none; }
-.banner__item {
-  flex: 0 0 100%;
-  scroll-snap-align: center;
 }
 .quick {
   display: grid;
@@ -625,32 +547,47 @@ function teardownPullRefresh() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 24px 0 0;
-  height: 44px;
-  padding: 0 16px;
+  margin: 20px 12px 0;
+  gap: 8px;
 }
 .chips {
   display: flex;
-  gap: 16px;
-  padding: 14px 0;
+  gap: 8px;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 2px 0;
 }
+.chips::-webkit-scrollbar { display: none; }
 .chip {
-  font-size: 16px;
+  font-size: 13px;
   color: var(--text-sub);
-  line-height: 1;
+  line-height: 1.3;
+  white-space: nowrap;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: #F5F5F7;
+  transition: all 0.2s ease;
+  font-weight: 500;
 }
 .chip.active {
-  color: var(--brand);
-  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  font-weight: 600;
 }
 .sort {
-  color: var(--text-hint);
+  color: var(--text-sub);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   flex: none;
+  border-radius: 50%;
+  background: #F5F5F7;
+  transition: all 0.2s ease;
 }
 .content {
   margin-top: 16px;
@@ -770,5 +707,4 @@ function teardownPullRefresh() {
 }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
-.loadmore { text-align: center; color: var(--text-sub); font-size: 13px; padding: 16px 0; }
 </style>

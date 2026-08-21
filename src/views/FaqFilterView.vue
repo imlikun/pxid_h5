@@ -1,23 +1,17 @@
 <template>
   <div class="page">
     <!-- 顶部：× + 标题"问题筛选" -->
-    <div class="nav">
-      <span class="close press" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </span>
-      <span class="title">问题筛选</span>
-      <span class="placeholder"></span>
-    </div>
+    <TopBar close title="问题筛选" />
 
     <!-- 分组 + 标签 -->
     <div class="content">
-      <div v-for="g in faqCategories" :key="g.group" class="group fade-up" :class="'stagger-' + ((faqCategories.indexOf(g) % 10) + 1)">
+      <div v-for="g in faqCategories" :key="g.group" class="group">
         <div class="group-title">{{ g.group }}</div>
         <div class="tags">
           <span
             v-for="t in g.items"
             :key="t.key"
-            class="tag chip-bounce press"
+            class="tag"
             :class="{ active: selected.has(t.key) }"
             @click="toggle(t.key)"
           >{{ t.label }}</span>
@@ -26,9 +20,9 @@
     </div>
 
     <!-- 底部：重置 + 完成 -->
-    <div class="footer fade-up stagger-3">
-      <button class="btn-reset press" @click="reset">重置</button>
-      <button class="btn-confirm pop press" @click="confirm">完成</button>
+    <div class="footer">
+      <button class="btn-reset" @click="reset">重置</button>
+      <button class="btn-confirm" @click="confirm">完成</button>
     </div>
   </div>
 </template>
@@ -37,6 +31,7 @@
 import { onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { faqCategories } from '../data/mock'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -66,29 +61,7 @@ function confirm() {
   background: var(--bg);
   display: flex;
   flex-direction: column;
-  padding-top: env(safe-area-inset-top);
 }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  position: relative;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-}
-.close { display: flex; color: var(--text-hint); }
-.title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--text);
-}
-.placeholder { width: 22px; }
-
 .content {
   flex: 1;
   padding: 8px 16px 16px;

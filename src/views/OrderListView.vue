@@ -1,12 +1,6 @@
 <template>
   <div class="orders">
-    <div class="topbar">
-      <span class="back" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </span>
-      <span class="t">我的订单</span>
-      <span class="sp"></span>
-    </div>
+    <TopBar sticky title="我的订单" />
 
     <!-- 状态 tab -->
     <div class="tabs">
@@ -33,13 +27,13 @@
             <IconSvg :name="it.cover" :size="40" style="width:48px;height:48px;border-radius:8px;background:var(--brand-soft);color:var(--brand);padding:9px;box-sizing:border-box;flex:none" />
             <div class="o-mid">
               <div class="o-name">{{ it.name }}</div>
-              <div class="o-spec">¥{{ it.price }} × {{ it.qty }}</div>
+              <div class="o-spec">{{ sym(o.currency || 'CNY') }}{{ it.price }} × {{ it.qty }}</div>
             </div>
           </div>
         </div>
 
         <div class="o-foot">
-          <span class="o-total">共 {{ oCount(o) }} 件 合计 <b>¥{{ o.total }}</b></span>
+          <span class="o-total">共 {{ oCount(o) }} 件 合计 <b>{{ sym(o.currency || 'CNY') }}{{ o.total }}</b></span>
           <div class="o-actions">
             <button v-if="o.status === '待付款'" class="btn dark" @click="pay(o)">去支付</button>
             <template v-else>
@@ -50,27 +44,92 @@
         </div>
       </div>
 
-      <div v-if="filteredOrders.length === 0" class="empty">暂无订单</div>
+      <div v-if="filteredOrders.length === 0" class="empty">{{ loading ? '加载中…' : '暂无订单' }}</div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { orderTabs, orders } from '../data/mock'
+import { orderTabs, orders as mockOrders } from '../data/mock'
 import { addToCart } from '../store/cart'
-import bridge from '../bridge'
+import { bridge } from '../bridge'
+import { API_BASE, sym } from '../api/shop'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const activeTab = ref('全部')
+const remoteOrders = ref([])
+const loading = ref(false)
 
-const statusKey = (s) => ({ 待付款: 'pay', 待发货: 'ship', 已发货: 'sent', 已完成: 'done' }[s] || '')
-const oCount = (o) => o.items.reduce((s, i) => s + i.qty, 0)
+const statusKey = (s) =>
+  ({ 待付款: 'pay', 待发货: 'ship', 已发货: 'sent', 已完成: 'done', 已下单: 'done' }[s] || '')
+const oCount = (o) => (o.items || []).reduce((s, i) => s + (i.qty || 1), 0)
+const fmtTime = (t) => {
+  try {
+    return new Date(t).toLocaleString('zh-CN')
+  } catch (e) {
+    return t || ''
+  }
+}
+
+// 后端真实订单（Shopify webhook 回流 d_mall_order_map）映射成与本地一致的展示结构
+function mapRemote(o) {
+  let items = []
+  try {
+    items = JSON.parse(o.items_json || '[]').map((it) => ({
+      name: it.title || '商品',
+      price: it.price || 0,
+      qty: it.qty || 1,
+      cover: '',
+    }))
+  } catch (e) {}
+  const statusMap = {
+    pending: '待发货',
+    unfulfilled: '待发货',
+    fulfilled: '已发货',
+    paid: '待发货',
+  }
+  const status = statusMap[o.fulfillment] || o.fulfillment || '已下单'
+  return {
+    id: '#' + o.order_id,
+    status,
+    time: fmtTime(o.created_at),
+    items,
+    total: o.total || 0,
+    currency: o.currency || 'USD',
+  }
+}
+
+async function loadRemote() {
+  loading.value = true
+  try {
+    const [info, token] = await Promise.all([bridge.getUserInfo(), bridge.getToken().catch(() => '')])
+    const email = info && info.email
+    if (email) {
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = 'Bearer ' + token
+      const r = await fetch(`${API_BASE}/mall-api/orders?email=${encodeURIComponent(email)}`, { headers })
+      const j = await r.json()
+      const list = (j.data && j.data.list) || []
+      remoteOrders.value = list.map(mapRemote)
+    }
+  } catch (e) {
+    console.error('[orders] load remote failed', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadRemote)
+
+// 真实订单优先；无真实订单时回退 mock 演示数据
+const allOrders = computed(() => (remoteOrders.value.length ? remoteOrders.value : mockOrders))
 
 const filteredOrders = computed(() =>
-  activeTab.value === '全部' ? orders : orders.filter((o) => o.status === activeTab.value)
+  activeTab.value === '全部' ? allOrders.value : allOrders.value.filter((o) => o.status === activeTab.value)
 )
 
 function pay(o) {
@@ -86,18 +145,7 @@ function detail(o) {
 </script>
 
 <style scoped>
-.orders { min-height: 100vh; background: var(--bg); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px;
-  background: #ffffff;
-}
-.back { display: flex; width: 32px; color: #333; }
-.sp { width: 32px; }
-.t { font-size: 16px; font-weight: 600; color: #333; }
-
+.orders { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 .tabs {
   display: flex;
   background: #ffffff;

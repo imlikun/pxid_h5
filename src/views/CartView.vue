@@ -1,29 +1,24 @@
 <template>
   <div class="cart">
-    <div class="topbar">
-      <span class="back" @click="goBack">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </span>
-      <span class="t">购物车</span>
-      <span class="sp"></span>
-    </div>
+    <TopBar sticky title="购物车" :back="goBack" />
 
     <div v-if="cart.items.length" class="list">
-      <div v-for="it in cart.items" :key="it.id" class="row">
+      <div v-for="it in cart.items" :key="it.key" class="row">
         <!-- 勾选 -->
-        <span class="check" :class="{ on: it.checked }" @click="toggleChecked(it.id)">
+        <span class="check" :class="{ on: it.checked }" @click="toggleChecked(it.key)">
           <svg v-if="it.checked" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
         </span>
         <img v-if="it.cover && (it.cover.startsWith('http') || it.cover.startsWith('/'))" class="cover" :src="it.cover" :alt="it.name" />
         <IconSvg v-else :name="it.cover" :size="44" style="width:56px;height:56px;border-radius:10px;background:var(--brand-soft);color:var(--brand);padding:11px;box-sizing:border-box;flex:none" />
         <div class="mid">
           <div class="name">{{ it.name }}</div>
-          <div class="price">¥{{ it.price }}</div>
+          <div class="spec" v-if="it.variantTitle">{{ it.variantTitle }}</div>
+          <div class="price">{{ sym(it.currency) }}{{ it.price }}</div>
         </div>
         <div class="qty">
-          <button @click="changeQty(it.id, -1)">－</button>
+          <button @click="changeQty(it.key, -1)">－</button>
           <span>{{ it.qty }}</span>
-          <button @click="changeQty(it.id, 1)">＋</button>
+          <button @click="changeQty(it.key, 1)">＋</button>
         </div>
       </div>
     </div>
@@ -43,7 +38,7 @@
         <span class="all-txt">全选</span>
       </span>
       <div class="total">
-        合计 <span class="price">¥{{ checkedTotal }}</span>
+        合计 <span class="price">{{ sym(checkedCurrency) }}{{ checkedTotal }}</span>
       </div>
       <button class="pay" :disabled="checkedCount === 0" @click="goCheckout">
         去结算({{ checkedCount }})
@@ -53,19 +48,30 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 import {
   cart,
   changeQty,
   toggleChecked,
   toggleAllChecked,
+  clearChecked,
   allChecked,
+  checkedItems,
   checkedTotal,
   checkedCount,
 } from '../store/cart'
+import { getStore, sym } from '../api/shop'
+import { bridge } from '../bridge'
 
 const router = useRouter()
+
+const checkedCurrency = computed(() => {
+  const first = checkedItems.value[0]
+  return first ? first.currency : 'USD'
+})
 
 function goBack() {
   router.back()
@@ -75,7 +81,19 @@ function goDiscover() {
 }
 function goCheckout() {
   if (checkedCount.value === 0) return
-  router.push('/cart/checkout')
+  const store = getStore()
+  if (!store) {
+    alert('店铺信息加载中，请稍后重试')
+    return
+  }
+  // 拼 Shopify cart permalink（多品逗号分隔），用户到 Shopify 看到已加好的车直接 checkout
+  const parts = checkedItems.value
+    .map((it) => `${it.variantId}:${it.qty}`)
+    .join(',')
+  const url = `https://${store}/cart/${parts}`
+  bridge.openShopify(url)
+  // permalink 是"添加"语义，跳转即代表已带入 Shopify 车，清空本地车
+  clearChecked()
 }
 </script>
 
@@ -83,6 +101,7 @@ function goCheckout() {
 .cart {
   min-height: 100vh;
   background: var(--bg);
+  padding-top: env(safe-area-inset-top);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 .topbar {
@@ -138,6 +157,7 @@ function goCheckout() {
 }
 .mid { flex: 1; min-width: 0; }
 .name { font-size: 14px; color: #333; line-height: 1.4; }
+.spec { font-size: 12px; color: #999; margin-top: 2px; }
 .price { color: #e53935; font-weight: 700; margin-top: 4px; font-size: 15px; }
 .qty {
   display: flex;

@@ -1,26 +1,20 @@
 <template>
   <div class="notices">
-    <div class="nav fade-up">
-      <span class="back press" @click="goBack">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </span>
-      <span class="title">官方公告</span>
-      <span class="right"></span>
-    </div>
+    <TopBar :title="t('notice.title')" :back="goBack" />
 
     <!-- 召回强提醒横幅：存在未确认召回公告时置顶 -->
-    <div v-if="recallOpen" class="recall-bar fade-up stagger-1 press" @click="toDetail(recallOpen.id)">
-      <span class="rb-tag">召回</span>
-      <span class="rb-text">您有一条车辆召回通知待确认，点击查看</span>
+    <div v-if="recallOpen" class="recall-bar" @click="toDetail(recallOpen.id)">
+      <span class="rb-tag">{{ t('notice.recallTag') }}</span>
+      <span class="rb-text">{{ t('notice.recallText') }}</span>
       <span class="rb-arrow">&gt;</span>
     </div>
 
     <div class="list">
       <div
-        v-for="(n, i) in list"
+        v-for="n in list"
         :key="n.id"
-        class="row fade-up press"
-        :class="[{ unread: !n.isRead }, 'stagger-' + ((i % 10) + 2)]"
+        class="row"
+        :class="{ unread: !n.isRead }"
         @click="toDetail(n.id)"
       >
         <span v-if="!n.isRead" class="dot"></span>
@@ -42,6 +36,8 @@
 import { reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { notices } from '../data/mock'
+import { t } from '../i18n'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 
@@ -50,8 +46,14 @@ const list = reactive(notices.map((n) => ({ ...n })))
 
 const recallOpen = computed(() => list.find((n) => n.type === 'recall' && !n.isRead) || null)
 
-function typeLabel(t) {
-  return { recall: '召回', version: '版本', activity: '活动', safety: '安全', maintain: '维护' }[t] || '公告'
+function typeLabel(type) {
+  return {
+    recall: t('notice.type.recall'),
+    version: t('notice.type.version'),
+    activity: t('notice.type.activity'),
+    safety: t('notice.type.safety'),
+    maintain: t('notice.type.maintain'),
+  }[type] || t('notice.type.default')
 }
 function toDetail(id) {
   router.push('/notice/' + id)
@@ -66,21 +68,8 @@ function goBack() {
 .notices {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  background: #ffffff;
-  position: relative;
-}
-.back { display: flex; align-items: center; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
-.right { width: 24px; }
 
 .recall-bar {
   margin: 12px;
@@ -142,25 +131,4 @@ function goBack() {
 .row.unread .tt { font-weight: 700; }
 .line2 { font-size: 12px; color: var(--text-hint); margin-top: 6px; }
 .arrow { color: var(--text-hint); font-size: 14px; }
-.recall-bar:active { transform: scale(0.98); }
-.row {
-  transition: transform 0.12s ease, background 0.18s ease;
-}
-.row:active {
-  transform: scale(0.98);
-  background: var(--bg-press, rgba(0, 0, 0, 0.05));
-}
-.back {
-  transition: transform 0.12s ease, background 0.18s ease;
-  border-radius: 50%;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.back:active {
-  transform: scale(0.92);
-  background: var(--bg-press, rgba(0, 0, 0, 0.05));
-}
 </style>

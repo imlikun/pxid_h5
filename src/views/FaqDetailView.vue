@@ -1,11 +1,6 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back press" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">问题详情</span>
-    </div>
+    <TopBar title="问题详情" />
 
     <div class="body" v-if="faq">
       <div class="card fade-up stagger-1">
@@ -38,6 +33,7 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { faqs } from '../data/mock'
 import IconSvg from '../components/IconSvg.vue'
+import TopBar from '../components/TopBar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,18 +43,7 @@ const faq = computed(() => faqs.find((f) => String(f.id) === String(route.params
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-}
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
+.page { min-height: 100vh; background: var(--bg); padding-bottom: env(safe-area-inset-bottom); }
 
 .body { padding: 12px; }
 .card {

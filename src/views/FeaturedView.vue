@@ -1,44 +1,50 @@
 <template>
   <div class="featured">
-    <!-- 下拉刷新指示器（手机 WebView 必需，调好后可删除） -->
-    <div
-      class="pull-indicator"
-      :class="{ pulling: pulling, ready: pullReady, refreshing: refreshing }"
-      :style="{ transform: pulling && !refreshing ? `translateX(-50%) translateY(${pullDelta - 8}px)` : 'translateX(-50%) translateY(-8px)' }"
-    >
-      <div class="pull-spinner" v-if="refreshing || pulling"></div>
-      <span class="pull-text">{{ refreshing ? '刷新中…' : (pullReady ? '释放刷新' : '下拉刷新') }}</span>
-    </div>
-
     <!-- 顶部：三 tab + 搜索图标 -->
-    <div class="topbar">
-      <div class="tabs">
-        <span
-          v-for="t in topTabs"
-          :key="t.key"
-          class="tab tab-bounce"
-          :class="{ active: activeTab === t.key }"
-          @click="activeTab = t.key"
-          >{{ t.label }}</span
-        >
-      </div>
-      <span class="search-ico">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </span>
-    </div>
+    <TopBar sticky :show-back="false">
+      <template #left>
+        <div class="tabs">
+          <span
+            v-for="t in topTabs"
+            :key="t.key"
+            class="tab tab-bounce"
+            :class="{ active: activeTab === t.key }"
+            @click="activeTab = t.key"
+            >{{ t.label }}</span
+          >
+        </div>
+      </template>
+      <template #right>
+        <span class="search-ico">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </span>
+      </template>
+    </TopBar>
 
     <!-- 推荐 -->
     <template v-if="activeTab === 'rec'">
+      <!-- 加载中 -->
+      <div v-if="loading" class="load-tip">{{ t('featured.loading') }}</div>
+
+      <!-- 错误提示 -->
+      <div v-else-if="error && !all.length" class="err-tip">
+        <p>{{ t('featured.loadFail') }}</p>
+        <small>{{ error }}</small>
+        <button class="press" @click="retry" style="margin-top:8px;padding:6px 16px;border:1px solid var(--brand);border-radius:20px;background:none;color:var(--brand);font-size:13px">{{ t('featured.retry') }}</button>
+      </div>
+
+      <template v-else>
       <!-- Banner -->
       <div class="banner">
         <img class="banner__img" :src="bannerImg" alt="Banner" />
       </div>
+      <button class="enter-store press" @click="enterStore">{{ t('featured.enterStore') }}</button>
 
       <!-- 三个快捷 -->
-      <QuickActions :items="featuredQuick" @tap="onQuick" />
+      <QuickActions :items="featuredQuickI18n" @tap="onQuick" />
 
       <!-- 热购榜单 -->
-      <SectionHeader title="热购榜单" />
+      <SectionHeader :title="t('featured.hotTitle')" />
       <div class="grid2">
         <ProductCard
           v-for="(p, i) in hotProducts"
@@ -49,7 +55,7 @@
       </div>
 
       <!-- 踏春装备 | 限时直降 -->
-      <SectionHeader title="踏春装备" sub="限时直降" more="更多" @more="activeTab = 'spring'" />
+      <SectionHeader :title="t('featured.springTitle')" :sub="t('featured.springSub')" :more="t('featured.more')" @more="activeTab = 'spring'" />
       <div class="grid2">
         <ProductCard
           v-for="(p, i) in springProducts"
@@ -58,11 +64,12 @@
           :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
         />
       </div>
+      </template><!-- /v-else 有数据 -->
     </template>
 
     <!-- 踏春装备 -->
     <template v-else-if="activeTab === 'spring'">
-      <SectionHeader title="踏春装备" sub="限时直降" more="更多" />
+      <SectionHeader :title="t('featured.springTitle')" :sub="t('featured.springSub')" :more="t('featured.more')" />
       <div class="grid2">
         <ProductCard
           v-for="(p, i) in springProducts"
@@ -75,7 +82,7 @@
 
     <!-- Bikes -->
     <template v-else>
-      <SectionHeader title="Bikes" sub="车型原厂配件" />
+      <SectionHeader :title="t('featured.bikesTitle')" :sub="t('featured.bikesSub')" />
       <div class="grid2">
         <ProductCard
           v-for="(p, i) in bikeProducts"
@@ -89,109 +96,66 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
+import TopBar from '../components/TopBar.vue'
 import { featuredQuick } from '../data/mock'
-import { fetchProducts } from '../api/shop'
-import { hasHotUpdate } from '../utils/hotUpdate'
+import { fetchProducts, getProducts, getStore, getLastError, initRegion } from '../api/shop'
+import { bridge } from '../bridge'
+import { t } from '../i18n'
 
 const router = useRouter()
 const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
+const store = ref('')
+const loading = ref(true)
+const error = ref('')
 
-const topTabs = [
-  { key: 'rec', label: '推荐' },
-  { key: 'spring', label: '踏春装备' },
-  { key: 'bikes', label: 'Bikes' },
-]
+onMounted(async () => {
+  try {
+    await initRegion()
+    await fetchProducts()
+    store.value = getStore()
+    error.value = getLastError()
+  } finally {
+    loading.value = false
+  }
+})
+
+function enterStore() {
+  if (store.value) bridge.openShopify('https://' + store.value)
+}
+
+const topTabs = computed(() => [
+  { key: 'rec', label: t('featured.tab.rec') },
+  { key: 'spring', label: t('featured.tab.spring') },
+  { key: 'bikes', label: t('featured.tab.bikes') },
+])
 const activeTab = ref('rec')
 
-// 商品数据：真实 Shopify（每国店），失败回落 mock
-const allProducts = ref([])
-async function refreshFeatured() {
-  allProducts.value = await fetchProducts()
-}
-onMounted(async () => {
-  await refreshFeatured()
-  attachPullRefresh()
+// 精选快捷入口：label 走 i18n（key 不变，展示文案随语言切换）
+const featuredQuickI18n = computed(() =>
+  featuredQuick.map((q) => ({ ...q, label: t('featured.quick.' + q.key) }))
+)
+
+const all = computed(() => getProducts())
+const hotProducts = computed(() => all.value.slice(0, 4))
+const springProducts = computed(() => {
+  const list = all.value
+  const f = list.filter(
+    (p) => p.collection === 'spring' || (p.tags || []).includes('spring')
+  )
+  return f.length ? f : list
 })
-onUnmounted(() => teardownPullRefresh())
-
-// ===== 下拉刷新（手机 WebView 必备，调好后可删除） =====
-const PULL_THRESHOLD = 60 // 释放触发阈值（像素）
-const pulling = ref(false)
-const pullReady = ref(false)
-const pullDelta = ref(0)
-const refreshing = ref(false)
-let pullStartY = 0
-let touchAttached = false
-
-function onTouchStart(e) {
-  if (refreshing.value) return
-  // 已在内容顶部才响应下拉，避免与正常滚动冲突
-  if ((window.scrollY || document.documentElement.scrollTop || 0) > 4) {
-    pulling.value = false
-    return
-  }
-  pullStartY = e.touches[0].clientY
-  pulling.value = true
-  pullReady.value = false
-  pullDelta.value = 0
-}
-function onTouchMove(e) {
-  if (!pulling.value || refreshing.value) return
-  const y = e.touches[0].clientY
-  const delta = y - pullStartY
-  if (delta <= 0) { pulling.value = false; return }
-  // 阻尼：超过阈值后增速放缓
-  pullDelta.value = Math.min(delta * 0.45, PULL_THRESHOLD * 1.4)
-  pullReady.value = pullDelta.value >= PULL_THRESHOLD
-}
-async function onTouchEnd() {
-  if (!pulling.value) return
-  pulling.value = false
-  if (pullReady.value) await doRefresh()
-  pullDelta.value = 0
-  pullReady.value = false
-}
-async function doRefresh() {
-  if (refreshing.value) return
-  refreshing.value = true
-  // 热更新：线上有新版 JS/CSS 包（样式/逻辑改动）→ 整页重载拉新包；否则只刷数据
-  if (await hasHotUpdate()) {
-    location.reload()
-    return
-  }
-  try {
-    await refreshFeatured()
-  } catch (e) {
-    /* swallow; 数据保持原状 */
-  } finally {
-    // 至少展示 350ms spinner，避免一闪而过
-    await new Promise((r) => setTimeout(r, 350))
-    refreshing.value = false
-  }
-}
-function attachPullRefresh() {
-  if (touchAttached) return
-  document.addEventListener('touchstart', onTouchStart, { passive: true })
-  document.addEventListener('touchmove', onTouchMove, { passive: true })
-  document.addEventListener('touchend', onTouchEnd, { passive: true })
-  touchAttached = true
-}
-function teardownPullRefresh() {
-  if (!touchAttached) return
-  document.removeEventListener('touchstart', onTouchStart)
-  document.removeEventListener('touchmove', onTouchMove)
-  document.removeEventListener('touchend', onTouchEnd)
-  touchAttached = false
-}
-
-const hotProducts = computed(() => allProducts.value.slice(0, 4))
-const springProducts = computed(() => allProducts.value.filter((p) => p.collection === 'spring'))
-const bikeProducts = computed(() => allProducts.value.filter((p) => p.collection === 'p1parts'))
+const bikeProducts = computed(() => {
+  const list = all.value
+  const f = list.filter(
+    (p) => p.collection === 'bikes' || (p.tags || []).includes('bike')
+  )
+  return f.length ? f : list
+})
 
 function onQuick(q) {
   if (q.key === 'hot') {
@@ -202,21 +166,25 @@ function onQuick(q) {
     router.push('/points')
   }
 }
+
+async function retry() {
+  loading.value = true
+  error.value = ''
+  try {
+    await fetchProducts()
+    store.value = getStore()
+    error.value = getLastError()
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <style scoped>
 .featured {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-}
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 8px;
-  background: #ffffff;
 }
 .tabs {
   display: flex;
@@ -232,16 +200,16 @@ function onQuick(q) {
   transform: scale(0.96);
 }
 .tab.active {
-  color: #000000;
+  color: var(--text);
   font-weight: 700;
 }
 .search-ico {
   color: #000000;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
 }
 .banner {
   margin: 12px 12px 0;
@@ -255,44 +223,36 @@ function onQuick(q) {
   object-fit: cover;
   display: block;
 }
+.enter-store {
+  display: block;
+  margin: 12px 12px 0;
+  width: calc(100% - 24px);
+  padding: 12px 0;
+  border-radius: var(--radius-lg);
+  background: var(--brand);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  border: none;
+}
 .grid2 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   padding: 0 12px 16px;
 }
-/* 下拉刷新指示器（调好后可删除） */
-.pull-indicator {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 999px;
-  font-size: 13px;
+.load-tip,
+.err-tip {
+  text-align: center;
+  padding: 40px 20px;
   color: var(--text-sub);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  z-index: 9;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.18s ease;
+  font-size: 14px;
 }
-.pull-indicator.pulling,
-.pull-indicator.refreshing {
-  opacity: 1;
-}
-.pull-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid #e5e7eb;
-  border-top-color: var(--brand, #f97316);
-  border-radius: 50%;
-  animation: pull-spin 0.8s linear infinite;
-}
-@keyframes pull-spin {
-  to { transform: rotate(360deg); }
+.err-tip small {
+  display: block;
+  color: #e53e3e;
+  margin-top: 4px;
+  font-size: 12px;
 }
 </style>

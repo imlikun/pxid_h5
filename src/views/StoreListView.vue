@@ -1,14 +1,12 @@
 <template>
   <div class="page">
-    <div class="nav">
-      <span class="back press" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </span>
-      <span class="title">附近门店</span>
-      <span class="search-icon press" @click="showSearch = !showSearch">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </span>
-    </div>
+    <TopBar title="附近门店">
+      <template #right>
+        <span class="search-icon" @click="showSearch = !showSearch">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </span>
+      </template>
+    </TopBar>
 
     <!-- 搜索 + 排序 -->
     <div v-if="showSearch" class="bar fade-up">
@@ -35,6 +33,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import StoreCard from '../components/StoreCard.vue'
 import { stores } from '../data/mock'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const kw = ref('')
@@ -56,19 +55,8 @@ const list = computed(() => {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-}
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
-.search-icon { position: absolute; right: 14px; display: flex; color: var(--text); }
+.page { min-height: 100vh; background: var(--bg); padding-bottom: env(safe-area-inset-bottom); }
+.search-icon { display: flex; color: var(--text); padding: 4px; }
 
 .bar {
   background: var(--card);

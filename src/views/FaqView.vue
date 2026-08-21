@@ -1,19 +1,17 @@
 <template>
   <div class="page">
     <!-- 顶部：常见问题 + 筛选 -->
-    <div class="nav">
-      <span class="back press" @click="router.back()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </span>
-      <span class="title">常见问题</span>
-      <span class="filter-btn press" @click="goFilter">
-        <span class="filter-label">筛选</span>
-        <span v-if="activeTagCount > 0" class="filter-badge">{{ activeTagCount }}</span>
-      </span>
-    </div>
+    <TopBar title="常见问题">
+      <template #right>
+        <span class="filter-btn" @click="goFilter">
+          <span class="filter-label">筛选</span>
+          <span v-if="activeTagCount > 0" class="filter-badge">{{ activeTagCount }}</span>
+        </span>
+      </template>
+    </TopBar>
 
     <!-- 搜索框 -->
-    <div class="search fade-up stagger-1">
+    <div class="search">
       <span class="sicon">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </span>
@@ -22,7 +20,7 @@
 
     <!-- 列表：每条 Q+A 独立卡片 -->
     <div class="list">
-      <div v-for="f in filteredFaqs" :key="f.id" class="card press fade-up" :class="'stagger-' + ((filteredFaqs.indexOf(f) % 10) + 1)" @click="go(f)">
+      <div v-for="f in filteredFaqs" :key="f.id" class="card" @click="go(f)">
         <div class="q-row">
           <span class="q">Q</span>
           <span class="q-txt">{{ f.q }}</span>
@@ -41,6 +39,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { faqs } from '../data/mock'
+import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -75,26 +74,14 @@ function goFilter() {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-.nav {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-}
-.back { position: absolute; left: 12px; display: flex; color: var(--text); }
-.title { font-size: 17px; font-weight: 600; color: var(--text); }
+.page { min-height: 100vh; background: var(--bg); padding-bottom: env(safe-area-inset-bottom); }
 .filter-btn {
-  position: absolute;
-  right: 16px;
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 14px;
   color: var(--text);
+  padding: 4px 6px;
 }
 .filter-badge {
   background: var(--text);
