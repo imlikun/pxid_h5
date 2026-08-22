@@ -32,13 +32,11 @@ async function request(path, { method = 'GET', body } = {}) {
   const headers = { 'Content-Type': 'application/json' }
   const tk = await getAuthTokenSafe()
   if (tk) headers.Authorization = 'Bearer ' + tk
-  console.log('[api/request] fetch', FEED_API + path, 'method=', method, 'hasToken=', !!tk)
   const res = await fetch(FEED_API + path, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   })
-  console.log('[api/request] response status=', res.status)
   if (!res.ok) throw new Error('HTTP ' + res.status)
   const json = await res.json()
   if (json.code !== 0) throw new Error(json.message || '接口错误')
@@ -52,23 +50,19 @@ function normalize(item) {
 
 // ---- 动态流 ----
 export async function fetchFeeds(tab = 'dynamic', params = {}) {
-  console.log('[fetchFeeds] called, tab=', tab, 'params=', JSON.stringify(params), 'FEED_API=', !!FEED_API)
   if (FEED_API) {
     try {
       const qsParams = { tab, ...params }
       // 动态：关注流，传当前设备 ID 让后端按「关注 + 官方」过滤
       if (tab === 'dynamic') qsParams.followerDevice = getDeviceId()
       const qs = new URLSearchParams(qsParams).toString()
-      console.log('[fetchFeeds] requesting /feed?' + qs)
       const data = await request('/feed?' + qs)
-      console.log('[fetchFeeds] got data, listLen=', (data.list || []).length)
       return (data.list || []).map(normalize)
     } catch (e) {
       console.warn('[fetchFeeds] API error:', e.message || e)
       /* 接口失败回落 mock */
     }
   }
-  console.log('[fetchFeeds] falling back to mock')
   // 兜底：我的发布（localStorage 持久化）+ 官方 mock moments，最新在前
   const mine = publishState.list.map((m) => ({ ...m, itemType: 'moment' }))
   const official = moments.map((m) => ({ ...m }))
@@ -207,10 +201,12 @@ export async function fetchComments(id) {
 }
 
 // ---- 广场热门活动（只读；运营后台可配基础活动）----
-export async function fetchActivities() {
+export async function fetchActivities(params = {}) {
   if (!FEED_API) return []
   try {
-    const data = await request('/activities')
+    const qs = new URLSearchParams(params).toString()
+    const url = '/activities' + (qs ? '?' + qs : '')
+    const data = await request(url)
     return data.list || []
   } catch (e) {
     return []

@@ -1269,11 +1269,12 @@ app.delete('/admin/plaza-grid/:id', requireAdmin, (req, res) => {
 app.get('/activities', (req, res) => {
   const { region } = req.query
   const reg = String(region || '').toUpperCase()
-  // 地区过滤：CN/BR/US，US 为全球公共池（与 feed 语义一致）
+  // 地区过滤：精确匹配 region_code；US 为全球公共池（仅查 US 标记的）
+  // CN/BR 各看各的，没有则返回空列表（不 fallback 到 US 数据）
   let w = "WHERE status='on'"
   const args = []
   if (['CN', 'BR', 'US'].includes(reg)) {
-    w += " AND region_code IN (?, 'US')"
+    w += " AND region_code = ?"
     args.push(reg)
   }
   const rows = db.prepare(`SELECT * FROM activities ${w} ORDER BY sort ASC, id DESC`).all(...args)
