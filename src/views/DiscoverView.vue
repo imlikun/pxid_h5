@@ -256,11 +256,13 @@ function setTab(t) {
 // 从 /feed 接口拉取真实数据（带地区过滤）。改用统一数据层 api/feed.js：
 // 动态 tab 自动带 followerDevice → 后端返回「官方+已关注」关注流（修 H1 关注流非全局流）；
 // 归一化/错误回落统一，消除 api/feed.js 死代码（修 H2）
-async function loadFeed(tab) {
-  const key = TAB_KEY[tab] || tab
+// ⚠️ 调用方（onMounted / switchRegion）统一传英文 key（'recommend'/'dynamic'），
+//    内部必须按 key 比对，勿用中文——曾因 'recommend' !== '推荐' 导致
+//    推荐数据被塞进 dynamicData、recommendData 永远为空、For You 页永久空白（2026-08-22 修复）
+async function loadFeed(tabKey) {
   try {
-    const list = await fetchFeeds(key, { region: currentRegion.value, pageSize: 30 })
-    if (tab === '推荐') recommendData.value = list
+    const list = await fetchFeeds(tabKey, { region: currentRegion.value, pageSize: 30 })
+    if (tabKey === 'recommend') recommendData.value = list
     else dynamicData.value = list
   } catch (e) {
     loadErr.value = t('discover.loadFail')

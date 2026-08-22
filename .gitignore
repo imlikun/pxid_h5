@@ -1,5 +1,5 @@
 node_modules/
-dist/
+server/node_modules/
 dist.old.*/
 dist.rebuild.del.*/
 .DS_Store
@@ -8,4 +8,7 @@ dist.rebuild.del.*/
 *.bak
 shots/
 *.zip
+*.db
+*.db-shm
+*.db-wal
 !.gitignore
