@@ -258,23 +258,29 @@ function setTab(t) {
 // 归一化/错误回落统一，消除 api/feed.js 死代码（修 H2）
 async function loadFeed(tab) {
   const key = TAB_KEY[tab] || tab
+  console.log('[DiscoverView.loadFeed] tab=', tab, 'region=', currentRegion.value)
   try {
     const list = await fetchFeeds(key, { region: currentRegion.value, pageSize: 30 })
+    console.log('[DiscoverView.loadFeed] got list, len=', Array.isArray(list) ? list.length : 'not array:', list)
     if (tab === '推荐') recommendData.value = list
     else dynamicData.value = list
   } catch (e) {
+    console.error('[DiscoverView.loadFeed] error:', e)
     loadErr.value = t('discover.loadFail')
   }
 }
 
 // 广场热门活动（随地区切换）
 async function loadActivities() {
+  console.log('[DiscoverView.loadActivities] region=', currentRegion.value)
   try {
     const url = `${API_BASE}/activities?region=${currentRegion.value}`
     const r = await fetch(url)
     const j = await r.json()
+    console.log('[DiscoverView.loadActivities] got', j.code === 0 ? (j.data?.list || []).length : 'code=' + j.code, 'items')
     if (j.code === 0 && j.data) actList.value = j.data.list || []
   } catch (e) {
+    console.error('[DiscoverView.loadActivities] error:', e)
     actList.value = []
   }
 }
@@ -320,9 +326,11 @@ function onBanner() {
 
 // 发布后自动切到「动态」tab 展示新内容
 onMounted(async () => {
+  console.log('[DiscoverView.onMounted] start')
   await initLocale() // 先按系统语言初始化
   try {
     const reg = await bridge.getRegion()
+    console.log('[DiscoverView.onMounted] getRegion=', reg)
     if (reg && ['CN', 'BR', 'US'].includes(String(reg).toUpperCase())) {
       currentRegion.value = String(reg).toUpperCase()
     }
@@ -330,7 +338,9 @@ onMounted(async () => {
   // 强制按当前地区对齐语言：无论 getRegion 是否成功，语言都与当前 region 一致（兜底默认 CN=中文）
   setLocale(REGION_LOCALE[currentRegion.value] || 'en')
   loading.value = true
+  console.log('[DiscoverView.onMounted] loading data, region=', currentRegion.value)
   await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities(), fetchBanners()])
+  console.log('[DiscoverView.onMounted] data loaded, recommendData.len=', recommendData.value?.length, 'dynamicData.len=', dynamicData.value?.length, 'actList.len=', actList.value?.length)
   loading.value = false
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab)
