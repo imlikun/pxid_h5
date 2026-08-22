@@ -1269,12 +1269,11 @@ app.delete('/admin/plaza-grid/:id', requireAdmin, (req, res) => {
 app.get('/activities', (req, res) => {
   const { region } = req.query
   const reg = String(region || '').toUpperCase()
-  // 地区过滤：精确匹配 region_code；US 为全球公共池（仅查 US 标记的）
-  // CN/BR 各看各的，没有则返回空列表（不 fallback 到 US 数据）
+  // 地区过滤：CN/BR/US，US 为全球公共池（与 feed 语义一致）
   let w = "WHERE status='on'"
   const args = []
   if (['CN', 'BR', 'US'].includes(reg)) {
-    w += " AND region_code = ?"
+    w += " AND region_code IN (?, 'US')"
     args.push(reg)
   }
   const rows = db.prepare(`SELECT * FROM activities ${w} ORDER BY sort ASC, id DESC`).all(...args)
@@ -1931,6 +1930,73 @@ app.post('/mall-api/checkout', (req, res) => {
     const qty = Math.max(1, parseInt(body.qty || '1', 10) || 1)
     const url = 'https://' + cfg.store + '/cart/' + variantId + ':' + qty
     res.json(ok({ url: url, store: cfg.store, region: region, currency: cfg.currency }))
+  } catch (e) {
+    res.status(500).json(err(500, String(e.message || e)))
+  }
+})
+
+// 中文省名 → ISO 3166-2 省码；中文国名 → ISO 3166-1 alpha-2（兜底，避免 Flutter 误传中文被 Shopify 拒）
+const PROVINCE_CN2CODE = { '北京':'BJ','天津':'TJ','河北':'HE','山西':'SX','内蒙古':'NM','辽宁':'LN','吉林':'JL','黑龙江':'HL','上海':'SH','江苏':'JS','浙江':'ZJ','安徽':'AH','福建':'FJ','江西':'JX','山东':'SD','河南':'HA','湖北':'HB','湖南':'HN','广东':'GD','广西':'GX','海南':'HI','重庆':'CQ','四川':'SC','贵州':'GZ','云南':'YN','西藏':'XZ','陕西':'SN','甘肃':'GS','青海':'QH','宁夏':'NX','新疆':'XJ','台湾':'TW','香港':'HK','澳门':'MO' }
+const COUNTRY_CN2CODE = { '中国':'CN','中国大陆':'CN','美国':'US','美利坚':'US','巴西':'BR','巴西联邦共和国':'BR' }
+function normCountryCode(c){ if(!c) return 'US'; const s=String(c).trim(); if(/^[A-Za-z]{2}$/.test(s)) return s.toUpperCase(); return COUNTRY_CN2CODE[s]||'US' }
+function normProvinceCode(p){ if(!p) return ''; const s=String(p).trim(); if(/^[A-Za-z]{2}$/.test(s)) return s.toUpperCase(); return PROVINCE_CN2CODE[s]||s }
+function normPhone(ph, country){ if(!ph) return ''; let s=String(ph).trim().replace(/[\s-]/g,''); if(s.startsWith('+')) return s; if(country==='CN'||!country){ return '+86'+s.replace(/^0/,'') } return '+'+s }
+
+// M-MVP1 升级：Cart API 建车 + 自动预填邮箱/地址，返回 Shopify checkoutUrl（2026-08-22 真上线）
+// 入参：{ variantId, qty, region, email, shippingAddress:{firstName,lastName,address1,address2,city,province,country,zip,phone} }
+app.post('/mall-api/checkout-v2', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const rawVid = String(body.variantId || '').trim()
+    if (!rawVid) return res.status(400).json(err(400, 'variantId required'))
+    const region = resolveRegion(body.region || req.headers['x-region'])
+    const cfg = getStoreConfig(region)
+    const token = cfg.storefrontToken
+    if (!token) return res.status(500).json(err(500, 'storefront token 未配置'))
+    const qty = Math.max(1, parseInt(body.qty || '1', 10) || 1)
+    const digits = rawVid.replace(/\D/g, '')
+    const vid = /^gid:\/\//.test(rawVid) ? rawVid : (digits ? 'gid://shopify/ProductVariant/' + digits : '')
+    if (!vid) return res.status(400).json(err(400, 'variantId 格式无效'))
+    const buyerIdentity = {}
+    if (body.email) buyerIdentity.email = String(body.email).trim()
+    const a = body.shippingAddress
+    if (a && (a.address1 || a.city)) {
+      const country = normCountryCode(a.country)
+      buyerIdentity.deliveryAddressPreferences = [{
+        deliveryAddress: {
+          firstName: String(a.firstName || ''),
+          lastName: String(a.lastName || ''),
+          address1: String(a.address1 || ''),
+          address2: String(a.address2 || ''),
+          city: String(a.city || ''),
+          province: normProvinceCode(a.province),
+          country: country,
+          zip: String(a.zip || a.postalCode || ''),
+          phone: normPhone(a.phone, country),
+        },
+      }]
+    }
+    const query = `mutation cartCreate($input: CartInput!) {
+      cartCreate(input: $input) {
+        cart { id checkoutUrl }
+        userErrors { code field message }
+      }
+    }`
+    const variables = { input: { lines: [{ merchandiseId: vid, quantity: qty }], buyerIdentity } }
+    const r = await fetch('https://' + cfg.store + '/api/2024-01/graphql.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Shopify-Storefront-Access-Token': token },
+      body: JSON.stringify({ query, variables }),
+    })
+    if (!r.ok) return res.status(502).json(err(502, 'Shopify Cart API HTTP ' + r.status))
+    const gql = await r.json()
+    if (gql.errors) return res.status(502).json(err(502, 'Shopify GraphQL error: ' + JSON.stringify(gql.errors)))
+    const cc = gql.data && gql.data.cartCreate
+    const ue = cc && cc.userErrors
+    if (ue && ue.length) return res.status(400).json(err(400, 'Shopify: ' + ue[0].message))
+    const cart = cc && cc.cart
+    if (!cart) return res.status(502).json(err(502, 'cart 创建失败'))
+    res.json(ok({ url: cart.checkoutUrl, cartId: cart.id, region: region, currency: cfg.currency }))
   } catch (e) {
     res.status(500).json(err(500, String(e.message || e)))
   }
