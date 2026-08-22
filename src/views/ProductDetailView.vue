@@ -262,12 +262,21 @@ function onAddCart() {
 async function onBuy() {
   if (!product.value) return
   const vid = currentVariant.value ? currentVariant.value.id : 'def'
-  // 走后端结算接口拿 Shopify cart permalink（region/未来 Multipass 都在后端收敛）
+  // 走后端 checkout-v2 建 Shopify 购物车并预填邮箱/地址（region + Multipass 收敛在后端）
   try {
-    const r = await fetch(`${API_BASE}/mall-api/checkout`, {
+    // 拉取 Flutter 注入的用户资料：email + shippingAddress 用于 Shopify 结算页自动预填
+    let profile = {}
+    try { profile = (await bridge.getUserInfo()) || {} } catch (e) { profile = {} }
+    const r = await fetch(`${API_BASE}/mall-api/checkout-v2`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ variantId: vid, qty: qty.value, region: getRegion() }),
+      body: JSON.stringify({
+        variantId: vid,
+        qty: qty.value,
+        region: getRegion(),
+        email: profile.email || '',
+        shippingAddress: profile.shippingAddress || null,
+      }),
     })
     const j = await r.json()
     const url = (j.data && j.data.url) || (j.url)
