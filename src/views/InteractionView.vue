@@ -117,7 +117,6 @@ onMounted(load)
 .interaction {
   min-height: 100vh;
   background: var(--bg, #f7f8fa);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .markall {
