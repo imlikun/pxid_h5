@@ -633,7 +633,7 @@ function showToast(msg) {
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding: 6px 2px;
+  padding: 6px 4px;
 }
 .chips::-webkit-scrollbar { display: none; }
 .chip {
@@ -651,7 +651,6 @@ function showToast(msg) {
 .chip.active {
   color: #fff;
   background: var(--brand, #4A6CF7);
-  box-shadow: 0 2px 8px rgba(74, 108, 247, 0.3);
   font-weight: 600;
 }
 .sort {
