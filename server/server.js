@@ -24,18 +24,56 @@ try { require('dotenv').config() } catch (_) {}
 const app = express()
 app.use(express.json({ limit: '5mb', verify: (req, res, buf) => { if (req.path && (req.path.indexOf('/mall-api/webhook') === 0 || req.path.indexOf('/ban-sync/from-toc') === 0)) req.rawBody = buf } }))
 
-// ---- CORS：允许 H5（appin.site / preview.*）及运营后台跨域 ----
+// ---- 安全加固：信任反代，取真实客户端 IP 供限流/审计 ----
+app.set('trust proxy', true)
+
+// ---- CORS：仅反射自家 H5 域名；未知来源不回退 *（原生 WebView 不受 CORS 限制）----
 app.use((req, res, next) => {
   const origin = req.headers.origin || ''
-  if (/^https?:\/\/(.*\.)?appin\.site$/.test(origin) || /^https?:\/\/preview(-[a-z0-9]+)?\.appin\.site$/.test(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin)
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*')
-  }
+  const allow = /^https?:\/\/(.*\.)?appin\.site$/.test(origin) || /^https?:\/\/preview(-[a-z0-9]+)?\.appin\.site$/.test(origin)
+  if (allow) res.setHeader('Access-Control-Allow-Origin', origin)
+  // 非允许来源：不设置 CORS 头（不回退 *），浏览器同源策略即拦截跨域读取
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+  // 基础安全响应头
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'no-referrer')
   if (req.method === 'OPTIONS') return res.sendStatus(204)
   next()
+})
+
+// ---- 限流（内存滑动窗口，单实例足够；多实例可换 Redis）----
+const rlBuckets = new Map()
+function rateLimit(windowMs, max) {
+  return (req, res, next) => {
+    const ip = (req.headers['x-forwarded-for'] && req.headers['x-forwarded-for'].split(',')[0].trim()) || req.ip || req.socket.remoteAddress || 'unknown'
+    const key = ip + '|' + req.method + '|' + req.path
+    const now = Date.now()
+    const rec = rlBuckets.get(key)
+    if (!rec || now - rec.start > windowMs) {
+      rlBuckets.set(key, { start: now, count: 1 })
+      return next()
+    }
+    rec.count++
+    if (rec.count > max) return res.status(429).json(err(429, '请求过于频繁，请稍后再试'))
+    next()
+  }
+}
+// 敏感写接口按路径定制阈值（其余 POST/PUT/DELETE 走默认）
+function pickLimit(path, method) {
+  if (method !== 'POST' && method !== 'PUT' && method !== 'DELETE') return null
+  if (path === '/auth/token') return rateLimit(60 * 1000, 10)
+  if (path.endsWith('/report')) return rateLimit(60 * 1000, 10)
+  if (path === '/media/upload') return rateLimit(60 * 1000, 30)
+  if (path === '/feed') return rateLimit(60 * 1000, 30)
+  if (path === '/follow') return rateLimit(60 * 1000, 60)
+  return rateLimit(60 * 1000, 120)
+}
+app.use((req, res, next) => {
+  const lim = pickLimit(req.path, req.method)
+  if (!lim) return next()
+  lim(req, res, next)
 })
 
 // ---- 数据库 ----
@@ -2258,7 +2296,18 @@ app.get('/mall-api/orders', requireAuth, (req, res) => {
 })
 
 // ---- 健康检查 ----
-app.get('/health', (req, res) => res.json(ok({ status: 'up', time: now() })))
+app.get('/health', (req, res) => res.json(ok({ status: 'up', time: now(), version: APP_VERSION })))
+
+// ---- 版本 ----
+const APP_VERSION = '1.0.0'
+app.get('/version', (req, res) => res.json(ok({ version: APP_VERSION })))
+
+// ---- 全局错误处理（避免未捕获异常泄露堆栈）----
+app.use((e, req, res, next) => {
+  if (res.headersSent) return next(e)
+  console.error('[pxid-feed] unhandled error:', e && e.message)
+  res.status(500).json(err(500, '服务器内部错误'))
+})
 
 const PORT = process.env.PORT || 8700
 // 启动：从 banned_words 表加载运营自定义词，重建本地词库
