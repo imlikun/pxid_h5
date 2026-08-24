@@ -545,7 +545,7 @@ function showToast(msg) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 20px 12px 0;
+  margin: 16px 12px 0;
   gap: 8px;
 }
 .chips {
@@ -555,15 +555,15 @@ function showToast(msg) {
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding: 4px 2px;
+  padding: 6px 2px;
 }
 .chips::-webkit-scrollbar { display: none; }
 .chip {
   font-size: 13px;
   color: var(--text-sub);
-  line-height: 1.3;
+  line-height: 1.4;
   white-space: nowrap;
-  padding: 6px 14px;
+  padding: 7px 14px;
   border-radius: 20px;
   background: #F5F5F7;
   transition: all 0.2s ease;
