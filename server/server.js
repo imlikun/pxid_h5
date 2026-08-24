@@ -85,6 +85,8 @@ addCol('region_code', "TEXT NOT NULL DEFAULT 'US'") // 地区（CN/BR/US，US �
 addCol('lat', 'REAL') // 发布定位纬度（附近 LBS 用）
 addCol('lng', 'REAL') // 发布定位经度
 addCol('mentions', "TEXT NOT NULL DEFAULT '[]'") // @话题：被提及用户昵称数组 JSON
+addCol('video_url', "TEXT NOT NULL DEFAULT ''") // 视频 objectKey（统一 storage 层：local=uploads/xxx.mp4，oss=media/xxx.mp4）
+addCol('cover_url', "TEXT NOT NULL DEFAULT ''") // 视频封面 objectKey
 
 // ---- 精选（Shopify）订单回流映射表 ----
 db.exec(`
@@ -328,6 +330,8 @@ function rowToFeed(r) {
     lat: r.lat != null ? Number(r.lat) : null,
     lng: r.lng != null ? Number(r.lng) : null,
     mentions: safeJsonArr(r.mentions).map((m) => String(m)),
+    videoUrl: r.video_url || '',
+    videoCover: r.cover_url || '',
   }
 }
 
@@ -498,7 +502,7 @@ app.get('/feed/users', (req, res) => {
 
 // ---- 发帖（用户侧，kind=user）----
 app.post('/feed', requireAuth, (req, res) => {
-  const { content, images = [], carModel = '', tags = [], nickname = '骑友', avatar = '', region = 'US', lat, lng, mentions = [] } = req.body || {}
+  const { content, images = [], carModel = '', tags = [], nickname = '骑友', avatar = '', region = 'US', lat, lng, mentions = [], video = '', cover = '' } = req.body || {}
   // 安全：deviceId 以 token 内可信值为准（P0-1/P1-4），未配 USER_TOKEN_SECRET 时降级用 body 传值
   const deviceId = (USER_TOKEN_SECRET && req.user && req.user.deviceId) || String(req.body.deviceId || '')
   const text = String(content || '').trim()
@@ -513,8 +517,8 @@ app.post('/feed', requireAuth, (req, res) => {
   const reg = ['CN', 'BR', 'US'].includes(String(region).toUpperCase()) ? String(region).toUpperCase() : 'US'
   const info = db
     .prepare(
-      `INSERT INTO feeds (nickname, device_id, avatar, content, images, tags, car_model, region_code, lat, lng, mentions, created_at, kind, status, operator)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'published', '')`
+      `INSERT INTO feeds (nickname, device_id, avatar, content, images, tags, car_model, region_code, lat, lng, mentions, video_url, cover_url, created_at, kind, status, operator)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'published', '')`
     )
     .run(
       String(nickname).slice(0, 20),
@@ -528,11 +532,15 @@ app.post('/feed', requireAuth, (req, res) => {
       lat != null && lat !== '' ? Number(lat) : null,
       lng != null && lng !== '' ? Number(lng) : null,
       JSON.stringify(Array.isArray(mentions) ? mentions.slice(0, 20) : []),
+      String(video || ''),
+      String(cover || ''),
       now()
     )
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(info.lastInsertRowid)
   // 内容安全②：阿里云异步复核（配置 AK 后生效；命中高危自动下架）
   moderation.reviewFeed(row, db)
+  // 视频异步转码（增强，可选）：有 ffmpeg 才转，失败静默，不影响发布
+  if (video) transcodeVideoIfAvailable(row.id, video)
   res.json(ok(rowToFeed(row)))
 })
 
@@ -1191,6 +1199,85 @@ app.post('/feed/upload', requireAuth, upload.array('images', 9), (req, res) => {
   const urls = files.map((f) => API_BASE + '/uploads/' + f.filename)
   res.json(ok({ urls, count: urls.length }))
 })
+
+// ---- 统一媒体上传（图片/视频，storage 抽象层 local 实现）----
+// 视频 magic bytes：mp4/mov=ftyp box；webm=EBML 头 0x1A45DFA3
+function detectVideoType(head) {
+  if (head.length >= 12 && head.indexOf(Buffer.from('ftyp')) >= 0) return 'mp4'
+  if (head.length >= 4 && head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3) return 'webm'
+  return ''
+}
+// 落盘后校验 magic bytes，图片/视频均支持；通过则 rename 真实扩展名，返回 {filename,type} 否则清理返回 null
+function verifyMediaUpload(file) {
+  let fd = null
+  try {
+    fd = fs.openSync(file.path, 'r')
+    const head = Buffer.alloc(12)
+    fs.readSync(fd, head, 0, 12, 0)
+    fs.closeSync(fd); fd = null
+    const imgExt = detectImageType(head)
+    const vidExt = imgExt ? '' : detectVideoType(head)
+    if (!imgExt && !vidExt) { try { fs.unlinkSync(file.path) } catch (_) {} return null }
+    const ext = imgExt || vidExt
+    const newName = file.filename.replace(/\.tmp$/, '') + '.' + ext
+    const newPath = path.join(path.dirname(file.path), newName)
+    fs.renameSync(file.path, newPath)
+    return { filename: newName, path: newPath, type: imgExt ? 'image' : 'video' }
+  } catch (e) {
+    if (fd) { try { fs.closeSync(fd) } catch (_) {} }
+    try { fs.unlinkSync(file.path) } catch (_) {}
+    return null
+  }
+}
+const mediaUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    filename: (req, file, cb) => cb(null, Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.tmp'),
+  }),
+  limits: { fileSize: 200 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ok = /^image\/(jpeg|png|webp)$/.test(file.mimetype) || /^video\/(mp4|webm|quicktime)$/.test(file.mimetype)
+    cb(ok ? null : new Error('仅支持 jpg/png/webp 图片与 mp4/webm 视频'))
+  },
+})
+app.post('/media/upload', requireAuth, mediaUpload.single('file'), (req, res) => {
+  if (!req.file) return res.json(err(1, '未收到文件'))
+  const v = verifyMediaUpload(req.file)
+  if (!v) return res.status(400).json(err(400, '文件内容不合法（仅支持图片/视频）'))
+  const key = 'uploads/' + v.filename
+  res.json(ok({ objectKey: key, url: API_BASE + '/' + key, type: v.type }))
+})
+// OSS 模式 STS 签发（迁移阶段骨架；本地盘模式前端走 /media/upload，不调此接口）
+app.get('/media/sts', requireAuth, (req, res) => {
+  res.json(err(501, '当前为本地存储模式，请使用 /media/upload 直传'))
+})
+// 视频异步转码（增强，可选）：系统有 ffmpeg 才执行，失败静默；转 720p + 抽封面回写
+function transcodeVideoIfAvailable(feedId, srcKey) {
+  let cp
+  try { cp = require('child_process') } catch (_) { return }
+  try { cp.execSync('which ffmpeg', { stdio: 'ignore' }) } catch (_) { return }
+  setImmediate(() => {
+    try {
+      const src = path.join(UPLOAD_DIR, path.basename(srcKey))
+      if (!fs.existsSync(src)) return
+      const dir = path.join(UPLOAD_DIR, 'transcoded')
+      fs.mkdirSync(dir, { recursive: true })
+      const outMp4 = path.join(dir, feedId + '-720.mp4')
+      const outCover = path.join(dir, feedId + '-cover.jpg')
+      const enc = cp.spawn('ffmpeg', ['-y', '-i', src, '-vf', 'scale=-2:720', '-c:v', 'libx264', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '128k', outMp4])
+      enc.on('close', (code) => {
+        if (code === 0) {
+          db.prepare('UPDATE feeds SET video_url=? WHERE id=?').run('uploads/transcoded/' + feedId + '-720.mp4', feedId)
+          const cov = cp.spawn('ffmpeg', ['-y', '-i', src, '-ss', '0.1', '-vframes', '1', outCover])
+          cov.on('close', () => {
+            const row = db.prepare('SELECT cover_url FROM feeds WHERE id=?').get(feedId)
+            if (row && !row.cover_url) db.prepare('UPDATE feeds SET cover_url=? WHERE id=?').run('uploads/transcoded/' + feedId + '-cover.jpg', feedId)
+          })
+        }
+      })
+    } catch (_) {}
+  })
+}
 
 // 管理列表（含全部状态：published/offline/scheduled/deleted）
 app.get('/admin/feed', requireAdmin, (req, res) => {

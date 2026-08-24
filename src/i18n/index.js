@@ -63,6 +63,11 @@ const messages = {
     'publish.mention': '@ 提到',
     'publish.mentionTitle': '选择提到的人',
     'publish.mentionEmpty': '暂无可选用户',
+    'publish.video': '添加视频',
+    'publish.addVideo': '选择视频',
+    'publish.videoTip': '支持 mp4/webm，≤60秒，≤200MB；封面自动取首帧',
+    'publish.videoTooBig': '视频超过 200MB',
+    'publish.videoTooLong': '视频超过 60 秒',
     // 通用
     'common.loading': '加载中…',
 
@@ -238,6 +243,11 @@ const messages = {
     'publish.mention': '@ Mention',
     'publish.mentionTitle': 'Mention someone',
     'publish.mentionEmpty': 'No users available',
+    'publish.video': 'Add video',
+    'publish.addVideo': 'Choose video',
+    'publish.videoTip': 'MP4/WebM, ≤60s, ≤200MB; cover auto from first frame',
+    'publish.videoTooBig': 'Video exceeds 200MB',
+    'publish.videoTooLong': 'Video exceeds 60s',
     'common.loading': 'Loading…',
 
     // ============ Feed detail ============
@@ -411,6 +421,11 @@ const messages = {
     'publish.mention': '@ Mencionar',
     'publish.mentionTitle': 'Mencionar alguém',
     'publish.mentionEmpty': 'Nenhum usuário disponível',
+    'publish.video': 'Adicionar vídeo',
+    'publish.addVideo': 'Escolher vídeo',
+    'publish.videoTip': 'MP4/WebM, ≤60s, ≤200MB; capa automática do 1º frame',
+    'publish.videoTooBig': 'Vídeo excede 200MB',
+    'publish.videoTooLong': 'Vídeo excede 60s',
     'common.loading': 'Carregando…',
 
     // ============ Feed detail ============

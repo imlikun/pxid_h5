@@ -3,6 +3,7 @@
     <div class="fcard__coverwrap">
       <img class="fcard__cover" :src="coverUrl" :alt="item.title" @error="onImgErr" />
       <span v-if="item.pinned" class="fcard__pin">置顶</span>
+      <span v-if="item.videoUrl" class="fcard__play"><svg viewBox="0 0 24 24" width="18" height="18" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
     </div>
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
@@ -22,6 +23,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { defaultAvatar } from '../data/mock'
+import { mediaUrl } from '../storage'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -31,6 +33,10 @@ const router = useRouter()
 const FALLBACK = import.meta.env.BASE_URL + 'feed_default.jpg'
 const coverUrl = computed(() => {
   const it = props.item || {}
+  if (it.videoUrl) {
+    const c = mediaUrl(it.videoCover)
+    if (c) return c
+  }
   return it.cover || (Array.isArray(it.images) && it.images[0]) || FALLBACK
 })
 function onImgErr(e) {
@@ -69,6 +75,21 @@ function go() {
   padding: 3px 6px;
   border-radius: 4px;
   z-index: 2;
+}
+.fcard__play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
 }
 .fcard__title {
   padding: 10px 0 0;

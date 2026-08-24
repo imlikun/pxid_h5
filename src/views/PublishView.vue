@@ -33,7 +33,7 @@
         </div>
       </div>
 
-      <!-- 图片上传（真实上传 /feed/upload，jpg/png/webp 白名单，≤9 张） -->
+      <!-- 图片上传（真实上传 /media/upload，jpg/png/webp 白名单，≤9 张） -->
       <div class="card section">
         <div class="label">{{ t('publish.images') }}</div>
         <div class="gallery">
@@ -56,6 +56,24 @@
         </div>
         <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" @change="onPick" />
         <div class="hint">{{ uploading ? t('publish.uploading') : t('publish.uploadTip') }}</div>
+      </div>
+
+      <!-- 视频上传（统一 /media/upload，封面自动取首帧，≤60s / ≤200MB） -->
+      <div class="card section">
+        <div class="label">{{ t('publish.video') }}</div>
+        <div v-if="!videoFile" class="vadd" @click="pickVideo">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+          <span>{{ t('publish.addVideo') }}</span>
+        </div>
+        <div v-else class="vprev">
+          <video class="vprev__v" :src="videoFile.url" muted playsinline preload="metadata"></video>
+          <span class="vprev__del" @click="removeVideo">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </span>
+          <span class="vprev__dur">{{ Math.round(videoFile.duration || 0) }}s</span>
+        </div>
+        <input ref="fileInputVideo" type="file" accept="video/mp4,video/webm,video/quicktime" style="display:none" @change="onPickVideo" />
+        <div class="hint">{{ t('publish.videoTip') }}</div>
       </div>
 
       <!-- 发布选项：位置 + @提到 -->
@@ -101,18 +119,22 @@ import { carModels } from '../data/mock'
 import bridge from '../bridge'
 import { t } from '../i18n'
 import { fetchFeedUsers } from '../api/feed'
+import { uploadMedia } from '../storage'
 import TopBar from '../components/TopBar.vue'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
 const router = useRouter()
 const fileInput = ref(null)
+const fileInputVideo = ref(null)
 
 const content = ref('')
 const carModel = ref('')
 // 已选图片：{ file, url(本地预览), uploadedUrl, uploading }
 const picked = ref([])
 const uploading = ref(false)
+// 已选视频：{ file, url(本地预览), duration }
+const videoFile = ref(null)
 
 // 定位（附近 LBS）与 @提到 状态
 const lat = ref(null)
@@ -202,7 +224,56 @@ function removePick(i) {
   picked.value.splice(i, 1)
 }
 
-// 逐张上传 /feed/upload（requireAuth，jpg/png/webp 白名单，单张≤5MB）
+// 选视频（≤60s / ≤200MB）
+function pickVideo() {
+  fileInputVideo.value && fileInputVideo.value.click()
+}
+function getVideoDuration(file) {
+  return new Promise((resolve) => {
+    const v = document.createElement('video')
+    v.preload = 'metadata'
+    v.muted = true
+    v.src = URL.createObjectURL(file)
+    v.onloadedmetadata = () => { resolve(v.duration || 0); URL.revokeObjectURL(v.src) }
+    v.onerror = () => { resolve(0); URL.revokeObjectURL(v.src) }
+  })
+}
+async function onPickVideo(e) {
+  const f = e.target.files && e.target.files[0]
+  e.target.value = ''
+  if (!f) return
+  if (f.size > 200 * 1024 * 1024) { showToast(t('publish.videoTooBig')); return }
+  const dur = await getVideoDuration(f)
+  if (dur > 60) { showToast(t('publish.videoTooLong')); return }
+  if (videoFile.value && videoFile.value.url) URL.revokeObjectURL(videoFile.value.url)
+  videoFile.value = { file: f, url: URL.createObjectURL(f), duration: dur }
+}
+function removeVideo() {
+  if (videoFile.value && videoFile.value.url) URL.revokeObjectURL(videoFile.value.url)
+  videoFile.value = null
+}
+// 抽首帧当封面（返回 jpeg blob）
+function captureFrame(file, atSec = 0.1) {
+  return new Promise((resolve) => {
+    const v = document.createElement('video')
+    v.preload = 'metadata'
+    v.muted = true
+    v.src = URL.createObjectURL(file)
+    v.onloadedmetadata = () => { v.currentTime = Math.min(atSec, (v.duration || 1) / 2) }
+    v.onseeked = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = v.videoWidth
+        c.height = v.videoHeight
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
+        c.toBlob((blob) => { URL.revokeObjectURL(v.src); resolve(blob) }, 'image/jpeg', 0.8)
+      } catch (e) { URL.revokeObjectURL(v.src); resolve(null) }
+    }
+    v.onerror = () => { URL.revokeObjectURL(v.src); resolve(null) }
+  })
+}
+
+// 逐张上传图片（/media/upload）
 async function uploadImages() {
   const token = await bridge.getToken()
   if (!token) throw new Error('NO_TOKEN')
@@ -211,15 +282,15 @@ async function uploadImages() {
   for (const g of pending) {
     g.uploading = true
     const fd = new FormData()
-    fd.append('images', g.file)
-    const r = await fetch(API_BASE + '/feed/upload', {
+    fd.append('file', g.file)
+    const r = await fetch(API_BASE + '/media/upload', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token },
       body: fd,
     })
     const j = await r.json()
-    if (j.code === 0 && j.data && j.data.urls && j.data.urls.length) {
-      g.uploadedUrl = j.data.urls[0]
+    if (j.code === 0 && j.data && j.data.url) {
+      g.uploadedUrl = j.data.url
     } else {
       throw new Error(j.message || 'UPLOAD_FAIL')
     }
@@ -242,21 +313,34 @@ function showToast(m) {
 
 async function onPublish() {
   if (!canPost.value) return
-  // 原生环境：交由原生发布器承载（契约一致，图片在原生侧处理）
+  // 原生环境：交由原生发布器承载（契约一致，媒体在原生侧处理）
   if (bridge.isNative()) {
     bridge.openNative('discover/publish?content=' + encodeURIComponent(content.value.trim()))
     return
   }
   uploading.value = true
   try {
-    // 1) 先传图
-    await uploadImages()
-    const images = picked.value.map((g) => g.uploadedUrl).filter(Boolean)
-    // 2) 带 token + 当前地区发帖
     const token = await bridge.getToken()
     if (!token) { showToast(t('publish.needLogin')); uploading.value = false; return }
     const region = await getRegion()
     const cm = carModel.value || ''
+    // 1) 图片
+    await uploadImages()
+    const images = picked.value.map((g) => g.uploadedUrl).filter(Boolean)
+    // 2) 视频 + 封面（封面自动抽首帧）
+    let videoKey = ''
+    let coverKey = ''
+    if (videoFile.value && videoFile.value.file) {
+      const blob = await captureFrame(videoFile.value.file, 0.1)
+      if (blob) {
+        const coverFile = new File([blob], 'cover.jpg', { type: 'image/jpeg' })
+        const cr = await uploadMedia(coverFile, token)
+        coverKey = cr.objectKey
+      }
+      const vr = await uploadMedia(videoFile.value.file, token)
+      videoKey = vr.objectKey
+    }
+    // 3) 发帖
     const r = await fetch(API_BASE + '/feed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
@@ -271,6 +355,8 @@ async function onPublish() {
         lat: lat.value,
         lng: lng.value,
         mentions: mentions.value.map((m) => m.nickname),
+        video: videoKey,
+        cover: coverKey,
       }),
     })
     const j = await r.json()
@@ -442,6 +528,58 @@ async function onPublish() {
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+/* 视频选择 */
+.vadd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-sub);
+  border: 1.5px dashed var(--line);
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.vadd:active {
+  background: var(--bg-press);
+}
+.vprev {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 16 / 9;
+}
+.vprev__v {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.vprev__del {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.vprev__dur {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+  padding: 2px 6px;
 }
 .hint {
   font-size: 12px;

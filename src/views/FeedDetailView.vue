@@ -46,6 +46,18 @@
       <button class="signup__btn press" @click="onActivitySignup">{{ t('feed.signup.btn') }}</button>
     </div>
 
+    <!-- 视频播放器 -->
+    <div v-if="item && item.videoUrl" class="vd-video fade-up stagger-2">
+      <video
+        class="vd-video__el"
+        :src="videoSrc"
+        :poster="videoPoster"
+        controls
+        playsinline
+        preload="metadata"
+      ></video>
+    </div>
+
     <!-- 图片九宫格 -->
     <div class="gallery fade-up stagger-3" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
       <img
@@ -218,6 +230,7 @@ import { requireLogin } from '../utils/auth'
 import bridge from '../bridge'
 import { t } from '../i18n'
 import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds } from '../api/feed'
+import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
 
 const route = useRoute()
@@ -332,6 +345,8 @@ const images = computed(() => {
     ? item.value.images
     : [item.value.cover]
 })
+const videoSrc = computed(() => mediaUrl(item.value && item.value.videoUrl))
+const videoPoster = computed(() => mediaUrl(item.value && item.value.videoCover) || '')
 const gridCols = computed(() => {
   const n = images.value.length
   if (n <= 1) return 1
@@ -658,6 +673,20 @@ function showToast(msg) {
   padding: 11px 0;
   font-size: 15px;
   font-weight: 600;
+}
+
+/* 视频播放器 */
+.vd-video {
+  padding: 14px 16px 0;
+  background: var(--card);
+}
+.vd-video__el {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: #000;
+  display: block;
 }
 
 /* 图片九宫格 */

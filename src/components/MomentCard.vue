@@ -17,6 +17,11 @@
     <div class="m-title">{{ item.title }}</div>
     <div class="m-body">{{ item.content }}</div>
 
+    <div v-if="item.videoUrl" class="m-video" @click.stop="open">
+      <img class="m-video__cover" :src="videoCoverUrl" :alt="item.title" @error="onImgErr" />
+      <span class="m-video__play"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
+    </div>
+
     <div class="m-imgs" :style="{ gridTemplateColumns: `repeat(${cols}, 1fr)` }">
       <img
         v-for="(img, i) in displayImages"
@@ -52,6 +57,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import bridge from '../bridge'
 import { defaultAvatar } from '../data/mock'
+import { mediaUrl } from '../storage'
 import { requireLogin } from '../utils/auth'
 
 const props = defineProps({
@@ -64,6 +70,10 @@ const likeCount = ref(props.item.likes || 0)
 
 // 图列表兜底：原 images 数组；空就放占位图（FALLBACK）防 m-imgs 区域空白
 const FALLBACK = import.meta.env.BASE_URL + 'feed_default.jpg'
+const videoCoverUrl = computed(() => {
+  const c = mediaUrl(props.item && props.item.videoCover)
+  return c || FALLBACK
+})
 const displayImages = computed(() => {
   const imgs = props.item && props.item.images
   return Array.isArray(imgs) ? imgs : []
@@ -161,6 +171,35 @@ async function onFollow() {
   color: #444;
   line-height: 1.7;
   margin-top: 6px;
+}
+.m-video {
+  position: relative;
+  margin-top: 10px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 16 / 9;
+  cursor: pointer;
+}
+.m-video__cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.m-video__play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 .m-imgs {
   display: grid;
