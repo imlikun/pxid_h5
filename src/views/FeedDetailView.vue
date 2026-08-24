@@ -3,6 +3,9 @@
     <!-- 顶部 -->
     <TopBar sticky :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
       <template #right>
+        <span class="more press" @click="showReport = true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+        </span>
         <span class="share press" @click="onShare">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
         </span>
@@ -98,21 +101,33 @@
           <div class="cmt__text">{{ c.content }}</div>
           <div class="cmt__foot">
             <span class="cmt__time">{{ c.time }}</span>
+            <span class="cmt__reply" @click="startReply(c)">{{ t('feed.reply') }}</span>
             <span class="cmt__like pop" :class="{ liked: c.isLiked }" @click="onCommentLike(c)">
               <svg viewBox="0 0 24 24" width="14" height="14" :fill="c.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
               <span>{{ c.likes }}</span>
             </span>
+          </div>
+          <div v-if="c.replies && c.replies.length" class="replies">
+            <div v-for="r in c.replies" :key="r.id" class="reply" @click="startReply(c, r)">
+              <img class="reply__avatar" :src="r.avatar || defaultAvatar" :alt="r.author" />
+              <div class="reply__main">
+                <div class="reply__name">{{ r.author }}<span v-if="r.replyTo" class="reply__to"> 回复 {{ r.replyTo }}</span></div>
+                <div class="reply__text">{{ r.content }}</div>
+                <div class="reply__time">{{ r.time }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- 输入栏 -->
       <div class="cinput">
+        <div v-if="replyTo" class="cinput__reply">回复 {{ replyTo.name }} <span class="cinput__cancel" @click="replyTo = null">{{ t('feed.cancel') }}</span></div>
         <input
           ref="commentInput"
           v-model="commentText"
           class="cinput__field"
-          :placeholder="t('feed.inputPlaceholder')"
+          :placeholder="replyTo ? ('回复 ' + replyTo.name + '：') : t('feed.inputPlaceholder')"
           @keyup.enter="submitComment"
         />
         <button class="cinput__send press" @click="submitComment">{{ t('feed.send') }}</button>
@@ -178,6 +193,17 @@
     </button>
   </div>
 
+  <!-- 举报弹层 -->
+  <transition name="fade">
+    <div v-if="showReport" class="sheet-mask" @click="showReport = false">
+      <div class="sheet" @click.stop>
+        <div class="sheet__title">{{ t('feed.reportTitle') }}</div>
+        <div v-for="r in reportReasons" :key="r" class="sheet__item" @click="doReport(r)">{{ r }}</div>
+        <div class="sheet__cancel" @click="showReport = false">{{ t('feed.cancel') }}</div>
+      </div>
+    </div>
+  </transition>
+
   <!-- toast -->
   <transition name="fade">
     <div v-if="toast" class="toast">{{ toast }}</div>
@@ -191,7 +217,7 @@ import { activities } from '../data/mock'
 import { requireLogin } from '../utils/auth'
 import bridge from '../bridge'
 import { t } from '../i18n'
-import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow } from '../api/feed'
+import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds } from '../api/feed'
 import TopBar from '../components/TopBar.vue'
 
 const route = useRoute()
@@ -218,6 +244,22 @@ const toast = ref('')
 let toastTimer = null
 const commentsBox = ref(null)
 const commentInput = ref(null)
+const showReport = ref(false)
+const reportReasons = ['色情低俗', '广告诈骗', '辱骂攻击', '违法违规', '其他']
+const replyTo = ref(null) // { commentId, name }
+function startReply(c, r) {
+  replyTo.value = { commentId: c.id, name: r ? r.author : c.author }
+  nextTick(() => { commentInput.value && commentInput.value.focus() })
+}
+async function doReport(reason) {
+  showReport.value = false
+  try {
+    const r = await reportFeed(id.value, reason)
+    showToast(r && r.ok ? t('feed.toast.reported') : t('feed.toast.reportFail'))
+  } catch (e) {
+    showToast(t('feed.toast.reportFail'))
+  }
+}
 
 // 从接口/mock 加载详情并初始化状态
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同 id 时组件被复用 → 必须监听路由重载，否则“永远同一片”
@@ -240,7 +282,10 @@ async function load() {
         }
       }
     } catch (e) { /* keep null → show empty */ }
-    if (item.value) await loadComments(id.value)
+    if (item.value) {
+      await loadComments(id.value)
+      loadRelated()
+    }
   }
   loading.value = false
 }
@@ -294,8 +339,28 @@ const gridCols = computed(() => {
   return 3
 })
 
-// 相关推荐：暂不展示（后续可从 /feed?tab=recommend 取同车型）
+// 相关推荐：从推荐流取同车型/同标签帖子（排除自身）
+const currentRegion = ref('CN')
 const related = ref([])
+async function loadRelated() {
+  if (!item.value) return
+  try {
+    const list = await fetchFeeds('recommend', { region: currentRegion.value, pageSize: 30 })
+    const cur = item.value
+    const curTags = new Set((cur.tags || []).map(String))
+    const rel = list
+      .filter((it) => it.id !== cur.id && ((cur.carModel && it.carModel === cur.carModel) || (it.tags || []).some((tg) => curTags.has(String(tg)))))
+      .sort((a, b) => (Number(b.likes) || 0) - (Number(a.likes) || 0))
+      .slice(0, 4)
+    related.value = rel.map((it) => ({
+      id: it.id,
+      title: it.title,
+      cover: (it.images && it.images[0]) || it.cover,
+      author: it.author,
+      likes: it.likes || 0,
+    }))
+  } catch (e) { /* 相关推荐失败不影响详情 */ }
+}
 
 // 富文本分段：#车型# / @用户 可点
 const segments = computed(() => {
@@ -446,23 +511,46 @@ async function submitComment() {
     bridge.getUserInfo().catch(() => ({ nickname: t('feed.me'), avatar: '' })),
     bridge.getAuthToken(),
   ])
+  const body = { content: text, nickname: profile.nickname, avatar: profile.avatar }
+  if (replyTo.value) {
+    body.parentCommentId = replyTo.value.commentId
+    body.replyTo = replyTo.value.name
+  }
   try {
     const r = await fetch(`${API_BASE}/feed/${id.value}/comment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ content: text, nickname: profile.nickname, avatar: profile.avatar }),
+      body: JSON.stringify(body),
     })
     const j = await r.json()
     if (j.code === 0 && j.data) {
-      comments.value.unshift({
-        id: j.data.id,
-        author: j.data.author,
-        avatar: j.data.avatar,
-        content: j.data.content,
-        time: formatCommentTime(j.data.createdAt),
-        likes: 0,
-        isLiked: false,
-      })
+      if (replyTo.value) {
+        const parent = comments.value.find((x) => x.id === replyTo.value.commentId)
+        if (parent) {
+          parent.replies = parent.replies || []
+          parent.replies.unshift({
+            id: j.data.id,
+            author: j.data.author,
+            avatar: j.data.avatar,
+            content: j.data.content,
+            replyTo: replyTo.value.name,
+            time: formatCommentTime(j.data.createdAt),
+            likes: 0,
+            isLiked: false,
+          })
+        }
+        replyTo.value = null
+      } else {
+        comments.value.unshift({
+          id: j.data.id,
+          author: j.data.author,
+          avatar: j.data.avatar,
+          content: j.data.content,
+          time: formatCommentTime(j.data.createdAt),
+          likes: 0,
+          isLiked: false,
+        })
+      }
       commentText.value = ''
       showToast(t('feed.toast.commentOk'))
       return
@@ -769,6 +857,33 @@ function showToast(msg) {
   border-radius: var(--radius);
   z-index: 100;
 }
+.more { display: flex; color: var(--text); margin-right: 8px; }
+.cmt__reply { font-size: 12px; color: var(--brand); }
+.replies { margin-top: 10px; background: #f7f8fa; border-radius: 10px; padding: 8px 10px; }
+.reply { display: flex; gap: 8px; padding: 6px 0; }
+.reply__avatar { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex: none; }
+.reply__main { flex: 1; min-width: 0; }
+.reply__name { font-size: 13px; color: var(--text-sub); font-weight: 600; }
+.reply__to { color: var(--brand); font-weight: 400; }
+.reply__text { font-size: 14px; color: #333; line-height: 1.55; margin-top: 2px; }
+.reply__time { font-size: 11px; color: var(--text-hint); margin-top: 3px; }
+.cinput__reply { font-size: 12px; color: var(--text-sub); padding: 0 2px 6px; }
+.cinput__cancel { color: var(--brand); margin-left: 6px; }
+
+/* 举报弹层 */
+.sheet-mask {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4);
+  display: flex; align-items: flex-end; justify-content: center; z-index: 200;
+}
+.sheet {
+  width: 100%; max-width: 480px; background: var(--card);
+  border-radius: 14px 14px 0 0; padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+}
+.sheet__title { text-align: center; font-size: 14px; color: var(--text-hint); padding: 12px 0; border-bottom: 1px solid #f0f1f3; }
+.sheet__item { text-align: center; font-size: 16px; color: var(--text); padding: 14px 0; border-bottom: 1px solid #f0f1f3; }
+.sheet__item:active { background: #f5f5f7; }
+.sheet__cancel { text-align: center; font-size: 16px; color: var(--text-sub); font-weight: 600; padding: 14px 0; }
+
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

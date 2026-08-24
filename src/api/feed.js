@@ -133,13 +133,13 @@ export async function likeFeed(id) {
 }
 
 // ---- 评论 ----
-export async function commentFeed(id, text) {
+export async function commentFeed(id, text, { parentCommentId = 0, replyTo = '' } = {}) {
   if (!FEED_API) return { ok: false }
   try {
-    // 后端评论字段名是 content（非 text）
+    // 后端评论字段名是 content（非 text）；parentCommentId>0 为楼中楼回复
     const data = await request('/feed/' + id + '/comment', {
       method: 'POST',
-      body: { content: text },
+      body: { content: text, parentCommentId, replyTo },
     })
     return { ok: true, data }
   } catch (e) {

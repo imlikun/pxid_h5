@@ -74,6 +74,11 @@ const messages = {
     'feed.inputPlaceholder': '说点什么…',
     'feed.send': '发送',
     'feed.related': '相关推荐',
+    'feed.reply': '回复',
+    'feed.reportTitle': '举报内容',
+    'feed.cancel': '取消',
+    'feed.sort.latest': '最新',
+    'feed.sort.hot': '最热',
     'feed.notFound': '内容不存在或已下架',
     'feed.back': '返回',
     'feed.collect.collected': '已收藏',
@@ -98,6 +103,8 @@ const messages = {
     'feed.toast.signupOpen': '已打开报名',
     'feed.toast.commentOk': '评论成功',
     'feed.toast.commentFail': '评论失败',
+    'feed.toast.reported': '举报已提交，感谢反馈',
+    'feed.toast.reportFail': '举报提交失败',
 
     // ============ 搜索 ============
     'search.placeholder': '搜索内容 / 活动 / 车型',
@@ -231,6 +238,11 @@ const messages = {
     'feed.inputPlaceholder': 'Say something…',
     'feed.send': 'Send',
     'feed.related': 'Related',
+    'feed.reply': 'Reply',
+    'feed.reportTitle': 'Report content',
+    'feed.cancel': 'Cancel',
+    'feed.sort.latest': 'Latest',
+    'feed.sort.hot': 'Hottest',
     'feed.notFound': 'Content not found or removed',
     'feed.back': 'Back',
     'feed.collect.collected': 'Saved',
@@ -254,6 +266,8 @@ const messages = {
     'feed.toast.signupOpen': 'Sign-up opened',
     'feed.toast.commentOk': 'Comment posted',
     'feed.toast.commentFail': 'Failed to comment',
+    'feed.toast.reported': 'Report submitted',
+    'feed.toast.reportFail': 'Failed to report',
 
     // ============ Search ============
     'search.placeholder': 'Search posts / events / models',
@@ -387,6 +401,11 @@ const messages = {
     'feed.inputPlaceholder': 'Diga algo…',
     'feed.send': 'Enviar',
     'feed.related': 'Relacionados',
+    'feed.reply': 'Responder',
+    'feed.reportTitle': 'Denunciar conteúdo',
+    'feed.cancel': 'Cancelar',
+    'feed.sort.latest': 'Mais recentes',
+    'feed.sort.hot': 'Populares',
     'feed.notFound': 'Conteúdo não encontrado ou removido',
     'feed.back': 'Voltar',
     'feed.collect.collected': 'Salvo',
@@ -410,6 +429,8 @@ const messages = {
     'feed.toast.signupOpen': 'Inscrição aberta',
     'feed.toast.commentOk': 'Comentário enviado',
     'feed.toast.commentFail': 'Falha ao comentar',
+    'feed.toast.reported': 'Denúncia enviada',
+    'feed.toast.reportFail': 'Falha ao denunciar',
 
     // ============ Search ============
     'search.placeholder': 'Buscar posts / eventos / modelos',

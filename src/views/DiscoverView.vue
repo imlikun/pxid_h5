@@ -84,7 +84,7 @@
           >{{ filterLabel(f) }}</span
         >
       </div>
-      <span class="sort" @click="onSort">
+      <span class="sort" :class="{ on: sortMode === 'hot' }" @click="onSort">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m11 12 4 4 4-4"/><path d="M15 20V4"/></svg>
       </span>
     </div>
@@ -186,6 +186,7 @@ const bannerUrl = computed(() => (bannerList.value[0] && bannerList.value[0].url
 const tabs = discoverTabs
 const activeTab = ref('推荐')
 const activeFilter = ref('全部')
+const sortMode = ref('latest')
 
 // ---- 地区（PRD 硬限定：CN / BR / US，3 国互不交叉）----
 const regionOptions = [
@@ -224,21 +225,33 @@ const currentFilters = computed(() => {
   return ['最新', ...cars]
 })
 
-// 置顶优先：pinned 的帖子排到列表最前，其余保持原顺序
-function sortPinned(list) {
-  return [...list].sort((a, b) => Number(b.pinned ? 1 : 0) - Number(a.pinned ? 1 : 0))
+// 置顶优先 + 排序（最新/最热）：pinned 始终在前，组内按模式排序
+function tsOf(i) {
+  const v = i.createdAt || i.created_at || 0
+  if (!v) return 0
+  const t = new Date(v).getTime()
+  return isNaN(t) ? 0 : t
 }
-// 推荐：按车型筛选 + 置顶优先
+function rankList(list) {
+  return [...list].sort((a, b) => {
+    const pa = Number(a.pinned ? 1 : 0)
+    const pb = Number(b.pinned ? 1 : 0)
+    if (pa !== pb) return pb - pa
+    if (sortMode.value === 'hot') return (Number(b.likes) || 0) - (Number(a.likes) || 0)
+    return tsOf(b) - tsOf(a)
+  })
+}
+// 推荐：按车型筛选 + 置顶优先 + 排序
 const recommendList = computed(() => {
   const f = activeFilter.value
   const list = f === '全部' ? recommendData.value : recommendData.value.filter((i) => i.carModel === f)
-  return sortPinned(list)
+  return rankList(list)
 })
-// 动态：按车型筛选，最新=全部 + 置顶优先
+// 动态：按车型筛选，最新=全部 + 置顶优先 + 排序
 const dynamicList = computed(() => {
   const f = activeFilter.value
   const list = f === '最新' ? dynamicData.value : dynamicData.value.filter((i) => i.carModel === f)
-  return sortPinned(list)
+  return rankList(list)
 })
 
 // 官方公告未读数（驱动发现页快捷区红点）
@@ -355,7 +368,10 @@ function onQuick(q) {
   if (q.key === 'custom') { bridge.openNative('purchase/customize'); return }
   if (q.key === 'points') { router.push('/points'); return }
 }
-function onSort() { /* TODO: 排序逻辑（最新/最热） */ }
+function onSort() {
+  sortMode.value = sortMode.value === 'latest' ? 'hot' : 'latest'
+  showToast(sortMode.value === 'hot' ? t('discover.sort.hot') : t('discover.sort.latest'))
+}
 function onShowcase(p) {
   // 决策 8：车型卡跳购车车型页（原生承载）
   bridge.openNative('vehicle/' + p.id)

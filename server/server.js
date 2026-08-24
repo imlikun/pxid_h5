@@ -144,6 +144,16 @@ CREATE TABLE IF NOT EXISTS reports (
   handled_at TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS comment_replies (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  feed_id INTEGER NOT NULL,
+  parent_comment_id INTEGER NOT NULL,
+  nickname TEXT NOT NULL DEFAULT '',
+  avatar TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
+  reply_to TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS moderation_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   feed_id INTEGER NOT NULL DEFAULT 0,
@@ -497,7 +507,7 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
 app.post('/feed/:id/comment', requireAuth, (req, res) => {
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(req.params.id)
   if (!row) return res.json(err(404, '动态不存在'))
-  const { content, nickname = '骑友', avatar = '' } = req.body || {}
+  const { content, nickname = '骑友', avatar = '', parentCommentId = 0, replyTo = '' } = req.body || {}
   const text = String(content || '').trim()
   if (!text) return res.json(err(1, '评论内容不能为空'))
   // 内容安全①：本地词库同步拦截（评论同样「有违禁词发不出」）
@@ -505,6 +515,15 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
   if (!mc.pass) {
     moderation.logLocalBlock(db, row.id, text, mc.words)
     return res.json(err(1, '评论包含违禁词「' + mc.words.slice(0, 5).join('、') + '」，请修改后发送'))
+  }
+  // 楼中楼：回复某条一级评论 → 写 comment_replies
+  if (parentCommentId) {
+    const info = db
+      .prepare(`INSERT INTO comment_replies (feed_id, parent_comment_id, nickname, avatar, content, reply_to, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(row.id, Number(parentCommentId) || 0, String(nickname).slice(0, 20), String(avatar || ''), text.slice(0, 500), String(replyTo || '').slice(0, 20), now())
+    const c = db.prepare('SELECT * FROM comment_replies WHERE id=?').get(info.lastInsertRowid)
+    res.json(ok({ id: c.id, author: c.nickname, avatar: c.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))
+    return
   }
   const info = db
     .prepare(`INSERT INTO comments (feed_id, nickname, avatar, content, created_at) VALUES (?, ?, ?, ?, ?)`)
@@ -520,7 +539,27 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
 
 app.get('/feed/:id/comments', (req, res) => {
   const rows = db.prepare('SELECT * FROM comments WHERE feed_id=? ORDER BY id ASC').all(req.params.id)
-  res.json(ok({ list: rows.map((c) => ({ id: c.id, author: c.nickname, avatar: c.avatar, content: c.content, createdAt: c.created_at, time: c.created_at })) }))
+  const replyRows = db.prepare('SELECT * FROM comment_replies WHERE feed_id=? ORDER BY id ASC').all(req.params.id)
+  const replyMap = {}
+  replyRows.forEach((r) => {
+    ;(replyMap[r.parent_comment_id] = replyMap[r.parent_comment_id] || []).push(r)
+  })
+  res.json(ok({
+    list: rows.map((c) => {
+      const replies = (replyMap[c.id] || []).map((r) => ({
+        id: r.id,
+        author: r.nickname,
+        avatar: r.avatar,
+        content: r.content,
+        replyTo: r.reply_to,
+        createdAt: r.created_at,
+        time: r.created_at,
+        likes: 0,
+        isLiked: false,
+      }))
+      return { id: c.id, author: c.nickname, avatar: c.avatar, content: c.content, createdAt: c.created_at, time: c.created_at, replies }
+    }),
+  }))
 })
 
 // ============================================================
