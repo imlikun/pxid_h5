@@ -623,7 +623,7 @@ function showToast(msg) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 16px 12px 0;
+  margin: 12px 12px 0;
   gap: 8px;
 }
 .chips {
@@ -633,18 +633,18 @@ function showToast(msg) {
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding: 6px 4px;
+  padding: 4px 2px;
 }
 .chips::-webkit-scrollbar { display: none; }
 .chip {
   font-size: 13px;
   color: var(--text-sub);
-  line-height: 1.4;
+  line-height: 1.3;
   white-space: nowrap;
-  padding: 7px 14px;
-  border-radius: 20px;
+  padding: 6px 14px;
+  border-radius: 16px;
   background: #F5F5F7;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   font-weight: 500;
   flex-shrink: 0;
 }
@@ -658,12 +658,12 @@ function showToast(msg) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   flex: none;
-  border-radius: 50%;
+  border-radius: 16px;
   background: #F5F5F7;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 .content {
   margin-top: 16px;
@@ -786,22 +786,20 @@ function showToast(msg) {
 .subtabs {
   display: flex;
   gap: 8px;
-  padding: 12px 16px 4px;
+  padding: 10px 12px 0;
 }
 .subtab {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-sub);
-  background: var(--bg);
-  border: 1px solid var(--line);
+  background: #F5F5F7;
   border-radius: 16px;
-  padding: 6px 16px;
+  padding: 6px 14px;
   font-weight: 500;
   transition: all 0.15s ease;
 }
 .subtab.active {
   color: #fff;
   background: var(--brand);
-  border-color: var(--brand);
 }
 .subtab:active { transform: scale(0.96); }
 </style>
