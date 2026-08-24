@@ -57,7 +57,36 @@
         <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" @change="onPick" />
         <div class="hint">{{ uploading ? t('publish.uploading') : t('publish.uploadTip') }}</div>
       </div>
+
+      <!-- 发布选项：位置 + @提到 -->
+      <div class="card section opts">
+        <button class="opt" :class="{ on: located }" @click="onLocate" :disabled="locating">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          {{ locating ? '…' : (located ? t('publish.locationOn') : t('publish.location')) }}
+        </button>
+        <button class="opt" @click="openMention">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>
+          {{ t('publish.mention') }}
+        </button>
+        <div v-if="mentions.length" class="mtags">
+          <span v-for="m in mentions" :key="m.deviceId" class="mtag">@{{ m.nickname }}</span>
+        </div>
+      </div>
     </div>
+
+    <!-- @选人弹层 -->
+    <transition name="fade">
+      <div v-if="showMention" class="sheet-mask" @click="showMention = false">
+        <div class="sheet" @click.stop>
+          <div class="sheet__title">{{ t('publish.mentionTitle') }}</div>
+          <div class="sheet__list">
+            <div v-for="u in mentionUsers" :key="u.deviceId" class="sheet__item" @click="pickMention(u)">{{ u.nickname }}</div>
+            <div v-if="!mentionUsers.length" class="sheet__empty">{{ t('publish.mentionEmpty') }}</div>
+          </div>
+          <div class="sheet__cancel" @click="showMention = false">{{ t('feed.cancel') }}</div>
+        </div>
+      </div>
+    </transition>
 
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
@@ -71,6 +100,7 @@ import { useRouter } from 'vue-router'
 import { carModels } from '../data/mock'
 import bridge from '../bridge'
 import { t } from '../i18n'
+import { fetchFeedUsers } from '../api/feed'
 import TopBar from '../components/TopBar.vue'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
@@ -83,6 +113,73 @@ const carModel = ref('')
 // 已选图片：{ file, url(本地预览), uploadedUrl, uploading }
 const picked = ref([])
 const uploading = ref(false)
+
+// 定位（附近 LBS）与 @提到 状态
+const lat = ref(null)
+const lng = ref(null)
+const located = ref(false)
+const locating = ref(false)
+const showMention = ref(false)
+const mentionUsers = ref([])
+const mentions = ref([]) // [{ deviceId, nickname }]
+
+async function getRegion() {
+  try {
+    const reg = await bridge.getRegion()
+    if (['CN', 'BR', 'US'].includes(String(reg).toUpperCase())) return String(reg).toUpperCase()
+  } catch (e) {}
+  return 'US'
+}
+
+async function getLocation() {
+  // 优先原生桥（Flutter 注入坐标），降级浏览器 geolocation
+  try {
+    const loc = await bridge.getLocation()
+    if (loc && loc.lat != null && loc.lng != null) return loc
+  } catch (e) {}
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 8000 }
+    )
+  })
+}
+
+async function onLocate() {
+  if (located.value) {
+    located.value = false
+    lat.value = null
+    lng.value = null
+    return
+  }
+  locating.value = true
+  const loc = await getLocation()
+  locating.value = false
+  if (loc) {
+    lat.value = loc.lat
+    lng.value = loc.lng
+    located.value = true
+  } else {
+    showToast(t('publish.locationFail'))
+  }
+}
+
+async function openMention() {
+  const region = await getRegion()
+  const list = await fetchFeedUsers(region)
+  mentionUsers.value = list
+  showMention.value = true
+}
+
+function pickMention(u) {
+  if (!mentions.value.find((m) => m.deviceId === u.deviceId)) {
+    mentions.value.push({ deviceId: u.deviceId, nickname: u.nickname })
+  }
+  content.value = (content.value ? content.value + ' ' : '') + '@' + u.nickname + ' '
+  showMention.value = false
+}
 
 const canPost = computed(() => content.value.trim().length > 0 && !uploading.value)
 
@@ -158,11 +255,7 @@ async function onPublish() {
     // 2) 带 token + 当前地区发帖
     const token = await bridge.getToken()
     if (!token) { showToast(t('publish.needLogin')); uploading.value = false; return }
-    let region = 'US'
-    try {
-      const reg = await bridge.getRegion()
-      if (['CN', 'BR', 'US'].includes(String(reg).toUpperCase())) region = String(reg).toUpperCase()
-    } catch (e) { /* 默认 US */ }
+    const region = await getRegion()
     const cm = carModel.value || ''
     const r = await fetch(API_BASE + '/feed', {
       method: 'POST',
@@ -175,6 +268,9 @@ async function onPublish() {
         region,
         nickname: '骑友',
         deviceId: await bridge.getDeviceId(),
+        lat: lat.value,
+        lng: lng.value,
+        mentions: mentions.value.map((m) => m.nickname),
       }),
     })
     const j = await r.json()

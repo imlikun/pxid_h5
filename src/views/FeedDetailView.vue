@@ -395,9 +395,13 @@ function segClass(seg) {
   if (seg.t === 'at') return 'seg seg--at'
   return 'seg'
 }
+function onAt(name) {
+  // @用户：用户主页归 Flutter 原生承载；原生未实现时静默（H5 暂无用户页）
+  bridge.openNative('user/' + encodeURIComponent(name))
+}
 function segClick(seg) {
   if (seg.t === 'car') onCar(seg.v)
-  else if (seg.t === 'at') console.log('tap user:', seg.v)
+  else if (seg.t === 'at') onAt(seg.v)
 }
 
 function onCar(model) {

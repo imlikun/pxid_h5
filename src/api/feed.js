@@ -53,8 +53,8 @@ export async function fetchFeeds(tab = 'dynamic', params = {}) {
   if (FEED_API) {
     try {
       const qsParams = { tab, ...params }
-      // 动态：关注流，传当前设备 ID 让后端按「关注 + 官方」过滤
-      if (tab === 'dynamic') qsParams.followerDevice = getDeviceId()
+      // 动态：关注流，传当前设备 ID 让后端按「关注 + 官方」过滤；near 模式显式传 followerDevice='' 则不过滤
+      if (tab === 'dynamic' && params.followerDevice === undefined) qsParams.followerDevice = getDeviceId()
       const qs = new URLSearchParams(qsParams).toString()
       const data = await request('/feed?' + qs)
       return (data.list || []).map(normalize)
@@ -246,5 +246,17 @@ export async function reportFeed(id, reason) {
     return { ok: true }
   } catch (e) {
     return { ok: false, message: e.message || '举报失败' }
+  }
+}
+
+// ---- 活跃用户（@话题选人）----
+export async function fetchFeedUsers(region = '') {
+  if (!FEED_API) return []
+  try {
+    const qs = region ? '?region=' + encodeURIComponent(region) : ''
+    const data = await request('/feed/users' + qs)
+    return data.list || []
+  } catch (e) {
+    return []
   }
 }

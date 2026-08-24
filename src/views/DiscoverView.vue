@@ -101,16 +101,23 @@
       </div>
     </div>
 
-    <!-- 动态：独立 UGC 流（单列卡片） -->
-    <div v-else-if="activeTab === '动态'" class="content">
-      <MomentCard
-        v-for="(it, i) in dynamicList"
-        :key="it.id"
-        :item="it"
-        :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
-      />
-      <div v-if="dynamicList.length === 0" class="empty-tab">{{ t('discover.emptyDynamic') }}</div>
-    </div>
+    <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 -->
+    <template v-else-if="activeTab === '动态'">
+      <div class="subtabs">
+        <span class="subtab" :class="{ active: dynamicSubtab === 'follow' }" @click="setDynamicSub('follow')">{{ t('discover.subFollow') }}</span>
+        <span class="subtab" :class="{ active: dynamicSubtab === 'near' }" @click="setDynamicSub('near')">{{ t('discover.subNear') }}</span>
+      </div>
+      <div class="content">
+        <MomentCard
+          v-for="(it, i) in dynamicList"
+          :key="it.id"
+          :item="it"
+          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+        />
+        <div v-if="nearLoading" class="empty-tab">{{ t('discover.nearLoading') }}</div>
+        <div v-else-if="dynamicList.length === 0" class="empty-tab">{{ t('discover.emptyDynamic') }}</div>
+      </div>
+    </template>
 
     <!-- 广场：车型展示 + 热门活动 -->
     <div v-else-if="activeTab === '广场'" class="content">
@@ -212,6 +219,10 @@ function filterLabel(f) {
 // 真实数据源（从 /feed 接口拉取）
 const recommendData = ref([])
 const dynamicData = ref([])
+// 动态「附近」子栏：LBS 坐标流 + 加载态
+const dynamicSubtab = ref('follow')
+const nearList = ref([])
+const nearLoading = ref(false)
 // 广场热门活动（从 /activities 接口拉取，随地区切换）
 const actList = ref([])
 const loading = ref(false)
@@ -247,10 +258,11 @@ const recommendList = computed(() => {
   const list = f === '全部' ? recommendData.value : recommendData.value.filter((i) => i.carModel === f)
   return rankList(list)
 })
-// 动态：按车型筛选，最新=全部 + 置顶优先 + 排序
+// 动态：按车型筛选，最新=全部 + 置顶优先 + 排序；附近子栏用 nearList
 const dynamicList = computed(() => {
+  const src = dynamicSubtab.value === 'near' ? nearList.value : dynamicData.value
   const f = activeFilter.value
-  const list = f === '最新' ? dynamicData.value : dynamicData.value.filter((i) => i.carModel === f)
+  const list = f === '最新' || f === '全部' ? src : src.filter((i) => i.carModel === f)
   return rankList(list)
 })
 
@@ -309,6 +321,11 @@ async function switchRegion(code) {
   currentRegion.value = code
   regionHint.value = ''
   await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities()])
+  // 切地区后「附近」子栏数据失效，重置回关注流避免显示旧区坐标流
+  if (dynamicSubtab.value === 'near') {
+    dynamicSubtab.value = 'follow'
+    nearList.value = []
+  }
 }
 
 // 发现页 banner：拉运营后台配置的 banner（status=on），点击跳 banner.url
@@ -368,6 +385,51 @@ function onQuick(q) {
   if (q.key === 'custom') { bridge.openNative('purchase/customize'); return }
   if (q.key === 'points') { router.push('/points'); return }
 }
+// 取本机坐标：优先原生桥（Flutter 注入），降级浏览器 geolocation
+async function getLocation() {
+  try {
+    const loc = await bridge.getLocation()
+    if (loc && loc.lat != null && loc.lng != null) return loc
+  } catch (e) {}
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 8000 }
+    )
+  })
+}
+
+// 动态子栏切换：关注（默认关注流）/ 附近（LBS 距离流）
+async function setDynamicSub(sub) {
+  if (dynamicSubtab.value === sub) return
+  dynamicSubtab.value = sub
+  if (sub === 'near') {
+    nearLoading.value = true
+    const loc = await getLocation()
+    if (!loc) {
+      nearLoading.value = false
+      showToast(t('discover.nearFail'))
+      dynamicSubtab.value = 'follow'
+      return
+    }
+    try {
+      const list = await fetchFeeds('dynamic', {
+        near: loc.lat + ',' + loc.lng,
+        radius: 50,
+        followerDevice: '',
+        region: currentRegion.value,
+        pageSize: 30,
+      })
+      nearList.value = list
+    } catch (e) {
+      nearList.value = []
+    }
+    nearLoading.value = false
+  }
+}
+
 function onSort() {
   sortMode.value = sortMode.value === 'latest' ? 'hot' : 'latest'
   showToast(sortMode.value === 'hot' ? t('discover.sort.hot') : t('discover.sort.latest'))
@@ -722,4 +784,25 @@ function showToast(msg) {
 }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+.subtabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 4px;
+}
+.subtab {
+  font-size: 14px;
+  color: var(--text-sub);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 6px 16px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+.subtab.active {
+  color: #fff;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.subtab:active { transform: scale(0.96); }
 </style>

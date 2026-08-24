@@ -89,6 +89,11 @@ const mockBridge = {
       return Promise.resolve('h5-anon')
     }
   },
+  getLocation() {
+    logMock('getLocation')
+    // H5 侧走浏览器定位，原生未注入时返回 null 由上层降级
+    return Promise.resolve(null)
+  },
 
   // 取当前登录用户信息（昵称/头像），用于评论/互动带身份
   // 真机由 Flutter 注入真实实现；H5 预览用默认游客态
@@ -223,6 +228,7 @@ export const bridge = {
   callPhone: (p) => window.PXIDBridge.callPhone(p),
   openMap: (o) => window.PXIDBridge.openMap(o),
   openNative: (p) => window.PXIDBridge.openNative(p),
+  getLocation: () => window.PXIDBridge.getLocation(),
   openShopify: (u) => window.PXIDBridge.openShopify(u),
   openCheckout: (lines) => window.PXIDBridge.openCheckout(lines),
 }

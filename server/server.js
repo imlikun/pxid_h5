@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS feeds (
   tags TEXT NOT NULL DEFAULT '[]',
   car_model TEXT NOT NULL DEFAULT '',
   likes INTEGER NOT NULL DEFAULT 0,
+  lat REAL,
+  lng REAL,
+  mentions TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS comments (
@@ -79,6 +82,9 @@ addCol('updated_at', 'TEXT')
 addCol('operator', "TEXT NOT NULL DEFAULT ''") // 操作人（审计）
 addCol('cover', "TEXT NOT NULL DEFAULT ''") // 封面图 URL
 addCol('region_code', "TEXT NOT NULL DEFAULT 'US'") // 地区（CN/BR/US，US 为全球公共池，对齐 ToC）
+addCol('lat', 'REAL') // 发布定位纬度（附近 LBS 用）
+addCol('lng', 'REAL') // 发布定位经度
+addCol('mentions', "TEXT NOT NULL DEFAULT '[]'") // @话题：被提及用户昵称数组 JSON
 
 // ---- 精选（Shopify）订单回流映射表 ----
 db.exec(`
@@ -319,6 +325,9 @@ function rowToFeed(r) {
     updatedAt: r.updated_at || '',
     operator: r.operator || '',
     regionCode: r.region_code || 'US',
+    lat: r.lat != null ? Number(r.lat) : null,
+    lng: r.lng != null ? Number(r.lng) : null,
+    mentions: safeJsonArr(r.mentions).map((m) => String(m)),
   }
 }
 
@@ -412,7 +421,7 @@ app.post('/auth/token', (req, res) => {
 
 // ---- 动态流 ----
 app.get('/feed', (req, res) => {
-  const { tab = 'dynamic', carModel, page = 1, pageSize = 20, offset, followerDevice, region } = req.query
+  const { tab = 'dynamic', carModel, page = 1, pageSize = 20, offset, followerDevice, region, near, radius = 50 } = req.query
   const cm = carModel && carModel !== '全部' && carModel !== '最新' ? carModel : ''
   // 地区过滤：CN/BR/US，US 为全球公共池；请求某区时显示该区 + US 帖（三区均可见全球内容）
   const reg = String(region || '').toUpperCase()
@@ -430,6 +439,30 @@ app.get('/feed', (req, res) => {
     if (cm) { w += ' AND car_model = ?'; args.push(cm) }
   }
   if (regFiltered) { w += " AND region_code IN (?, 'US')"; args.push(regFiltered) }
+  // 附近 LBS：near=lat,lng（半径 radius km，默认 50）。SQLite 无三角函数，JS 算距离，数据量小内存筛
+  let nearLat = null, nearLng = null
+  const nearRad = Math.max(0.1, Number(radius) || 50)
+  if (near && /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(near))) {
+    const p = String(near).split(',').map(Number)
+    nearLat = p[0]; nearLng = p[1]
+  }
+  if (nearLat != null) {
+    const cand = db.prepare(`SELECT * FROM feeds ${w}`).all(...args)
+    const R = 6371, rad = (d) => (d * Math.PI) / 180
+    const withDist = cand
+      .filter((r) => r.lat != null && r.lng != null)
+      .map((r) => {
+        const dLat = rad(r.lat - nearLat), dLng = rad(r.lng - nearLng)
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(nearLat)) * Math.cos(rad(r.lat)) * Math.sin(dLng / 2) ** 2
+        return { r, d: R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) }
+      })
+      .filter((x) => x.d <= nearRad)
+      .sort((a, b) => a.d - b.d)
+    const ps = Math.min(50, Math.max(1, parseInt(pageSize) || 20))
+    const off = offset !== undefined ? Math.max(0, parseInt(offset) || 0) : (Math.max(1, parseInt(page) || 1) - 1) * ps
+    const rows = withDist.slice(off, off + ps).map((x) => x.r)
+    return res.json(ok({ total: withDist.length, list: rows.map(rowToFeed), tab, near: true }))
+  }
   const total = db.prepare(`SELECT COUNT(*) c FROM feeds ${w}`).get(...args).c
   const ps = Math.min(50, Math.max(1, parseInt(pageSize) || 20))
   // 分页：前端动态流用 offset，其余用 page；二者兼容
@@ -444,9 +477,28 @@ app.get('/feed', (req, res) => {
   res.json(ok({ total, list: rows.map(rowToFeed), tab }))
 })
 
+// ---- 活跃用户（@话题选人用；返回最近发帖去重的 deviceId/nickname/avatar）----
+app.get('/feed/users', (req, res) => {
+  const { region } = req.query
+  const reg = ['CN', 'BR', 'US'].includes(String(region || '').toUpperCase()) ? String(region).toUpperCase() : ''
+  let w = `WHERE status='published'`
+  const args = []
+  if (reg) { w += " AND region_code IN (?, 'US')"; args.push(reg) }
+  const rows = db.prepare(`SELECT device_id, nickname, avatar FROM feeds ${w} ORDER BY id DESC LIMIT 300`).all(...args)
+  const seen = new Set()
+  const list = []
+  for (const r of rows) {
+    if (!r.device_id || seen.has(r.device_id)) continue
+    seen.add(r.device_id)
+    list.push({ deviceId: r.device_id, nickname: String(r.nickname || '骑友'), avatar: r.avatar || '' })
+    if (list.length >= 30) break
+  }
+  res.json(ok({ list }))
+})
+
 // ---- 发帖（用户侧，kind=user）----
 app.post('/feed', requireAuth, (req, res) => {
-  const { content, images = [], carModel = '', tags = [], nickname = '骑友', avatar = '', region = 'US' } = req.body || {}
+  const { content, images = [], carModel = '', tags = [], nickname = '骑友', avatar = '', region = 'US', lat, lng, mentions = [] } = req.body || {}
   // 安全：deviceId 以 token 内可信值为准（P0-1/P1-4），未配 USER_TOKEN_SECRET 时降级用 body 传值
   const deviceId = (USER_TOKEN_SECRET && req.user && req.user.deviceId) || String(req.body.deviceId || '')
   const text = String(content || '').trim()
@@ -461,8 +513,8 @@ app.post('/feed', requireAuth, (req, res) => {
   const reg = ['CN', 'BR', 'US'].includes(String(region).toUpperCase()) ? String(region).toUpperCase() : 'US'
   const info = db
     .prepare(
-      `INSERT INTO feeds (nickname, device_id, avatar, content, images, tags, car_model, region_code, created_at, kind, status, operator)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'published', '')`
+      `INSERT INTO feeds (nickname, device_id, avatar, content, images, tags, car_model, region_code, lat, lng, mentions, created_at, kind, status, operator)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'published', '')`
     )
     .run(
       String(nickname).slice(0, 20),
@@ -473,6 +525,9 @@ app.post('/feed', requireAuth, (req, res) => {
       JSON.stringify((tags || []).slice(0, 5)),
       String(carModel || ''),
       reg,
+      lat != null && lat !== '' ? Number(lat) : null,
+      lng != null && lng !== '' ? Number(lng) : null,
+      JSON.stringify(Array.isArray(mentions) ? mentions.slice(0, 20) : []),
       now()
     )
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(info.lastInsertRowid)
