@@ -283,6 +283,9 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_notif_device ON notifications(device_id, id DESC);
 `)
+// 真身份通知适配：接收者支持 member_user_id（ToC 维度），与 device_id 并存；兼容已上线旧库
+try { db.exec("ALTER TABLE notifications ADD COLUMN member_user_id TEXT NOT NULL DEFAULT ''") } catch (_) {}
+try { db.exec("CREATE INDEX IF NOT EXISTS idx_notif_member ON notifications(member_user_id, id DESC)") } catch (_) {}
 
 // 启动种子：演示互动消息（device_id='__demo__' 对所有登录用户可见，便于先看效果）
 ;(function seedDemoNotifications() {
@@ -599,7 +602,7 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
   db.prepare('UPDATE feeds SET likes=? WHERE id=?').run(Math.max(0, likes), row.id)
   // 互动消息：点赞通知作者（不通知自己）
   if (liked && row.device_id && row.device_id !== deviceId) {
-    emitNotification({ deviceId: row.device_id, type: 'like', actorDevice: deviceId, actorName: String(nickname || ''), targetType: 'feed', targetId: row.id, content: '赞了你的动态' })
+    emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'like', actorDevice: deviceId, actorName: String(nickname || ''), targetType: 'feed', targetId: row.id, content: '赞了你的动态' })
   }
   res.json(ok({ isLiked: !!liked, likes: Math.max(0, likes) }))
 })
@@ -633,7 +636,7 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
   const deviceId = (req.user && req.user.deviceId) || ''
   // 互动消息：评论通知作者（不通知自己）
   if (row.device_id && row.device_id !== deviceId) {
-    emitNotification({ deviceId: row.device_id, type: 'comment', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '评论了你的动态：' + text.slice(0, 40) })
+    emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'comment', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '评论了你的动态：' + text.slice(0, 40) })
   }
   res.json(ok({ id: c.id, author: c.nickname, avatar: c.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))
 })
@@ -667,27 +670,33 @@ app.get('/feed/:id/comments', (req, res) => {
 // 互动消息（通知）接口
 // ============================================================
 // 辅助：写入一条通知（永不抛错，避免影响主业务）
-function emitNotification({ deviceId, type, actorDevice = '', actorName = '', actorAvatar = '', targetType = '', targetId = '', content = '' }) {
+function emitNotification({ deviceId = '', memberUserId = '', type, actorDevice = '', actorName = '', actorAvatar = '', targetType = '', targetId = '', content = '' }) {
   try {
-    if (!deviceId) return
+    if (!deviceId && !memberUserId) return
     db.prepare(
-      'INSERT INTO notifications (device_id, type, actor_device, actor_name, actor_avatar, target_type, target_id, content, read, created_at) VALUES (?,?,?,?,?,?,?,?,0,?)'
-    ).run(deviceId, type, actorDevice, actorName, actorAvatar, targetType, String(targetId || ''), String(content || ''), now())
+      'INSERT INTO notifications (device_id, member_user_id, type, actor_device, actor_name, actor_avatar, target_type, target_id, content, read, created_at) VALUES (?,?,?,?,?,?,?,?,?,0,?)'
+    ).run(String(deviceId || ''), String(memberUserId || ''), type, actorDevice, actorName, actorAvatar, targetType, String(targetId || ''), String(content || ''), now())
   } catch (e) {
     console.error('[pxid-feed] emitNotification failed:', e.message || e)
   }
 }
 
-// 可见通知范围：自己的 + 全局演示（__demo__）
-function visibleNotifClause(device) {
-  return { clause: "device_id = ? OR device_id = '__demo__'", args: [device] }
+// 可见通知范围：真身份(member_user_id) + 演示态(device_id) + 全局演示(__demo__)
+function visibleNotifClause(memberUserId, device) {
+  const parts = []
+  const args = []
+  if (memberUserId) { parts.push('member_user_id = ?'); args.push(memberUserId) }
+  if (device) { parts.push('device_id = ?'); args.push(device) }
+  parts.push("device_id = '__demo__'")
+  return { clause: parts.join(' OR '), args }
 }
 
 // 通知列表
 app.get('/notifications', requireAuth, (req, res) => {
+  const memberUserId = req.user && req.user.memberUserId
   const device = req.user && req.user.deviceId
-  if (!device) return res.json(err(401, '未授权'))
-  const vc = visibleNotifClause(device)
+  if (!memberUserId && !device) return res.json(err(401, '未授权'))
+  const vc = visibleNotifClause(memberUserId, device)
   const rows = db
     .prepare(`SELECT * FROM notifications WHERE ${vc.clause} ORDER BY id DESC LIMIT 100`)
     .all(...vc.args)
@@ -707,26 +716,29 @@ app.get('/notifications', requireAuth, (req, res) => {
 
 // 未读计数
 app.get('/notifications/unread-count', requireAuth, (req, res) => {
+  const memberUserId = req.user && req.user.memberUserId
   const device = req.user && req.user.deviceId
-  if (!device) return res.json(err(401, '未授权'))
-  const vc = visibleNotifClause(device)
+  if (!memberUserId && !device) return res.json(err(401, '未授权'))
+  const vc = visibleNotifClause(memberUserId, device)
   const row = db.prepare(`SELECT COUNT(*) c FROM notifications WHERE (${vc.clause}) AND read=0`).get(...vc.args)
   res.json(ok({ count: row.c }))
 })
 
 // 标记单条已读（仅自己的，演示数据不标记）
 app.post('/notifications/:id/read', requireAuth, (req, res) => {
+  const memberUserId = req.user && req.user.memberUserId
   const device = req.user && req.user.deviceId
-  if (!device) return res.json(err(401, '未授权'))
-  db.prepare("UPDATE notifications SET read=1 WHERE id=? AND device_id=?").run(req.params.id, device)
+  if (!memberUserId && !device) return res.json(err(401, '未授权'))
+  db.prepare("UPDATE notifications SET read=1 WHERE id=? AND (device_id=? OR member_user_id=?)").run(req.params.id, String(device || ''), String(memberUserId || ''))
   res.json(ok({}))
 })
 
 // 全部已读
 app.post('/notifications/read-all', requireAuth, (req, res) => {
+  const memberUserId = req.user && req.user.memberUserId
   const device = req.user && req.user.deviceId
-  if (!device) return res.json(err(401, '未授权'))
-  db.prepare("UPDATE notifications SET read=1 WHERE device_id=?").run(device)
+  if (!memberUserId && !device) return res.json(err(401, '未授权'))
+  db.prepare("UPDATE notifications SET read=1 WHERE (device_id=? OR member_user_id=?)").run(String(device || ''), String(memberUserId || ''))
   res.json(ok({}))
 })
 
@@ -1718,10 +1730,21 @@ app.get('/admin/activities-stats', requireAdmin, (req, res) => {
 
 // ---- 关注 / 取关（动态关注流）----
 app.post('/follow', requireAuth, (req, res) => {
-  const { followerDevice, followeeDevice } = req.body || {}
+  const { followerDevice, followeeDevice, followeeMemberUserId } = req.body || {}
   if (!followerDevice || !followeeDevice) return res.json(err(1, '缺少 followerDevice / followeeDevice'))
   if (followerDevice === followeeDevice) return res.json(err(1, '不能关注自己'))
   db.prepare('INSERT OR IGNORE INTO follows (follower_device, followee_device, created_at) VALUES (?,?,?)').run(followerDevice, followeeDevice, now())
+  // 互动消息：关注通知被关注者（真身份优先 memberUserId，演示态回退 device）
+  emitNotification({
+    deviceId: followeeDevice,
+    memberUserId: followeeMemberUserId || '',
+    type: 'follow',
+    actorDevice: String(followerDevice || ''),
+    actorName: String((req.user && req.user.raw && req.user.raw.nickname) || ''),
+    targetType: 'user',
+    targetId: '',
+    content: '关注了你',
+  })
   res.json(ok({ following: true }))
 })
 app.delete('/follow', requireAuth, (req, res) => {

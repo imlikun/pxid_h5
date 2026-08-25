@@ -11,4 +11,9 @@ shots/
 *.db
 *.db-shm
 *.db-wal
+# 凭证/密钥：本地 .env 与联调 .env.local 绝不入库；仅 .env.example 模板可入库
+.env
+.env.local
+.env.*
+!.env.example
 !.gitignore
