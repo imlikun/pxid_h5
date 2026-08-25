@@ -50,18 +50,32 @@
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             </span>
           </div>
-          <div v-if="picked.length < 9" class="gitem add" @click="pickFiles">
+          <div v-if="picked.length < 9" class="gitem add">
+            <input
+              ref="fileInput"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;z-index:1;"
+              @change="onPick"
+            />
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </div>
         </div>
-        <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" @change="onPick" />
         <div class="hint">{{ uploading ? t('publish.uploading') : t('publish.uploadTip') }}</div>
       </div>
 
       <!-- 视频上传（统一 /media/upload，封面自动取首帧，≤60s / ≤200MB） -->
       <div class="card section">
         <div class="label">{{ t('publish.video') }}</div>
-        <div v-if="!videoFile" class="vadd" @click="pickVideo">
+        <div v-if="!videoFile" class="vadd" style="position:relative;">
+          <input
+            ref="fileInputVideo"
+            type="file"
+            accept="video/mp4,video/webm,video/quicktime"
+            style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;z-index:1;"
+            @change="onPickVideo"
+          />
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
           <span>{{ t('publish.addVideo') }}</span>
         </div>
@@ -72,7 +86,6 @@
           </span>
           <span class="vprev__dur">{{ Math.round(videoFile.duration || 0) }}s</span>
         </div>
-        <input ref="fileInputVideo" type="file" accept="video/mp4,video/webm,video/quicktime" style="display:none" @change="onPickVideo" />
         <div class="hint">{{ t('publish.videoTip') }}</div>
       </div>
 
@@ -164,7 +177,7 @@ async function getLocation() {
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => resolve(null),
-      { enableHighAccuracy: false, timeout: 8000 }
+      { enableHighAccuracy: false, timeout: 5000 }
     )
   })
 }
@@ -205,10 +218,6 @@ function pickMention(u) {
 
 const canPost = computed(() => content.value.trim().length > 0 && !uploading.value)
 
-// 选图（≤9 张，jpg/png/webp）
-function pickFiles() {
-  fileInput.value && fileInput.value.click()
-}
 function onPick(e) {
   const files = Array.from(e.target.files || [])
   const remain = 9 - picked.value.length
@@ -224,10 +233,6 @@ function removePick(i) {
   picked.value.splice(i, 1)
 }
 
-// 选视频（≤60s / ≤200MB）
-function pickVideo() {
-  fileInputVideo.value && fileInputVideo.value.click()
-}
 function getVideoDuration(file) {
   return new Promise((resolve) => {
     const v = document.createElement('video')
@@ -601,4 +606,64 @@ async function onPublish() {
 }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* @选人弹层 */
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.sheet {
+  background: var(--card, #fff);
+  border-radius: 20px 20px 0 0;
+  padding: 12px 0 24px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+.sheet__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  padding: 8px 20px 14px;
+}
+.sheet__list {
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+}
+.sheet__item {
+  padding: 14px 20px;
+  font-size: 15px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.sheet__item:active {
+  background: var(--bg-press, rgba(0,0,0,0.05));
+}
+.sheet__empty {
+  padding: 30px 20px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-hint);
+}
+.sheet__cancel {
+  margin-top: 10px;
+  padding: 14px 20px;
+  text-align: center;
+  font-size: 16px;
+  color: var(--text-sub);
+  font-weight: 500;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+.sheet__cancel:active {
+  background: var(--bg-press, rgba(0,0,0,0.05));
+}
 </style>
