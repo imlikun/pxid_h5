@@ -60,12 +60,15 @@
           <div v-for="(b, i) in bannerSlides" :key="i" class="banner__slide">
             <video
               v-if="b.type === 'video'"
+              ref="heroVideoRef"
               class="banner__media"
               :src="b.src"
-              autoplay
+              :poster="b.poster"
               muted
               loop
               playsinline
+              preload="none"
+              @error="onVideoError"
               @ended="nextBanner"
             ></video>
             <img v-else class="banner__media" :src="b.src" :alt="b.title || 'Banner'" loading="lazy" />
@@ -211,7 +214,7 @@ const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://
 const router = useRouter()
 // Banner 轮播：视频 + 实拍 + 不同车型渲染图混排，后端运营 banner 追加
 const LOCAL_BANNERS = [
-  { type: 'video', src: import.meta.env.BASE_URL + 'banner/banner-hero.mp4', title: 'PXID 实拍', url: '/featured' },
+  { type: 'video', src: import.meta.env.BASE_URL + 'banner/banner-hero.mp4', poster: import.meta.env.BASE_URL + 'banner/banner-hero-poster.jpg', title: 'PXID 实拍', url: '/featured' },
   { type: 'image', src: import.meta.env.BASE_URL + 'banner/banner-shot1.jpg', title: 'PXID 户外实拍', url: '/featured' },
   { type: 'image', src: import.meta.env.BASE_URL + 'banner/banner-trike.jpg', title: 'PXID 电动三轮车', url: '/featured' },
 ]
@@ -223,10 +226,25 @@ const bannerSlides = computed(() => {
 const bannerIdx = ref(0)
 let bannerTimer = null
 let bannerTouchX = 0
+const heroVideoRef = ref(null)
+let videoPlayTimer = null
 
 function nextBanner() {
   if (bannerSlides.value.length < 2) return
   bannerIdx.value = (bannerIdx.value + 1) % bannerSlides.value.length
+}
+// 视频懒加载：preload=none 不占首屏带宽，图片先出；延迟 1.2s 再播视频
+function lazyPlayHeroVideo() {
+  const v = heroVideoRef.value
+  if (!v) return
+  videoPlayTimer = setTimeout(() => {
+    const p = v.play()
+    if (p && p.catch) p.catch(() => { /* iOS 等自动播被拦：停留在 poster，用户滑动后仍可播 */ })
+  }, 1200)
+}
+// 视频加载/播放失败：直接切下一张，不卡住轮播
+function onVideoError() {
+  nextBanner()
 }
 function onBannerTouchStart(e) {
   bannerTouchX = e.changedTouches[0].clientX
@@ -413,14 +431,16 @@ onMounted(async () => {
   }
   // 拉取互动消息未读数（铃铛红点）
   interactionUnread.value = await fetchUnreadCount()
-  // Banner 轮播自动播放（4s/张；视频 slide 用 @ended 驱动，timer 兜底切走避免卡住）
+  // Banner 轮播自动播放：统一 4s/张，视频 slide 也定时切走（不再等 @ended，避免视频 loop 卡在第一张）
   bannerTimer = setInterval(() => {
-    const cur = bannerSlides.value[bannerIdx.value]
-    if (!cur || cur.type !== 'video') nextBanner()
+    if (bannerSlides.value.length > 1) nextBanner()
   }, 4000)
+  // 视频懒加载：首屏图片先渲染，视频延迟播放
+  lazyPlayHeroVideo()
 })
 onUnmounted(() => {
   if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null }
+  if (videoPlayTimer) { clearTimeout(videoPlayTimer); videoPlayTimer = null }
 })
 
 function onAdd() {
