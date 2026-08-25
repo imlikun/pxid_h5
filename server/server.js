@@ -19,7 +19,8 @@ const sanitizeHtml = require('sanitize-html')
 const moderation = require('./moderation')
 
 // 加载 .env（若项目安装 dotenv；未装则静默跳过，env 仍可由系统/pm2 注入）
-try { require('dotenv').config() } catch (_) {}
+// 同时加载 .env.local（本地联调用，已被 gitignore 忽略，不进 git），后者覆盖前者
+try { require('dotenv').config(); require('dotenv').config({ path: '.env.local' }) } catch (_) {}
 
 const app = express()
 app.use(express.json({ limit: '5mb', verify: (req, res, buf) => { if (req.path && (req.path.indexOf('/mall-api/webhook') === 0 || req.path.indexOf('/ban-sync/from-toc') === 0)) req.rawBody = buf } }))
