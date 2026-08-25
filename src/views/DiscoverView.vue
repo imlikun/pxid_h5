@@ -209,12 +209,11 @@ import { fetchFeeds, fetchActivities } from '../api/feed'
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
 const router = useRouter()
-// Banner 轮播：本地实拍素材（视频 + 帧 + 车灯特写）打头，后端运营 banner 追加
+// Banner 轮播：视频 + 实拍 + 不同车型渲染图混排，后端运营 banner 追加
 const LOCAL_BANNERS = [
   { type: 'video', src: import.meta.env.BASE_URL + 'banner/banner-hero.mp4', title: 'PXID 实拍', url: '/featured' },
   { type: 'image', src: import.meta.env.BASE_URL + 'banner/banner-shot1.jpg', title: 'PXID 户外实拍', url: '/featured' },
-  { type: 'image', src: import.meta.env.BASE_URL + 'banner/banner-shot2.jpg', title: 'PXID 公园实拍', url: '/featured' },
-  { type: 'image', src: import.meta.env.BASE_URL + 'banner/banner-shot3.jpg', title: 'PXID 林荫实拍', url: '/featured' },
+  { type: 'image', src: import.meta.env.BASE_URL + 'banner/banner-trike.jpg', title: 'PXID 电动三轮车', url: '/featured' },
 ]
 const bannerList = ref([])
 const bannerSlides = computed(() => {
