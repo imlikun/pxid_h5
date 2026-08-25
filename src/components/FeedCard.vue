@@ -1,14 +1,14 @@
 <template>
   <div class="fcard press" @click="go">
     <div class="fcard__coverwrap">
-      <img class="fcard__cover" :src="coverUrl" :alt="item.title" @error="onImgErr" />
+      <img class="fcard__cover" :src="coverUrl" :alt="item.title" loading="lazy" @error="onImgErr" />
       <span v-if="item.pinned" class="fcard__pin">置顶</span>
       <span v-if="item.videoUrl" class="fcard__play"><svg viewBox="0 0 24 24" width="18" height="18" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
     </div>
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
       <div class="author">
-        <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
+        <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" loading="lazy" />
         <span class="name">{{ item.author }}</span>
       </div>
       <span class="like">

@@ -1,6 +1,6 @@
 <template>
   <div class="pcard press" @click="go">
-    <img class="pcard__cover" :src="product.cover" :alt="product.name" />
+    <img class="pcard__cover" :src="product.cover" :alt="product.name" loading="lazy" />
     <div class="pcard__name">{{ product.name }}</div>
     <div class="pcard__price">
       <span class="price">{{ sym(product.currency) }}{{ product.price }}</span>

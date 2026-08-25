@@ -126,6 +126,10 @@
           :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
         />
       </div>
+      <div v-if="currentFeedKey && recommendList.length" class="load-more">
+        <span v-if="loadingMore">{{ t('discover.loadingMore') }}</span>
+        <span v-else-if="!feedPage[currentFeedKey].hasMore">{{ t('discover.noMore') }}</span>
+      </div>
     </div>
 
     <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 -->
@@ -143,6 +147,10 @@
         />
         <div v-if="nearLoading" class="empty-tab">{{ t('discover.nearLoading') }}</div>
         <div v-else-if="dynamicList.length === 0" class="empty-tab">{{ t('discover.emptyDynamic') }}</div>
+        <div v-if="currentFeedKey && dynamicList.length" class="load-more">
+          <span v-if="loadingMore">{{ t('discover.loadingMore') }}</span>
+          <span v-else-if="!feedPage[currentFeedKey].hasMore">{{ t('discover.noMore') }}</span>
+        </div>
       </div>
     </template>
 
@@ -156,7 +164,7 @@
           :class="'stagger-' + ((i % 10) + 1)"
           @click="onShowcase(p)"
         >
-          <img class="showcase__img" :src="p.cover" :alt="p.name" />
+          <img class="showcase__img" :src="p.cover" :alt="p.name" loading="lazy" />
           <div class="showcase__bar">{{ p.name }}</div>
         </div>
       </div>
@@ -172,7 +180,7 @@
           :class="'stagger-' + ((i % 10) + 1)"
           @click="onActivity(a)"
         >
-          <img class="act__img" :src="a.cover" :alt="a.title" />
+          <img class="act__img" :src="a.cover" :alt="a.title" loading="lazy" />
           <div class="act__info">
             <div class="act__title">{{ a.title }}</div>
             <div class="act__date">{{ fmtDate(a) }}</div>
@@ -332,6 +340,11 @@ const dynamicList = computed(() => {
 // 官方公告未读数（驱动发现页快捷区红点）
 const noticeUnread = computed(() => notices.filter((n) => !n.isRead).length)
 
+// 当前 tab 的 feed 分页 key（触底加载提示用）
+const currentFeedKey = computed(() =>
+  activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
+)
+
 // 互动消息未读（真实后端计数，驱动铃铛红点）
 const interactionUnread = ref(0)
 
@@ -341,19 +354,55 @@ function setTab(t) {
   if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
 }
 
-// 从 /feed 接口拉取真实数据（带地区过滤）。改用统一数据层 api/feed.js：
+// 触底分页状态（推荐/动态各自维护 page + hasMore；广场活动量小不分页）
+const PAGE_SIZE = 15
+const feedPage = {
+  recommend: { page: 1, hasMore: true },
+  dynamic: { page: 1, hasMore: true },
+}
+const loadingMore = ref(false)
+
+// 从 /feed 接口拉取真实数据（带地区过滤 + 分页）。改用统一数据层 api/feed.js：
 // 动态 tab 自动带 followerDevice → 后端返回「官方+已关注」关注流（修 H1 关注流非全局流）；
 // 归一化/错误回落统一，消除 api/feed.js 死代码（修 H2）
 // ⚠️ 调用方（onMounted / switchRegion）统一传英文 key（'recommend'/'dynamic'），
 //    内部必须按 key 比对，勿用中文——曾因 'recommend' !== '推荐' 导致
 //    推荐数据被塞进 dynamicData、recommendData 永远为空、For You 页永久空白（2026-08-22 修复）
-async function loadFeed(tabKey) {
+// append=false 拉第一页（重置 page/hasMore）；append=true 触底追加下一页
+async function loadFeed(tabKey, { append = false } = {}) {
+  const st = feedPage[tabKey]
+  if (!st || st.hasMore === false || (append && loadingMore.value)) return
+  if (append) loadingMore.value = true
   try {
-    const list = await fetchFeeds(tabKey, { region: currentRegion.value, pageSize: 30 })
-    if (tabKey === 'recommend') recommendData.value = list
-    else dynamicData.value = list
+    const page = append ? st.page + 1 : 1
+    const res = await fetchFeeds(tabKey, {
+      region: currentRegion.value,
+      page,
+      pageSize: PAGE_SIZE,
+    })
+    const list = res.list || []
+    st.page = page
+    st.hasMore = list.length >= PAGE_SIZE && (page * PAGE_SIZE) < (res.total || Infinity)
+    if (append) {
+      if (tabKey === 'recommend') recommendData.value = recommendData.value.concat(list)
+      else dynamicData.value = dynamicData.value.concat(list)
+    } else {
+      if (tabKey === 'recommend') recommendData.value = list
+      else dynamicData.value = list
+    }
   } catch (e) {
     loadErr.value = t('discover.loadFail')
+  } finally {
+    if (append) loadingMore.value = false
+  }
+}
+
+// 滚动触底加载：距底部 300px 时拉当前 tab 的下一页（推荐/动态；广场活动量小不触发）
+function onScroll() {
+  const doc = document.documentElement
+  if (doc.scrollHeight - window.scrollY - window.innerHeight < 300) {
+    const key = activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
+    if (key) loadFeed(key, { append: true })
   }
 }
 
@@ -437,9 +486,12 @@ onMounted(async () => {
   }, 4000)
   // 视频懒加载：首屏图片先渲染，视频延迟播放
   lazyPlayHeroVideo()
+  // 触底分页：滚动加载更多（推荐/动态）
+  window.addEventListener('scroll', onScroll, { passive: true })
 })
 onUnmounted(() => {
   if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null }
+  window.removeEventListener('scroll', onScroll)
   if (videoPlayTimer) { clearTimeout(videoPlayTimer); videoPlayTimer = null }
 })
 
@@ -489,14 +541,14 @@ async function setDynamicSub(sub) {
       return
     }
     try {
-      const list = await fetchFeeds('dynamic', {
+      const res = await fetchFeeds('dynamic', {
         near: loc.lat + ',' + loc.lng,
         radius: 50,
         followerDevice: '',
         region: currentRegion.value,
         pageSize: 30,
       })
-      nearList.value = list
+      nearList.value = res.list || []
     } catch (e) {
       nearList.value = []
     }
@@ -783,6 +835,12 @@ function showToast(msg) {
   font-size: 13px;
   color: var(--text-hint);
   padding: 40px 0;
+}
+.load-more {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-hint);
+  padding: 20px 0 8px;
 }
 .grid2 {
   display: grid;

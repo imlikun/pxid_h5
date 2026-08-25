@@ -1,39 +1,42 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { bridge } from '../bridge'
-import DiscoverView from '../views/DiscoverView.vue'
-import FeaturedView from '../views/FeaturedView.vue'
-import ServiceView from '../views/ServiceView.vue'
-import ProductDetailView from '../views/ProductDetailView.vue'
-import CartView from '../views/CartView.vue'
-import CheckoutView from '../views/CheckoutView.vue'
-import OrderSuccessView from '../views/OrderSuccessView.vue'
-import OrderListView from '../views/OrderListView.vue'
-import MessageView from '../views/MessageView.vue'
-import FeedDetailView from '../views/FeedDetailView.vue'
-import NoticesView from '../views/NoticesView.vue'
-import NoticeDetailView from '../views/NoticeDetailView.vue'
+
+// 路由级懒加载：全部页面动态 import，Vite 按路由拆 chunk，
+// 首屏只加载当前页面代码，大幅减小首包体积（原 30+ 页面全打一个 bundle）
+const DiscoverView = () => import('../views/DiscoverView.vue')
+const FeaturedView = () => import('../views/FeaturedView.vue')
+const ServiceView = () => import('../views/ServiceView.vue')
+const ProductDetailView = () => import('../views/ProductDetailView.vue')
+const CartView = () => import('../views/CartView.vue')
+const CheckoutView = () => import('../views/CheckoutView.vue')
+const OrderSuccessView = () => import('../views/OrderSuccessView.vue')
+const OrderListView = () => import('../views/OrderListView.vue')
+const MessageView = () => import('../views/MessageView.vue')
+const FeedDetailView = () => import('../views/FeedDetailView.vue')
+const NoticesView = () => import('../views/NoticesView.vue')
+const NoticeDetailView = () => import('../views/NoticeDetailView.vue')
 
 // 服务子页
-import RoadRescueView from '../views/RoadRescueView.vue'
-import GuideView from '../views/GuideView.vue'
-import GuideVideoView from '../views/GuideVideoView.vue'
-import GuideManualView from '../views/GuideManualView.vue'
-import VehicleCheckView from '../views/VehicleCheckView.vue'
-import FeedbackView from '../views/FeedbackView.vue'
-import WarrantyView from '../views/WarrantyView.vue'
-import StoreListView from '../views/StoreListView.vue'
-import WorkOrderView from '../views/WorkOrderView.vue'
-import WorkOrderDetailView from '../views/WorkOrderDetailView.vue'
-import FaqView from '../views/FaqView.vue'
-import FaqDetailView from '../views/FaqDetailView.vue'
-import FaqFilterView from '../views/FaqFilterView.vue'
-import VehicleDetailView from '../views/VehicleDetailView.vue'
-import CustomizeView from '../views/CustomizeView.vue'
-import SearchView from '../views/SearchView.vue'
-import PointsView from '../views/PointsView.vue'
-import PublishView from '../views/PublishView.vue'
-import ActivityCenterView from '../views/ActivityCenterView.vue'
-import InteractionView from '../views/InteractionView.vue'
+const RoadRescueView = () => import('../views/RoadRescueView.vue')
+const GuideView = () => import('../views/GuideView.vue')
+const GuideVideoView = () => import('../views/GuideVideoView.vue')
+const GuideManualView = () => import('../views/GuideManualView.vue')
+const VehicleCheckView = () => import('../views/VehicleCheckView.vue')
+const FeedbackView = () => import('../views/FeedbackView.vue')
+const WarrantyView = () => import('../views/WarrantyView.vue')
+const StoreListView = () => import('../views/StoreListView.vue')
+const WorkOrderView = () => import('../views/WorkOrderView.vue')
+const WorkOrderDetailView = () => import('../views/WorkOrderDetailView.vue')
+const FaqView = () => import('../views/FaqView.vue')
+const FaqDetailView = () => import('../views/FaqDetailView.vue')
+const FaqFilterView = () => import('../views/FaqFilterView.vue')
+const VehicleDetailView = () => import('../views/VehicleDetailView.vue')
+const CustomizeView = () => import('../views/CustomizeView.vue')
+const SearchView = () => import('../views/SearchView.vue')
+const PointsView = () => import('../views/PointsView.vue')
+const PublishView = () => import('../views/PublishView.vue')
+const ActivityCenterView = () => import('../views/ActivityCenterView.vue')
+const InteractionView = () => import('../views/InteractionView.vue')
 
 // 用 hash 路由：WebView 内加载任意域名/本地文件都不会 404，无需服务端 rewrite
 const routes = [

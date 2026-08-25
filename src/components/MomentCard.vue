@@ -1,7 +1,7 @@
 <template>
   <div class="moment press" @click="open">
     <div class="m-head">
-      <img class="m-avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
+      <img class="m-avatar" :src="item.avatar || defaultAvatar" :alt="item.author" loading="lazy" />
       <div class="m-meta">
         <div class="m-name"><span v-if="item.pinned" class="m-pin">置顶</span>{{ item.author }}</div>
         <div class="m-time">{{ item.time }}</div>
@@ -18,7 +18,7 @@
     <div class="m-body">{{ item.content }}</div>
 
     <div v-if="item.videoUrl" class="m-video" @click.stop="open">
-      <img class="m-video__cover" :src="videoCoverUrl" :alt="item.title" @error="onImgErr" />
+      <img class="m-video__cover" :src="videoCoverUrl" :alt="item.title" loading="lazy" @error="onImgErr" />
       <span class="m-video__play"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
     </div>
 
@@ -30,10 +30,11 @@
         :class="{ single: cols === 1 }"
         :src="img"
         :alt="item.title"
+        loading="lazy"
         @click.stop="onPreview(img)"
         @error="onImgErr($event)"
       />
-      <img v-if="!displayImages.length" class="m-img single" :src="FALLBACK" :alt="item.title" @error="onImgErr($event)" />
+      <img v-if="!displayImages.length" class="m-img single" :src="FALLBACK" :alt="item.title" loading="lazy" @error="onImgErr($event)" />
     </div>
 
     <div class="m-foot">

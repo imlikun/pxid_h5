@@ -49,6 +49,8 @@ function normalize(item) {
 }
 
 // ---- 动态流 ----
+// 返回 { list, total }：分页触底加载（page/pageSize 由调用方传，后端返回 total 判断是否还有更多）
+// ⚠️ 2026-08-25 起返回值从「数组」改为「{ list, total }」，调用方需解构（DiscoverView.loadFeed / near 已适配）
 export async function fetchFeeds(tab = 'dynamic', params = {}) {
   if (FEED_API) {
     try {
@@ -57,7 +59,7 @@ export async function fetchFeeds(tab = 'dynamic', params = {}) {
       if (tab === 'dynamic' && params.followerDevice === undefined) qsParams.followerDevice = getDeviceId()
       const qs = new URLSearchParams(qsParams).toString()
       const data = await request('/feed?' + qs)
-      return (data.list || []).map(normalize)
+      return { list: (data.list || []).map(normalize), total: data.total || 0 }
     } catch (e) {
       console.warn('[fetchFeeds] API error:', e.message || e)
       /* 接口失败回落 mock */
@@ -66,7 +68,7 @@ export async function fetchFeeds(tab = 'dynamic', params = {}) {
   // 兜底：我的发布（localStorage 持久化）+ 官方 mock moments，最新在前
   const mine = publishState.list.map((m) => ({ ...m, itemType: 'moment' }))
   const official = moments.map((m) => ({ ...m }))
-  return [...mine, ...official]
+  return { list: [...mine, ...official], total: mine.length + official.length }
 }
 
 // ---- 发帖 ----
