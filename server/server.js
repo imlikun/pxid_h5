@@ -18,9 +18,13 @@ const multer = require('multer')
 const sanitizeHtml = require('sanitize-html')
 const moderation = require('./moderation')
 
-// 加载 .env（若项目安装 dotenv；未装则静默跳过，env 仍可由系统/pm2 注入）
-// 同时加载 .env.local（本地联调用，已被 gitignore 忽略，不进 git），后者覆盖前者
-try { require('dotenv').config(); require('dotenv').config({ path: '.env.local' }) } catch (_) {}
+// 加载 .env / .env.local（若项目安装 dotenv；未装则静默跳过，env 仍可由系统/pm2 注入）
+// 路径按 server.js 所在目录显式解析（server/ 上级 = 项目根），避免因 CWD 不同读不到凭证
+const _envRoot = path.join(__dirname, '..')
+try {
+  require('dotenv').config({ path: path.join(_envRoot, '.env') })
+  require('dotenv').config({ path: path.join(_envRoot, '.env.local') })
+} catch (_) {}
 
 const app = express()
 app.use(express.json({ limit: '5mb', verify: (req, res, buf) => { if (req.path && (req.path.indexOf('/mall-api/webhook') === 0 || req.path.indexOf('/ban-sync/from-toc') === 0)) req.rawBody = buf } }))
