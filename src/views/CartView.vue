@@ -63,7 +63,7 @@ import {
   checkedTotal,
   checkedCount,
 } from '../store/cart'
-import { getStore, sym } from '../api/shop'
+import { getStore, sym, API_BASE, getRegion } from '../api/shop'
 import { bridge } from '../bridge'
 
 const router = useRouter()
@@ -79,21 +79,55 @@ function goBack() {
 function goDiscover() {
   router.push('/featured')
 }
-function goCheckout() {
+async function goCheckout() {
   if (checkedCount.value === 0) return
   const store = getStore()
   if (!store) {
     alert('店铺信息加载中，请稍后重试')
     return
   }
-  // 拼 Shopify cart permalink（多品逗号分隔），用户到 Shopify 看到已加好的车直接 checkout
-  const parts = checkedItems.value
-    .map((it) => `${it.variantId}:${it.qty}`)
-    .join(',')
-  const url = `https://${store}/cart/${parts}`
-  bridge.openShopify(url)
-  // permalink 是"添加"语义，跳转即代表已带入 Shopify 车，清空本地车
-  clearChecked()
+  // 多品组装 items[]，走后端 checkout-v2 建 Shopify 车并预填邮箱/地址
+  const items = checkedItems.value.map((it) => ({ variantId: it.variantId, qty: it.qty }))
+  const fallback = () => {
+    const parts = checkedItems.value.map((it) => `${it.variantId}:${it.qty}`).join(',')
+    bridge.openShopify(`https://${store}/cart/${parts}`)
+    clearChecked()
+  }
+  try {
+    let profile = {}
+    try { profile = (await bridge.getUserInfo()) || {} } catch (e) { profile = {} }
+    const r = await fetch(`${API_BASE}/mall-api/checkout-v2`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items,
+        region: getRegion(),
+        email: profile.email || '',
+        shippingAddress: profile.shippingAddress || null,
+      }),
+    })
+    const j = await r.json()
+    const url = (j.data && j.data.url) || j.url
+    if (!url) throw new Error('empty checkout url')
+    bridge.openShopify(url)
+    showToast('正在前往 Shopify…')
+    clearChecked()
+  } catch (e) {
+    fallback()
+  }
+}
+function showToast(msg) {
+  let el = document.getElementById('__toast')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = '__toast'
+    el.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.8);color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;z-index:9999;pointer-events:none;max-width:80%;text-align:center'
+    document.body.appendChild(el)
+  }
+  el.textContent = msg
+  el.style.display = 'block'
+  clearTimeout(el.__t)
+  el.__t = setTimeout(() => (el.style.display = 'none'), 1500)
 }
 </script>
 

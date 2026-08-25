@@ -37,6 +37,7 @@
           <div class="o-actions">
             <button v-if="o.status === '待付款'" class="btn dark" @click="pay(o)">去支付</button>
             <template v-else>
+              <button v-if="o.rawOrderId" class="btn ghost" @click="applyReturn(o)">申请售后</button>
               <button class="btn ghost" @click="buyAgain(o)">再来一单</button>
               <button class="btn ghost" @click="detail(o)">查看详情</button>
             </template>
@@ -95,6 +96,7 @@ function mapRemote(o) {
   const status = statusMap[o.fulfillment] || o.fulfillment || '已下单'
   return {
     id: '#' + o.order_id,
+    rawOrderId: o.order_id,
     status,
     time: fmtTime(o.created_at),
     items,
@@ -141,6 +143,40 @@ function buyAgain(o) {
 }
 function detail(o) {
   console.log('order detail:', o.id)
+}
+async function applyReturn(o) {
+  if (!o.rawOrderId) return
+  try {
+    const token = await bridge.getToken().catch(() => '')
+    const headers = { 'Content-Type': 'application/json' }
+    if (token) headers.Authorization = 'Bearer ' + token
+    const r = await fetch(`${API_BASE}/mall-api/order/return-request`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orderId: o.rawOrderId, type: 'return', reason: '' }),
+    })
+    const j = await r.json()
+    if (j && (j.code === 0 || j.ok)) {
+      showToast('售后申请已提交，我们会尽快处理')
+    } else {
+      showToast((j && j.msg) || '提交失败，请重试')
+    }
+  } catch (e) {
+    showToast('提交失败，请重试')
+  }
+}
+function showToast(msg) {
+  let el = document.getElementById('__toast')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = '__toast'
+    el.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.8);color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;z-index:9999;pointer-events:none;max-width:80%;text-align:center'
+    document.body.appendChild(el)
+  }
+  el.textContent = msg
+  el.style.display = 'block'
+  clearTimeout(el.__t)
+  el.__t = setTimeout(() => (el.style.display = 'none'), 1500)
 }
 </script>
 
