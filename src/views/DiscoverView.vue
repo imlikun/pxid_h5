@@ -48,14 +48,38 @@
       <input class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearch" @click.stop />
     </div>
 
-    <!-- Banner + 快捷入口：仅推荐页 -->
+    <!-- Banner 轮播 + 快捷入口：仅推荐页 -->
     <template v-if="activeTab === '推荐'">
-      <div class="banner" @click="onBanner">
-        <img
-          class="banner__img"
-          :src="bannerImg"
-          alt="Banner"
-        />
+      <div
+        class="banner"
+        @touchstart="onBannerTouchStart"
+        @touchend="onBannerTouchEnd"
+        @click="onBanner"
+      >
+        <div class="banner__track" :style="{ transform: `translateX(-${bannerIdx * 100}%)` }">
+          <div v-for="(b, i) in bannerSlides" :key="i" class="banner__slide">
+            <video
+              v-if="b.type === 'video'"
+              class="banner__media"
+              :src="b.src"
+              autoplay
+              muted
+              loop
+              playsinline
+              @ended="nextBanner"
+            ></video>
+            <img v-else class="banner__media" :src="b.src" :alt="b.title || 'Banner'" loading="lazy" />
+          </div>
+        </div>
+        <div v-if="bannerSlides.length > 1" class="banner__dots">
+          <span
+            v-for="(b, i) in bannerSlides"
+            :key="i"
+            class="banner__dot"
+            :class="{ on: bannerIdx === i }"
+            @click.stop="bannerIdx = i"
+          ></span>
+        </div>
       </div>
       <div class="quick">
         <div
@@ -162,7 +186,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
@@ -185,11 +209,32 @@ import { fetchFeeds, fetchActivities } from '../api/feed'
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
 const router = useRouter()
+// Banner 轮播：本地实拍素材（视频 + 帧 + 车灯特写）打头，后端运营 banner 追加
+const LOCAL_BANNERS = [
+  { type: 'video', src: import.meta.env.BASE_URL + 'banner/banner-hero.mp4', title: 'PXID 实拍', url: '/featured' },
+  { type: 'image', src: import.meta.env.BASE_URL + 'banner/banner-frame1.jpg', title: 'PXID 整车实拍', url: '/featured' },
+  { type: 'image', src: import.meta.env.BASE_URL + 'banner/moto-headlight.jpg', title: 'PXID 前灯特写', url: '/featured' },
+]
 const bannerList = ref([])
-const bannerImg = computed(
-  () => (bannerList.value[0] && bannerList.value[0].image) || import.meta.env.BASE_URL + 'discover-banner.jpg'
-)
-const bannerUrl = computed(() => (bannerList.value[0] && bannerList.value[0].url) || '')
+const bannerSlides = computed(() => {
+  const ops = bannerList.value.map((b) => ({ type: 'image', src: b.image, title: b.title || '', url: b.url || '' }))
+  return [...LOCAL_BANNERS, ...ops]
+})
+const bannerIdx = ref(0)
+let bannerTimer = null
+let bannerTouchX = 0
+
+function nextBanner() {
+  if (bannerSlides.value.length < 2) return
+  bannerIdx.value = (bannerIdx.value + 1) % bannerSlides.value.length
+}
+function onBannerTouchStart(e) {
+  bannerTouchX = e.changedTouches[0].clientX
+}
+function onBannerTouchEnd(e) {
+  const dx = e.changedTouches[0].clientX - bannerTouchX
+  if (Math.abs(dx) > 40) (dx < 0 ? nextBanner() : (bannerIdx.value = (bannerIdx.value - 1 + bannerSlides.value.length) % bannerSlides.value.length))
+}
 const tabs = discoverTabs
 const activeTab = ref('推荐')
 const activeFilter = ref('全部')
@@ -340,8 +385,9 @@ async function fetchBanners() {
   } catch (e) { /* 拉取失败保持静态兜底图 */ }
 }
 function onBanner() {
-  const u = bannerUrl.value
-  if (!u) return
+  const b = bannerSlides.value[bannerIdx.value]
+  if (!b || !b.url) return
+  const u = b.url
   if (/^https?:\/\//i.test(u)) bridge.openShopify(u)
   else if (u.startsWith('/')) router.push(u)
   else bridge.openNative(u)
@@ -367,6 +413,14 @@ onMounted(async () => {
   }
   // 拉取互动消息未读数（铃铛红点）
   interactionUnread.value = await fetchUnreadCount()
+  // Banner 轮播自动播放（4s/张；视频 slide 用 @ended 驱动，timer 兜底切走避免卡住）
+  bannerTimer = setInterval(() => {
+    const cur = bannerSlides.value[bannerIdx.value]
+    if (!cur || cur.type !== 'video') nextBanner()
+  }, 4000)
+})
+onUnmounted(() => {
+  if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null }
 })
 
 function onAdd() {
@@ -569,16 +623,51 @@ function showToast(msg) {
   color: var(--text-hint);
 }
 .banner {
+  position: relative;
   margin: 16px 14px 0;
   border-radius: var(--radius);
   overflow: hidden;
   aspect-ratio: 16 / 9;
+  touch-action: pan-y;
 }
-.banner__img {
+.banner__track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.banner__slide {
+  flex: 0 0 100%;
+  min-width: 100%;
+  height: 100%;
+}
+.banner__media {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  pointer-events: none;
+}
+.banner__dots {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  z-index: 2;
+}
+.banner__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  transition: all 0.3s;
+}
+.banner__dot.on {
+  width: 16px;
+  border-radius: 3px;
+  background: #ffffff;
 }
 .quick {
   display: grid;
