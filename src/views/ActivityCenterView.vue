@@ -141,8 +141,9 @@ onMounted(async () => {
 .activity-center {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
+  /* 顶部安全区由 Flutter WebView 处理，H5 不额外 padding-top（与发现页/互动消息页一致） */
   padding-bottom: env(safe-area-inset-bottom);
+  overflow-x: hidden;
 }
 .top-region {
   font-size: 13px;
