@@ -185,7 +185,8 @@ function goBanner(i) {
   startBanner()
 }
 function goModel(c) {
-  bridge.openNative('vehicle/' + c.id)
+  // 优先走 H5 车型详情页（Flutter 端未实现 vehicle 原生路由时会弹 toast 不跳转）
+  router.push('/vehicle/' + c.id)
 }
 let _touchX = 0
 function onTouchStart(e) {

@@ -420,8 +420,8 @@ function segClick(seg) {
 }
 
 function onCar(model) {
-  // 决策 8：车型详情归口购车车型页（原生承载）
-  bridge.openNative('vehicle/' + model)
+  // 车型详情归口 H5 车型详情页（Flutter 端未实现 vehicle 原生路由，走 H5 兜底）
+  router.push('/vehicle/' + model)
 }
 function onTopic(t) {
   console.log('tap topic:', t)

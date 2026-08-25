@@ -193,7 +193,7 @@ const mockBridge = {
     if (!isEmbed() && window.__router) {
       const map = (p) => {
         let m
-        if ((m = p.match(/^vehicle\/(P\d+)/))) return '/vehicle/' + m[1]
+        if ((m = p.match(/^vehicle\/(.+)/))) return '/vehicle/' + m[1]
         if (p === 'purchase/customize' || p.startsWith('purchase/customize?')) return '/purchase/customize'
         if (p === 'search' || p.startsWith('search?')) return '/search'
         return null

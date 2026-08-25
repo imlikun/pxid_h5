@@ -561,8 +561,8 @@ function onSort() {
   showToast(sortMode.value === 'hot' ? t('discover.sort.hot') : t('discover.sort.latest'))
 }
 function onShowcase(p) {
-  // 决策 8：车型卡跳购车车型页（原生承载）
-  bridge.openNative('vehicle/' + p.id)
+  // 车型卡跳 H5 车型详情页（Flutter 端未实现 vehicle 原生路由，走 H5 兜底）
+  router.push('/vehicle/' + p.id)
 }
 function onMoreActivity() { router.push('/activity-center') }
 function onActivity(a) { router.push('/activity/' + a.id) }

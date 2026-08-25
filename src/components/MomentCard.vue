@@ -97,7 +97,8 @@ function onPreview(img) {
   console.log('preview image:', img)
 }
 function onCar(model) {
-  bridge.openNative('vehicle/' + model)
+  // 车型标签跳 H5 车型详情页（Flutter 端未实现 vehicle 原生路由，走 H5 兜底）
+  router.push('/vehicle/' + model)
 }
 async function onLike() {
   const ok = await requireLogin()

@@ -37,7 +37,6 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { feedItems, activities, plazaShowcase } from '../data/mock'
-import { bridge } from '../bridge'
 import { t } from '../i18n'
 import TopBar from '../components/TopBar.vue'
 
@@ -65,7 +64,7 @@ const results = computed(() => {
 })
 
 function onItem(r) {
-  if (r.type === 'vehicle') { bridge.openNative('vehicle/' + r.id); return }
+  if (r.type === 'vehicle') { router.push('/vehicle/' + r.id); return }
   router.push('/' + (r.type === 'feed' ? 'feed' : 'activity') + '/' + r.id)
 }
 </script>
