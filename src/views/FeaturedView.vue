@@ -256,7 +256,9 @@ async function retry() {
 <style scoped>
 .featured {
   min-height: 100vh;
-  background: var(--bg);
+  background:
+    linear-gradient(180deg, rgba(77, 124, 255, 0.07) 0%, rgba(77, 124, 255, 0) 200px),
+    var(--bg);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .tabs {
@@ -355,14 +357,20 @@ async function retry() {
   display: block;
   margin: 12px 12px 0;
   width: calc(100% - 24px);
-  padding: 12px 0;
-  border-radius: var(--radius-lg);
-  background: var(--brand);
+  padding: 13px 0;
+  border-radius: var(--radius-pill);
+  background: var(--brand-gradient);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
   text-align: center;
   border: none;
+  box-shadow: 0 4px 14px rgba(77, 124, 255, 0.35);
+  transition: transform 0.18s ease;
+}
+.enter-store:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(77, 124, 255, 0.3);
 }
 .grid2 {
   display: grid;

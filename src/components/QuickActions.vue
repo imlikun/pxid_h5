@@ -29,20 +29,32 @@ defineEmits(['tap'])
 }
 .qitem {
   flex: 1;
-  background: #ffffff;
+  background: var(--card);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 12px 4px;
+  border-radius: var(--radius-lg);
+  padding: 14px 4px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  gap: 9px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.qitem:active {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(77, 124, 255, 0.15);
 }
 .qicon {
-  width: 22px;
-  height: 22px;
-  color: var(--text);
+  width: 44px;
+  height: 44px;
+  padding: 11px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .qlabel {
   font-size: 13px;
