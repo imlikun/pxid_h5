@@ -15,7 +15,7 @@
         class="region-pill"
         :class="{ on: currentRegion === r.code }"
         @click="switchRegion(r.code)"
-        >{{ r.label }}</span
+        >{{ t(r.label) }}</span
       >
     </div>
 
@@ -63,14 +63,14 @@ const loading = ref(false)
 // 地区（与发现页同一套语义：US/CN/BR）→ 语言映射
 const REGION_LOCALE = { US: 'en', CN: 'zh', BR: 'pt' }
 const regionOptions = [
-  { code: 'US', label: () => t('discover.region.global') },
-  { code: 'CN', label: () => t('discover.region.cn') },
-  { code: 'BR', label: () => t('discover.region.br') },
+  { code: 'US', label: 'discover.region.global' },
+  { code: 'CN', label: 'discover.region.cn' },
+  { code: 'BR', label: 'discover.region.br' },
 ]
 const currentRegion = ref('CN')
 const regionLabel = computed(() => {
   const o = regionOptions.find((r) => r.code === currentRegion.value)
-  return o ? o.label() : currentRegion.value
+  return o ? t(o.label) : currentRegion.value
 })
 
 async function load() {
