@@ -50,14 +50,16 @@
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             </span>
           </div>
-          <div v-if="picked.length < 9" class="gitem add">
+          <div v-if="picked.length < 9" class="gitem add" @click="onPickImageClick">
             <input
+              v-show="!bridge.isNative()"
               ref="fileInput"
               type="file"
               accept="image/jpeg,image/png,image/webp"
               multiple
               style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;z-index:1;"
               @change="onPick"
+              @click.stop
             />
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </div>
@@ -68,13 +70,15 @@
       <!-- 视频上传（统一 /media/upload，封面自动取首帧，≤60s / ≤200MB） -->
       <div class="card section">
         <div class="label">{{ t('publish.video') }}</div>
-        <div v-if="!videoFile" class="vadd" style="position:relative;">
+        <div v-if="!videoFile" class="vadd" style="position:relative;" @click="onPickVideoClick">
           <input
+            v-show="!bridge.isNative()"
             ref="fileInputVideo"
             type="file"
             accept="video/mp4,video/webm,video/quicktime"
             style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;z-index:1;"
             @change="onPickVideo"
+            @click.stop
           />
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
           <span>{{ t('publish.addVideo') }}</span>
@@ -218,6 +222,53 @@ function pickMention(u) {
 
 const canPost = computed(() => content.value.trim().length > 0 && !uploading.value)
 
+// 图片选择入口：浏览器走 file input，原生走 bridge
+function onPickImageClick() {
+  if (bridge.isNative()) {
+    pickImagesNative()
+  } else {
+    fileInput.value && fileInput.value.click()
+  }
+}
+
+// 视频选择入口：浏览器走 file input，原生走 bridge
+function onPickVideoClick() {
+  if (bridge.isNative()) {
+    pickVideoNative()
+  } else {
+    fileInputVideo.value && fileInputVideo.value.click()
+  }
+}
+
+// 原生图片选择（Flutter 需实现 window.PXIDBridge.pickImages）
+async function pickImagesNative() {
+  try {
+    const remain = 9 - picked.value.length
+    if (remain <= 0) return
+    const images = await bridge.pickImages({ maxCount: remain })
+    if (!Array.isArray(images)) { showToast('选择图片失败'); return }
+    for (const img of images) {
+      const url = img.url || img.path || ''
+      if (url) {
+        picked.value.push({ file: null, url, uploadedUrl: url, uploading: false })
+      }
+    }
+  } catch (e) {
+    showToast(e.message || '选择图片失败')
+  }
+}
+
+// 原生视频选择（Flutter 需实现 window.PXIDBridge.pickVideo）
+async function pickVideoNative() {
+  try {
+    const video = await bridge.pickVideo({ maxDuration: 60 })
+    if (!video || !video.url) { showToast('选择视频失败'); return }
+    videoFile.value = { file: null, url: video.url, duration: video.duration || 0 }
+  } catch (e) {
+    showToast(e.message || '选择视频失败')
+  }
+}
+
 function onPick(e) {
   const files = Array.from(e.target.files || [])
   const remain = 9 - picked.value.length
@@ -280,7 +331,7 @@ function captureFrame(file, atSec = 0.1) {
 
 // 逐张上传图片（/media/upload）
 async function uploadImages() {
-  const token = await bridge.getToken()
+  const token = await bridge.getAuthToken()
   if (!token) throw new Error('NO_TOKEN')
   const pending = picked.value.filter((g) => !g.uploadedUrl)
   if (!pending.length) return
@@ -325,25 +376,29 @@ async function onPublish() {
   }
   uploading.value = true
   try {
-    const token = await bridge.getToken()
+    const token = await bridge.getAuthToken()
     if (!token) { showToast(t('publish.needLogin')); uploading.value = false; return }
     const region = await getRegion()
     const cm = carModel.value || ''
     // 1) 图片
     await uploadImages()
     const images = picked.value.map((g) => g.uploadedUrl).filter(Boolean)
-    // 2) 视频 + 封面（封面自动抽首帧）
+    // 2) 视频 + 封面（封面自动抽首帧；原生环境 Flutter 已上传直接取 URL）
     let videoKey = ''
     let coverKey = ''
-    if (videoFile.value && videoFile.value.file) {
-      const blob = await captureFrame(videoFile.value.file, 0.1)
-      if (blob) {
-        const coverFile = new File([blob], 'cover.jpg', { type: 'image/jpeg' })
-        const cr = await uploadMedia(coverFile, token)
-        coverKey = cr.objectKey
+    if (videoFile.value) {
+      if (videoFile.value.file) {
+        const blob = await captureFrame(videoFile.value.file, 0.1)
+        if (blob) {
+          const coverFile = new File([blob], 'cover.jpg', { type: 'image/jpeg' })
+          const cr = await uploadMedia(coverFile, token)
+          coverKey = cr.objectKey
+        }
+        const vr = await uploadMedia(videoFile.value.file, token)
+        videoKey = vr.objectKey
+      } else if (videoFile.value.url) {
+        videoKey = videoFile.value.url
       }
-      const vr = await uploadMedia(videoFile.value.file, token)
-      videoKey = vr.objectKey
     }
     // 3) 发帖
     const r = await fetch(API_BASE + '/feed', {
@@ -374,7 +429,8 @@ async function onPublish() {
     }
   } catch (e) {
     uploading.value = false
-    showToast(e.message === 'NO_TOKEN' ? t('publish.needLogin') : t('publish.fail'))
+    console.error('[Publish] error:', e)
+    showToast(e.message === 'NO_TOKEN' ? t('publish.needLogin') : (e.message || t('publish.fail')))
   }
 }
 </script>

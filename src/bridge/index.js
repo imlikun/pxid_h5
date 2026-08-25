@@ -99,6 +99,19 @@ const mockBridge = {
     return Promise.reject(new Error('OSS 直传未实现（本地模式）'))
   },
 
+  // 唤起原生图片选择器（多选，≤maxCount 张）
+  // Flutter 返回：[{ uri, path, width, height, size }] 或转线上 URL 后直接传 url 数组
+  pickImages({ maxCount = 9 } = {}) {
+    logMock('pickImages', { maxCount })
+    return Promise.reject(new Error('图片选择需原生 App 支持'))
+  },
+
+  // 唤起原生视频选择器（单选，≤maxDuration 秒）
+  pickVideo({ maxDuration = 60 } = {}) {
+    logMock('pickVideo', { maxDuration })
+    return Promise.reject(new Error('视频选择需原生 App 支持'))
+  },
+
   // 取当前登录用户信息（昵称/头像），用于评论/互动带身份
   // 真机由 Flutter 注入真实实现；H5 预览用默认游客态
   getUserInfo() {
@@ -234,6 +247,8 @@ export const bridge = {
   openNative: (p) => window.PXIDBridge.openNative(p),
   getLocation: () => window.PXIDBridge.getLocation(),
   getOSSCredentials: () => window.PXIDBridge.getOSSCredentials(),
+  pickImages: (opts) => window.PXIDBridge.pickImages ? window.PXIDBridge.pickImages(opts) : Promise.reject(new Error('未实现')),
+  pickVideo: (opts) => window.PXIDBridge.pickVideo ? window.PXIDBridge.pickVideo(opts) : Promise.reject(new Error('未实现')),
   openShopify: (u) => window.PXIDBridge.openShopify(u),
   openCheckout: (lines) => window.PXIDBridge.openCheckout(lines),
 }
