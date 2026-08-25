@@ -390,7 +390,9 @@ async function onBuy() {
   background: #fff;
   margin-top: 10px;
   padding: 14px;
-  border-radius: 0;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.03);
 }
 .info .name {
   font-size: 18px;
@@ -435,7 +437,21 @@ async function onBuy() {
 .block__title {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  padding-left: 10px;
+  position: relative;
+  color: var(--text);
+}
+.block__title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--brand);
 }
 .opts {
   display: flex;
@@ -514,17 +530,35 @@ async function onBuy() {
 .desc .prose :deep(img) {
   max-width: 100%;
   height: auto;
-  border-radius: 8px;
-  margin: 8px 0;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  margin: 10px 0;
 }
 .desc .prose :deep(p) {
-  margin: 0 0 10px;
+  margin: 0 0 14px;
+  line-height: 1.8;
 }
 .desc .prose :deep(h1),
 .desc .prose :deep(h2),
 .desc .prose :deep(h3) {
   font-size: 16px;
-  margin: 14px 0 8px;
+  margin: 18px 0 10px;
+  padding-left: 10px;
+  position: relative;
+  color: var(--text);
+}
+.desc .prose :deep(h1)::before,
+.desc .prose :deep(h2)::before,
+.desc .prose :deep(h3)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--brand);
 }
 .desc .prose :deep(a) {
   color: var(--brand);
@@ -573,40 +607,54 @@ async function onBuy() {
 }
 .points li {
   position: relative;
-  padding-left: 22px;
+  display: flex;
+  align-items: center;
+  padding: 12px 14px 12px 40px;
   font-size: 14px;
   line-height: 1.5;
   color: var(--text);
+  background: var(--brand-soft);
+  border-radius: 10px;
 }
 .points li::before {
-  content: '✓';
+  content: '';
   position: absolute;
-  left: 0;
-  top: 1px;
-  width: 15px;
-  height: 15px;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--brand-soft);
-  color: var(--brand);
-  font-size: 10px;
-  line-height: 15px;
-  text-align: center;
-  font-weight: 700;
+  background: var(--brand);
+}
+.points li::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-65%) rotate(45deg);
 }
 .specs {
   display: flex;
   flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 0.5px solid var(--line);
 }
 .spec {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
+  padding: 11px 12px;
   font-size: 14px;
+  background: #fff;
 }
-.spec:last-child {
-  border-bottom: none;
+.spec:nth-child(even) {
+  background: var(--brand-soft);
 }
 .spec__k {
   color: var(--text-sub);
