@@ -890,13 +890,13 @@ function buildProfile(deviceId) {
 }
 // 成长主页聚合
 app.get('/growth/profile', requireAuth, (req, res) => {
-  const device = req.user && req.user.deviceId
+  const device = (req.user && (req.user.memberUserId || req.user.deviceId)) || ''
   if (!device) return res.json(err(401, '未授权'))
   res.json(ok(buildProfile(device)))
 })
 // 签到（幂等：今天已签返回 already）
 app.post('/growth/signin', requireAuth, (req, res) => {
-  const device = req.user && req.user.deviceId
+  const device = (req.user && (req.user.memberUserId || req.user.deviceId)) || ''
   if (!device) return res.json(err(401, '未授权'))
   const today = ymd()
   const exist = db.prepare('SELECT * FROM growth_signins WHERE device_id=? AND sign_date=?').get(device, today)
@@ -913,7 +913,7 @@ app.post('/growth/signin', requireAuth, (req, res) => {
 })
 // 勋章墙（全量 + 是否已获得）
 app.get('/growth/medals', requireAuth, (req, res) => {
-  const device = req.user && req.user.deviceId
+  const device = (req.user && (req.user.memberUserId || req.user.deviceId)) || ''
   if (!device) return res.json(err(401, '未授权'))
   const eff = effectiveDevice(device)
   const owned = new Set(db.prepare('SELECT medal_code FROM growth_user_medals WHERE device_id=?').all(eff).map((r) => r.medal_code))
@@ -971,7 +971,7 @@ const TOC_BANSYNC_SECRET = process.env.TOC_BANSYNC_SECRET || ''         // D↔T
 // 四头：X-Discover-Client-Id / X-Discover-Timestamp / X-Discover-Nonce / X-Discover-Signature
 function discoverSign(bodyStr) {
   const ts = Math.floor(Date.now() / 1000).toString()
-  const nonce = crypto.randomUUID()
+  const nonce = crypto.randomBytes(16).toString('hex')   // 32hex 对齐ToC
   const sig = crypto.createHmac('sha256', TOC_CLIENT_SECRET).update(ts + '\n' + nonce + '\n' + bodyStr).digest('hex')
   return {
     'X-Discover-Client-Id': TOC_CLIENT_ID,
