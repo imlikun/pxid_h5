@@ -130,6 +130,7 @@ addCol('lng', 'REAL') // 发布定位经度
 addCol('mentions', "TEXT NOT NULL DEFAULT '[]'") // @话题：被提及用户昵称数组 JSON
 addCol('video_url', "TEXT NOT NULL DEFAULT ''") // 视频 objectKey（统一 storage 层：local=uploads/xxx.mp4，oss=media/xxx.mp4）
 addCol('cover_url', "TEXT NOT NULL DEFAULT ''") // 视频封面 objectKey
+addCol('member_user_id', "TEXT NOT NULL DEFAULT ''") // ToC 真身份（通知路由/自检维度；演示态为空）
 
 // ---- 精选（Shopify）订单回流映射表 ----
 db.exec(`
@@ -350,6 +351,7 @@ function rowToFeed(r) {
   return {
     id: r.id,
     deviceId: r.device_id || '',
+    memberUserId: r.member_user_id || '',
     kind: r.kind || 'user',
     itemType: 'moment',
     author: r.nickname,
@@ -551,6 +553,7 @@ app.post('/feed', requireAuth, (req, res) => {
   const { content, images = [], carModel = '', tags = [], nickname = '骑友', avatar = '', region = 'US', lat, lng, mentions = [], video = '', cover = '' } = req.body || {}
   // 安全：deviceId 以 token 内可信值为准（P0-1/P1-4），未配 USER_TOKEN_SECRET 时降级用 body 传值
   const deviceId = (USER_TOKEN_SECRET && req.user && req.user.deviceId) || String(req.body.deviceId || '')
+  const memberUserId = (req.user && req.user.memberUserId) || ''
   const text = String(content || '').trim()
   if (!text) return res.json(err(1, '内容不能为空'))
   if (text.length > 1000) return res.json(err(1, '内容不能超过 1000 字'))
@@ -563,12 +566,13 @@ app.post('/feed', requireAuth, (req, res) => {
   const reg = ['CN', 'BR', 'US'].includes(String(region).toUpperCase()) ? String(region).toUpperCase() : 'US'
   const info = db
     .prepare(
-      `INSERT INTO feeds (nickname, device_id, avatar, content, images, tags, car_model, region_code, lat, lng, mentions, video_url, cover_url, created_at, kind, status, operator)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'published', '')`
+      `INSERT INTO feeds (nickname, device_id, member_user_id, avatar, content, images, tags, car_model, region_code, lat, lng, mentions, video_url, cover_url, created_at, kind, status, operator)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'published', '')`
     )
     .run(
       String(nickname).slice(0, 20),
       String(deviceId || ''),
+      String(memberUserId || ''),
       String(avatar || ''),
       text,
       JSON.stringify((images || []).slice(0, 9)),
@@ -602,12 +606,15 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(req.params.id)
   if (!row) return res.json(err(404, '动态不存在'))
   const deviceId = (req.user && req.user.deviceId) || ''
-  const { liked = true, nickname = '' } = req.body || {}
+  const memberUserId = (req.user && req.user.memberUserId) || ''
+  const { liked = true, nickname = '', avatar = '' } = req.body || {}
   const likes = row.likes + (liked ? 1 : -1)
   db.prepare('UPDATE feeds SET likes=? WHERE id=?').run(Math.max(0, likes), row.id)
-  // 互动消息：点赞通知作者（不通知自己）
-  if (liked && row.device_id && row.device_id !== deviceId) {
-    emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'like', actorDevice: deviceId, actorName: String(nickname || ''), targetType: 'feed', targetId: row.id, content: '赞了你的动态' })
+  // 互动消息：点赞通知作者（不通知自己；自检双维度：device 演示态 / memberUserId ToC 态）
+  // 修复：ToC 生产模式下 deviceId 恒为空串，旧逻辑 row.device_id !== deviceId 恒真 → 自己赞自己也通知
+  const isSelf = (row.device_id && deviceId && row.device_id === deviceId) || (row.member_user_id && memberUserId && row.member_user_id === memberUserId)
+  if (liked && !isSelf && (row.device_id || row.member_user_id)) {
+    emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'like', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '赞了你的动态' })
   }
   res.json(ok({ isLiked: !!liked, likes: Math.max(0, likes) }))
 })
@@ -639,8 +646,10 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
     .run(row.id, String(nickname).slice(0, 20), String(avatar || ''), text.slice(0, 500), now())
   const c = db.prepare('SELECT * FROM comments WHERE id=?').get(info.lastInsertRowid)
   const deviceId = (req.user && req.user.deviceId) || ''
-  // 互动消息：评论通知作者（不通知自己）
-  if (row.device_id && row.device_id !== deviceId) {
+  const memberUserId = (req.user && req.user.memberUserId) || ''
+  // 互动消息：评论通知作者（不通知自己；自检双维度：device 演示态 / memberUserId ToC 态）
+  const isSelf = (row.device_id && deviceId && row.device_id === deviceId) || (row.member_user_id && memberUserId && row.member_user_id === memberUserId)
+  if (!isSelf && (row.device_id || row.member_user_id)) {
     emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'comment', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '评论了你的动态：' + text.slice(0, 40) })
   }
   res.json(ok({ id: c.id, author: c.nickname, avatar: c.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))

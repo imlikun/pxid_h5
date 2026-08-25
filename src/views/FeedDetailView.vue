@@ -434,11 +434,15 @@ async function onLike() {
   liked.value = next
   likeCount.value += next ? 1 : -1
   try {
-    const token = await bridge.getAuthToken()
+    const [token, profile] = await Promise.all([
+      bridge.getAuthToken(),
+      bridge.getUserInfo().catch(() => ({ nickname: '', avatar: '' })),
+    ])
     const r = await fetch(`${API_BASE}/feed/${id.value}/like`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ liked: next }),
+      // 带 actor 身份（nickname/avatar），通知作者时能显示是谁赞的
+      body: JSON.stringify({ liked: next, nickname: profile.nickname || '', avatar: profile.avatar || '' }),
     })
     const j = await r.json()
     if (j.code === 0 && j.data) {

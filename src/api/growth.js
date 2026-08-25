@@ -6,7 +6,7 @@ import { bridge } from '../bridge'
 
 async function authHeaders() {
   const headers = { 'Content-Type': 'application/json' }
-  const token = bridge.getAuthToken ? bridge.getAuthToken() : ''
+  const token = bridge.getAuthToken ? await bridge.getAuthToken() : ''
   if (token) headers['Authorization'] = 'Bearer ' + token
   return headers
 }
