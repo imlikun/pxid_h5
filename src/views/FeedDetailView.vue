@@ -483,8 +483,7 @@ async function onFollow() {
   }
 }
 async function onShare() {
-  const ok = await requireLogin()
-  if (!ok) return
+  // 分享是纯客户端动作（原生分享面板 / Web Share / 复制链接），不写后端数据，无需登录态（2026-08-25 修复：原挂 requireLogin 导致未登录点分享跳登录窗）
   // 原生环境：拉起原生分享面板（契约 openNative('share/feed?id=')）
   if (bridge.isNative()) {
     bridge.openNative('share/feed?id=' + id.value)
