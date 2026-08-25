@@ -122,6 +122,7 @@ export async function fetchFeedDetail(id) {
 }
 
 // ---- 点赞 ----
+// TODO: dead code —— FeedDetailView.onLike 直接 fetch /feed/:id/like（带身份），此函数无调用方，待清理
 export async function likeFeed(id) {
   if (!FEED_API) return { ok: false }
   try {
