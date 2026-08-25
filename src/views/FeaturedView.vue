@@ -34,28 +34,26 @@
       </div>
 
       <template v-else>
-      <!-- Banner 产品轮播 -->
+      <!-- Banner 车型轮播（2-3 个在售车型，点击跳车型详情） -->
       <div v-if="bannerList.length" class="banner" @touchstart="onTouchStart" @touchend="onTouchEnd">
         <div class="banner__track" :style="{ transform: `translateX(-${current * 100}%)` }">
           <div
-            v-for="(p, i) in bannerList"
-            :key="p.id"
+            v-for="(c, i) in bannerList"
+            :key="c.id"
             class="banner__slide press"
-            @click="goProduct(p)"
+            @click="goModel(c)"
           >
-            <img class="banner__img" :src="p.cover" :alt="p.name" />
+            <img class="banner__img" :src="bannerImgOf(c)" :alt="c.name" />
             <div class="banner__mask">
-              <div class="banner__name">{{ p.name }}</div>
-              <div class="banner__price">
-                {{ sym(p.currency) }}{{ p.price }}<span v-if="p.origin" class="banner__origin">{{ sym(p.currency) }}{{ p.origin }}</span>
-              </div>
+              <div class="banner__name">{{ c.name }}</div>
+              <div class="banner__sub">{{ t('featured.viewModel') }}</div>
             </div>
           </div>
         </div>
         <div v-if="bannerList.length > 1" class="banner__dots">
           <span
-            v-for="(p, i) in bannerList"
-            :key="'dot-' + p.id"
+            v-for="(c, i) in bannerList"
+            :key="'dot-' + c.id"
             class="dot"
             :class="{ active: current === i }"
             @click.stop="goBanner(i)"
@@ -129,8 +127,8 @@ import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
 import TopBar from '../components/TopBar.vue'
-import { featuredQuick } from '../data/mock'
-import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym } from '../api/shop'
+import { featuredQuick, plazaShowcase } from '../data/mock'
+import { fetchProducts, getProducts, getStore, getLastError, initRegion } from '../api/shop'
 import { bridge } from '../bridge'
 import { t } from '../i18n'
 
@@ -157,10 +155,16 @@ function enterStore() {
   if (store.value) bridge.openShopify('https://' + store.value)
 }
 
-// ---- 顶部 Banner 产品轮播 ----
+// ---- 顶部 Banner 车型轮播（取 2-3 个代表车型，与发现页"广场-车型展示"同源 plazaShowcase）----
+const BANNER_MODEL_IDS = ['scooter-F1', 'ebike-P2', 'motorcycle-P5']
+const bannerList = computed(() =>
+  plazaShowcase.filter((m) => BANNER_MODEL_IDS.includes(m.id))
+)
+function bannerImgOf(c) {
+  return import.meta.env.BASE_URL + c.cover
+}
 const current = ref(0)
 let _bannerTimer = null
-const bannerList = computed(() => all.value)
 
 function startBanner() {
   stopBanner()
@@ -180,9 +184,8 @@ function goBanner(i) {
   current.value = i
   startBanner()
 }
-function goProduct(p) {
-  const h = p.handle || p.id
-  router.push('/product/' + h)
+function goModel(c) {
+  bridge.openNative('vehicle/' + c.id)
 }
 let _touchX = 0
 function onTouchStart(e) {
@@ -321,16 +324,11 @@ async function retry() {
   margin-bottom: 4px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
-.banner__price {
-  font-size: 15px;
-  font-weight: 700;
-}
-.banner__origin {
+.banner__sub {
   font-size: 12px;
-  font-weight: 400;
-  text-decoration: line-through;
-  opacity: 0.85;
-  margin-left: 6px;
+  font-weight: 500;
+  opacity: 0.9;
+  margin-top: 2px;
 }
 .banner__dots {
   position: absolute;
