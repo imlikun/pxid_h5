@@ -533,7 +533,7 @@ async function submitComment() {
     bridge.getUserInfo().catch(() => ({ nickname: t('feed.me'), avatar: '' })),
     bridge.getAuthToken(),
   ])
-  const body = { content: text, nickname: profile.nickname, avatar: profile.avatar }
+  const body = { content: text, nickname: profile?.nickname || t('feed.me'), avatar: profile?.avatar || '' }
   if (replyTo.value) {
     body.parentCommentId = replyTo.value.commentId
     body.replyTo = replyTo.value.name
@@ -577,7 +577,7 @@ async function submitComment() {
       showToast(t('feed.toast.commentOk'))
       return
     }
-    showToast(j.msg || t('feed.toast.commentFail'))
+    showToast(j.message || t('feed.toast.commentFail'))
   } catch (e) {
     showToast(t('feed.toast.commentFail'))
   }
