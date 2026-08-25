@@ -34,8 +34,35 @@
       </div>
 
       <template v-else>
-      <!-- Banner -->
-      <div class="banner">
+      <!-- Banner 产品轮播 -->
+      <div v-if="bannerList.length" class="banner" @touchstart="onTouchStart" @touchend="onTouchEnd">
+        <div class="banner__track" :style="{ transform: `translateX(-${current * 100}%)` }">
+          <div
+            v-for="(p, i) in bannerList"
+            :key="p.id"
+            class="banner__slide press"
+            @click="goProduct(p)"
+          >
+            <img class="banner__img" :src="p.cover" :alt="p.name" />
+            <div class="banner__mask">
+              <div class="banner__name">{{ p.name }}</div>
+              <div class="banner__price">
+                {{ sym(p.currency) }}{{ p.price }}<span v-if="p.origin" class="banner__origin">{{ sym(p.currency) }}{{ p.origin }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-if="bannerList.length > 1" class="banner__dots">
+          <span
+            v-for="(p, i) in bannerList"
+            :key="'dot-' + p.id"
+            class="dot"
+            :class="{ active: current === i }"
+            @click.stop="goBanner(i)"
+          ></span>
+        </div>
+      </div>
+      <div v-else class="banner">
         <img class="banner__img" :src="bannerImg" alt="Banner" />
       </div>
       <button class="enter-store press" @click="enterStore">{{ t('featured.enterStore') }}</button>
@@ -96,14 +123,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
 import TopBar from '../components/TopBar.vue'
 import { featuredQuick } from '../data/mock'
-import { fetchProducts, getProducts, getStore, getLastError, initRegion } from '../api/shop'
+import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym } from '../api/shop'
 import { bridge } from '../bridge'
 import { t } from '../i18n'
 
@@ -122,10 +149,52 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  startBanner()
 })
+onUnmounted(stopBanner)
 
 function enterStore() {
   if (store.value) bridge.openShopify('https://' + store.value)
+}
+
+// ---- 顶部 Banner 产品轮播 ----
+const current = ref(0)
+let _bannerTimer = null
+const bannerList = computed(() => all.value)
+
+function startBanner() {
+  stopBanner()
+  if (bannerList.value.length > 1) {
+    _bannerTimer = setInterval(() => {
+      current.value = (current.value + 1) % bannerList.value.length
+    }, 4000)
+  }
+}
+function stopBanner() {
+  if (_bannerTimer) {
+    clearInterval(_bannerTimer)
+    _bannerTimer = null
+  }
+}
+function goBanner(i) {
+  current.value = i
+  startBanner()
+}
+function goProduct(p) {
+  const h = p.handle || p.id
+  router.push('/product/' + h)
+}
+let _touchX = 0
+function onTouchStart(e) {
+  _touchX = e.touches[0].clientX
+  stopBanner()
+}
+function onTouchEnd(e) {
+  const dx = e.changedTouches[0].clientX - _touchX
+  const len = bannerList.value.length
+  if (dx > 40 && current.value > 0) goBanner(current.value - 1)
+  else if (dx < -40 && current.value < len - 1) goBanner(current.value + 1)
+  else startBanner()
 }
 
 const topTabs = computed(() => [
@@ -212,16 +281,76 @@ async function retry() {
   justify-content: center;
 }
 .banner {
+  position: relative;
   margin: 12px 12px 0;
   border-radius: var(--radius-lg);
   overflow: hidden;
   aspect-ratio: 16 / 9;
+  background: var(--card);
+}
+.banner__track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.4s ease;
+}
+.banner__slide {
+  position: relative;
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
 }
 .banner__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.banner__mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px 14px 14px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
+  color: #fff;
+}
+.banner__name {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+.banner__price {
+  font-size: 15px;
+  font-weight: 700;
+}
+.banner__origin {
+  font-size: 12px;
+  font-weight: 400;
+  text-decoration: line-through;
+  opacity: 0.85;
+  margin-left: 6px;
+}
+.banner__dots {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transition: all 0.25s;
+}
+.dot.active {
+  width: 16px;
+  background: #fff;
+  border-radius: 3px;
 }
 .enter-store {
   display: block;
