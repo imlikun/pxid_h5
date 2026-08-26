@@ -540,9 +540,9 @@ function onTopic(t) {
 
 // 互动：点赞 / 收藏 / 关注 / 分享
 async function onLike() {
-  // 登录 Gate：未登录拉起原生登录，不再静默失败（对齐 onCollect/onFollow）
-  const ok = await requireLogin()
-  if (!ok) return
+  // 点赞不强制前置登录：直接发请求由后端 requireAuth 最终鉴权（对齐 submitComment 评论流程）。
+  // 背景（2026-08-26）：requireLogin 前置在真机 getUserInfo 字段差异下误判未登录 → 已登录用户被拉去登录页；
+  //   评论无前置也能正常落库，故点赞/收藏同策略（未登录时后端 401 → 下方回滚 + toast 提示）。
   // 乐观更新 + 真实落库
   const next = !liked.value
   liked.value = next
@@ -577,8 +577,7 @@ async function onLike() {
   }
 }
 async function onCollect() {
-  const ok = await requireLogin()
-  if (!ok) return
+  // 同 onLike：不强制前置登录，由后端鉴权（避免 requireLogin 误判拉登录页）
   collected.value = !collected.value
   showToast(collected.value ? t('feed.toast.collected') : t('feed.toast.uncollected'))
 }
