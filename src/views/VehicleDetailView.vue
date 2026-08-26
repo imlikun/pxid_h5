@@ -30,12 +30,6 @@
         <p class="v-slogan">{{ v.slogan }}</p>
       </section>
 
-      <!-- 双 CTA 按钮 -->
-      <section class="cta-row fade-up stagger-2">
-        <button class="cta cta-primary press" @click="onOrder">立即订购</button>
-        <button class="cta cta-outline press" @click="onContact">在线客服</button>
-      </section>
-
       <!-- 车友圈入口条 -->
       <section class="community-bar card fade-up stagger-3" @click="onCommunity">
         <div class="comm-left">
