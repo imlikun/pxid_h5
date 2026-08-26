@@ -127,7 +127,6 @@ import { useRouter } from 'vue-router'
 import { bridge } from '../bridge'
 import { t, locale } from '../i18n'
 import { fetchGrowthProfile, doSignin, fetchMedals } from '../api/growth'
-import { requireLogin } from '../utils/auth'
 import { pointsProducts } from '../data/mock'
 import TopBar from '../components/TopBar.vue'
 
@@ -176,9 +175,8 @@ async function load() {
 }
 async function onSignin() {
   if (profile.value.signedToday) return
-  // 登录 Gate：未登录拉起原生登录，不再静默失败（对齐点赞/关注）
-  const ok = await requireLogin()
-  if (!ok) return
+  // 签到不强制前置登录（同点赞/收藏策略，2026-08-26）：匿名/未登录也能按 deviceId 维度签到攒积分，
+  // 后端 /growth/signin requireAuth 已兼容匿名 token；真机登录用户走登录 token 正常签。
   try {
     const r = await doSignin()
     lastGain.value = r.todayPoints || 0
