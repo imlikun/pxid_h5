@@ -50,6 +50,7 @@ import { useRouter } from 'vue-router'
 import { t } from '../i18n'
 import { bridge } from '../bridge'
 import { fetchPointsProducts, fetchGrowthProfile } from '../api/growth'
+import { pointsProducts as mockPointsProducts } from '../data/mock'
 import TopBar from '../components/TopBar.vue'
 import RedeemModal from '../components/RedeemModal.vue'
 
@@ -80,11 +81,16 @@ function onRedeemed() {
 async function load() {
   loading.value = true
   try {
-    const [r, p] = await Promise.all([fetchPointsProducts(), fetchGrowthProfile().catch(() => null)])
-    list.value = r.list || []
+    const [r, p] = await Promise.all([
+      fetchPointsProducts().catch(() => null),
+      fetchGrowthProfile().catch(() => null),
+    ])
+    // 接口不可用（如未登录真机 401 / 网络异常）→ 用 mock 兜底，保证页面有内容不白屏
+    const arr = r && r.list && r.list.length ? r.list : mockPointsProducts
+    list.value = arr
     if (p) profileBalance.value = p.balance
   } catch (e) {
-    list.value = []
+    list.value = mockPointsProducts
   } finally {
     loading.value = false
   }
