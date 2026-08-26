@@ -632,10 +632,6 @@ function showToast(msg) {
   background: var(--bg);
   padding-bottom: env(safe-area-inset-bottom);
 }
-/* 发现页顶栏：确保在 WebView 中有正确的状态栏避让 */
-.discover :deep(.tb-sticky) {
-  min-height: calc(48px + env(safe-area-inset-top, 0px));
-}
 .tabs {
   display: flex;
   align-items: center;
