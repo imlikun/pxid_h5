@@ -29,3 +29,18 @@ export async function doSignin() {
 export async function fetchMedals() {
   return req('GET', '/growth/medals')
 }
+
+// ---- 积分商城（兑换商品 / 兑换 / 我的兑换记录）----
+export async function fetchPointsProducts(region) {
+  const q = region ? '?region=' + encodeURIComponent(region) : ''
+  return req('GET', '/growth/points-products' + q)
+}
+export async function fetchPointsProduct(id) {
+  return req('GET', '/growth/points-products/' + id)
+}
+export async function doRedeem(payload) {
+  return req('POST', '/growth/redeem', payload)
+}
+export async function fetchMyExchanges(page = 1, pageSize = 20) {
+  return req('GET', '/growth/exchanges?page=' + page + '&pageSize=' + pageSize)
+}

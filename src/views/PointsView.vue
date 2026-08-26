@@ -86,10 +86,13 @@
     <div class="section">
       <div class="section__hd">
         <span class="section__title">{{ t('points.featuredTitle') }}</span>
-        <span class="section__more" @click="onMore">
-          {{ t('points.more') }}
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </span>
+        <div class="section__hd-right">
+          <span class="section__records" @click="goRecords">{{ t('points.records') }}</span>
+          <span class="section__more" @click="goMall">
+            {{ t('points.more') }}
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </span>
+        </div>
       </div>
       <div class="goods">
         <div
@@ -113,6 +116,14 @@
         </div>
       </div>
     </div>
+
+    <RedeemModal
+      v-if="redeemProduct"
+      :product="redeemProduct"
+      @close="redeemProduct = null"
+      @done="onRedeemed"
+      @viewRecords="goRecords"
+    />
   </div>
 </template>
 
@@ -121,15 +132,18 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { bridge } from '../bridge'
 import { t, locale } from '../i18n'
-import { fetchGrowthProfile, doSignin, fetchMedals } from '../api/growth'
-import { pointsProducts } from '../data/mock'
+import { fetchGrowthProfile, doSignin, fetchMedals, fetchPointsProducts } from '../api/growth'
+import { pointsProducts as mockPointsProducts } from '../data/mock'
 import TopBar from '../components/TopBar.vue'
+import RedeemModal from '../components/RedeemModal.vue'
 
 const router = useRouter()
 
 const profile = ref({ balance: 0, continuousDays: 0, signedToday: false, isDemo: false, level: {}, levelIndex: 0, groups: [], medals: [], monthSigns: [] })
 const medals = ref([])
 const lastGain = ref(0)
+const pointsProducts = ref([])
+const redeemProduct = ref(null)
 
 const groupName = computed(() => {
   const lv = profile.value.level || {}
@@ -160,6 +174,16 @@ async function load() {
     profile.value = { balance: 0, continuousDays: 0, signedToday: false, isDemo: false, level: { zh: '新晋骑手', en: 'Rookie Rider', pt: 'Iniciante' }, levelIndex: 0, groups: [], medals: [], monthSigns: [] }
     medals.value = []
   }
+  loadProducts()
+}
+async function loadProducts() {
+  try {
+    const r = await fetchPointsProducts()
+    pointsProducts.value = (r.list && r.list.length) ? r.list : mockPointsProducts
+  } catch (e) {
+    // 后端不可用 → 用 mock 兜底，保证预览可点
+    pointsProducts.value = mockPointsProducts
+  }
 }
 async function onSignin() {
   if (profile.value.signedToday) return
@@ -186,14 +210,22 @@ function onRules() {
 function onBanner() {
   bridge.openNative('points/guide')
 }
-function onMore() {
-  bridge.openNative('points/mall')
+function goMall() {
+  router.push('/points/mall')
+}
+function goRecords() {
+  redeemProduct.value = null
+  router.push('/points/exchanges')
 }
 function onProduct(p) {
   bridge.openShopify(p.shopUrl)
 }
 function onExchange(p) {
-  bridge.openNative('points/exchange?id=' + p.id)
+  redeemProduct.value = p
+}
+function onRedeemed() {
+  // 兑换成功：刷新余额与商品列表
+  load()
 }
 
 onMounted(load)
@@ -393,6 +425,15 @@ onMounted(load)
   gap: 2px;
   font-size: 13px;
   color: var(--text-hint);
+}
+.section__hd-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.section__records {
+  font-size: 13px;
+  color: var(--brand);
 }
 .medals {
   display: grid;
