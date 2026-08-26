@@ -484,10 +484,17 @@ function onTopic(t) {
 
 // 互动：点赞 / 收藏 / 关注 / 分享
 async function onLike() {
-  // 乐观更新 + 真实落库（生产环境 requireAuth，需带登录态 token）
+  // 登录 Gate：未登录拉起原生登录，不再静默失败（对齐 onCollect/onFollow）
+  const ok = await requireLogin()
+  if (!ok) return
+  // 乐观更新 + 真实落库
   const next = !liked.value
   liked.value = next
   likeCount.value += next ? 1 : -1
+  const rollback = () => {
+    liked.value = !next
+    likeCount.value -= next ? 1 : -1
+  }
   try {
     const [token, profile] = await Promise.all([
       bridge.getAuthToken(),
@@ -503,8 +510,13 @@ async function onLike() {
     if (j.code === 0 && j.data) {
       liked.value = !!j.data.isLiked
       likeCount.value = j.data.likes
+    } else {
+      // 后端非 0 码（如 401/无权限）：回滚 + 明确提示（原静默失败，用户以为点赞无效）
+      rollback()
+      showToast(j.msg || j.message || t('feed.toast.likeFail'))
     }
   } catch (e) {
+    rollback()
     showToast(t('feed.toast.likeFail'))
   }
 }

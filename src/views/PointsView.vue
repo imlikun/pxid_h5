@@ -113,6 +113,11 @@
         </div>
       </div>
     </div>
+
+    <!-- toast -->
+    <transition name="fade">
+      <div v-if="toast" class="toast">{{ toast }}</div>
+    </transition>
   </div>
 </template>
 
@@ -122,6 +127,7 @@ import { useRouter } from 'vue-router'
 import { bridge } from '../bridge'
 import { t, locale } from '../i18n'
 import { fetchGrowthProfile, doSignin, fetchMedals } from '../api/growth'
+import { requireLogin } from '../utils/auth'
 import { pointsProducts } from '../data/mock'
 import TopBar from '../components/TopBar.vue'
 
@@ -130,6 +136,13 @@ const router = useRouter()
 const profile = ref({ balance: 0, continuousDays: 0, signedToday: false, isDemo: false, level: {}, levelIndex: 0, groups: [], medals: [], monthSigns: [] })
 const medals = ref([])
 const lastGain = ref(0)
+const toast = ref('')
+let toastTimer = null
+function showToast(msg) {
+  toast.value = msg
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toast.value = ''), 1600)
+}
 
 const groupName = computed(() => {
   const lv = profile.value.level || {}
@@ -163,6 +176,9 @@ async function load() {
 }
 async function onSignin() {
   if (profile.value.signedToday) return
+  // 登录 Gate：未登录拉起原生登录，不再静默失败（对齐点赞/关注）
+  const ok = await requireLogin()
+  if (!ok) return
   try {
     const r = await doSignin()
     lastGain.value = r.todayPoints || 0
@@ -175,8 +191,9 @@ async function onSignin() {
       isDemo: false,
       monthSigns: [...(profile.value.monthSigns || []), today],
     }
+    showToast(t('points.signin.getToday', { n: r.todayPoints || 0 }))
   } catch (e) {
-    /* 签到失败静默，不破坏页面 */
+    showToast(t('points.signin.fail'))
   }
 }
 
@@ -491,5 +508,30 @@ onMounted(load)
   color: #fff;
   font-size: 13px;
   font-weight: 500;
+}
+
+/* toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  padding: 9px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  z-index: 99;
+  max-width: 80%;
+  text-align: center;
+  pointer-events: none;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
