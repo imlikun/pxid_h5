@@ -232,7 +232,6 @@
 import { computed, ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
-import { requireLogin } from '../utils/auth'
 import bridge from '../bridge'
 import { t } from '../i18n'
 import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds } from '../api/feed'
@@ -586,8 +585,8 @@ async function onFollow() {
     showToast(t('feed.toast.followFail'))
     return
   }
-  const ok = await requireLogin()
-  if (!ok) return
+  // 关注不强制前置登录（同点赞/收藏/签到策略，2026-08-26）：直接发请求由后端 requireAuth 鉴权，
+  // 避免真机 getUserInfo 字段差异下 requireLogin 误判未登录 → 已登录用户被拉去登录页
   const next = !followed.value
   followed.value = next
   try {
