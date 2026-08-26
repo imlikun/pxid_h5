@@ -29,3 +29,16 @@ export async function doSignin() {
 export async function fetchMedals() {
   return req('GET', '/growth/medals')
 }
+
+// ---- 积分商城（自家后端闭环 2026-08-26）----
+export async function fetchPointsProducts() {
+  return req('GET', '/growth/points-products') // { balance, list:[{id,name,cover,tags,price,points,stock}] }
+}
+export async function doPointsExchange(payload) {
+  // payload: { productId, shippingName, shippingPhone, shippingAddress, note? }
+  return req('POST', '/growth/points-exchange', payload) // { exchangeId, balance }
+}
+export async function fetchPointsExchanges() {
+  const data = await req('GET', '/growth/points-exchanges')
+  return (data && data.list) || []
+}

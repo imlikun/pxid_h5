@@ -926,6 +926,73 @@ app.get('/growth/medals', requireAuth, (req, res) => {
 })
 
 // ============================================================
+// 积分商城（自家后端闭环 2026-08-26）
+//   points_products 商品表（status='on' 上架、stock 库存）
+//   points_exchanges 兑换记录表（pending 待发货，运营后台改 status + tracking_no 发货）
+// ============================================================
+
+// 1) 商品列表 + 当前余额
+app.get('/growth/points-products', requireAuth, (req, res) => {
+  const device = (req.user && (req.user.memberUserId || req.user.deviceId)) || ''
+  if (!device) return res.json(err(401, '未授权'))
+  const eff = effectiveDevice(device)
+  const rows = db.prepare("SELECT id,name,cover,tags,price,points,stock,description FROM points_products WHERE status='on' ORDER BY sort,id").all()
+  const list = rows.map((r) => ({
+    ...r,
+    tags: r.tags ? String(r.tags).split(',').map((s) => s.trim()).filter(Boolean) : [],
+  }))
+  res.json(ok({ balance: getBalance(eff), list }))
+})
+
+// 2) 兑换（事务：扣积分 + 减库存 + 写记录；积分不足/库存不足返回明确错误）
+app.post('/growth/points-exchange', requireAuth, (req, res) => {
+  const device = (req.user && (req.user.memberUserId || req.user.deviceId)) || ''
+  if (!device) return res.json(err(401, '未授权'))
+  const { productId, shippingName, shippingPhone, shippingAddress, note } = req.body || {}
+  if (!productId) return res.json(err(400, '缺少商品'))
+  if (!shippingName || !shippingPhone || !shippingAddress) return res.json(err(400, '请填写完整收货信息'))
+  const eff = effectiveDevice(device)
+  const product = db.prepare("SELECT * FROM points_products WHERE id=? AND status='on'").get(productId)
+  if (!product) return res.json(err(404, '商品不存在或已下架'))
+  if (product.stock <= 0) return res.json(err(400, '库存不足'))
+  const balance = getBalance(eff)
+  if (balance < product.points) return res.json(err(400, '积分不足，还差 ' + (product.points - balance) + ' 分'))
+  const tx = db.transaction(() => {
+    // 扣积分（事务内直接 SQL，不调 addPoints 避免嵌套事务）
+    db.prepare('INSERT INTO growth_points (device_id,balance,updated_at) VALUES (?,?,?) ON CONFLICT(device_id) DO UPDATE SET balance=balance+?, updated_at=?')
+      .run(eff, -product.points, now(), -product.points, now())
+    db.prepare('INSERT INTO growth_point_logs (device_id,delta,reason,created_at) VALUES (?,?,?,?)')
+      .run(eff, -product.points, 'exchange:' + product.id, now())
+    // 减库存（防超卖：stock>0 才扣，0 行影响即失败回滚）
+    const upd = db.prepare('UPDATE points_products SET stock=stock-1 WHERE id=? AND stock>0').run(productId)
+    if (upd.changes === 0) throw new Error('库存不足')
+    // 写兑换记录（pending 待发货）
+    const info = db.prepare(`INSERT INTO points_exchanges
+      (device_id,product_id,product_name,cover,points_cost,status,shipping_name,shipping_phone,shipping_address,note,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(eff, product.id, product.name, product.cover || '', product.points, 'pending',
+        shippingName, shippingPhone, shippingAddress, note || '', now(), now())
+    return info.lastInsertRowid
+  })
+  let id
+  try {
+    id = tx()
+  } catch (e) {
+    return res.json(err(400, e && e.message === '库存不足' ? '库存不足' : '兑换失败，请重试'))
+  }
+  res.json(ok({ exchangeId: id, balance: getBalance(eff) }))
+})
+
+// 3) 我的兑换记录（最近 50 条）
+app.get('/growth/points-exchanges', requireAuth, (req, res) => {
+  const device = (req.user && (req.user.memberUserId || req.user.deviceId)) || ''
+  if (!device) return res.json(err(401, '未授权'))
+  const eff = effectiveDevice(device)
+  const list = db.prepare('SELECT id,product_id,product_name,cover,points_cost,status,tracking_no,created_at FROM points_exchanges WHERE device_id=? ORDER BY id DESC LIMIT 50').all(eff)
+  res.json(ok({ list }))
+})
+
+// ============================================================
 // 运营侧接口（/admin/* 需 Bearer ADMIN_TOKEN）
 // ============================================================
 

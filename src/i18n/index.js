@@ -175,6 +175,9 @@ const messages = {
     'points.mallTitle': '积分商城',
     'points.mallTip': '积分可兑换精选好物，兑换后 48 小时内发货',
     'points.mallEmpty': '商城商品更新中，敬请期待',
+    'points.soldOut': '已兑完',
+    'points.exchangeOk': '兑换成功，等待发货',
+    'points.exchangeFail': '兑换失败，请重试',
 
     // ============ 精选 ============
     'featured.loading': '加载商品中…',
@@ -360,6 +363,9 @@ const messages = {
     'points.mallTitle': 'Points Mall',
     'points.mallTip': 'Redeem points for curated goods; ships within 48 hours',
     'points.mallEmpty': 'Mall items are being updated, stay tuned',
+    'points.soldOut': 'Sold out',
+    'points.exchangeOk': 'Success, pending shipment',
+    'points.exchangeFail': 'Failed, try again',
 
     // ============ Featured ============
     'featured.loading': 'Loading products…',
@@ -545,6 +551,9 @@ const messages = {
     'points.mallTitle': 'Loja de Pontos',
     'points.mallTip': 'Troque pontos por produtos selecionados; envio em 48 horas',
     'points.mallEmpty': 'Itens em atualização, aguarde',
+    'points.soldOut': 'Esgotado',
+    'points.exchangeOk': 'Sucesso, aguardando envio',
+    'points.exchangeFail': 'Falhou, tente novamente',
 
     // ============ Em destaque ============
     'featured.loading': 'Carregando produtos…',
