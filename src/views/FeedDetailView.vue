@@ -296,6 +296,19 @@ function calcKbH() {
 function syncKeyboard() {
   kbH.value = calcKbH()
 }
+// 输入栏预估高度（含 padding）。用于给主内容加 padding-bottom 让最后内容能滚到输入栏上方
+const CINPUT_RESERVE = 80
+function applyDetailPadding() {
+  const detailEl = document.querySelector('.detail')
+  if (!detailEl) return
+  const kb = kbH.value || Math.round(window.innerHeight * KB_RESERVE_RATIO)
+  // 主内容底部留白 = 键盘高 + 输入栏高，让滚动后内容不被固定输入栏遮挡
+  detailEl.style.paddingBottom = kb + CINPUT_RESERVE + 'px'
+}
+function clearDetailPadding() {
+  const detailEl = document.querySelector('.detail')
+  if (detailEl) detailEl.style.paddingBottom = ''
+}
 function onCommentFocus() {
   commenting.value = true
   // 记录聚焦时的布局高度：用于识别「悬浮窗/覆盖模式输入法」（微信输入法等第三方输入法常见）
@@ -312,6 +325,14 @@ function onCommentFocus() {
           const vv = window.visualViewport
           kbH.value = Math.max(0, Math.round((vv && typeof vv.height === 'number' ? vv.height : baseH) * KB_RESERVE_RATIO))
         }
+        // 键盘动画稳定后挂主内容 padding-bottom，让内容能滚到输入栏上方不被遮挡
+        if (ms === 1200) {
+          applyDetailPadding()
+          // 评论区自动滚到屏幕上部（输入栏上方可见）
+          if (commentsBox.value) {
+            commentsBox.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }
       }, ms)
     })
     const el = commentInput.value
@@ -326,7 +347,10 @@ function onCommentFocus() {
 }
 function onCommentBlur() {
   // 延迟复位，避免点击发送按钮先 blur 再 click 丢失
-  setTimeout(() => { commenting.value = false }, 120)
+  setTimeout(() => {
+    commenting.value = false
+    clearDetailPadding()
+  }, 120)
 }
 onMounted(() => {
   if (window.visualViewport) {
