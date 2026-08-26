@@ -227,7 +227,7 @@ function onRules() {
   bridge.openNative('points/rules')
 }
 function onBanner() {
-  bridge.openNative('points/guide')
+  router.push('/points/guide')
 }
 function goMall() {
   router.push('/points/mall')
