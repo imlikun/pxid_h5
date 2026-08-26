@@ -9,6 +9,7 @@
 | 方法 | 签名 | 说明 |
 | --- | --- | --- |
 | `getToken` | `() => Promise<string>` | 获取登录态 token；缺失即未登录 |
+| `getUserInfo` | `() => Promise<{email?, nickname?, token?, deviceId?}>` | 获取当前登录用户资料；**登录后必须返回** `email` / `nickname` / `token`（任一非空即视为已登录）；未登录返回 `null` 或空对象。`token` 用于 H5 `getAuthToken` 落库鉴权（关注/评论/点赞写后端） |
 | `getLocale` | `() => Promise<{locale,country,currency}>` | 获取当前定位（语言/国家/货币）；详见《多国定位与 i18n 对接规范》 |
 | `navigateTo` | `(tab: string) => void` | 切换到原生底部 tab：`discover` / `featured` / `purchase` / `service` / `profile` |
 | `openNative` | `(path: string) => void` | 打开原生页面（见下方约定） |
@@ -79,11 +80,13 @@ H5 这边已全部完成并推送到 `origin/master` 与 `gitlab/main`，构建�
 - 所有方法请保证异步安全；`getToken` / `requestPurchase` 返回 Promise。
 
 ### 2. 必须实现的方法（签名见「调用出口」表）
-`getToken` / `getLocale` / `navigateTo` / `openNative` / `requestPurchase` / `callPhone` / `openMap` / `openShopify` / `openCheckout`
+`getToken` / `getUserInfo` / `getLocale` / `navigateTo` / `openNative` / `requestPurchase` / `callPhone` / `openMap` / `openShopify` / `openCheckout`
 
 - `getLocale`：返回当前 `{ locale, country, currency }`（如 `{locale:'zh-CN',country:'CN',currency:'CNY'}`）；H5 启动时调用一次初始化多语言与货币格式。未注入时 H5 用默认 `zh-CN/CN/CNY`。详见《多国定位与 i18n 对接规范》。
 
 - `getToken`：返回当前登录 token；**未登录返回空串**，H5 的登录 Gate（`auth.js`）会据此调 `openNative('login')`。
+
+- `getUserInfo`：返回当前登录用户资料 `{ email, nickname, token }`；**登录后必须返回**（token 可为空串，有 email/nickname 即视为已登录，H5 放行关注/评论交互）；未登录返回 `null` 或空对象。真机联调时请打印此方法返回值确认（H5 的 `requireLogin` 三重兜底：`getAuthToken` → `getToken` → `getUserInfo`，任一命中即放行）。
 - `navigateTo(tab)`：tab 取值 `discover` / `featured` / `purchase` / `service` / `profile`，对应原生底部 5 个 tab。
 - `openNative(path)`：解析「已用标识一览」表里的 `module/action?param=value` 字符串，路由到对应原生页。
 - `openShopify(url)`：在 WebView/外部浏览器打开商品 URL，保留返回（外链兜底）。
@@ -92,6 +95,7 @@ H5 这边已全部完成并推送到 `origin/master` 与 `gitlab/main`，构建�
 ### 3. 登录闭环（重点）
 - H5 在缺失 token 时调 `openNative('login')` → 原生拉起登录页。
 - 登录成功后 **`getToken` 要能立即拿到新 token**（H5 不刷新页面，靠 token 变化判断登录态）。
+- **登录后同步让 `getUserInfo()` 返回用户资料**（`email`/`nickname` 至少其一）：H5 的 `requireLogin` 兜底逻辑（`auth.js`）在拿不到 token 时，只要有用户资料即放行，避免"已登录仍误弹登录窗"（历史 Bug #1 根因）。
 
 ### 4. 验收方式
 - 联调时建议原生侧打印 H5 实际调桥的 `path`，与「已用标识一览」逐条对一遍。
