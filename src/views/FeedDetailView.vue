@@ -266,17 +266,33 @@ const commentInput = ref(null)
 // 评论输入栏：聚焦时变固定底部栏，用 visualViewport 顶到软键盘上方，避免被输入法遮挡
 const commenting = ref(false)
 const kbH = ref(0)
-function syncKeyboard() {
+function calcKbH() {
   const vv = window.visualViewport
-  if (!vv) return
-  // 键盘高度 = 视口高度 - 视觉视口高度 - 视觉视口顶部偏移
-  kbH.value = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+  if (vv && typeof vv.height === 'number') {
+    // iOS / 新 Android WebView：键盘高度 = 布局视口 - 视觉视口 - 顶部偏移
+    return Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
+  }
+  // 降级：无 visualViewport（旧 Android WebView）
+  //   adjustResize 模式：innerHeight 已缩小，fixed bottom:0 天然位于键盘上方 → 0 即正确
+  //   覆盖模式：取不到键盘高度 → 靠 onCommentFocus 里的 scrollIntoView 兜底
+  return 0
+}
+function syncKeyboard() {
+  kbH.value = calcKbH()
 }
 function onCommentFocus() {
   commenting.value = true
   nextTick(() => {
     syncKeyboard()
-    commentInput.value && commentInput.value.focus()
+    // 键盘弹出动画期间高度分两次重算（iOS 键盘动画约 250ms，事件可能滞后）
+    setTimeout(syncKeyboard, 120)
+    setTimeout(syncKeyboard, 320)
+    const el = commentInput.value
+    if (el) {
+      el.focus()
+      // 兜底：旧 WebView 取不到键盘高度时，把输入框滚到可视区中部
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
   })
 }
 function onCommentBlur() {
