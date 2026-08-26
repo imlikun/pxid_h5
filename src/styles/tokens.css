@@ -37,8 +37,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden; /* 兜底：任何页面内容意外横向溢出时不产生左右滑动 */
-  overflow-x: clip;   /* 不创建滚动容器，避免破坏 position:sticky */
+  overflow-x: clip;   /* 不创建滚动容器，避免破坏 position:sticky；同时兜底横向溢出不产生左右滑动 */
 }
 
 body {
