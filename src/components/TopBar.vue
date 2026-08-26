@@ -58,6 +58,8 @@ function onBack() {
   align-items: center;
   justify-content: space-between;
   padding: 0 8px;
+  /* 沉浸式：所有模式（含非 sticky 的标题页）都避让状态栏，避免标题/按钮被状态栏遮挡 */
+  padding-top: env(safe-area-inset-top, 0px);
   background: var(--bg, #ffffff);
 }
 .tb-sticky {
@@ -97,7 +99,7 @@ function onBack() {
 }
 .tb-title {
   position: absolute;
-  top: env(safe-area-inset-top, 0px);
+  top: 0;
   left: 56px;
   right: 56px;
   bottom: 0;
