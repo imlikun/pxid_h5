@@ -249,7 +249,25 @@ export const bridge = {
   requestPurchase: (p) => window.PXIDBridge.requestPurchase(p),
   callPhone: (p) => window.PXIDBridge.callPhone(p),
   openMap: (o) => window.PXIDBridge.openMap(o),
-  openNative: (p) => window.PXIDBridge.openNative(p),
+  openNative: (p) => {
+    // 积分板块：H5 等价页优先（预览+真机都可用，不依赖 Flutter 原生实现；
+    //   ⚠️ 将来 Flutter 实现 points/* 原生页后，如需原生体验可移除此分支回退 window.PXIDBridge.openNative）
+    if (window.__router) {
+      const pts = (q) => {
+        if (q === 'points/guide' || q.startsWith('points/guide?')) return '/points/guide'
+        if (q === 'points/rules' || q.startsWith('points/rules?')) return '/points/guide'
+        if (q === 'points/mall' || q.startsWith('points/mall?')) return '/points/mall'
+        if (q === 'points/exchange' || q.startsWith('points/exchange?')) return '/points/mall'
+        return null
+      }
+      const t = pts(p)
+      if (t) {
+        window.__router.push(t)
+        return
+      }
+    }
+    return window.PXIDBridge.openNative(p)
+  },
   getLocation: () => window.PXIDBridge.getLocation(),
   getOSSCredentials: () => window.PXIDBridge.getOSSCredentials(),
   pickImages: (opts) => window.PXIDBridge.pickImages ? window.PXIDBridge.pickImages(opts) : Promise.reject(new Error('未实现')),
