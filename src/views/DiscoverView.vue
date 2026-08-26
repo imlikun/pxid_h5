@@ -459,22 +459,29 @@ async function fetchBanners() {
     }
   } catch (e) { /* 拉取失败保持静态兜底图 */ }
 }
+// 5 个主底部 tab（与 bridge.navigateTo 契约键名一致）
+const MAIN_TABS = ['discover', 'featured', 'purchase', 'service', 'profile']
 function onBanner() {
   const b = bannerSlides.value[bannerIdx.value]
   if (!b || !b.url) return
   const u = b.url
   if (/^https?:\/\//i.test(u)) { bridge.openShopify(u); return }
-  // 内部路由：原生环境走 openNative 让 Flutter 切 tab（解决"点了精选但 tab 还在发现"）
-  if (u.startsWith('/')) {
-    if (bridge.isNative()) {
-      // 截取路径名作为原生路由指令（如 /featured → featured）
-      bridge.openNative(u.slice(1))
+  if (!u.startsWith('/')) { bridge.openNative(u); return }
+  // 内部路由：取路径首段
+  const seg = u.slice(1).split('/')[0]
+  if (bridge.isNative()) {
+    if (MAIN_TABS.includes(seg)) {
+      // 关键点：主 tab 路由必须走 navigateTo 让 Flutter 正确切换底部 tab 并加载该 tab 路由。
+      // router.push 只改 H5 内部路由、Flutter tab 状态仍停在发现 → 点底部 tab 不响应（回不来发现）；
+      // openNative 是开原生子页(车型/绑车)，不是切 tab → 同样失效。两者都错。
+      bridge.navigateTo(seg)
     } else {
-      router.push(u)
+      // /product/*、/vehicle/* 等子页走原生页指令
+      bridge.openNative(u.slice(1))
     }
-    return
+  } else {
+    router.push(u) // 浏览器独立预览兜底
   }
-  bridge.openNative(u)
 }
 
 // 发布后自动切到「动态」tab 展示新内容
