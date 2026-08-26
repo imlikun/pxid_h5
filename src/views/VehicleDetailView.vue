@@ -234,13 +234,14 @@ function relatedName(id) {
 
 // CTA 操作
 function onOrder() {
-  const q = new URLSearchParams({
-    model: v.value.id,
-    code: v.value.code,
-    price: currentPrice.value,
-    config: JSON.stringify(selections),
-  }).toString()
-  bridge.openNative('buy/order?' + q)
+  // 跳转 Shopify 商品页购买（Headless 模式：H5 展示 → Shopify 结算）
+  const url = v.value?.shopUrl
+  if (url) {
+    bridge.openShopify(url)
+  } else {
+    // 无 Shopify 映射时降级到原生购买流程
+    bridge.openNative('buy/order?model=' + v.value.id)
+  }
 }
 function onTestDrive() {
   bridge.openNative('service/testdrive?model=' + v.value.id)

@@ -637,6 +637,7 @@ export const vehicleCatalog = {
     name: 'F2 倒三轮滑板车', shortName: 'F2',
     slogan: '城市穿梭 · 稳如泰山 · 倒三轮结构重新定义滑板车',
     price: 16980, priceUnit: '¥',
+    shopUrl: 'https://shop.pxid.com/products/f2-scooter',
     heroImage: 'banner/banner-op1.jpg',       // 主 Hero 大图（16:9）
     gallery: [                                  // 配置区轮播小图
       'banner/banner-op1.jpg',
@@ -692,6 +693,7 @@ export const vehicleCatalog = {
     name: 'P2 Fat-Tire 电助力越野', shortName: 'P2',
     slogan: '全地形征服者 · 4.0 肥胎 · 山地级避震',
     price: 12880, priceUnit: '¥',
+    shopUrl: 'https://shop.pxid.com/products/p2-ebike',
     heroImage: 'banner/banner-shot1.jpg',
     gallery: ['banner/banner-shot1.jpg', 'banner/banner-moto.jpg'],
     specs: [
@@ -731,6 +733,7 @@ export const vehicleCatalog = {
     name: 'P5 智能电摩 Pro', shortName: 'P5',
     slogan: '速度与智能的完美融合 · TFT 彩屏 · Bosch ABS',
     price: 25800, priceUnit: '¥',
+    shopUrl: 'https://shop.pxid.com/products/p5-motorcycle',
     heroImage: 'banner/banner-moto.jpg',
     gallery: ['banner/banner-moto.jpg'],
     specs: [

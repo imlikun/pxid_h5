@@ -507,8 +507,8 @@ function onAdd() {
 function onNotice() { router.push('/interactions') }
 function onQuick(q) {
   if (q.key === 'notice') { router.push('/notices'); return }
-  // 决策 2：立即定制归口购车定制页（原生承载）
-  if (q.key === 'custom') { bridge.openNative('purchase/customize'); return }
+  // 决策 2：立即定制 → 跳转 H5 车型定制页（鸿蒙智行风格，VehicleDetailView）
+  if (q.key === 'custom') { router.push('/vehicle/scooter-F2'); return }
   if (q.key === 'points') { router.push('/points'); return }
 }
 // 取本机坐标：优先原生桥（Flutter 注入），降级浏览器 geolocation
@@ -653,8 +653,8 @@ function showToast(msg) {
 .region-pill {
   font-size: 12px;
   color: var(--text-sub);
-  background: #F0F1F3;
-  border-radius: 12px;
+  background: #F5F5F7;
+  border-radius: var(--radius-pill);
   padding: 4px 12px;
   line-height: 1.4;
   transition: all 0.15s ease;
@@ -672,13 +672,14 @@ function showToast(msg) {
 .search {
   margin: 10px 16px 0;
   height: 40px;
-  background: #F0F1F3;
+  background: #F5F5F7;
   border: none;
   border-radius: var(--radius-pill);
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 14px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
 }
 .sicon {
   color: var(--text-hint);
@@ -697,10 +698,11 @@ function showToast(msg) {
 .banner {
   position: relative;
   margin: 16px 14px 0;
-  border-radius: var(--radius);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   aspect-ratio: 16 / 9;
   touch-action: pan-y;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
 }
 .banner__track {
   display: flex;
@@ -751,16 +753,18 @@ function showToast(msg) {
   position: relative;
   height: 72px;
   background: #ffffff;
-  border: 1px solid #E0E0E0;
-  border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  border: none;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
   padding: 6px 4px;
+  transition: transform .15s ease, box-shadow .15s ease;
 }
+.quick__item:active { transform: scale(.96); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .quick__icon {
   width: 20px;
   height: 20px;
@@ -803,7 +807,7 @@ function showToast(msg) {
   line-height: 1.3;
   white-space: nowrap;
   padding: 6px 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-pill);
   background: #F5F5F7;
   transition: all 0.15s ease;
   font-weight: 500;
@@ -813,6 +817,7 @@ function showToast(msg) {
   color: #fff;
   background: var(--brand, #4A6CF7);
   font-weight: 600;
+  box-shadow: 0 2px 8px rgba(77,124,255,.25);
 }
 .sort {
   color: var(--text-sub);
@@ -822,9 +827,10 @@ function showToast(msg) {
   width: 30px;
   height: 30px;
   flex: none;
-  border-radius: 16px;
+  border-radius: var(--radius-pill);
   background: #F5F5F7;
   transition: all 0.15s ease;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
 }
 .content {
   margin-top: 16px;
@@ -856,8 +862,9 @@ function showToast(msg) {
 }
 .showcase {
   background: #ffffff;
-  border-radius: var(--radius);
+  border-radius: var(--radius-xl);
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
 }
 .showcase__img {
   width: 100%;
@@ -895,9 +902,9 @@ function showToast(msg) {
 }
 .activity {
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  border: none;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -930,11 +937,13 @@ function showToast(msg) {
 }
 .act__btn {
   flex: none;
-  background: #2F2F2F;
+  background: var(--brand-gradient, linear-gradient(135deg, #4D7CFF, #6C4DFF));
   color: #ffffff;
-  border-radius: 6px;
+  border-radius: var(--radius-pill);
   padding: 7px 12px;
   font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(77,124,255,.25);
 }
 .toast {
   position: fixed;
@@ -967,6 +976,7 @@ function showToast(msg) {
 .subtab.active {
   color: #fff;
   background: var(--brand);
+  box-shadow: 0 2px 8px rgba(77,124,255,.25);
 }
 .subtab:active { transform: scale(0.96); }
 </style>
