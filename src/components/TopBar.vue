@@ -62,8 +62,10 @@ function onBack() {
 }
 .tb-sticky {
   position: sticky;
-  top: 0;
-  z-index: 10;
+  top: env(safe-area-inset-top, 0);
+  z-index: 100;
+  background: var(--bg, #fff);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
 }
 .tb-left,
 .tb-right {
