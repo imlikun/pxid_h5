@@ -937,10 +937,12 @@ app.get('/growth/points-products', requireAuth, (req, res) => {
   if (!device) return res.json(err(401, '未授权'))
   const eff = effectiveDevice(device)
   const rows = db.prepare("SELECT id,name,cover,tags,price,points,stock,description FROM points_products WHERE status='on' ORDER BY sort,id").all()
-  const list = rows.map((r) => ({
-    ...r,
-    tags: r.tags ? String(r.tags).split(',').map((s) => s.trim()).filter(Boolean) : [],
-  }))
+  const parseTags = (raw) => {
+    if (!raw) return []
+    try { const a = JSON.parse(raw); return Array.isArray(a) ? a.map((s) => String(s).trim()).filter(Boolean) : [] } catch (e) { /* 非 JSON 则按逗号拆 */ }
+    return String(raw).split(',').map((s) => s.trim()).filter(Boolean)
+  }
+  const list = rows.map((r) => ({ ...r, tags: parseTags(r.tags) }))
   res.json(ok({ balance: getBalance(eff), list }))
 })
 
