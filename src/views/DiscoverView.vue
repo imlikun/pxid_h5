@@ -124,9 +124,6 @@
           >{{ filterLabel(f) }}</span
         >
       </div>
-      <span class="sort" :class="{ on: sortMode === 'hot' }" @click="onSort">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m11 12 4 4 4-4"/><path d="M15 20V4"/></svg>
-      </span>
     </div>
 
     <!-- 推荐：双列网格 -->
@@ -277,7 +274,6 @@ function onBannerTouchEnd(e) {
 const tabs = discoverTabs
 const activeTab = ref('推荐')
 const activeFilter = ref('全部')
-const sortMode = ref('latest')
 
 // ---- 地区（PRD 硬限定：CN / BR / US，3 国互不交叉）----
 const regionOptions = [
@@ -332,7 +328,6 @@ function rankList(list) {
     const pa = Number(a.pinned ? 1 : 0)
     const pb = Number(b.pinned ? 1 : 0)
     if (pa !== pb) return pb - pa
-    if (sortMode.value === 'hot') return (Number(b.likes) || 0) - (Number(a.likes) || 0)
     return tsOf(b) - tsOf(a)
   })
 }
@@ -578,10 +573,6 @@ async function setDynamicSub(sub) {
   }
 }
 
-function onSort() {
-  sortMode.value = sortMode.value === 'latest' ? 'hot' : 'latest'
-  showToast(sortMode.value === 'hot' ? t('discover.sort.hot') : t('discover.sort.latest'))
-}
 function onShowcase(p) {
   // 车型卡跳 H5 车型详情页（Flutter 端未实现 vehicle 原生路由，走 H5 兜底）
   router.push('/vehicle/' + p.id)
@@ -892,19 +883,6 @@ function showToast(msg) {
   font-weight: 600;
   line-height: 1;
   box-shadow: 0 2px 8px rgba(77,124,255,.25);
-}
-.sort {
-  color: var(--text-sub);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  flex: none;
-  border-radius: var(--radius-pill);
-  background: #F5F5F7;
-  transition: all 0.15s ease;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
 }
 .content {
   margin-top: 16px;
