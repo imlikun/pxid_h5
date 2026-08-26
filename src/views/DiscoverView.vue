@@ -686,12 +686,15 @@ function showToast(msg) {
   margin-top: 4px;
 }
 .region-pill {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-sub);
   background: #F5F5F7;
   border-radius: var(--radius-pill);
-  padding: 4px 12px;
-  line-height: 1.4;
+  padding: 6px 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
 }
 .region-pill.on {
@@ -701,7 +704,6 @@ function showToast(msg) {
   font-size: 13px;
   padding: 6px 14px;
   line-height: 1;
-  box-shadow: 0 2px 8px rgba(77,124,255,.25);
 }
 .region-hint {
   margin-left: auto;
@@ -868,7 +870,7 @@ function showToast(msg) {
 .chip {
   font-size: 13px;
   color: var(--text-sub);
-  line-height: 1.3;
+  line-height: 1;
   white-space: nowrap;
   padding: 6px 14px;
   border-radius: var(--radius-pill);
@@ -876,13 +878,15 @@ function showToast(msg) {
   transition: all 0.15s ease;
   font-weight: 500;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .chip.active {
   color: #fff;
   background: var(--brand, #4A6CF7);
   font-weight: 600;
   line-height: 1;
-  box-shadow: 0 2px 8px rgba(77,124,255,.25);
 }
 .content {
   margin-top: 16px;
@@ -1023,12 +1027,15 @@ function showToast(msg) {
   border-radius: 16px;
   padding: 6px 14px;
   font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
 }
 .subtab.active {
   color: #fff;
   background: var(--brand);
-  box-shadow: 0 2px 8px rgba(77,124,255,.25);
   font-weight: 600;
   line-height: 1;
 }
