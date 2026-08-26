@@ -33,7 +33,7 @@
       <!-- 双 CTA 按钮 -->
       <section class="cta-row fade-up stagger-2">
         <button class="cta cta-primary press" @click="onOrder">立即订购</button>
-        <button class="cta cta-outline press" @click="onTestDrive">预约试驾</button>
+        <button class="cta cta-outline press" @click="onContact">在线客服</button>
       </section>
 
       <!-- 车友圈入口条 -->
@@ -160,7 +160,7 @@
         <span class="fp-hint">起</span>
       </div>
       <button class="f-buy press" @click="onOrder">立即订购</button>
-      <button class="f-test press" @click="onTestDrive">预约试驾</button>
+      <button class="f-test press" @click="onContact">在线客服</button>
     </div>
   </div>
 </template>
@@ -234,17 +234,21 @@ function relatedName(id) {
 
 // CTA 操作
 function onOrder() {
-  // 跳转 Shopify 商品页购买（Headless 模式：H5 展示 → Shopify 结算）
+  // 直接跳转 Shopify 商品页（H5 内打开，不依赖 Flutter bridge）
   const url = v.value?.shopUrl
   if (url) {
-    bridge.openShopify(url)
+    window.open(url, '_blank')
   } else {
     // 无 Shopify 映射时降级到原生购买流程
     bridge.openNative('buy/order?model=' + v.value.id)
   }
 }
-function onTestDrive() {
-  bridge.openNative('service/testdrive?model=' + v.value.id)
+function onContact() {
+  // 在线客服 / 咨询：优先走原生，H5 降级跳转 Shopify 联系页
+  const called = bridge.openNative('service/contact?model=' + v.value.id)
+  if (!called) {
+    window.open('https://shop.pxid.com/pages/contact', '_blank')
+  }
 }
 function onCommunity() {
   router.push('/discover')
