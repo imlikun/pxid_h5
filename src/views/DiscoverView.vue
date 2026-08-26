@@ -45,24 +45,11 @@
       <span class="sicon">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </span>
-      <input class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearchEnter" @compositionstart="isComposing = true" @compositionend="onCompositionEnd" @click.stop />
+      <input class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearch" @click.stop />
     </div>
 
-    <!-- 搜索结果（内联过滤，不跳页） -->
-    <div v-if="showSearchResults" class="search-results">
-      <div class="search-results__head">「{{ keyword }}」{{ searchResults.length }} 个结果</div>
-      <div v-if="searchResults.length === 0" class="search-results__empty">{{ t('search.empty', { q: keyword }) }}</div>
-      <FeedCard
-        v-for="it in searchResults"
-        :key="'sr-' + it.id"
-        :item="it"
-        class="fade-up"
-      />
-      <button class="search-results__clear press" @click="showSearchResults = false; keyword = ''">{{ t('search.clear') || '清除' }}</button>
-    </div>
-
-    <!-- Banner 轮播 + 快捷入口：仅推荐页 + 非搜索态 -->
-    <template v-if="activeTab === '推荐' && !showSearchResults">
+    <!-- Banner 轮播 + 快捷入口：仅推荐页 -->
+    <template v-if="activeTab === '推荐'">
       <div
         class="banner"
         @touchstart="onBannerTouchStart"
@@ -112,8 +99,8 @@
       </div>
     </template>
 
-    <!-- 车型筛选：仅推荐/动态显示（推荐=全部、动态=最新；广场无筛选条，与设计稿一致）+ 非搜索态 -->
-    <div v-if="activeTab !== '广场' && !showSearchResults" class="filter">
+    <!-- 车型筛选：仅推荐/动态显示（推荐=全部、动态=最新；广场无筛选条，与设计稿一致） -->
+    <div v-if="activeTab !== '广场'" class="filter">
       <div class="chips">
         <span
           v-for="f in currentFilters"
@@ -124,10 +111,13 @@
           >{{ filterLabel(f) }}</span
         >
       </div>
+      <span class="sort" :class="{ on: sortMode === 'hot' }" @click="onSort">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m11 12 4 4 4-4"/><path d="M15 20V4"/></svg>
+      </span>
     </div>
 
     <!-- 推荐：双列网格 -->
-    <div v-if="activeTab === '推荐' && !showSearchResults" class="content">
+    <div v-if="activeTab === '推荐'" class="content">
       <div class="grid2">
         <FeedCard
           v-for="(it, i) in recommendList"
@@ -142,8 +132,8 @@
       </div>
     </div>
 
-    <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 + 非搜索态 -->
-    <template v-else-if="activeTab === '动态' && !showSearchResults">
+    <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 -->
+    <template v-else-if="activeTab === '动态'">
       <div class="subtabs">
         <span class="subtab" :class="{ active: dynamicSubtab === 'follow' }" @click="setDynamicSub('follow')">{{ t('discover.subFollow') }}</span>
         <span class="subtab" :class="{ active: dynamicSubtab === 'near' }" @click="setDynamicSub('near')">{{ t('discover.subNear') }}</span>
@@ -164,8 +154,8 @@
       </div>
     </template>
 
-    <!-- 广场：车型展示 + 热门活动 + 非搜索态 -->
-    <div v-else-if="activeTab === '广场' && !showSearchResults" class="content">
+    <!-- 广场：车型展示 + 热门活动 -->
+    <div v-else-if="activeTab === '广场'" class="content">
       <div class="grid3">
         <div
           v-for="(p, i) in plazaShowcase"
@@ -274,6 +264,7 @@ function onBannerTouchEnd(e) {
 const tabs = discoverTabs
 const activeTab = ref('推荐')
 const activeFilter = ref('全部')
+const sortMode = ref('latest')
 
 // ---- 地区（PRD 硬限定：CN / BR / US，3 国互不交叉）----
 const regionOptions = [
@@ -308,10 +299,10 @@ const actList = ref([])
 const loading = ref(false)
 const loadErr = ref('')
 
-// 车型筛选 chip：从接口数据动态提取（推荐=全部+有车型的帖子去重；动态=最新+同），过滤掉含汉字的标签
+// 车型筛选 chip：从接口数据动态提取（推荐=全部+有车型的帖子去重；动态=最新+同）
 const currentFilters = computed(() => {
   const list = activeTab.value === '推荐' ? recommendData.value : dynamicData.value
-  const cars = [...new Set(list.map((i) => i.carModel).filter(Boolean).filter((c) => !/[\u4e00-\u9fff]/.test(c)))]
+  const cars = [...new Set(list.map((i) => i.carModel).filter(Boolean))]
   if (activeTab.value === '推荐') return ['全部', ...cars]
   return ['最新', ...cars]
 })
@@ -328,6 +319,7 @@ function rankList(list) {
     const pa = Number(a.pinned ? 1 : 0)
     const pb = Number(b.pinned ? 1 : 0)
     if (pa !== pb) return pb - pa
+    if (sortMode.value === 'hot') return (Number(b.likes) || 0) - (Number(a.likes) || 0)
     return tsOf(b) - tsOf(a)
   })
 }
@@ -463,18 +455,9 @@ function onBanner() {
   const b = bannerSlides.value[bannerIdx.value]
   if (!b || !b.url) return
   const u = b.url
-  if (/^https?:\/\//i.test(u)) { bridge.openShopify(u); return }
-  // 内部路由：原生环境走 openNative 让 Flutter 切 tab（解决"点了精选但 tab 还在发现"）
-  if (u.startsWith('/')) {
-    if (bridge.isNative()) {
-      // 截取路径名作为原生路由指令（如 /featured → featured）
-      bridge.openNative(u.slice(1))
-    } else {
-      router.push(u)
-    }
-    return
-  }
-  bridge.openNative(u)
+  if (/^https?:\/\//i.test(u)) bridge.openShopify(u)
+  else if (u.startsWith('/')) router.push(u)
+  else bridge.openNative(u)
 }
 
 // 发布后自动切到「动态」tab 展示新内容
@@ -524,8 +507,8 @@ function onAdd() {
 function onNotice() { router.push('/interactions') }
 function onQuick(q) {
   if (q.key === 'notice') { router.push('/notices'); return }
-  // 决策 2：立即定制 → 跳转 H5 车型定制页（鸿蒙智行风格，VehicleDetailView）
-  if (q.key === 'custom') { router.push('/vehicle/scooter-F2'); return }
+  // 决策 2：立即定制归口购车定制页（原生承载）
+  if (q.key === 'custom') { bridge.openNative('purchase/customize'); return }
   if (q.key === 'points') { router.push('/points'); return }
 }
 // 取本机坐标：优先原生桥（Flutter 注入），降级浏览器 geolocation
@@ -573,39 +556,21 @@ async function setDynamicSub(sub) {
   }
 }
 
+function onSort() {
+  sortMode.value = sortMode.value === 'latest' ? 'hot' : 'latest'
+  showToast(sortMode.value === 'hot' ? t('discover.sort.hot') : t('discover.sort.latest'))
+}
 function onShowcase(p) {
-  // 车型卡跳 H5 车型详情页（Flutter 端未实现 vehicle 原生路由，走 H5 兜底）
-  router.push('/vehicle/' + p.id)
+  // 决策 8：车型卡跳购车车型页（原生承载）
+  bridge.openNative('vehicle/' + p.id)
 }
 function onMoreActivity() { router.push('/activity-center') }
 function onActivity(a) { router.push('/activity/' + a.id) }
 
 const keyword = ref('')
-const isComposing = ref(false)
-function onSearchEnter() {
-  if (isComposing.value) return // IME 组合中不触发搜索
-  onSearch()
-}
-function onCompositionEnd(e) {
-  isComposing.value = false
-}
-// 搜索：内联过滤当前 tab 已加载数据（不走二级页，不调原生）
-const showSearchResults = ref(false)
-const searchResults = computed(() => {
-  const k = (keyword.value || '').trim().toLowerCase()
-  if (!k || !showSearchResults.value) return []
-  const src = activeTab.value === '推荐' ? recommendData.value : dynamicList.value
-  return src.filter((it) => {
-    const t = (it.title || '').toLowerCase()
-    const c = (it.content || '').toLowerCase()
-    const a = (it.author || '').toLowerCase()
-    return t.includes(k) || c.includes(k) || a.includes(k)
-  })
-})
 function onSearch() {
-  const k = keyword.value.trim()
-  if (!k) { showSearchResults.value = false; return }
-  showSearchResults.value = true
+  // 搜索（决策相关）：原生承载；H5 兜底跳 /search 并带 q
+  bridge.openNative('search?q=' + encodeURIComponent(keyword.value.trim()))
 }
 
 const toast = ref('')
@@ -686,24 +651,18 @@ function showToast(msg) {
   margin-top: 4px;
 }
 .region-pill {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-sub);
-  background: #F5F5F7;
-  border-radius: var(--radius-pill);
-  padding: 6px 14px;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  background: #F0F1F3;
+  border-radius: 12px;
+  padding: 4px 12px;
+  line-height: 1.4;
   transition: all 0.15s ease;
 }
 .region-pill.on {
   color: #fff;
   background: var(--brand);
   font-weight: 600;
-  font-size: 13px;
-  padding: 6px 14px;
-  line-height: 1;
 }
 .region-hint {
   margin-left: auto;
@@ -713,39 +672,13 @@ function showToast(msg) {
 .search {
   margin: 10px 16px 0;
   height: 40px;
-  background: #F5F5F7;
+  background: #F0F1F3;
   border: none;
   border-radius: var(--radius-pill);
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 14px;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
-}
-/* 搜索结果（内联） */
-.search-results {
-  padding: 8px 12px 16px;
-}
-.search-results__head {
-  font-size: 13px;
-  color: var(--text-hint);
-  padding: 4px 4px 12px;
-}
-.search-results__empty {
-  text-align: center;
-  color: var(--text-hint);
-  font-size: 14px;
-  padding: 40px 0;
-}
-.search-results__clear {
-  display: block;
-  margin: 16px auto 0;
-  background: none;
-  border: 1px solid var(--line);
-  color: var(--text-sub);
-  font-size: 13px;
-  padding: 8px 24px;
-  border-radius: var(--radius-pill);
 }
 .sicon {
   color: var(--text-hint);
@@ -764,11 +697,10 @@ function showToast(msg) {
 .banner {
   position: relative;
   margin: 16px 14px 0;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius);
   overflow: hidden;
   aspect-ratio: 16 / 9;
   touch-action: pan-y;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
 }
 .banner__track {
   display: flex;
@@ -819,18 +751,16 @@ function showToast(msg) {
   position: relative;
   height: 72px;
   background: #ffffff;
-  border: none;
-  border-radius: var(--radius-xl);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+  border: 1px solid #E0E0E0;
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
   padding: 6px 4px;
-  transition: transform .15s ease, box-shadow .15s ease;
 }
-.quick__item:active { transform: scale(.96); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .quick__icon {
   width: 20px;
   height: 20px;
@@ -870,23 +800,31 @@ function showToast(msg) {
 .chip {
   font-size: 13px;
   color: var(--text-sub);
-  line-height: 1;
+  line-height: 1.3;
   white-space: nowrap;
   padding: 6px 14px;
-  border-radius: var(--radius-pill);
+  border-radius: 16px;
   background: #F5F5F7;
   transition: all 0.15s ease;
   font-weight: 500;
   flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 .chip.active {
   color: #fff;
   background: var(--brand, #4A6CF7);
   font-weight: 600;
-  line-height: 1;
+}
+.sort {
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 16px;
+  background: #F5F5F7;
+  transition: all 0.15s ease;
 }
 .content {
   margin-top: 16px;
@@ -918,9 +856,8 @@ function showToast(msg) {
 }
 .showcase {
   background: #ffffff;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
 }
 .showcase__img {
   width: 100%;
@@ -958,9 +895,9 @@ function showToast(msg) {
 }
 .activity {
   background: var(--card);
-  border: none;
-  border-radius: var(--radius-xl);
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -993,13 +930,11 @@ function showToast(msg) {
 }
 .act__btn {
   flex: none;
-  background: var(--brand-gradient, linear-gradient(135deg, #4D7CFF, #6C4DFF));
+  background: #2F2F2F;
   color: #ffffff;
-  border-radius: var(--radius-pill);
+  border-radius: 6px;
   padding: 7px 12px;
   font-size: 12px;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(77,124,255,.25);
 }
 .toast {
   position: fixed;
@@ -1027,17 +962,11 @@ function showToast(msg) {
   border-radius: 16px;
   padding: 6px 14px;
   font-weight: 500;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   transition: all 0.15s ease;
 }
 .subtab.active {
   color: #fff;
   background: var(--brand);
-  font-weight: 600;
-  line-height: 1;
 }
 .subtab:active { transform: scale(0.96); }
 </style>

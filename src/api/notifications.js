@@ -1,6 +1,11 @@
 // 互动消息（通知）数据层：对接后端 /notifications（自有后端，不依赖 Flutter）
 import { API_BASE } from './shop'
-import { authHeaders } from '../utils/auth'
+import { bridge } from '../bridge'
+
+async function authHeaders() {
+  const token = await bridge.getAuthToken()
+  return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || '') }
+}
 
 export async function fetchNotifications() {
   try {

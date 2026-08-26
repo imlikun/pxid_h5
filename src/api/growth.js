@@ -2,7 +2,14 @@
 // 后端：GET /growth/profile、POST /growth/signin、GET /growth/medals（均 requireAuth）
 // 与 notifications.js 一致：走 API_BASE（pxid-api.appin.site），路径无 /api 前缀
 import { API_BASE } from './shop'
-import { authHeaders } from '../utils/auth'
+import { bridge } from '../bridge'
+
+async function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' }
+  const token = bridge.getAuthToken ? await bridge.getAuthToken() : ''
+  if (token) headers['Authorization'] = 'Bearer ' + token
+  return headers
+}
 
 async function req(method, path, body) {
   const opt = { method, headers: await authHeaders() }
@@ -21,19 +28,4 @@ export async function doSignin() {
 }
 export async function fetchMedals() {
   return req('GET', '/growth/medals')
-}
-
-// ---- 积分商城（兑换商品 / 兑换 / 我的兑换记录）----
-export async function fetchPointsProducts(region) {
-  const q = region ? '?region=' + encodeURIComponent(region) : ''
-  return req('GET', '/growth/points-products' + q)
-}
-export async function fetchPointsProduct(id) {
-  return req('GET', '/growth/points-products/' + id)
-}
-export async function doRedeem(payload) {
-  return req('POST', '/growth/redeem', payload)
-}
-export async function fetchMyExchanges(page = 1, pageSize = 20) {
-  return req('GET', '/growth/exchanges?page=' + page + '&pageSize=' + pageSize)
 }

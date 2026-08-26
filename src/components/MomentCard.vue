@@ -60,7 +60,6 @@ import bridge from '../bridge'
 import { defaultAvatar } from '../data/mock'
 import { mediaUrl } from '../storage'
 import { requireLogin } from '../utils/auth'
-import { followUser, unfollowUser, checkFollow } from '../api/feed'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -98,8 +97,7 @@ function onPreview(img) {
   console.log('preview image:', img)
 }
 function onCar(model) {
-  // 车型标签跳 H5 车型详情页（Flutter 端未实现 vehicle 原生路由，走 H5 兜底）
-  router.push('/vehicle/' + model)
+  bridge.openNative('vehicle/' + model)
 }
 async function onLike() {
   const ok = await requireLogin()
@@ -111,19 +109,8 @@ async function onLike() {
 async function onFollow() {
   const ok = await requireLogin()
   if (!ok) return
-  const next = !props.item.followed
-  props.item.followed = next
-  try {
-    // 走 H5 API 真实落库（与 FeedDetailView.onFollow 一致），不再纯丢给原生
-    const r = next
-      ? await followUser(props.item.deviceId)
-      : await unfollowUser(props.item.deviceId)
-    if (!r || !r.ok) {
-      props.item.followed = !next
-    }
-  } catch (e) {
-    props.item.followed = !next
-  }
+  props.item.followed = true
+  bridge.openNative('feed/follow?id=' + props.item.id)
 }
 </script>
 

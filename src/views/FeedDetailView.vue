@@ -141,9 +141,6 @@
           class="cinput__field"
           :placeholder="replyTo ? ('回复 ' + replyTo.name + '：') : t('feed.inputPlaceholder')"
           @keyup.enter="submitComment"
-          @compositionstart="isComposing = true"
-          @compositionend="onCompositionEnd"
-          @focus="onCommentFocus"
         />
         <button class="cinput__send press" @click="submitComment">{{ t('feed.send') }}</button>
       </div>
@@ -256,16 +253,6 @@ const collected = ref(false)
 const followed = ref(false)
 const comments = ref([])
 const commentText = ref('')
-const isComposing = ref(false)
-function onCompositionEnd() {
-  isComposing.value = false
-}
-// Bug5: 输入法遮挡——focus 时将输入栏滚动到可视区（延迟等键盘弹起）
-function onCommentFocus() {
-  setTimeout(() => {
-    commentInput.value?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, 300)
-}
 const toast = ref('')
 let toastTimer = null
 const commentsBox = ref(null)
@@ -433,8 +420,8 @@ function segClick(seg) {
 }
 
 function onCar(model) {
-  // 车型详情归口 H5 车型详情页（Flutter 端未实现 vehicle 原生路由，走 H5 兜底）
-  router.push('/vehicle/' + model)
+  // 决策 8：车型详情归口购车车型页（原生承载）
+  bridge.openNative('vehicle/' + model)
 }
 function onTopic(t) {
   console.log('tap topic:', t)
@@ -540,14 +527,13 @@ function onCommentBtn() {
   })
 }
 async function submitComment() {
-  if (isComposing.value) return // IME 组合中不提交
   const text = commentText.value.trim()
   if (!text) return
   const [profile, token] = await Promise.all([
     bridge.getUserInfo().catch(() => ({ nickname: t('feed.me'), avatar: '' })),
     bridge.getAuthToken(),
   ])
-  const body = { content: text, nickname: profile?.nickname || t('feed.me'), avatar: profile?.avatar || '' }
+  const body = { content: text, nickname: profile.nickname, avatar: profile.avatar }
   if (replyTo.value) {
     body.parentCommentId = replyTo.value.commentId
     body.replyTo = replyTo.value.name
@@ -591,7 +577,7 @@ async function submitComment() {
       showToast(t('feed.toast.commentOk'))
       return
     }
-    showToast(j.message || t('feed.toast.commentFail'))
+    showToast(j.msg || t('feed.toast.commentFail'))
   } catch (e) {
     showToast(t('feed.toast.commentFail'))
   }

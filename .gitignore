@@ -17,3 +17,8 @@ shots/
 .env.*
 !.env.example
 !.gitignore
+
+# 本地回退备份目录（含旧 discover 构建），不入库
+.legacy-20260822/
+# WorkBuddy 运行态数据（自动化 memory 等），属本地状态非源码，不入库
+.workbuddy/

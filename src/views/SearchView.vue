@@ -6,9 +6,7 @@
           class="sinput"
           v-model="kw"
           :placeholder="t('search.placeholder')"
-          @keyup.enter="doSearchEnter"
-          @compositionstart="isComposing = true"
-          @compositionend="onCompositionEnd"
+          @keyup.enter="doSearch"
         />
       </template>
       <template #right>
@@ -39,6 +37,7 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { feedItems, activities, plazaShowcase } from '../data/mock'
+import { bridge } from '../bridge'
 import { t } from '../i18n'
 import TopBar from '../components/TopBar.vue'
 
@@ -46,14 +45,6 @@ const router = useRouter()
 const route = useRoute()
 const q = ref(route.query.q || '')
 const kw = ref(route.query.q || '')
-const isComposing = ref(false)
-function doSearchEnter() {
-  if (isComposing.value) return
-  doSearch()
-}
-function onCompositionEnd(e) {
-  isComposing.value = false
-}
 const doSearch = () => { q.value = kw.value.trim() }
 
 const results = computed(() => {
@@ -74,7 +65,7 @@ const results = computed(() => {
 })
 
 function onItem(r) {
-  if (r.type === 'vehicle') { router.push('/vehicle/' + r.id); return }
+  if (r.type === 'vehicle') { bridge.openNative('vehicle/' + r.id); return }
   router.push('/' + (r.type === 'feed' ? 'feed' : 'activity') + '/' + r.id)
 }
 </script>

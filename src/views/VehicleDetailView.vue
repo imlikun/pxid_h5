@@ -167,7 +167,6 @@ import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { fetchProducts, fetchProductDetail, getProductByHandle, sym, initRegion } from '../api/shop'
 import { plazaShowcase, VEHICLE_HANDLES, carModelToHandle } from '../data/mock'
-import { bridge } from '../bridge'
 
 const router = useRouter()
 const route = useRoute()
@@ -305,13 +304,10 @@ function relatedName(h) {
 }
 
 // CTA 操作
+// 车型页本质是一个「推荐落地页」，立即订购统一跳转到精选商品详情页（/product/:handle），
+// 复用精选已打通的购物车/结算流程（checkout-v2 + openShopify），保证两端购买体验一致，不裸跳 Shopify。
 function onOrder() {
-  const url = v.value?.shopUrl
-  if (url) {
-    window.open(url, '_blank')
-  } else {
-    bridge.openNative('buy/order?model=' + handle.value)
-  }
+  router.push('/product/' + handle.value)
 }
 function onCommunity() {
   router.push('/discover')

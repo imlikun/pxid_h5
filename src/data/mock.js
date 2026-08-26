@@ -164,7 +164,7 @@ export const feedItems = [
   },
 ]
 
-// 广场：车型展示（真实 Shopify 车型，collection=spring；id=Shopify handle，点击跳车型页拉真实数据）
+// 广场：车型展示（真实 Shopify handle；点击 → /vehicle/:handle → 车型详情页拉真实商品数据）
 export const plazaShowcase = [
   { id: 'ant5', name: 'ANT5', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/marsant_s_x-ANT5_300ee173-43dd-494f-9d7e-3172399253c6.jpg?v=1764830619', itemType: 'buy-vehicle' },
   { id: 'long-range-20-inch-4-fat-tire-pedal-assist-ebike-ant6', name: 'ANT6', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/6_1e5b5268-e204-47e8-8da4-976d2b16738c.jpg?v=1764830364', itemType: 'buy-vehicle' },
@@ -647,12 +647,6 @@ export const notices = [
   { id: 'N3', type: 'activity', forceAck: false, isRead: true, title: '踏春出行季 · 装备直降限时开启', summary: '精选商城踏春装备专场开启，头盔、袖套、储物包等限时直降，积分可叠加抵扣。', publisher: 'PXID 运营中心', publishTime: '2026-08-01 09:00', effectiveTime: '2026-08-01 至 2026-08-31', content: '活动期间踏春装备专区全场直降，满 199 减 30，积分可 100:1 抵扣现金。' },
   { id: 'N4', type: 'safety', forceAck: false, isRead: true, title: '雨季骑行安全提醒', summary: '雨季路面湿滑，请降低胎压、保持车距、避免涉水，刹车提前轻柔点刹。', publisher: 'PXID 用户运营', publishTime: '2026-07-20 11:00', effectiveTime: '2026-07-20 起', content: '雨季骑行三要点：① 胎压适当降低增加抓地；② 涉水深度不超过轮毂中心；③ 刹车提前点刹防止侧滑。' },
 ]
-
-// ---------------- 车型详情页（VehicleDetailView）----------------
-// ⚠️ 不再使用本地 mock：车型页改为按 Shopify handle 从 /mall-api/products/:handle 拉真实数据
-//    （参数/配置/价格/立即订购全部来自精选真实商品，见 src/views/VehicleDetailView.vue）
-//    旧 vehicleCatalog / getVehicleDetail 已删除，避免「假车型数据」混入交付。
-
 
 // ---------------- 立即定制 → 购车 Tab（前端展示，提交走原生）----------------
 export const customizeOptions = {

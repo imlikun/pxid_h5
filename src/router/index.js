@@ -34,9 +34,6 @@ const VehicleDetailView = () => import('../views/VehicleDetailView.vue')
 const CustomizeView = () => import('../views/CustomizeView.vue')
 const SearchView = () => import('../views/SearchView.vue')
 const PointsView = () => import('../views/PointsView.vue')
-const PointsMallView = () => import('../views/PointsMallView.vue')
-const ExchangeRecordsView = () => import('../views/ExchangeRecordsView.vue')
-const PointsGuideView = () => import('../views/PointsGuideView.vue')
 const PublishView = () => import('../views/PublishView.vue')
 const ActivityCenterView = () => import('../views/ActivityCenterView.vue')
 const InteractionView = () => import('../views/InteractionView.vue')
@@ -101,9 +98,6 @@ const routes = [
   { path: '/purchase/customize', name: 'customize', component: CustomizeView, meta: { hideTabBar: true, title: '购车定制' } },
   { path: '/search', name: 'search', component: SearchView, meta: { hideTabBar: true, title: '搜索' } },
   { path: '/points', name: 'points', component: PointsView, meta: { hideTabBar: true, title: '我的积分' } },
-  { path: '/points/mall', name: 'points-mall', component: PointsMallView, meta: { hideTabBar: true, title: '积分商城' } },
-  { path: '/points/exchanges', name: 'points-exchanges', component: ExchangeRecordsView, meta: { hideTabBar: true, title: '兑换记录' } },
-  { path: '/points/guide', name: 'points-guide', component: PointsGuideView, meta: { hideTabBar: true, title: '玩转积分' } },
   { path: '/publish', name: 'publish', component: PublishView, meta: { hideTabBar: true, title: '发布动态' } },
 ]
 

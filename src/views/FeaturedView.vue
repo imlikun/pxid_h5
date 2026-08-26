@@ -34,26 +34,28 @@
       </div>
 
       <template v-else>
-      <!-- Banner 车型轮播（2-3 个在售车型，点击跳车型详情） -->
+      <!-- Banner 产品轮播 -->
       <div v-if="bannerList.length" class="banner" @touchstart="onTouchStart" @touchend="onTouchEnd">
         <div class="banner__track" :style="{ transform: `translateX(-${current * 100}%)` }">
           <div
-            v-for="(c, i) in bannerList"
-            :key="c.id"
+            v-for="(p, i) in bannerList"
+            :key="p.id"
             class="banner__slide press"
-            @click="goModel(c)"
+            @click="goProduct(p)"
           >
-            <img class="banner__img" :src="bannerImgOf(c)" :alt="c.name" />
+            <img class="banner__img" :src="p.cover" :alt="p.name" />
             <div class="banner__mask">
-              <div class="banner__name">{{ c.name }}</div>
-              <div class="banner__sub">{{ t('featured.viewModel') }}</div>
+              <div class="banner__name">{{ p.name }}</div>
+              <div class="banner__price">
+                {{ sym(p.currency) }}{{ p.price }}<span v-if="p.origin" class="banner__origin">{{ sym(p.currency) }}{{ p.origin }}</span>
+              </div>
             </div>
           </div>
         </div>
         <div v-if="bannerList.length > 1" class="banner__dots">
           <span
-            v-for="(c, i) in bannerList"
-            :key="'dot-' + c.id"
+            v-for="(p, i) in bannerList"
+            :key="'dot-' + p.id"
             class="dot"
             :class="{ active: current === i }"
             @click.stop="goBanner(i)"
@@ -63,7 +65,6 @@
       <div v-else class="banner">
         <img class="banner__img" :src="bannerImg" alt="Banner" />
       </div>
-      <button class="enter-store press" @click="enterStore">{{ t('featured.enterStore') }}</button>
 
       <!-- 三个快捷 -->
       <QuickActions :items="featuredQuickI18n" @tap="onQuick" />
@@ -89,6 +90,8 @@
           :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
         />
       </div>
+
+      <button class="enter-store press" @click="enterStore">{{ t('featured.enterStore') }}</button>
       </template><!-- /v-else 有数据 -->
     </template>
 
@@ -128,7 +131,7 @@ import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
 import TopBar from '../components/TopBar.vue'
 import { featuredQuick } from '../data/mock'
-import { fetchProducts, getProducts, getStore, getLastError, initRegion } from '../api/shop'
+import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym } from '../api/shop'
 import { bridge } from '../bridge'
 import { t } from '../i18n'
 
@@ -155,21 +158,14 @@ function enterStore() {
   if (store.value) bridge.openShopify('https://' + store.value)
 }
 
-// ---- 顶部 Banner 车型轮播：固定三张运营图，点击跳转对应 product 详情页 ----
-const bannerList = [
-  { id: 'p4', name: 'P4', image: import.meta.env.BASE_URL + 'banner/banner-p4.jpg', link: '/product/p4' },
-  { id: 'scooter-purple', name: '500W 48V City Folding Electric Scooter', image: import.meta.env.BASE_URL + 'banner/banner-scooter-purple.png', link: '/product/500w-48v-city-folding-electric-scooter-with-app' },
-  { id: 'ant5', name: 'ANT5', image: import.meta.env.BASE_URL + 'banner/banner-ant5.jpg', link: '/product/ant5' },
-]
-function bannerImgOf(c) {
-  return c.image
-}
+// ---- 顶部 Banner 产品轮播 ----
 const current = ref(0)
 let _bannerTimer = null
+const bannerList = computed(() => all.value)
 
 function startBanner() {
   stopBanner()
-  if (bannerList.length > 1) {
+  if (bannerList.value.length > 1) {
     _bannerTimer = setInterval(() => {
       current.value = (current.value + 1) % bannerList.value.length
     }, 4000)
@@ -185,8 +181,9 @@ function goBanner(i) {
   current.value = i
   startBanner()
 }
-function goModel(c) {
-  router.push(c.link)
+function goProduct(p) {
+  const h = p.handle || p.id
+  router.push('/product/' + h)
 }
 let _touchX = 0
 function onTouchStart(e) {
@@ -195,7 +192,7 @@ function onTouchStart(e) {
 }
 function onTouchEnd(e) {
   const dx = e.changedTouches[0].clientX - _touchX
-  const len = bannerList.length
+  const len = bannerList.value.length
   if (dx > 40 && current.value > 0) goBanner(current.value - 1)
   else if (dx < -40 && current.value < len - 1) goBanner(current.value + 1)
   else startBanner()
@@ -256,9 +253,7 @@ async function retry() {
 <style scoped>
 .featured {
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(77, 124, 255, 0.07) 0%, rgba(77, 124, 255, 0) 200px),
-    var(--bg);
+  background: var(--bg);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .tabs {
@@ -327,11 +322,16 @@ async function retry() {
   margin-bottom: 4px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
-.banner__sub {
+.banner__price {
+  font-size: 15px;
+  font-weight: 700;
+}
+.banner__origin {
   font-size: 12px;
-  font-weight: 500;
-  opacity: 0.9;
-  margin-top: 2px;
+  font-weight: 400;
+  text-decoration: line-through;
+  opacity: 0.85;
+  margin-left: 6px;
 }
 .banner__dots {
   position: absolute;
@@ -355,22 +355,16 @@ async function retry() {
 }
 .enter-store {
   display: block;
-  margin: 12px 12px 0;
+  margin: 12px 12px 16px;
   width: calc(100% - 24px);
-  padding: 13px 0;
-  border-radius: var(--radius-pill);
-  background: var(--brand-gradient);
+  padding: 12px 0;
+  border-radius: var(--radius-lg);
+  background: var(--brand);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
   text-align: center;
   border: none;
-  box-shadow: 0 4px 14px rgba(77, 124, 255, 0.35);
-  transition: transform 0.18s ease;
-}
-.enter-store:active {
-  transform: translateY(1px);
-  box-shadow: 0 2px 8px rgba(77, 124, 255, 0.3);
 }
 .grid2 {
   display: grid;

@@ -17,18 +17,6 @@ function isEmbed() {
 
 // H5 预览/mock 模式下向后端申请匿名 token 的地址
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
-// 带超时保护的安全调用：原生方法若 pending 不 resolve（如未实现的 getUserInfo），
-// 超时返回 fallback，避免整条评论/发帖链路永久卡死（点发布/评论"没反应"）。
-// 非 Promise（方法未注入）立即返回 fallback，不等待。
-function withTimeout(promise, ms, fallback) {
-  if (!promise || typeof promise.then !== 'function') {
-    return Promise.resolve(promise === undefined ? fallback : promise)
-  }
-  return Promise.race([
-    Promise.resolve(promise).catch(() => fallback),
-    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
-  ])
-}
 let _cachedToken = null
 let _tokenPromise = null
 
@@ -205,7 +193,7 @@ const mockBridge = {
     if (!isEmbed() && window.__router) {
       const map = (p) => {
         let m
-        if ((m = p.match(/^vehicle\/(.+)/))) return '/vehicle/' + m[1]
+        if ((m = p.match(/^vehicle\/(P\d+)/))) return '/vehicle/' + m[1]
         if (p === 'purchase/customize' || p.startsWith('purchase/customize?')) return '/purchase/customize'
         if (p === 'search' || p.startsWith('search?')) return '/search'
         return null
@@ -235,21 +223,20 @@ export const bridge = {
   // 是否真实原生桥（Flutter 注入的实现 isNative===true；mock 为 false）
   isNative: () => window.PXIDBridge && window.PXIDBridge.isNative === true,
   getToken: () => window.PXIDBridge.getToken(),
-  // 统一登录态 token：契约（INTEGRATION.md）规定来源是 getToken()，getUserInfo 不在契约内。
-  // 故优先 getToken()；仅当部分实现把 token 挂在 getUserInfo().token 上时作补充，且全程带超时不阻塞。
+  // 统一登录态 token：真机优先 getUserInfo 注入的登录 token，回退 getToken()（mock/匿名）
+  // 修复：真机 getToken() 未必返回登录 token，但登录态经 getUserInfo 注入 → 评论/点赞统一走这里
   getAuthToken: async () => {
     try {
-      const t = await withTimeout(window.PXIDBridge.getToken?.(), 2000, null)
-      if (t) return t
-    } catch (e) { /* 原生未注入 */ }
-    try {
-      const u = await withTimeout(window.PXIDBridge.getUserInfo?.(), 2000, null)
+      const u = await window.PXIDBridge.getUserInfo()
       if (u && u.token) return u.token
-    } catch (e) { /* 原生未注入 */ }
+    } catch (e) { /* 真机未实现 getUserInfo 时回退 */ }
+    try {
+      const t = await window.PXIDBridge.getToken()
+      if (t) return t
+    } catch (e) { /* 原生未注入时回退 */ }
     return null
   },
-  // getUserInfo 不在契约强制清单，原生可能未实现 → 带超时返回兜底资料，避免评论取昵称时卡死
-  getUserInfo: () => withTimeout(window.PXIDBridge.getUserInfo?.(), 2000, { nickname: '', avatar: '' }),
+  getUserInfo: () => window.PXIDBridge.getUserInfo(),
   getRegion: () => window.PXIDBridge.getRegion(),
   getDeviceId: () => window.PXIDBridge.getDeviceId(),
   getLocale: () => window.PXIDBridge.getLocale(),

@@ -27,26 +27,12 @@ defineEmits(['more'])
 .left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 .title {
-  position: relative;
-  padding-left: 10px;
   font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.3px;
   color: var(--text);
-}
-.title::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 15px;
-  border-radius: 2px;
-  background: var(--brand);
 }
 .sub {
   font-size: 12px;

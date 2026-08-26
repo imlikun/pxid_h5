@@ -1084,15 +1084,11 @@ async function requireAuth(req, res, next) {
           headers: { 'Content-Type': 'application/json', ...signHeaders },
           body: bodyStr
         })
-        // ToC 401 = Token 无效/过期，或这是演示态自签 token（非 ToC 签发）。
-        // 不直接 return，改为 throw 让下方 catch 回退到 USER_TOKEN_SECRET 演示态，保留 app(ToC) + 网页(自签) 双模式。
-        if (r.status === 401) throw new Error('ToC userinfo 401（Token 无效/过期），回退演示态重试')
+        if (r.status === 401) return res.status(401).json(err(401, '未授权：Token 无效或已过期'))
         if (!r.ok) throw new Error('userinfo HTTP ' + r.status)
         const j = await r.json().catch(() => ({}))
-        // ToC 网关统一返回 HTTP 200，真实成败在 body.code；有效身份在 body.data.memberUserId。
-        // 旧逻辑 r.status===401 判断会误判（失败也是 200），改为校验 body.data.memberUserId 是否存在。
-        u = j.data || null
-        if (!u || !u.memberUserId) throw new Error('ToC userinfo 未返回有效 memberUserId（code=' + j.code + ' msg=' + (j.msg || '') + '），回退演示态')
+        u = j.data || j   // 规范返回 { code, data:{ memberUserId, banned, ... } }
+        u.memberUserId = u.memberUserId || u.member_user_id || ''
         cacheUserinfo(t, u)
       }
       user = { memberUserId: u.memberUserId || '', deviceId: '', toc: true, banned: !!u.banned, raw: u }
