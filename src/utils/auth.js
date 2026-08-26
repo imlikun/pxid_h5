@@ -24,7 +24,14 @@ export async function requireLogin() {
     token = ''
   }
   if (token) return true
-  // 无 token → 拉起原生登录（决策 A）
+  // 兜底：Flutter 已注入真实用户资料（email/nickname/token 任一）即视为已登录。
+  // 背景：登录 token 注入在 Flutter 侧曾长期未定案，导致真机已登录却因取不到独立 token 误弹登录。
+  // 只要 Flutter 回传了用户资料，就不再弹登录窗（后续 API 落库仍依赖 getAuthToken 的 token）。
+  try {
+    const u = await bridge.getUserInfo()
+    if (u && (u.token || u.email || u.nickname)) return true
+  } catch (e) { /* 未实现则继续走登录 */ }
+  // 无登录证据 → 拉起原生登录（决策 A）
   bridge.openNative('login')
   return false
 }

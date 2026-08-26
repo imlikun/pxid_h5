@@ -37,7 +37,10 @@ html,
 body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden; /* 兜底：任何页面内容意外横向溢出时不产生左右滑动 */
+  /* 关键：用 overflow-x: clip 而非 hidden。hidden 会把 overflow-y 隐式算成 auto，
+     使 html/body 变成滚动容器、body 自身不滚动，导致内部 position:sticky 顶栏失效。
+     clip 只裁剪横向溢出、不建立滚动容器，sticky 恢复正常。 */
+  overflow-x: clip;
 }
 
 body {

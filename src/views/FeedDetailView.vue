@@ -132,14 +132,20 @@
         </div>
       </div>
 
-      <!-- 输入栏 -->
-      <div class="cinput">
+      <!-- 输入栏：聚焦时变固定底部栏并顶到键盘上方（修复评论框被输入法遮挡） -->
+      <div
+        class="cinput"
+        :class="{ 'cinput--fixed': commenting }"
+        :style="commenting ? { bottom: kbH + 'px' } : null"
+      >
         <div v-if="replyTo" class="cinput__reply">回复 {{ replyTo.name }} <span class="cinput__cancel" @click="replyTo = null">{{ t('feed.cancel') }}</span></div>
         <input
           ref="commentInput"
           v-model="commentText"
           class="cinput__field"
           :placeholder="replyTo ? ('回复 ' + replyTo.name + '：') : t('feed.inputPlaceholder')"
+          @focus="onCommentFocus"
+          @blur="onCommentBlur"
           @keyup.enter="submitComment"
         />
         <button class="cinput__send press" @click="submitComment">{{ t('feed.send') }}</button>
@@ -186,7 +192,7 @@
   </div>
 
   <!-- 底部互动栏 -->
-  <div v-if="item" class="actions">
+  <div v-if="item" class="actions" v-show="!commenting">
     <button class="act pop press" :class="{ liked, on: liked }" @click="onLike">
       <svg viewBox="0 0 24 24" width="22" height="22" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
       <span>{{ likeCount }}</span>
@@ -223,7 +229,7 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick, onMounted, watch } from 'vue'
+import { computed, ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import { requireLogin } from '../utils/auth'
@@ -257,6 +263,39 @@ const toast = ref('')
 let toastTimer = null
 const commentsBox = ref(null)
 const commentInput = ref(null)
+// 评论输入栏：聚焦时变固定底部栏，用 visualViewport 顶到软键盘上方，避免被输入法遮挡
+const commenting = ref(false)
+const kbH = ref(0)
+function syncKeyboard() {
+  const vv = window.visualViewport
+  if (!vv) return
+  // 键盘高度 = 视口高度 - 视觉视口高度 - 视觉视口顶部偏移
+  kbH.value = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+}
+function onCommentFocus() {
+  commenting.value = true
+  nextTick(() => {
+    syncKeyboard()
+    commentInput.value && commentInput.value.focus()
+  })
+}
+function onCommentBlur() {
+  // 延迟复位，避免点击发送按钮先 blur 再 click 丢失
+  setTimeout(() => { commenting.value = false }, 120)
+}
+onMounted(() => {
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncKeyboard)
+    window.visualViewport.addEventListener('scroll', syncKeyboard)
+    syncKeyboard()
+  }
+})
+onBeforeUnmount(() => {
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', syncKeyboard)
+    window.visualViewport.removeEventListener('scroll', syncKeyboard)
+  }
+})
 const showReport = ref(false)
 const reportReasons = ['色情低俗', '广告诈骗', '辱骂攻击', '违法违规', '其他']
 const replyTo = ref(null) // { commentId, name }
@@ -781,6 +820,20 @@ function showToast(msg) {
   align-items: center;
   gap: 10px;
   padding: 12px 0 14px;
+}
+/* 聚焦时变固定底部栏，顶到软键盘上方（bottom 由 visualViewport 动态计算） */
+.cinput--fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
 }
 .cinput__field {
   flex: 1;
