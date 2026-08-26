@@ -1,10 +1,8 @@
 <template>
   <div class="discover">
-    <!-- 顶部吸顶容器：TopBar + 地区栏一起固定 -->
-    <div class="sticky-header">
-      <!-- 顶部：三 tab + 操作 -->
-      <TopBar sticky :show-back="false">
-        <template #left>
+    <!-- 顶部：三 tab + 操作 -->
+    <TopBar sticky :show-back="false">
+      <template #left>
         <div class="tabs">
           <span
             v-for="t in tabs"
@@ -41,7 +39,6 @@
       >
       <span class="region-hint">{{ regionHint }}</span>
     </div>
-    </div><!-- /sticky-header -->
 
     <!-- 搜索：推荐/广场显示 -->
     <div v-if="activeTab !== '动态'" class="search" @click="onSearch">
@@ -634,13 +631,6 @@ function showToast(msg) {
   min-height: 100vh;
   background: var(--bg);
   padding-bottom: env(safe-area-inset-bottom);
-}
-/* 顶部吸顶：TopBar + 地区栏一起固定 */
-.sticky-header {
-  position: sticky;
-  top: 0;
-  z-index: 99;
-  background: var(--bg);
 }
 .tabs {
   display: flex;
