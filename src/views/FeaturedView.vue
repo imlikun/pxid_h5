@@ -127,7 +127,7 @@ import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
 import TopBar from '../components/TopBar.vue'
-import { featuredQuick, plazaShowcase } from '../data/mock'
+import { featuredQuick } from '../data/mock'
 import { fetchProducts, getProducts, getStore, getLastError, initRegion } from '../api/shop'
 import { bridge } from '../bridge'
 import { t } from '../i18n'
@@ -155,10 +155,14 @@ function enterStore() {
   if (store.value) bridge.openShopify('https://' + store.value)
 }
 
-// ---- 顶部 Banner 车型轮播：展示精选栏目全部在售可购买车型，点击跳各自车型详情页 /vehicle/:id ----
-const bannerList = computed(() => plazaShowcase)
+// ---- 顶部 Banner 车型轮播：固定三张运营图，点击跳转对应 product 详情页 ----
+const bannerList = [
+  { id: 'p4', name: 'P4', image: import.meta.env.BASE_URL + 'banner/banner-p4.jpg', link: '/product/p4' },
+  { id: 'scooter-purple', name: '500W 48V City Folding Electric Scooter', image: import.meta.env.BASE_URL + 'banner/banner-scooter-purple.png', link: '/product/500w-48v-city-folding-electric-scooter-with-app' },
+  { id: 'ant5', name: 'ANT5', image: import.meta.env.BASE_URL + 'banner/banner-ant5.jpg', link: '/product/ant5' },
+]
 function bannerImgOf(c) {
-  return import.meta.env.BASE_URL + c.cover
+  return c.image
 }
 const current = ref(0)
 let _bannerTimer = null
@@ -182,8 +186,7 @@ function goBanner(i) {
   startBanner()
 }
 function goModel(c) {
-  // 优先走 H5 车型详情页（Flutter 端未实现 vehicle 原生路由时会弹 toast 不跳转）
-  router.push('/vehicle/' + c.id)
+  router.push(c.link)
 }
 let _touchX = 0
 function onTouchStart(e) {
