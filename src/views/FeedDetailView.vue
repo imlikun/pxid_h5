@@ -294,14 +294,26 @@ function syncKeyboard() {
 }
 function onCommentFocus() {
   commenting.value = true
+  // 记录聚焦时的布局高度：用于识别「悬浮窗/覆盖模式输入法」（微信输入法等第三方输入法常见）
+  const baseH = window.innerHeight
   nextTick(() => {
     syncKeyboard()
     // 键盘弹出动画期间多档重算（慢键盘/事件滞后补偿：120/320/700/1200ms）
-    ;[120, 320, 700, 1200].forEach((ms) => setTimeout(syncKeyboard, ms))
+    ;[120, 320, 700, 1200].forEach((ms) => {
+      setTimeout(() => {
+        syncKeyboard()
+        // 悬浮窗/覆盖模式兜底：1200ms 后布局高度与视觉视口都没变化（键盘未触发 resize）
+        // → 拿不到键盘高度，按视觉视口 45% 抬升输入栏（假定悬浮键盘占底部 ~55%）
+        if (ms === 1200 && !KEYBOARD_ENV && kbH.value === 0 && window.innerHeight === baseH) {
+          const vv = window.visualViewport
+          kbH.value = Math.max(0, Math.round((vv && typeof vv.height === 'number' ? vv.height : baseH) * 0.45))
+        }
+      }, ms)
+    })
     const el = commentInput.value
     if (el) {
       el.focus()
-      // 兜底：无 visualViewport 的旧 WebView，把输入框滚到可视区中部
+      // 兜底：无 visualViewport 的旧 WebView / 悬浮窗输入法，把输入框滚到可视区中部
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   })
