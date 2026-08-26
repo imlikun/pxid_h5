@@ -58,18 +58,14 @@ function onBack() {
   align-items: center;
   justify-content: space-between;
   padding: 0 8px;
-  /* 沉浸式：所有模式（含非 sticky 的标题页）都避让状态栏，避免标题/按钮被状态栏遮挡 */
-  padding-top: env(safe-area-inset-top, 0px);
   background: var(--bg, #ffffff);
 }
 .tb-sticky {
   position: sticky;
   top: 0;
   z-index: 100;
-  /* 沉浸式：吸在视口最顶，自身内边距把内容推到状态栏下方，背景铺到状态栏之上，消除状态栏与顶栏之间的留白。
-     顶栏避让高度完全交给 env(safe-area-inset-top) —— Flutter 壳已向 WebView 注入此变量（真机≈44px），
-     不可再加固定兜底：3be2f50 的 max(env,44px) 会在真值之上再叠 44px，导致顶栏下方多出"一截距离"。 */
-  padding-top: env(safe-area-inset-top, 0px);
+  /* 沉浸式：吸在视口最顶，自身内边距把内容推到状态栏下方，背景铺到状态栏之上，消除状态栏与顶栏之间的留白 */
+  padding-top: env(safe-area-inset-top, 0);
   background: var(--bg, #fff);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
 }
@@ -99,7 +95,7 @@ function onBack() {
 }
 .tb-title {
   position: absolute;
-  top: 0;
+  top: env(safe-area-inset-top, 0);
   left: 56px;
   right: 56px;
   bottom: 0;
