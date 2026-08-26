@@ -52,7 +52,7 @@ function onBack() {
    类名 tb-* 全局唯一，slot 内容样式仍由各页面 scoped 样式负责 */
 .tb-bar {
   position: relative;
-  height: 48px;
+  min-height: 48px;
   flex: none;
   display: flex;
   align-items: center;
@@ -62,8 +62,10 @@ function onBack() {
 }
 .tb-sticky {
   position: sticky;
-  top: env(safe-area-inset-top, 0);
+  top: 0;
   z-index: 100;
+  /* 沉浸式：吸在视口最顶，自身内边距把内容推到状态栏下方，背景铺到状态栏之上，消除状态栏与顶栏之间的留白 */
+  padding-top: env(safe-area-inset-top, 0);
   background: var(--bg, #fff);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
 }
@@ -93,8 +95,13 @@ function onBack() {
 }
 .tb-title {
   position: absolute;
+  top: env(safe-area-inset-top, 0);
   left: 56px;
   right: 56px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: 16px;
   font-weight: 600;
