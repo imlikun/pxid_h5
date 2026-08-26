@@ -170,6 +170,10 @@ const messages = {
     'points.medals.empty': '去签到赢取你的第一枚勋章',
     'points.group.current': '当前等级',
     'points.demoTip': '演示数据 · 签到即激活你的成长',
+    'points.guideTitle': '积分玩法',
+    'points.mallTitle': '积分商城',
+    'points.mallTip': '积分可兑换精选好物，兑换后 48 小时内发货',
+    'points.mallEmpty': '商城商品更新中，敬请期待',
 
     // ============ 精选 ============
     'featured.loading': '加载商品中…',
@@ -350,6 +354,10 @@ const messages = {
     'points.medals.empty': 'Check in to earn your first medal',
     'points.group.current': 'Current Level',
     'points.demoTip': 'Demo data · check in to activate your growth',
+    'points.guideTitle': 'Point Guide',
+    'points.mallTitle': 'Points Mall',
+    'points.mallTip': 'Redeem points for curated goods; ships within 48 hours',
+    'points.mallEmpty': 'Mall items are being updated, stay tuned',
 
     // ============ Featured ============
     'featured.loading': 'Loading products…',
@@ -530,6 +538,10 @@ const messages = {
     'points.medals.empty': 'Faça check-in para ganhar sua primeira medalha',
     'points.group.current': 'Nível Atual',
     'points.demoTip': 'Dados demo · check-in ativa seu crescimento',
+    'points.guideTitle': 'Guia de Pontos',
+    'points.mallTitle': 'Loja de Pontos',
+    'points.mallTip': 'Troque pontos por produtos selecionados; envio em 48 horas',
+    'points.mallEmpty': 'Itens em atualização, aguarde',
 
     // ============ Em destaque ============
     'featured.loading': 'Carregando produtos…',

@@ -161,9 +161,10 @@ function enterStore() {
 // ---- 顶部 Banner 产品轮播（仅展示指定的 3 个在售车型）----
 const current = ref(0)
 let _bannerTimer = null
+const BANNER_HANDLES = ['p4', '500w-48v-city-folding-electric-scooter-with-app', 'ant5']
 const bannerList = computed(() =>
-  all.value.filter((p) =>
-    ['p4', '500w-48v-city-folding-electric-scooter-with-app', 'ant5'].includes(p.id)
+  all.value.filter(
+    (p) => BANNER_HANDLES.includes(p.handle) || BANNER_HANDLES.includes(String(p.id))
   )
 )
 

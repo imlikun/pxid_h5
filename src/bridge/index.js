@@ -196,6 +196,11 @@ const mockBridge = {
         if ((m = p.match(/^vehicle\/(P\d+)/))) return '/vehicle/' + m[1]
         if (p === 'purchase/customize' || p.startsWith('purchase/customize?')) return '/purchase/customize'
         if (p === 'search' || p.startsWith('search?')) return '/search'
+        // 积分板块：真机走 Flutter 原生实现；预览环境兜底到 H5 等价页
+        if (p === 'points/guide' || p.startsWith('points/guide?')) return '/points/guide'
+        if (p === 'points/rules' || p.startsWith('points/rules?')) return '/points/guide'
+        if (p === 'points/mall' || p.startsWith('points/mall?')) return '/points/mall'
+        if (p === 'points/exchange' || p.startsWith('points/exchange?')) return '/points/mall'
         return null
       }
       const target = map(path)
