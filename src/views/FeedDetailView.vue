@@ -136,7 +136,7 @@
       <div
         class="cinput"
         :class="{ 'cinput--fixed': commenting }"
-        :style="commenting ? { bottom: kbH + 'px' } : null"
+        :style="commenting && !KEYBOARD_ENV ? { bottom: kbH + 'px' } : null"
       >
         <div v-if="replyTo" class="cinput__reply">回复 {{ replyTo.name }} <span class="cinput__cancel" @click="replyTo = null">{{ t('feed.cancel') }}</span></div>
         <input
@@ -263,10 +263,22 @@ const toast = ref('')
 let toastTimer = null
 const commentsBox = ref(null)
 const commentInput = ref(null)
-// 评论输入栏：聚焦时变固定底部栏，用 visualViewport 顶到软键盘上方，避免被输入法遮挡
+// 评论输入栏：聚焦时变固定底部栏，避免被输入法遮挡（三层防护）
+//   ① iOS 17+ / 新 WKWebView：CSS env(keyboard-inset-bottom) 原生键盘高度，零延迟、最精确
+//   ② visualViewport JS 计算：Safari / 新 Android WebView
+//   ③ window resize + 多档轮询：旧 WebView / 慢键盘 / 事件滞后
 const commenting = ref(false)
 const kbH = ref(0)
+const KEYBOARD_ENV = (() => {
+  try {
+    return typeof CSS !== 'undefined' && !!CSS.supports && CSS.supports('bottom: env(keyboard-inset-bottom)')
+  } catch (e) {
+    return false
+  }
+})()
 function calcKbH() {
+  // 支持 CSS 键盘变量时交给 CSS（env 精确且零延迟），JS 不再抬升，避免 inline 覆盖
+  if (KEYBOARD_ENV) return 0
   const vv = window.visualViewport
   if (vv && typeof vv.height === 'number') {
     // iOS / 新 Android WebView：键盘高度 = 布局视口 - 视觉视口 - 顶部偏移
@@ -284,13 +296,12 @@ function onCommentFocus() {
   commenting.value = true
   nextTick(() => {
     syncKeyboard()
-    // 键盘弹出动画期间高度分两次重算（iOS 键盘动画约 250ms，事件可能滞后）
-    setTimeout(syncKeyboard, 120)
-    setTimeout(syncKeyboard, 320)
+    // 键盘弹出动画期间多档重算（慢键盘/事件滞后补偿：120/320/700/1200ms）
+    ;[120, 320, 700, 1200].forEach((ms) => setTimeout(syncKeyboard, ms))
     const el = commentInput.value
     if (el) {
       el.focus()
-      // 兜底：旧 WebView 取不到键盘高度时，把输入框滚到可视区中部
+      // 兜底：无 visualViewport 的旧 WebView，把输入框滚到可视区中部
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   })
@@ -303,14 +314,17 @@ onMounted(() => {
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', syncKeyboard)
     window.visualViewport.addEventListener('scroll', syncKeyboard)
-    syncKeyboard()
   }
+  // 补充：部分 WebView/浏览器键盘弹出只触发 window resize（Android adjustResize 等）
+  window.addEventListener('resize', syncKeyboard)
+  syncKeyboard()
 })
 onBeforeUnmount(() => {
   if (window.visualViewport) {
     window.visualViewport.removeEventListener('resize', syncKeyboard)
     window.visualViewport.removeEventListener('scroll', syncKeyboard)
   }
+  window.removeEventListener('resize', syncKeyboard)
 })
 const showReport = ref(false)
 const reportReasons = ['色情低俗', '广告诈骗', '辱骂攻击', '违法违规', '其他']
@@ -849,12 +863,12 @@ function showToast(msg) {
   gap: 10px;
   padding: 12px 0 14px;
 }
-/* 聚焦时变固定底部栏，顶到软键盘上方（bottom 由 visualViewport 动态计算） */
+/* 聚焦时变固定底部栏，顶到软键盘上方（bottom 优先 CSS 原生键盘变量，回退 JS 动态计算） */
 .cinput--fixed {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: env(keyboard-inset-bottom, 0px);
   z-index: 60;
   max-width: 480px;
   margin: 0 auto;
