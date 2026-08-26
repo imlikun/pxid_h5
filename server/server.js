@@ -1158,7 +1158,13 @@ async function requireAuth(req, res, next) {
         u.memberUserId = u.memberUserId || u.member_user_id || ''
         cacheUserinfo(t, u)
       }
-      user = { memberUserId: u.memberUserId || '', deviceId: '', toc: true, banned: !!u.banned, raw: u }
+      // ToC 校验通过但无 memberUserId（如匿名 token 调 ToC）→ 置 null 走下方 HMAC 兜底，
+      // 保留 deviceId 身份（否则 deviceId 恒空 → 积分/成长等按 device 维度的接口全 401）
+      if (u.memberUserId) {
+        user = { memberUserId: u.memberUserId, deviceId: '', toc: true, banned: !!u.banned, raw: u }
+      } else {
+        user = null
+      }
     } catch (e) {
       // ToC 临时不可达 → 落到下方兜底，不中断请求（避免单点故障阻断整个发现页）
       console.warn('[pxid-feed] ToC userinfo 校验失败，回退演示态:', e.message)
