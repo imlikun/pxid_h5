@@ -1084,7 +1084,9 @@ async function requireAuth(req, res, next) {
           headers: { 'Content-Type': 'application/json', ...signHeaders },
           body: bodyStr
         })
-        if (r.status === 401) return res.status(401).json(err(401, '未授权：Token 无效或已过期'))
+        // ToC 401 = Token 无效/过期，或这是演示态自签 token（非 ToC 签发）。
+        // 不直接 return，改为 throw 让下方 catch 回退到 USER_TOKEN_SECRET 演示态，保留 app(ToC) + 网页(自签) 双模式。
+        if (r.status === 401) throw new Error('ToC userinfo 401（Token 无效/过期），回退演示态重试')
         if (!r.ok) throw new Error('userinfo HTTP ' + r.status)
         const j = await r.json().catch(() => ({}))
         u = j.data || j   // 规范返回 { code, data:{ memberUserId, banned, ... } }
