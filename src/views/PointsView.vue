@@ -133,6 +133,7 @@ import { useRouter } from 'vue-router'
 import { bridge } from '../bridge'
 import { t, locale } from '../i18n'
 import { fetchGrowthProfile, doSignin, fetchMedals, fetchPointsProducts } from '../api/growth'
+import { requireLogin } from '../utils/auth'
 import { pointsProducts as mockPointsProducts } from '../data/mock'
 import TopBar from '../components/TopBar.vue'
 import RedeemModal from '../components/RedeemModal.vue'
@@ -187,6 +188,9 @@ async function loadProducts() {
 }
 async function onSignin() {
   if (profile.value.signedToday) return
+  // 登录态守卫：无 token 时拉起原生登录并终止，不静默吞错
+  const ok = await requireLogin()
+  if (!ok) return
   try {
     const r = await doSignin()
     lastGain.value = r.todayPoints || 0
@@ -199,9 +203,24 @@ async function onSignin() {
       isDemo: false,
       monthSigns: [...(profile.value.monthSigns || []), today],
     }
+    showToast(t('points.signin.ok', { n: lastGain.value }))
   } catch (e) {
-    /* 签到失败静默，不破坏页面 */
+    console.error('[signin] 失败', e)
+    showToast(t('points.signin.fail'))
   }
+}
+function showToast(msg) {
+  let el = document.getElementById('__toast')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = '__toast'
+    el.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.8);color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;z-index:9999;pointer-events:none;max-width:80%;text-align:center'
+    document.body.appendChild(el)
+  }
+  el.textContent = msg
+  el.style.display = 'block'
+  clearTimeout(el.__t)
+  el.__t = setTimeout(() => { el.style.display = 'none' }, 1600)
 }
 
 function onRules() {
