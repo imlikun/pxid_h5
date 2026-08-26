@@ -169,7 +169,7 @@ let _bannerTimer = null
 
 function startBanner() {
   stopBanner()
-  if (bannerList.value.length > 1) {
+  if (bannerList.length > 1) {
     _bannerTimer = setInterval(() => {
       current.value = (current.value + 1) % bannerList.value.length
     }, 4000)
@@ -195,7 +195,7 @@ function onTouchStart(e) {
 }
 function onTouchEnd(e) {
   const dx = e.changedTouches[0].clientX - _touchX
-  const len = bannerList.value.length
+  const len = bannerList.length
   if (dx > 40 && current.value > 0) goBanner(current.value - 1)
   else if (dx < -40 && current.value < len - 1) goBanner(current.value + 1)
   else startBanner()
