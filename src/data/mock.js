@@ -164,20 +164,11 @@ export const feedItems = [
   },
 ]
 
-// 广场：车型展示（统一用 PXID 真实在售型号；按代号字母序 F1 F2 P1 P2 P3 P4 P5 P5 P6 P7 P8；封面暂用本地占位图，接 Shopify 后替换为真实商品图）
-// 广场车型宫格：name 用纯代号（F1/P2…），与 carModels.js displayLabel 一致（2026-08-24 去汉字前缀）
+// 广场：车型展示（只保留已有 vehicleCatalog 详情页的车型）
 export const plazaShowcase = [
-  { id: 'scooter-F1', name: 'F1', cover: 'plaza_p1.jpg', itemType: 'buy-vehicle' },
   { id: 'scooter-F2', name: 'F2', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
-  { id: 'scooter-P1', name: 'P1', cover: 'plaza_p3.jpg', itemType: 'buy-vehicle' },
   { id: 'ebike-P2', name: 'P2', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
-  { id: 'scooter-P3', name: 'P3', cover: 'plaza_p5.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P4', name: 'P4', cover: 'plaza_p6.jpg', itemType: 'buy-vehicle' },
   { id: 'motorcycle-P5', name: 'P5', cover: 'feed_r1.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P5', name: 'P5', cover: 'feed_r2.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P6', name: '助P6', cover: 'feed_r3.jpg', itemType: 'buy-vehicle' },
-  { id: 'motorcycle-P7', name: '摩P7', cover: 'feed_d1.jpg', itemType: 'buy-vehicle' },
-  { id: 'motorcycle-P8', name: '摩P8', cover: 'feed_d2.jpg', itemType: 'buy-vehicle' },
 ]
 
 // 广场：热门活动 2 条（封面按 广场/ 子目录文件顺序：(7)→活动1、base→活动2）
@@ -637,7 +628,7 @@ export const vehicleCatalog = {
     name: 'F2 倒三轮滑板车', shortName: 'F2',
     slogan: '城市穿梭 · 稳如泰山 · 倒三轮结构重新定义滑板车',
     price: 16980, priceUnit: '¥',
-    shopUrl: 'https://shop.pxid.com/products/f2-scooter',
+    shopUrl: '',
     heroImage: 'banner/banner-op1.jpg',       // 主 Hero 大图（16:9）
     gallery: [                                  // 配置区轮播小图
       'banner/banner-op1.jpg',
@@ -686,14 +677,14 @@ export const vehicleCatalog = {
       { author: '都市丽人小陈', avatar: 'unsplash/photo-1438761681033-6461ffad8d80_w_80_q_80.jpg', rating: 4, content: '颜值在线，白色款很适合女生骑。就是稍微有点重，不过倒三轮本来就这样。', time: '2026-08-10', likes: 18 },
     ],
     // 热门推荐（同系列其他车型）
-    relatedModels: ['scooter-F1', 'motorcycle-P5', 'ebike-P2'],
+    relatedModels: ['motorcycle-P5', 'ebike-P2'],
   },
   'ebike-P2': {
     id: 'ebike-P2', code: 'P2', series: '电助力自行车', seriesKey: 'ebike',
     name: 'P2 Fat-Tire 电助力越野', shortName: 'P2',
     slogan: '全地形征服者 · 4.0 肥胎 · 山地级避震',
     price: 12880, priceUnit: '¥',
-    shopUrl: 'https://shop.pxid.com/products/p2-ebike',
+    shopUrl: '',
     heroImage: 'banner/banner-shot1.jpg',
     gallery: ['banner/banner-shot1.jpg', 'banner/banner-moto.jpg'],
     specs: [
@@ -726,14 +717,14 @@ export const vehicleCatalog = {
       { author: '山地铁驴', avatar: 'unsplash/photo-1507003211169-0a1dd7228f2d_w_80_q_80.jpg', rating: 5, content: '肥胎过坑太爽了，感觉像在开坦克。助力很线性不像有些车一窜一窜的。', time: '2026-08-18', likes: 56 },
       { author: '周末骑士', avatar: 'unsplash/photo-1527980965255-d3b416303d12_w_80_q_80.jpg', rating: 4, content: '颜值高，棕色皮质坐垫很有质感。续航实测 75km 左右，够用了。', time: '2026-08-12', likes: 31 },
     ],
-    relatedModels: ['scooter-F2', 'ebike-P4', 'motorcycle-P5'],
+    relatedModels: ['scooter-F2', 'motorcycle-P5'],
   },
   'motorcycle-P5': {
     id: 'motorcycle-P5', code: 'P5', series: '电摩', seriesKey: 'motorcycle',
     name: 'P5 智能电摩 Pro', shortName: 'P5',
     slogan: '速度与智能的完美融合 · TFT 彩屏 · Bosch ABS',
     price: 25800, priceUnit: '¥',
-    shopUrl: 'https://shop.pxid.com/products/p5-motorcycle',
+    shopUrl: '',
     heroImage: 'banner/banner-moto.jpg',
     gallery: ['banner/banner-moto.jpg'],
     specs: [
@@ -765,7 +756,7 @@ export const vehicleCatalog = {
     reviews: [
       { author: '电摩玩家', avatar: 'unsplash/photo-1500648767791-00dcc994a43e_w_80_q_80.jpg', rating: 5, content: '这价格能买到这个配置真的值了。ABS 很有安全感，TFT 屏显示信息很全。', time: '2026-08-22', likes: 67 },
     ],
-    relatedModels: ['scooter-F2', 'ebike-P2', 'motorcycle-P7'],
+    relatedModels: ['scooter-F2', 'ebike-P2'],
   },
 }
 

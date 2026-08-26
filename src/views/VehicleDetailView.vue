@@ -154,7 +154,6 @@
         <span class="fp-hint">起</span>
       </div>
       <button class="f-buy press" @click="onOrder">立即订购</button>
-      <button class="f-test press" @click="onContact">在线客服</button>
     </div>
   </div>
 </template>
@@ -228,20 +227,12 @@ function relatedName(id) {
 
 // CTA 操作
 function onOrder() {
-  // 直接跳转 Shopify 商品页（H5 内打开，不依赖 Flutter bridge）
   const url = v.value?.shopUrl
   if (url) {
     window.open(url, '_blank')
   } else {
-    // 无 Shopify 映射时降级到原生购买流程
+    // 无 Shopify 映射时走原生购买流程
     bridge.openNative('buy/order?model=' + v.value.id)
-  }
-}
-function onContact() {
-  // 在线客服 / 咨询：优先走原生，H5 降级跳转 Shopify 联系页
-  const called = bridge.openNative('service/contact?model=' + v.value.id)
-  if (!called) {
-    window.open('https://shop.pxid.com/pages/contact', '_blank')
   }
 }
 function onCommunity() {
@@ -402,11 +393,6 @@ function onCommunity() {
   flex: 1; height: 42px; border-radius: var(--radius-pill);
   background: var(--brand-gradient); color: #fff; font-size: 15px; font-weight: 600;
   box-shadow: 0 3px 10px rgba(77,124,255,.3);
-}
-.f-test {
-  height: 42px; padding: 0 16px; border-radius: var(--radius-pill);
-  background: transparent; color: var(--brand); border: 1.5px solid var(--brand);
-  font-size: 14px; font-weight: 600;
 }
 
 /* ========== 占位 ========== */
