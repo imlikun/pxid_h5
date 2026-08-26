@@ -191,7 +191,8 @@ async function onSignin() {
     }
     showToast(t('points.signin.getToday', { n: r.todayPoints || 0 }))
   } catch (e) {
-    showToast(t('points.signin.fail'))
+    // 透传后端真实错误（如"未授权：需要登录后操作"→ 明确是登录态/token 问题，而非网络/接口故障）
+    showToast((e && e.message) || t('points.signin.fail'))
   }
 }
 
