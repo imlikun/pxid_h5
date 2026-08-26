@@ -1,8 +1,10 @@
 <template>
   <div class="discover">
-    <!-- 顶部：三 tab + 操作 -->
-    <TopBar sticky :show-back="false">
-      <template #left>
+    <!-- 顶部吸顶容器：TopBar + 地区栏一起固定 -->
+    <div class="sticky-header">
+      <!-- 顶部：三 tab + 操作 -->
+      <TopBar sticky :show-back="false">
+        <template #left>
         <div class="tabs">
           <span
             v-for="t in tabs"
@@ -39,17 +41,31 @@
       >
       <span class="region-hint">{{ regionHint }}</span>
     </div>
+    </div><!-- /sticky-header -->
 
     <!-- 搜索：推荐/广场显示 -->
     <div v-if="activeTab !== '动态'" class="search" @click="onSearch">
       <span class="sicon">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </span>
-      <input class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearch" @click.stop />
+      <input class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearchEnter" @compositionstart="isComposing = true" @compositionend="onCompositionEnd" @click.stop />
     </div>
 
-    <!-- Banner 轮播 + 快捷入口：仅推荐页 -->
-    <template v-if="activeTab === '推荐'">
+    <!-- 搜索结果（内联过滤，不跳页） -->
+    <div v-if="showSearchResults" class="search-results">
+      <div class="search-results__head">「{{ keyword }}」{{ searchResults.length }} 个结果</div>
+      <div v-if="searchResults.length === 0" class="search-results__empty">{{ t('search.empty', { q: keyword }) }}</div>
+      <FeedCard
+        v-for="it in searchResults"
+        :key="'sr-' + it.id"
+        :item="it"
+        class="fade-up"
+      />
+      <button class="search-results__clear press" @click="showSearchResults = false; keyword = ''">{{ t('search.clear') || '清除' }}</button>
+    </div>
+
+    <!-- Banner 轮播 + 快捷入口：仅推荐页 + 非搜索态 -->
+    <template v-if="activeTab === '推荐' && !showSearchResults">
       <div
         class="banner"
         @touchstart="onBannerTouchStart"
@@ -99,8 +115,8 @@
       </div>
     </template>
 
-    <!-- 车型筛选：仅推荐/动态显示（推荐=全部、动态=最新；广场无筛选条，与设计稿一致） -->
-    <div v-if="activeTab !== '广场'" class="filter">
+    <!-- 车型筛选：仅推荐/动态显示（推荐=全部、动态=最新；广场无筛选条，与设计稿一致）+ 非搜索态 -->
+    <div v-if="activeTab !== '广场' && !showSearchResults" class="filter">
       <div class="chips">
         <span
           v-for="f in currentFilters"
@@ -117,7 +133,7 @@
     </div>
 
     <!-- 推荐：双列网格 -->
-    <div v-if="activeTab === '推荐'" class="content">
+    <div v-if="activeTab === '推荐' && !showSearchResults" class="content">
       <div class="grid2">
         <FeedCard
           v-for="(it, i) in recommendList"
@@ -132,8 +148,8 @@
       </div>
     </div>
 
-    <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 -->
-    <template v-else-if="activeTab === '动态'">
+    <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 + 非搜索态 -->
+    <template v-else-if="activeTab === '动态' && !showSearchResults">
       <div class="subtabs">
         <span class="subtab" :class="{ active: dynamicSubtab === 'follow' }" @click="setDynamicSub('follow')">{{ t('discover.subFollow') }}</span>
         <span class="subtab" :class="{ active: dynamicSubtab === 'near' }" @click="setDynamicSub('near')">{{ t('discover.subNear') }}</span>
@@ -154,8 +170,8 @@
       </div>
     </template>
 
-    <!-- 广场：车型展示 + 热门活动 -->
-    <div v-else-if="activeTab === '广场'" class="content">
+    <!-- 广场：车型展示 + 热门活动 + 非搜索态 -->
+    <div v-else-if="activeTab === '广场' && !showSearchResults" class="content">
       <div class="grid3">
         <div
           v-for="(p, i) in plazaShowcase"
@@ -455,9 +471,18 @@ function onBanner() {
   const b = bannerSlides.value[bannerIdx.value]
   if (!b || !b.url) return
   const u = b.url
-  if (/^https?:\/\//i.test(u)) bridge.openShopify(u)
-  else if (u.startsWith('/')) router.push(u)
-  else bridge.openNative(u)
+  if (/^https?:\/\//i.test(u)) { bridge.openShopify(u); return }
+  // 内部路由：原生环境走 openNative 让 Flutter 切 tab（解决"点了精选但 tab 还在发现"）
+  if (u.startsWith('/')) {
+    if (bridge.isNative()) {
+      // 截取路径名作为原生路由指令（如 /featured → featured）
+      bridge.openNative(u.slice(1))
+    } else {
+      router.push(u)
+    }
+    return
+  }
+  bridge.openNative(u)
 }
 
 // 发布后自动切到「动态」tab 展示新内容
@@ -568,9 +593,31 @@ function onMoreActivity() { router.push('/activity-center') }
 function onActivity(a) { router.push('/activity/' + a.id) }
 
 const keyword = ref('')
+const isComposing = ref(false)
+function onSearchEnter() {
+  if (isComposing.value) return // IME 组合中不触发搜索
+  onSearch()
+}
+function onCompositionEnd(e) {
+  isComposing.value = false
+}
+// 搜索：内联过滤当前 tab 已加载数据（不走二级页，不调原生）
+const showSearchResults = ref(false)
+const searchResults = computed(() => {
+  const k = (keyword.value || '').trim().toLowerCase()
+  if (!k || !showSearchResults.value) return []
+  const src = activeTab.value === '推荐' ? recommendData.value : dynamicList.value
+  return src.filter((it) => {
+    const t = (it.title || '').toLowerCase()
+    const c = (it.content || '').toLowerCase()
+    const a = (it.author || '').toLowerCase()
+    return t.includes(k) || c.includes(k) || a.includes(k)
+  })
+})
 function onSearch() {
-  // 搜索（决策相关）：原生承载；H5 兜底跳 /search 并带 q
-  bridge.openNative('search?q=' + encodeURIComponent(keyword.value.trim()))
+  const k = keyword.value.trim()
+  if (!k) { showSearchResults.value = false; return }
+  showSearchResults.value = true
 }
 
 const toast = ref('')
@@ -587,6 +634,13 @@ function showToast(msg) {
   min-height: 100vh;
   background: var(--bg);
   padding-bottom: env(safe-area-inset-bottom);
+}
+/* 顶部吸顶：TopBar + 地区栏一起固定 */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 99;
+  background: var(--bg);
 }
 .tabs {
   display: flex;
@@ -680,6 +734,31 @@ function showToast(msg) {
   gap: 8px;
   padding: 0 14px;
   box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
+}
+/* 搜索结果（内联） */
+.search-results {
+  padding: 8px 12px 16px;
+}
+.search-results__head {
+  font-size: 13px;
+  color: var(--text-hint);
+  padding: 4px 4px 12px;
+}
+.search-results__empty {
+  text-align: center;
+  color: var(--text-hint);
+  font-size: 14px;
+  padding: 40px 0;
+}
+.search-results__clear {
+  display: block;
+  margin: 16px auto 0;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--text-sub);
+  font-size: 13px;
+  padding: 8px 24px;
+  border-radius: var(--radius-pill);
 }
 .sicon {
   color: var(--text-hint);

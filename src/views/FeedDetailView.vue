@@ -141,6 +141,9 @@
           class="cinput__field"
           :placeholder="replyTo ? ('回复 ' + replyTo.name + '：') : t('feed.inputPlaceholder')"
           @keyup.enter="submitComment"
+          @compositionstart="isComposing = true"
+          @compositionend="onCompositionEnd"
+          @focus="onCommentFocus"
         />
         <button class="cinput__send press" @click="submitComment">{{ t('feed.send') }}</button>
       </div>
@@ -253,6 +256,16 @@ const collected = ref(false)
 const followed = ref(false)
 const comments = ref([])
 const commentText = ref('')
+const isComposing = ref(false)
+function onCompositionEnd() {
+  isComposing.value = false
+}
+// Bug5: 输入法遮挡——focus 时将输入栏滚动到可视区（延迟等键盘弹起）
+function onCommentFocus() {
+  setTimeout(() => {
+    commentInput.value?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, 300)
+}
 const toast = ref('')
 let toastTimer = null
 const commentsBox = ref(null)
@@ -527,6 +540,7 @@ function onCommentBtn() {
   })
 }
 async function submitComment() {
+  if (isComposing.value) return // IME 组合中不提交
   const text = commentText.value.trim()
   if (!text) return
   const [profile, token] = await Promise.all([

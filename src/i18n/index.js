@@ -131,6 +131,7 @@ const messages = {
     'search.sub.feed': '内容',
     'search.sub.activity': '活动 · ',
     'search.sub.vehicle': '车型',
+    'search.clear': '清除',
 
     // ============ 公告 ============
     'notice.title': '官方公告',
@@ -337,6 +338,7 @@ const messages = {
     'search.sub.feed': 'Post',
     'search.sub.activity': 'Event · ',
     'search.sub.vehicle': 'Model',
+    'search.clear': 'Clear',
 
     // ============ Notice ============
     'notice.title': 'Official Notices',
@@ -543,6 +545,7 @@ const messages = {
     'search.sub.feed': 'Post',
     'search.sub.activity': 'Evento · ',
     'search.sub.vehicle': 'Modelo',
+    'search.clear': 'Limpar',
 
     // ============ Notice ============
     'notice.title': 'Avisos Oficiais',

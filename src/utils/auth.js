@@ -16,15 +16,20 @@ import { bridge } from '../bridge'
  * @returns {Promise<boolean>} true=已登录可继续；false=未登录（已拉起原生登录）
  */
 export async function requireLogin() {
-  let token = ''
-  try {
-    // 优先受限 token（HMAC 鉴权链注入的 getAuthToken），回退主 token；任一存在即视为已登录
-    token = (await bridge.getAuthToken()) || (await bridge.getToken()) || ''
-  } catch (e) {
-    token = ''
+  // 最多重试 2 次（等原生 bridge 注入 token），每次间隔 500ms
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let token = ''
+    try {
+      token = (await bridge.getAuthToken()) || (await bridge.getToken()) || ''
+    } catch (e) {
+      token = ''
+    }
+    if (token) return true
+    // 首次失败且还有重试机会：等一下再试（原生 bridge 可能还在 exchange-token）
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 500))
   }
-  if (token) return true
-  // 无 token → 拉起原生登录（决策 A）
+  // 确实无 token → 拉起原生登录（决策 A）
+  console.warn('[requireLogin] 无可用 token，将拉起原生登录')
   bridge.openNative('login')
   return false
 }

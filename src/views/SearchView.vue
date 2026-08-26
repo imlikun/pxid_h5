@@ -6,7 +6,9 @@
           class="sinput"
           v-model="kw"
           :placeholder="t('search.placeholder')"
-          @keyup.enter="doSearch"
+          @keyup.enter="doSearchEnter"
+          @compositionstart="isComposing = true"
+          @compositionend="onCompositionEnd"
         />
       </template>
       <template #right>
@@ -44,6 +46,14 @@ const router = useRouter()
 const route = useRoute()
 const q = ref(route.query.q || '')
 const kw = ref(route.query.q || '')
+const isComposing = ref(false)
+function doSearchEnter() {
+  if (isComposing.value) return
+  doSearch()
+}
+function onCompositionEnd(e) {
+  isComposing.value = false
+}
 const doSearch = () => { q.value = kw.value.trim() }
 
 const results = computed(() => {
