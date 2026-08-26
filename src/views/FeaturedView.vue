@@ -158,10 +158,14 @@ function enterStore() {
   if (store.value) bridge.openShopify('https://' + store.value)
 }
 
-// ---- 顶部 Banner 产品轮播 ----
+// ---- 顶部 Banner 产品轮播（仅展示指定的 3 个在售车型）----
 const current = ref(0)
 let _bannerTimer = null
-const bannerList = computed(() => all.value)
+const bannerList = computed(() =>
+  all.value.filter((p) =>
+    ['p4', '500w-48v-city-folding-electric-scooter-with-app', 'ant5'].includes(p.id)
+  )
+)
 
 function startBanner() {
   stopBanner()
