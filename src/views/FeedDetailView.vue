@@ -276,6 +276,10 @@ const KEYBOARD_ENV = (() => {
     return false
   }
 })()
+// 悬浮窗输入法兜底高度（占屏幕比例）。
+// 0.5 基于 2026-08-26 vivo X300 Pro + 微信输入法实测截图（键盘约 50% 屏高）；
+// 微信/搜狗/讯飞等悬浮窗输入法普遍 45-55%，可按实测机型调整。
+const KB_RESERVE_RATIO = 0.5
 function calcKbH() {
   // 支持 CSS 键盘变量时交给 CSS（env 精确且零延迟），JS 不再抬升，避免 inline 覆盖
   if (KEYBOARD_ENV) return 0
@@ -303,18 +307,20 @@ function onCommentFocus() {
       setTimeout(() => {
         syncKeyboard()
         // 悬浮窗/覆盖模式兜底：1200ms 后布局高度与视觉视口都没变化（键盘未触发 resize）
-        // → 拿不到键盘高度，按视觉视口 45% 抬升输入栏（假定悬浮键盘占底部 ~55%）
+        // → 拿不到键盘高度，按 KB_RESERVE_RATIO（悬浮键盘占屏比例）抬升输入栏
         if (ms === 1200 && !KEYBOARD_ENV && kbH.value === 0 && window.innerHeight === baseH) {
           const vv = window.visualViewport
-          kbH.value = Math.max(0, Math.round((vv && typeof vv.height === 'number' ? vv.height : baseH) * 0.45))
+          kbH.value = Math.max(0, Math.round((vv && typeof vv.height === 'number' ? vv.height : baseH) * KB_RESERVE_RATIO))
         }
       }, ms)
     })
     const el = commentInput.value
     if (el) {
-      el.focus()
-      // 兜底：无 visualViewport 的旧 WebView / 悬浮窗输入法，把输入框滚到可视区中部
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // preventScroll：不让浏览器自动滚（手动控制滚动位置，配合 fixed bottom 抬升）
+      el.focus({ preventScroll: true })
+      // 兜底：无 visualViewport 的旧 WebView / 悬浮窗输入法，
+      // 把输入框滚到祖先可视区底端（配合 bottom=键盘高度，双保险让输入栏浮在键盘上方）
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' })
     }
   })
 }
