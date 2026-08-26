@@ -40,3 +40,27 @@ export async function getToken() {
     return ''
   }
 }
+
+/**
+ * 取受限 token（HMAC 鉴权链注入的 getAuthToken），用于接口 Authorization 头。
+ * 与 requireLogin 同源，统一收敛到本文件，避免各 API 层重复封装。
+ * @returns {Promise<string>}
+ */
+export async function getAuthToken() {
+  try {
+    return (await bridge.getAuthToken()) || ''
+  } catch (e) {
+    return ''
+  }
+}
+
+/**
+ * 统一鉴权请求头：有 token 才带 Authorization，无则仅 Content-Type（公开读请求不阻塞）。
+ * @returns {Promise<Record<string,string>>}
+ */
+export async function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' }
+  const token = await getAuthToken()
+  if (token) headers.Authorization = 'Bearer ' + token
+  return headers
+}

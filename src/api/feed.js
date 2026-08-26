@@ -6,31 +6,21 @@
 //   POST /feed（发帖，author 由后端按 token 注入）
 //   GET /feed/{id}（详情）、POST /feed/{id}/like、comment...
 //
-// 当前后端未上线：走「mock + localStorage 持久化」兜底——
-//   发帖写本地存储，刷新不丢、本机可回看；动态流 = 我的发布 + 官方 mock moments。
-// 后端就绪后：在下方 FEED_API 填真实 Base URL 即自动切换（保留 mock 兜底）。
+// 当前已上线 pxid-api.appin.site（§3 契约）：真实接口优先，失败才回退 mock。
+// FEED_API 填真实 Base URL 即走真后端；mock 仅作离线兜底，避免演示态空白。
 // ============================================================
 
 import { publishState, addMoment } from '../store/publish'
 import { moments, feedItems, defaultAvatar } from '../data/mock'
 import { getDeviceId } from '../utils/device'
-import bridge from '../bridge'
+import { getAuthToken } from '../utils/auth'
 
-// 后端就绪后改为真实地址（2026-08-18 已上线 pxid-api.appin.site）
+// 已上线 pxid-api.appin.site（2026-08-18）
 const FEED_API = 'https://pxid-api.appin.site'
-
-// 取受限 token（后端 requireAuth 校验用）；取不到也不阻塞公开读请求
-async function getAuthTokenSafe() {
-  try {
-    return (await bridge.getAuthToken()) || ''
-  } catch (e) {
-    return ''
-  }
-}
 
 async function request(path, { method = 'GET', body } = {}) {
   const headers = { 'Content-Type': 'application/json' }
-  const tk = await getAuthTokenSafe()
+  const tk = await getAuthToken()
   if (tk) headers.Authorization = 'Bearer ' + tk
   const res = await fetch(FEED_API + path, {
     method,

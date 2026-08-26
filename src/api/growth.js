@@ -2,14 +2,7 @@
 // 后端：GET /growth/profile、POST /growth/signin、GET /growth/medals（均 requireAuth）
 // 与 notifications.js 一致：走 API_BASE（pxid-api.appin.site），路径无 /api 前缀
 import { API_BASE } from './shop'
-import { bridge } from '../bridge'
-
-async function authHeaders() {
-  const headers = { 'Content-Type': 'application/json' }
-  const token = bridge.getAuthToken ? await bridge.getAuthToken() : ''
-  if (token) headers['Authorization'] = 'Bearer ' + token
-  return headers
-}
+import { authHeaders } from '../utils/auth'
 
 async function req(method, path, body) {
   const opt = { method, headers: await authHeaders() }
