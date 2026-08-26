@@ -155,11 +155,8 @@ function enterStore() {
   if (store.value) bridge.openShopify('https://' + store.value)
 }
 
-// ---- 顶部 Banner 车型轮播（取 2-3 个代表车型，与发现页"广场-车型展示"同源 plazaShowcase）----
-const BANNER_MODEL_IDS = ['scooter-F1', 'ebike-P2', 'motorcycle-P5']
-const bannerList = computed(() =>
-  plazaShowcase.filter((m) => BANNER_MODEL_IDS.includes(m.id))
-)
+// ---- 顶部 Banner 车型轮播：展示精选栏目全部在售可购买车型，点击跳各自车型详情页 /vehicle/:id ----
+const bannerList = computed(() => plazaShowcase)
 function bannerImgOf(c) {
   return import.meta.env.BASE_URL + c.cover
 }
