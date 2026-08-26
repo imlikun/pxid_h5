@@ -259,7 +259,6 @@ async function retry() {
   background:
     linear-gradient(180deg, rgba(77, 124, 255, 0.07) 0%, rgba(77, 124, 255, 0) 200px),
     var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .tabs {

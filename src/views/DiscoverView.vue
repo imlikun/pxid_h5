@@ -586,7 +586,6 @@ function showToast(msg) {
 .discover {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .tabs {
