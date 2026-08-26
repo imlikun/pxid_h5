@@ -709,6 +709,7 @@ function showToast(msg) {
   font-weight: 600;
   font-size: 13px;
   padding: 6px 14px;
+  line-height: 1;
   box-shadow: 0 2px 8px rgba(77,124,255,.25);
 }
 .region-hint {
@@ -889,6 +890,7 @@ function showToast(msg) {
   color: #fff;
   background: var(--brand, #4A6CF7);
   font-weight: 600;
+  line-height: 1;
   box-shadow: 0 2px 8px rgba(77,124,255,.25);
 }
 .sort {
@@ -1050,6 +1052,7 @@ function showToast(msg) {
   background: var(--brand);
   box-shadow: 0 2px 8px rgba(77,124,255,.25);
   font-weight: 600;
+  line-height: 1;
 }
 .subtab:active { transform: scale(0.96); }
 </style>
