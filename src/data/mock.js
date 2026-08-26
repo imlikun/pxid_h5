@@ -164,12 +164,41 @@ export const feedItems = [
   },
 ]
 
-// 广场：车型展示（只保留已有 vehicleCatalog 详情页的车型）
+// 广场：车型展示（真实 Shopify 车型，collection=spring；id=Shopify handle，点击跳车型页拉真实数据）
 export const plazaShowcase = [
-  { id: 'scooter-F2', name: 'F2', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P2', name: 'P2', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
-  { id: 'motorcycle-P5', name: 'P5', cover: 'feed_r1.jpg', itemType: 'buy-vehicle' },
+  { id: 'ant5', name: 'ANT5', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/marsant_s_x-ANT5_300ee173-43dd-494f-9d7e-3172399253c6.jpg?v=1764830619', itemType: 'buy-vehicle' },
+  { id: 'long-range-20-inch-4-fat-tire-pedal-assist-ebike-ant6', name: 'ANT6', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/6_1e5b5268-e204-47e8-8da4-976d2b16738c.jpg?v=1764830364', itemType: 'buy-vehicle' },
+  { id: 'p2', name: 'P2', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/16_Inch_Light_Electric_Bike-p2.jpg?v=1746493054', itemType: 'buy-vehicle' },
+  { id: 'p4', name: 'P4', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/foldable_electric_bike_for_adults_16d407fe-4266-4116-b3a3-8824707dc585.jpg?v=1746511943', itemType: 'buy-vehicle' },
+  { id: '500w-48v-city-folding-electric-scooter-with-app', name: '城市滑板车', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/500W48VCityFoldingElectricScooter..jpg?v=1746580730', itemType: 'buy-vehicle' },
+  { id: 'light-weight-8-inch-electric-kick-scooter-for-adult', name: '轻便滑板车', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/Lightweight8-inchElectricKickScooter..jpg?v=1746585827', itemType: 'buy-vehicle' },
+  { id: '500w-48v-motor-off-road-electric-scooter-with-seat', name: '越野滑板车', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/Marsant_sxOffRoadElectricScooterWithSeatfoldableelectricscooter.jpg?v=1746523434', itemType: 'buy-vehicle' },
+  { id: '500w-2-dual-motor-three-wheel-electric-scooter', name: '三轮滑板车', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/Marsant_sxThreeWheelElectricScooterwitheasyfolddesign.jpg?v=1773730005', itemType: 'buy-vehicle' },
+  { id: 'ant5-1', name: 'ANT5 越野', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/electricoffroadbike_6ac0c18b-4b55-4605-b929-34f600fea919.jpg?v=1773729908', itemType: 'buy-vehicle' },
+  { id: '500w-2-dual-motor-three-wheel-electric-scooter-w2', name: 'W2 三轮', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/1000W_Dual_Motor_Long_Range_Three_Wheel_Electric_Scooter_W2_91b421e8-8995-4999-bea8-9b60fafeb5fe.jpg?v=1751956467', itemType: 'buy-vehicle' },
 ]
+
+// 真实车型 handle 全集（车型页「热门推荐」用）
+export const VEHICLE_HANDLES = plazaShowcase.map((p) => p.id)
+
+// 帖子 carModel（内部代号）→ Shopify handle 临时映射
+// ⚠️ 临时兜底：mock 帖子的 carModel 是内部代号，与 Shopify handle 不对应；
+//    后端把帖子 carModel 改为真实 Shopify handle 后本表可删。
+export const carModelToHandle = {
+  F2: 'ant5',
+  P2: 'p2',
+  P5: 'p4',
+  P1: 'p2',
+  H10: '500w-48v-motor-off-road-electric-scooter-with-seat',
+  M2: 'long-range-20-inch-4-fat-tire-pedal-assist-ebike-ant6',
+  Z3: 'p2',
+  'MOTA Z3': 'p2',
+  'PX-4': 'p4',
+  'CoolPlay PX-2': 'p2',
+  'MOTA Z1': 'ant5',
+  'Urban 03': 'ant5-1',
+  'scooter-F2': 'ant5',
+}
 
 // 广场：热门活动 2 条（封面按 广场/ 子目录文件顺序：(7)→活动1、base→活动2）
 export const activities = [
@@ -619,151 +648,11 @@ export const notices = [
   { id: 'N4', type: 'safety', forceAck: false, isRead: true, title: '雨季骑行安全提醒', summary: '雨季路面湿滑，请降低胎压、保持车距、避免涉水，刹车提前轻柔点刹。', publisher: 'PXID 用户运营', publishTime: '2026-07-20 11:00', effectiveTime: '2026-07-20 起', content: '雨季骑行三要点：① 胎压适当降低增加抓地；② 涉水深度不超过轮毂中心；③ 刹车提前点刹防止侧滑。' },
 ]
 
-// ---------------- 车型详情/定制页数据（鸿蒙智行风格）----------------
-// 数据源：CAR_MODELS(carModels.js) 为索引，本文件补充展示层详情
-// 接后端车型 API 后整块替换
-export const vehicleCatalog = {
-  'scooter-F2': {
-    id: 'scooter-F2', code: 'F2', series: '电动滑板车', seriesKey: 'scooter',
-    name: 'F2 倒三轮滑板车', shortName: 'F2',
-    slogan: '城市穿梭 · 稳如泰山 · 倒三轮结构重新定义滑板车',
-    price: 16980, priceUnit: '¥',
-    shopUrl: '',
-    heroImage: 'banner/banner-op1.jpg',       // 主 Hero 大图（16:9）
-    gallery: [                                  // 配置区轮播小图
-      'banner/banner-op1.jpg',
-      'banner/banner-shot1.jpg',
-    ],
-    // 核心参数
-    specs: [
-      { label: '续航', value: '65 km' },
-      { label: '最高时速', value: '45 km/h' },
-      { label: '电机功率', value: '2000W' },
-      { label: '充电时长', value: '4-6 h' },
-      { label: '载重', value: '150 kg' },
-      { label: '整车重量', value: '42 kg' },
-    ],
-    description: 'PXID F2 采用独创倒三轮转向结构，前双轮独立悬挂提供超强稳定性，后驱 2000W 无刷电机带来澎湃动力。无论是城市通勤还是郊外游玩，F2 都能给你前所未有的骑行信心。全车采用航空级铝合金车架，IPX5 防水等级，无惧风雨。',
-    // 选配配置组
-    configGroups: [
-      {
-        key: 'color', label: '车身颜色',
-        options: [
-          { id: 'black', name: '极夜黑', priceDiff: 0, color: '#1a1a1a' },
-          { id: 'white', name: '云朵白', priceDiff: 300, color: '#f0f0f0' },
-          { id: 'orange', name: '活力橙', priceDiff: 0, color: '#ff6b35' },
-          { id: 'army', name: '军绿色', priceDiff: 200, color: '#4a5d3e' },
-        ],
-      },
-      {
-        key: 'battery', label: '电池配置',
-        options: [
-          { id: 'std', name: '标准续航 48V 20Ah', desc: '约 65km', priceDiff: 0 },
-          { id: 'lng', name: '长续航 48V 30Ah', desc: '约 95km', priceDiff: 1800 },
-        ],
-      },
-      {
-        key: 'tire', label: '轮胎规格',
-        options: [
-          { id: 'street', name: '公路真空胎', desc: '低滚阻·省电', priceDiff: 0 },
-          { id: 'allterrain', name: '全地形越野胎', desc: '抓地强·防滑', priceDiff: 600 },
-        ],
-      },
-    ],
-    // 车主口碑
-    reviews: [
-      { author: '骑行老王', avatar: 'unsplash/photo-1500648767791-00dcc994a43e_w_80_q_80.jpg', rating: 5, content: '倒三轮真的稳，40码过弯完全不慌。橙色实车比图片还帅，回头率爆表。', time: '2026-08-20', likes: 23 },
-      { author: '外卖小哥阿强', avatar: 'unsplash/photo-1472099645785-5658abf4ff4e_w_80_q_80.jpg', rating: 5, content: '送餐神器，雨天路滑也不怕。长续航版一天不用充电。', time: '2026-08-15', likes: 41 },
-      { author: '都市丽人小陈', avatar: 'unsplash/photo-1438761681033-6461ffad8d80_w_80_q_80.jpg', rating: 4, content: '颜值在线，白色款很适合女生骑。就是稍微有点重，不过倒三轮本来就这样。', time: '2026-08-10', likes: 18 },
-    ],
-    // 热门推荐（同系列其他车型）
-    relatedModels: ['motorcycle-P5', 'ebike-P2'],
-  },
-  'ebike-P2': {
-    id: 'ebike-P2', code: 'P2', series: '电助力自行车', seriesKey: 'ebike',
-    name: 'P2 Fat-Tire 电助力越野', shortName: 'P2',
-    slogan: '全地形征服者 · 4.0 肥胎 · 山地级避震',
-    price: 12880, priceUnit: '¥',
-    shopUrl: '',
-    heroImage: 'banner/banner-shot1.jpg',
-    gallery: ['banner/banner-shot1.jpg', 'banner/banner-moto.jpg'],
-    specs: [
-      { label: '续航', value: '80 km' },
-      { label: '最高时速', value: '25 km/h(国标)' },
-      { label: '电机功率', value: '250W 中置' },
-      { label: '电池', value: '48V 14Ah' },
-      { label: '轮胎', value: '20×4.0 肥胎' },
-      { label: '重量', value: '24 kg' },
-    ],
-    description: 'PXID P2 是一款真正的全地形电助力自行车。20×4.0 超宽肥胎配合山地级前叉避震，无论是林道、沙滩还是城市坑洼路面都能轻松应对。中置力矩传感器提供自然踩踏辅助感，5 级助力可调。',
-    configGroups: [
-      {
-        key: 'color', label: '车身颜色',
-        options: [
-          { id: 'matteBlack', name: '哑光黑', priceDiff: 0, color: '#2c2c2c' },
-          { id: 'armyGreen', name: '军绿', priceDiff: 0, color: '#4a5d3e' },
-          { id: 'brown', name: '棕褐', priceDiff: 400, color: '#8b6914' },
-        ],
-      },
-      {
-        key: 'battery', label: '电池配置',
-        options: [
-          { id: 'std', name: '48V 14Ah 标准', desc: '约 80km', priceDiff: 0 },
-          { id: 'ext', name: '48V 21Ah 扩容', desc: '约 120km', priceDiff: 1500 },
-        ],
-      },
-    ],
-    reviews: [
-      { author: '山地铁驴', avatar: 'unsplash/photo-1507003211169-0a1dd7228f2d_w_80_q_80.jpg', rating: 5, content: '肥胎过坑太爽了，感觉像在开坦克。助力很线性不像有些车一窜一窜的。', time: '2026-08-18', likes: 56 },
-      { author: '周末骑士', avatar: 'unsplash/photo-1527980965255-d3b416303d12_w_80_q_80.jpg', rating: 4, content: '颜值高，棕色皮质坐垫很有质感。续航实测 75km 左右，够用了。', time: '2026-08-12', likes: 31 },
-    ],
-    relatedModels: ['scooter-F2', 'motorcycle-P5'],
-  },
-  'motorcycle-P5': {
-    id: 'motorcycle-P5', code: 'P5', series: '电摩', seriesKey: 'motorcycle',
-    name: 'P5 智能电摩 Pro', shortName: 'P5',
-    slogan: '速度与智能的完美融合 · TFT 彩屏 · Bosch ABS',
-    price: 25800, priceUnit: '¥',
-    shopUrl: '',
-    heroImage: 'banner/banner-moto.jpg',
-    gallery: ['banner/banner-moto.jpg'],
-    specs: [
-      { label: '续航', value: '100 km' },
-      { label: '最高时速', value: '75 km/h' },
-      { label: '电机功率', value: '3000W 中置' },
-      { label: '电池', value: '72V 32Ah' },
-      { label: '制动', value: '前后碟刹 + CBS' },
-      { label: '智能', value: 'TFT 彩屏 + NFC' },
-    ],
-    description: 'PXID P5 是品牌旗舰电摩。搭载 3000W 中置电机 + 72V 32Ah 锂电，极速 75km/h 续航破百。配备 5 英寸 TFT 智能彩屏、NFC 一键启动、Bosch 双通道 ABS，重新定义城市电摩标准。',
-    configGroups: [
-      {
-        key: 'color', label: '车身颜色',
-        options: [
-          { id: 'midnight', name: '暗夜黑', priceDiff: 0, color: '#111' },
-          { id: 'titanium', name: '钛灰', priceDiff: 800, color: '#888' },
-          { id: 'blue', name: '星际蓝', priceDiff: 1200, color: '#1a3a5c' },
-        ],
-      },
-      {
-        key: 'battery', label: '电池配置',
-        options: [
-          { id: 'std', name: '72V 26Ah', desc: '约 85km', priceDiff: -1500 },
-          { id: 'pro', name: '72V 32Ah 长续航', desc: '约 100km', priceDiff: 0 },
-        ],
-      },
-    ],
-    reviews: [
-      { author: '电摩玩家', avatar: 'unsplash/photo-1500648767791-00dcc994a43e_w_80_q_80.jpg', rating: 5, content: '这价格能买到这个配置真的值了。ABS 很有安全感，TFT 屏显示信息很全。', time: '2026-08-22', likes: 67 },
-    ],
-    relatedModels: ['scooter-F2', 'ebike-P2'],
-  },
-}
+// ---------------- 车型详情页（VehicleDetailView）----------------
+// ⚠️ 不再使用本地 mock：车型页改为按 Shopify handle 从 /mall-api/products/:handle 拉真实数据
+//    （参数/配置/价格/立即订购全部来自精选真实商品，见 src/views/VehicleDetailView.vue）
+//    旧 vehicleCatalog / getVehicleDetail 已删除，避免「假车型数据」混入交付。
 
-// 根据 plazaShowcase id 回退到 catalog（兼容旧路由 /vehicle/:id）
-export function getVehicleDetail(id) {
-  return vehicleCatalog[id] || null
-}
 
 // ---------------- 立即定制 → 购车 Tab（前端展示，提交走原生）----------------
 export const customizeOptions = {

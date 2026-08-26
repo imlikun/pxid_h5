@@ -9,10 +9,13 @@
       <div class="nav-placeholder"></div>
     </div>
 
-    <!-- 未找到 -->
+    <!-- 加载中 / 未找到 -->
     <div v-if="!v" class="notfound">
-      <p>未找到该车型</p>
-      <button class="press back-btn" @click="router.back()">返回</button>
+      <p v-if="loading">加载中…</p>
+      <template v-else>
+        <p>未找到该车型</p>
+        <button class="press back-btn" @click="router.back()">返回</button>
+      </template>
     </div>
 
     <template v-if="v">
@@ -42,7 +45,7 @@
       </section>
 
       <!-- ===== 选车配置区（核心） ===== -->
-      <section class="config-card card fade-up stagger-4">
+      <section v-if="v.configGroups.length" class="config-card card fade-up stagger-4">
         <!-- 标题行：车型 + 价格 -->
         <div class="config-header">
           <div>
@@ -98,8 +101,9 @@
       <section class="reviews-card card fade-up stagger-7">
         <div class="sec-header">
           <h3 class="sec-title">车主口碑</h3>
-          <span class="sec-more">{{ v.reviews.length }} 条评价</span>
+          <span class="sec-more">{{ v.reviews.length ? v.reviews.length + ' 条评价' : '暂无评价' }}</span>
         </div>
+        <p v-if="!v.reviews.length" class="rv-empty">暂无车主评价，欢迎前往 Shopify 商品页留言</p>
         <div v-for="(r, i) in v.reviews" :key="i" class="review-item">
           <div class="rv-head">
             <img class="rv-avatar" :src="avatarUrl(r.avatar)" alt="" loading="lazy" />
@@ -121,7 +125,7 @@
         <h3 class="sec-title" style="padding: 0 12px 10px;">热门推荐</h3>
         <div class="related-scroll">
           <div
-            v-for="rid in v.relatedModels"
+            v-for="rid in relatedHandles"
             :key="rid"
             class="related-item press"
             @click="router.push('/vehicle/' + rid)"
@@ -150,7 +154,7 @@
     <!-- 底部固定栏 -->
     <div v-if="v" class="footer-bar">
       <div class="f-price">
-        <span class="fp-symbol">¥</span><span class="fp-num">{{ currentPrice.toLocaleString() }}</span>
+        <span class="fp-symbol">{{ v.priceUnit }}</span><span class="fp-num">{{ currentPrice.toLocaleString() }}</span>
         <span class="fp-hint">起</span>
       </div>
       <button class="f-buy press" @click="onOrder">立即订购</button>
@@ -159,29 +163,104 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getVehicleDetail, vehicleCatalog, plazaShowcase } from '../data/mock'
+import { fetchProducts, fetchProductDetail, getProductByHandle, sym, initRegion } from '../api/shop'
+import { plazaShowcase, VEHICLE_HANDLES, carModelToHandle } from '../data/mock'
 import { bridge } from '../bridge'
 
 const router = useRouter()
 const route = useRoute()
-const BASE = import.meta.env.BASE_URL
 
-// 当前车型
-const v = computed(() => getVehicleDetail(route.params.id))
-const heroUrl = computed(() => (v.value ? BASE + v.value.heroImage : ''))
+const product = ref(null)
+const loading = ref(true)
+
+// 路由参数可能是 Shopify handle，也可能是帖子内部 carModel 代号 → 统一解析为 handle
+const handle = computed(() => carModelToHandle[route.params.id] || route.params.id)
+
+async function load() {
+  const h = handle.value
+  loading.value = true
+  product.value = null
+  await initRegion()
+  // 1) 列表缓存快速首屏
+  let p = getProductByHandle(h)
+  if (p) { product.value = p; loading.value = false }
+  // 2) 缓存未命中先拉列表填充缓存
+  if (!p) {
+    try { await fetchProducts() } catch (_) { /* 非阻塞 */ }
+    p = getProductByHandle(h)
+    if (p) { product.value = p; loading.value = false }
+  }
+  // 3) 单品详情真拉（覆盖缓存，带重试）
+  try {
+    const d = await fetchProductDetail(h)
+    if (d) product.value = d
+  } catch (e) { /* 忽略，沿用缓存 */ }
+  loading.value = false
+}
+onMounted(load)
+watch(() => route.params.id, load)
+
+// Shopify 商品 → 车型页布局字段（真实数据）
+const v = computed(() => {
+  const p = product.value
+  if (!p) return null
+  const imgs = p.images || []
+  const basePrice = Number(p.price) || 0
+  const variants = p.variants || []
+  const configGroups = []
+  if (variants.length > 1) {
+    configGroups.push({
+      key: 'variant',
+      label: '选择版本',
+      options: variants.map((vt) => ({
+        id: vt.id,
+        name: vt.title,
+        priceDiff: Math.round((Number(vt.price) || 0) - basePrice),
+      })),
+    })
+  }
+  const descText = (p.description || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&[a-z]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return {
+    name: p.name,
+    shortName: shortNameOf(p),
+    slogan: p.tagline || (p.sellingPoints && p.sellingPoints[0]) || '',
+    series: p.vendor || '',
+    price: basePrice,
+    priceUnit: sym(p.currency),
+    specs: p.specs || [],
+    configGroups,
+    description: descText,
+    heroImage: imgs[0] || '',
+    shopUrl: p.shopUrl || '',
+    reviews: [], // Shopify 暂无评价接口，真实评价接入后填此处（不展示假评价）
+  }
+})
+
+function shortNameOf(p) {
+  const h = p.handle || ''
+  const m = h.match(/ant\d|p\d|w\d/i)
+  if (m) return m[0].toUpperCase()
+  return (p.name || '').split(' ').slice(0, 2).join(' ')
+}
+
+const heroUrl = computed(() => (v.value ? v.value.heroImage : ''))
 
 // 选中的配置
 const selections = reactive({})
 function initSelections() {
   if (!v.value) return
-  selections._model = v.value.id
+  selections._model = handle.value
   for (const g of v.value.configGroups) {
     if (!selections[g.key]) selections[g.key] = g.options[0].id
   }
 }
-initSelections()
+watch(v, initSelections, { immediate: true })
 
 function selectOption(groupKey, opt) {
   selections[groupKey] = opt.id
@@ -208,21 +287,21 @@ const selectedConfigName = computed(() => {
   return parts.join(' / ')
 })
 
-// 头像 URL
-function avatarUrl(path) { return path ? BASE + path : '' }
+// 头像 URL（真实评价接入后用）
+function avatarUrl(path) { return path || '' }
 
-// 相关车型
-function relatedCover(id) {
-  const detail = vehicleCatalog[id]
-  if (detail) return BASE + detail.heroImage
-  const item = plazaShowcase.find((c) => c.id === id)
-  return item ? BASE + item.cover : ''
+// 热门推荐：其他真实车型
+const relatedHandles = computed(() => VEHICLE_HANDLES.filter((h) => h !== handle.value))
+function relatedCover(h) {
+  const p = getProductByHandle(h)
+  const imgs = (p && p.images) || []
+  return imgs[0] || ''
 }
-function relatedName(id) {
-  const detail = vehicleCatalog[id]
-  if (detail) return detail.shortName || detail.code
-  const item = plazaShowcase.find((c) => c.id === id)
-  return item ? item.name : id
+function relatedName(h) {
+  const p = getProductByHandle(h)
+  if (p) return shortNameOf(p)
+  const item = plazaShowcase.find((c) => c.id === h)
+  return item ? item.name : h
 }
 
 // CTA 操作
@@ -231,8 +310,7 @@ function onOrder() {
   if (url) {
     window.open(url, '_blank')
   } else {
-    // 无 Shopify 映射时走原生购买流程
-    bridge.openNative('buy/order?model=' + v.value.id)
+    bridge.openNative('buy/order?model=' + handle.value)
   }
 }
 function onCommunity() {
@@ -358,6 +436,7 @@ function onCommunity() {
 .rv-stars .filled { color: #ffb800; }
 .rv-body { font-size: 13px; color: var(--text-sub); line-height: 1.6; margin: 0 0 6px; }
 .rv-foot { font-size: 12px; color: var(--text-hint); }
+.rv-empty { font-size: 13px; color: var(--text-hint); padding: 4px 0 12px; }
 
 /* ========== 热门推荐横向滚动 ========== */
 .related-card { margin-top: 20px; }
