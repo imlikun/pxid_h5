@@ -29,6 +29,8 @@ export const CAR_MODELS = [
   { id: 'ebike-P6', series: 'ebike', seriesName: '电助力', code: 'P6', label: 'P6', displayLabel: 'P6' },
   { id: 'motorcycle-P7', series: 'motorcycle', seriesName: '电摩', code: 'P7', label: 'P7', displayLabel: 'P7' },
   { id: 'motorcycle-P8', series: 'motorcycle', seriesName: '电摩', code: 'P8', label: 'P8', displayLabel: 'P8' },
+  { id: 'motorcycle-G1', series: 'motorcycle', seriesName: '电摩', code: 'G1', label: 'G1', displayLabel: 'G1' },
+  { id: 'ebike-P9', series: 'ebike', seriesName: '电助力', code: 'P9', label: 'P9', displayLabel: 'P9' },
 ]
 
 // 展示名列表（用于 发现 chips / 发布车型选择 / 广场筛选）：纯代号，去重避免 P5 双显重复

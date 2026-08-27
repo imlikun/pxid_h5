@@ -131,7 +131,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { carModels } from '../data/mock'
 import bridge from '../bridge'
 import { t } from '../i18n'
@@ -142,11 +142,17 @@ import TopBar from '../components/TopBar.vue'
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
 const router = useRouter()
+const route = useRoute()
 const fileInput = ref(null)
 const fileInputVideo = ref(null)
 
 const content = ref('')
 const carModel = ref('')
+// 从广场车型卡跳过来时预选车型（?carModel=P2）
+const presetModel = route.query.carModel
+if (presetModel && carModels.includes(presetModel)) {
+  carModel.value = presetModel
+}
 // 已选图片：{ file, url(本地预览), uploadedUrl, uploading }
 const picked = ref([])
 const uploading = ref(false)

@@ -581,8 +581,14 @@ async function setDynamicSub(sub) {
 }
 
 function onShowcase(p) {
-  // 车型卡跳 H5 车型详情页（Flutter 端未实现 vehicle 原生路由，走 H5 兜底）
-  router.push('/vehicle/' + p.id)
+  // 广场车型卡是「发动态关联选车」车型库，点击直接进发布页并预选该车型
+  // 不跳车型详情/精选（精选仅单店且当前与发布无关）
+  const q = '?carModel=' + encodeURIComponent(p.name)
+  if (bridge.isNative()) {
+    bridge.openNative('discover/publish' + q)
+  } else {
+    router.push('/publish' + q)
+  }
 }
 function onMoreActivity() { router.push('/activity-center') }
 function onActivity(a) { router.push('/activity/' + a.id) }
