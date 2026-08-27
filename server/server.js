@@ -560,8 +560,16 @@ app.get('/feed/users', (req, res) => {
 app.get('/users/:deviceId', (req, res) => {
   const deviceId = String(req.params.deviceId || '')
   if (!deviceId) return res.json(err(400, '缺少 deviceId'))
-  const me = req.user || {}
-  const myDevice = me.deviceId || ''
+  // 可选身份：带有效 Bearer token 则解析（未登录也能看公开资料，只是 isFollowing/isSelf=false）
+  let myDevice = ''
+  try {
+    const h = req.headers.authorization || ''
+    const t = h.startsWith('Bearer ') ? h.slice(7) : ''
+    if (t && USER_TOKEN_SECRET) {
+      const payload = verifyUserToken(t)
+      if (payload) myDevice = payload.deviceId || ''
+    }
+  } catch (e) { /* 忽略，按未登录处理 */ }
   // 资料取最近一条有效发帖（昵称/头像/车型）
   const feed = db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(deviceId)
   // 关注数 = 他关注了谁；粉丝数 = 谁关注了他
