@@ -245,6 +245,19 @@ const mockBridge = {
       }
     }
   },
+
+  // 退出 App（侧滑双按退出用；真机由 Flutter 实现 window.PXIDBridge.exit()）
+  exit() {
+    logMock('exit')
+    return Promise.resolve()
+  },
+
+  // 返回原生上一页（H5 根页面侧滑返回用：详情页无 H5 历史时，弹回 Flutter 原生列表）
+  // 契约：Flutter 实现 window.PXIDBridge.popPage() —— pop 当前承载 H5 的原生页面
+  popPage() {
+    logMock('popPage')
+    return Promise.resolve()
+  },
 }
 
 export function initBridge() {
@@ -309,6 +322,23 @@ export const bridge = {
   pickVideo: (opts) => window.PXIDBridge.pickVideo ? window.PXIDBridge.pickVideo(opts) : Promise.reject(new Error('未实现')),
   openShopify: (u) => window.PXIDBridge.openShopify(u),
   openCheckout: (lines) => window.PXIDBridge.openCheckout(lines),
+  // 退出 App：优先 window.PXIDBridge.exit()（Flutter 实现），兜底 openNative('app/exit') 契约
+  exit: () => {
+    if (window.PXIDBridge && typeof window.PXIDBridge.exit === 'function') {
+      return window.PXIDBridge.exit()
+    }
+    try {
+      if (window.PXIDBridge) window.PXIDBridge.openNative('app/exit')
+    } catch (e) { /* 无原生实现时静默 */ }
+    return undefined
+  },
+  // 返回原生上一页：Flutter 实现 popPage 后，H5 根页面侧滑即弹回原生列表
+  popPage: () => {
+    if (window.PXIDBridge && typeof window.PXIDBridge.popPage === 'function') {
+      return window.PXIDBridge.popPage()
+    }
+    return Promise.reject(new Error('popPage 未实现'))
+  },
 }
 
 export default bridge
