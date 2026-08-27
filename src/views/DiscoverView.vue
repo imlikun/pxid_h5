@@ -218,6 +218,8 @@ import {
   discoverQuick,
   plazaFilters,
   plazaShowcase,
+  recommendFilters,
+  dynamicFilters,
   notices,
 } from '../data/mock'
 import { clearNewMoment } from '../store/ui'
@@ -308,12 +310,11 @@ const actList = ref([])
 const loading = ref(false)
 const loadErr = ref('')
 
-// 车型筛选 chip：从接口数据动态提取（推荐=全部+有车型的帖子去重；动态=最新+同），过滤掉含汉字的标签
+// 车型筛选 chip：与广场一致，使用固定的 12 个在售车型列表（不再从动态接口动态提取，避免线上仅显示发过帖的车型、导致数量少于广场）
+// 防御性过滤：车型代号均为纯字母数字，若异常数据混入中文标签则剔除
 const currentFilters = computed(() => {
-  const list = activeTab.value === '推荐' ? recommendData.value : dynamicData.value
-  const cars = [...new Set(list.map((i) => i.carModel).filter(Boolean).filter((c) => !/[\u4e00-\u9fff]/.test(c)))]
-  if (activeTab.value === '推荐') return ['全部', ...cars]
-  return ['最新', ...cars]
+  const base = activeTab.value === '推荐' ? recommendFilters : dynamicFilters
+  return base.filter((c) => c === '全部' || c === '最新' || !/[\u4e00-\u9fff]/.test(c))
 })
 
 // 置顶优先 + 排序（最新/最热）：pinned 始终在前，组内按模式排序
