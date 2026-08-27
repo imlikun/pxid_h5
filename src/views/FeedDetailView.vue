@@ -330,10 +330,10 @@ function onCommentFocus() {
         // 键盘动画稳定后挂主内容 padding-bottom，让内容能滚到输入栏上方不被遮挡
         if (ms === 1200) {
           applyDetailPadding()
-          // 评论区自动滚到屏幕上部（输入栏上方可见）
-          if (commentsBox.value) {
-            commentsBox.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }
+          // 注释掉评论区自动滚到顶部，避免干扰输入框位置
+          // if (commentsBox.value) {
+          //   commentsBox.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          // }
         }
       }, ms)
     })
