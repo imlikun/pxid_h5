@@ -313,44 +313,12 @@ function clearDetailPadding() {
 }
 function onCommentFocus() {
   commenting.value = true
-  // 记录聚焦时的布局高度：用于识别「悬浮窗/覆盖模式输入法」（微信输入法等第三方输入法常见）
-  const baseH = window.innerHeight
-  nextTick(() => {
-    syncKeyboard()
-    // 键盘弹出动画期间多档重算（慢键盘/事件滞后补偿：120/320/700/1200ms）
-    ;[120, 320, 700, 1200].forEach((ms) => {
-      setTimeout(() => {
-        syncKeyboard()
-        // 悬浮窗/覆盖模式兜底：1200ms 后布局高度与视觉视口都没变化（键盘未触发 resize）
-        // → 拿不到键盘高度，按 KB_RESERVE_RATIO（悬浮键盘占屏比例）抬升输入栏
-        if (ms === 1200 && !KEYBOARD_ENV && kbH.value === 0 && window.innerHeight === baseH) {
-          const vv = window.visualViewport
-          kbH.value = Math.max(0, Math.round((vv && typeof vv.height === 'number' ? vv.height : baseH) * KB_RESERVE_RATIO))
-        }
-        // 键盘动画稳定后挂主内容 padding-bottom，让内容能滚到输入栏上方不被遮挡
-        if (ms === 1200) {
-          applyDetailPadding()
-          // 注释掉评论区自动滚到顶部，避免干扰输入框位置
-          // if (commentsBox.value) {
-          //   commentsBox.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          // }
-        }
-      }, ms)
-    })
-    const el = commentInput.value
-    if (el) {
-      // 阻止浏览器自动滚动（fixed 元素不应该被 scrollIntoView 移动）
-      // 手动控制滚动位置，确保输入框在键盘上方
-      el.focus({ preventScroll: true })
-      // 延迟执行，等键盘动画完成
-      setTimeout(() => {
-        // 计算输入框应该停留的位置：键盘顶部上方 + 12px padding
-        const targetBottom = kbH.value > 0 ? kbH.value + 12 : 80
-        // 手动设置滚动位置（如果需要）
-        // 注意：fixed 元素不需要滚动，只需确保页面有足够空白
-      }, 400)
-    }
-  })
+  const el = commentInput.value
+  if (el) {
+    // 最简单的方案：只 focus，不阻止滚动，不手动控制位置
+    // 让浏览器原生行为处理焦点和视口调整
+    el.focus()
+  }
 }
 function onCommentBlur() {
   // 延迟复位，避免点击发送按钮先 blur 再 click 丢失
