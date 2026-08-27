@@ -388,6 +388,7 @@ const feedPage = {
   dynamic: { page: 1, hasMore: true },
 }
 const loadingMore = ref(false)
+let lastListLoadTs = 0 // 列表最近一次加载时间（keep-alive 返回时防频繁重拉）
 
 // 从 /feed 接口拉取真实数据（带地区过滤 + 分页）。改用统一数据层 api/feed.js：
 // 动态 tab 自动带 followerDevice → 后端返回「官方+已关注」关注流（修 H1 关注流非全局流）；
@@ -532,6 +533,7 @@ onMounted(async () => {
   loading.value = true
   await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities(), fetchBanners()])
   loading.value = false
+  lastListLoadTs = Date.now()
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab)
     publishState.pendingTab = null
@@ -557,6 +559,13 @@ onUnmounted(() => {
 // 必须 onActivated 重新拉未读数，否则「点过已读红点不消失」
 onActivated(async () => {
   interactionUnread.value = await fetchUnreadCount()
+  // keep-alive 返回时刷新当前 tab 列表（防陈旧数据：补头像/新帖等），30s 内不重复拉
+  const now = Date.now()
+  if (now - lastListLoadTs > 30000) {
+    lastListLoadTs = now
+    const key = activeTab.value === '推荐' ? 'recommend' : 'dynamic'
+    loadFeed(key)
+  }
 })
 
 function onAdd() {
