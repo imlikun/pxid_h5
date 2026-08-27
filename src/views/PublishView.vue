@@ -401,6 +401,7 @@ async function onPublish() {
       }
     }
     // 3) 发帖
+    const profile = await bridge.getUserInfo().catch(() => ({}))
     const r = await fetch(API_BASE + '/feed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
@@ -410,7 +411,8 @@ async function onPublish() {
         carModel: cm,
         tags: cm ? [cm] : [],
         region,
-        nickname: '骑友',
+        nickname: profile.nickname || '骑友',
+        avatar: profile.avatar || '',
         deviceId: await bridge.getDeviceId(),
         lat: lat.value,
         lng: lng.value,

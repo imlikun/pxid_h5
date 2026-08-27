@@ -15,6 +15,31 @@ function isEmbed() {
   return !!(window.PXIDBridge && window.PXIDBridge.isNative === true)
 }
 
+// 标准化用户资料：兼容 Flutter 可能返回的不同字段名
+// 真机 getUserInfo 的头像/昵称字段名未必是约定的 avatar/nickname（如 headImgUrl / portrait / photo 等），
+// 这里统一归一到 { nickname, avatar, email }，避免 H5 取不到头像（评论/发帖/点赞带身份时丢失头像）。
+function normalizeProfile(raw) {
+  if (!raw) return raw
+  return {
+    ...raw,
+    nickname: raw.nickname || raw.name || raw.userName || raw.nickName || raw.displayName || '',
+    avatar:
+      raw.avatar ||
+      raw.avatarUrl ||
+      raw.avatarURL ||
+      raw.headImgUrl ||
+      raw.headimgurl ||
+      raw.headImg ||
+      raw.portrait ||
+      raw.photo ||
+      raw.profileImage ||
+      raw.icon ||
+      raw.userAvatar ||
+      '',
+    email: raw.email || raw.emailAddress || '',
+  }
+}
+
 // H5 预览/mock 模式下向后端申请匿名 token 的地址
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 let _cachedToken = null
@@ -241,7 +266,7 @@ export const bridge = {
     } catch (e) { /* 原生未注入时回退 */ }
     return null
   },
-  getUserInfo: () => window.PXIDBridge.getUserInfo(),
+  getUserInfo: () => Promise.resolve(window.PXIDBridge.getUserInfo()).then(normalizeProfile),
   getRegion: () => window.PXIDBridge.getRegion(),
   getDeviceId: () => window.PXIDBridge.getDeviceId(),
   getLocale: () => window.PXIDBridge.getLocale(),
