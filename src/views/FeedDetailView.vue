@@ -136,7 +136,7 @@
       <div
         class="cinput"
         :class="{ 'cinput--fixed': commenting }"
-        :style="commenting && !KEYBOARD_ENV ? { bottom: kbH + 'px' } : null"
+        :style="commenting && !KEYBOARD_ENV ? { bottom: kbH + ACTIONS_HEIGHT + 'px' } : null"
       >
         <div v-if="replyTo" class="cinput__reply">回复 {{ replyTo.name }} <span class="cinput__cancel" @click="replyTo = null">{{ t('feed.cancel') }}</span></div>
         <input
@@ -266,6 +266,7 @@ const commentInput = ref(null)
 //   ① iOS 17+ / 新 WKWebView：CSS env(keyboard-inset-bottom) 原生键盘高度，零延迟、最精确
 //   ② visualViewport JS 计算：Safari / 新 Android WebView
 //   ③ window resize + 多档轮询：旧 WebView / 慢键盘 / 事件滞后
+// 修复：scrollIntoView 需在键盘稳定后执行；actions 栏高度需预留
 const commenting = ref(false)
 const kbH = ref(0)
 const KEYBOARD_ENV = (() => {
@@ -276,9 +277,11 @@ const KEYBOARD_ENV = (() => {
   }
 })()
 // 悬浮窗输入法兜底高度（占屏幕比例）。
-// 0.5 基于 2026-08-26 vivo X300 Pro + 微信输入法实测截图（键盘约 50% 屏高）；
+// 0.5 基于 vivo X300 Pro + 微信输入法实测截图（键盘约 50% 屏高）；
 // 微信/搜狗/讯飞等悬浮窗输入法普遍 45-55%，可按实测机型调整。
 const KB_RESERVE_RATIO = 0.5
+// actions 栏高度（padding-bottom 预留值）
+const ACTIONS_HEIGHT = 64
 function calcKbH() {
   // 支持 CSS 键盘变量时交给 CSS（env 精确且零延迟），JS 不再抬升，避免 inline 覆盖
   if (KEYBOARD_ENV) return 0
@@ -301,8 +304,8 @@ function applyDetailPadding() {
   const detailEl = document.querySelector('.detail')
   if (!detailEl) return
   const kb = kbH.value || Math.round(window.innerHeight * KB_RESERVE_RATIO)
-  // 主内容底部留白 = 键盘高 + 输入栏高，让滚动后内容不被固定输入栏遮挡
-  detailEl.style.paddingBottom = kb + CINPUT_RESERVE + 'px'
+  // 主内容底部留白 = 键盘高 + 输入栏高 + actions 栏高，让滚动后内容不被固定输入栏遮挡
+  detailEl.style.paddingBottom = kb + CINPUT_RESERVE + ACTIONS_HEIGHT + 'px'
 }
 function clearDetailPadding() {
   const detailEl = document.querySelector('.detail')
@@ -336,11 +339,17 @@ function onCommentFocus() {
     })
     const el = commentInput.value
     if (el) {
-      // preventScroll：不让浏览器自动滚（手动控制滚动位置，配合 fixed bottom 抬升）
-      el.focus({ preventScroll: true })
-      // 兜底：无 visualViewport 的旧 WebView / 悬浮窗输入法，
-      // 把输入框滚到祖先可视区底端（配合 bottom=键盘高度，双保险让输入栏浮在键盘上方）
-      el.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      // 不阻止浏览器自动滚动，让它自然处理（配合 fixed bottom 抬升）
+      el.focus()
+      // 延迟执行 scrollIntoView，等键盘动画完成后再滚动
+      // 原因：键盘弹出有动画（~300ms），立即 scrollIntoView 会被键盘动画打断
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // 再次确认位置（双重保险）
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'instant', block: 'center' })
+        }, 150)
+      }, 350)
     }
   })
 }
@@ -916,6 +925,8 @@ function showToast(msg) {
   border-top: 1px solid var(--line);
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+  /* 确保输入框不被父容器 overflow 裁剪 */
+  transform: translateZ(0);
 }
 .cinput__field {
   flex: 1;
@@ -1004,6 +1015,7 @@ function showToast(msg) {
   padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
   background: var(--card);
   border-top: 1px solid var(--line);
+  z-index: 50;
 }
 .act {
   display: flex;
