@@ -26,6 +26,10 @@ try {
   require('dotenv').config({ path: path.join(_envRoot, '.env.local') })
 } catch (_) {}
 
+// 官方帖默认头像/昵称（可通过 .env 的 OFFICIAL_AVATAR_URL / OFFICIAL_NICKNAME 覆盖）
+const OFFICIAL_AVATAR = process.env.OFFICIAL_AVATAR_URL || ''
+const OFFICIAL_NICKNAME = process.env.OFFICIAL_NICKNAME || 'PXID 官方'
+
 const app = express()
 app.use(express.json({ limit: '5mb', verify: (req, res, buf) => { if (req.path && (req.path.indexOf('/mall-api/webhook') === 0 || req.path.indexOf('/ban-sync/from-toc') === 0)) req.rawBody = buf } }))
 
@@ -1447,7 +1451,7 @@ app.get('/admin/feed', requireAdmin, (req, res) => {
 
 // 官方发帖（运营发布，kind=official）
 app.post('/admin/feed', requireAdmin, (req, res) => {
-  const { content, images = [], carModel = '', tags = [], scheduledAt, operator = 'admin' } = req.body || {}
+  const { content, images = [], carModel = '', tags = [], scheduledAt, operator = 'admin', avatar, nickname } = req.body || {}
   const text = String(content || '').trim()
   if (!text) return res.json(err(1, '内容不能为空'))
   if (text.length > 1000) return res.json(err(1, '内容不能超过 1000 字'))
@@ -1458,7 +1462,9 @@ app.post('/admin/feed', requireAdmin, (req, res) => {
        VALUES (?, '', '', ?, ?, ?, ?, ?, 'official', ?, 0, ?, ?, ?)`
     )
     .run(
-      'PXID 官方',
+      String(nickname || OFFICIAL_NICKNAME).slice(0, 50),
+      '',
+      String(avatar || OFFICIAL_AVATAR).slice(0, 500),
       text,
       JSON.stringify((images || []).slice(0, 9)),
       JSON.stringify((tags || []).slice(0, 5)),
@@ -1477,7 +1483,7 @@ app.post('/admin/feed', requireAdmin, (req, res) => {
 app.put('/admin/feed/:id', requireAdmin, (req, res) => {
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(req.params.id)
   if (!row) return res.json(err(404, '动态不存在'))
-  const { content, images, carModel, tags, cover, operator = 'admin' } = req.body || {}
+  const { content, images, carModel, tags, cover, operator = 'admin', avatar, nickname } = req.body || {}
   const sets = []
   const args = []
   if (content !== undefined) { sets.push('content = ?'); args.push(String(content).slice(0, 1000)) }
@@ -1485,6 +1491,8 @@ app.put('/admin/feed/:id', requireAdmin, (req, res) => {
   if (carModel !== undefined) { sets.push('car_model = ?'); args.push(String(carModel)) }
   if (tags !== undefined) { sets.push('tags = ?'); args.push(JSON.stringify(tags.slice(0, 5))) }
   if (cover !== undefined) { sets.push('cover = ?'); args.push(String(cover).slice(0, 500)) }
+  if (avatar !== undefined) { sets.push('avatar = ?'); args.push(String(avatar).slice(0, 500)) }
+  if (nickname !== undefined) { sets.push('nickname = ?'); args.push(String(nickname).slice(0, 50)) }
   if (!sets.length) return res.json(err(1, '无可更新字段'))
   sets.push('updated_at = ?'); args.push(now())
   sets.push('operator = ?'); args.push(String(operator || 'admin').slice(0, 30))
