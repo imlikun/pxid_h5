@@ -37,6 +37,14 @@ function normalizeProfile(raw) {
       raw.userAvatar ||
       '',
     email: raw.email || raw.emailAddress || '',
+    // 用户绑定车型：Flutter 在 getUserInfo 中带上（值用现有车型代号如 'P2'），用于发现页「我的车」快捷筛选
+    carModel:
+      raw.carModel ||
+      raw.myCar ||
+      raw.vehicle ||
+      raw.bindVehicle ||
+      raw.boundCar ||
+      '',
   }
 }
 
@@ -142,10 +150,12 @@ const mockBridge = {
   getUserInfo() {
     logMock('getUserInfo')
     // M-MVP1 订单归属需要 email：真机由 Flutter 注入真实用户 email；H5 预览用测试值
+    // carModel 为预览演示用绑定车型；真机由 Flutter 在 getUserInfo 返回真实绑定车型代号
     return Promise.resolve({
       nickname: '我',
       avatar: 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg',
       email: 'guest@pxid.app',
+      carModel: 'P2',
     })
   },
 

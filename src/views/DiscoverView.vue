@@ -117,11 +117,11 @@
       <div class="chips">
         <span
           v-for="f in currentFilters"
-          :key="f"
+          :key="f.value"
           class="chip chip-bounce"
-          :class="{ active: activeFilter === f }"
-          @click="activeFilter = f"
-          >{{ filterLabel(f) }}</span
+          :class="{ active: activeFilter === f.value, mine: f.mine }"
+          @click="activeFilter = f.value"
+          >{{ f.label }}</span
         >
       </div>
     </div>
@@ -222,6 +222,7 @@ import {
   dynamicFilters,
   notices,
 } from '../data/mock'
+import { CAR_MODEL_LABELS } from '../data/carModels'
 import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
 import bridge from '../bridge'
@@ -276,6 +277,8 @@ function onBannerTouchEnd(e) {
 const tabs = discoverTabs
 const activeTab = ref('推荐')
 const activeFilter = ref('全部')
+// 当前登录用户绑定的车型（来自 getUserInfo().carModel）；仅当其属于在售 12 车型时才在筛选条前置「我的车」
+const myCarModel = ref('')
 
 // ---- 地区（PRD 硬限定：CN / BR / US，3 国互不交叉）----
 const regionOptions = [
@@ -310,11 +313,24 @@ const actList = ref([])
 const loading = ref(false)
 const loadErr = ref('')
 
-// 车型筛选 chip：与广场一致，使用固定的 12 个在售车型列表（不再从动态接口动态提取，避免线上仅显示发过帖的车型、导致数量少于广场）
+// 车型筛选 chip：与广场一致，使用固定的 12 个在售车型列表（不再从动态接口动态提取）
 // 防御性过滤：车型代号均为纯字母数字，若异常数据混入中文标签则剔除
+// 「我的车」：若当前用户绑定车型且在售列表中，则在首位（全部/最新之后）插入一个带车图标的专属 chip
 const currentFilters = computed(() => {
-  const base = activeTab.value === '推荐' ? recommendFilters : dynamicFilters
-  return base.filter((c) => c === '全部' || c === '最新' || !/[\u4e00-\u9fff]/.test(c))
+  const isRec = activeTab.value === '推荐'
+  const lead = isRec ? '全部' : '最新'
+  const mine = myCarModel.value
+  const mineValid = !!mine && CAR_MODEL_LABELS.includes(mine)
+  const rest = (isRec ? recommendFilters : dynamicFilters)
+    .slice(1)
+    .filter((c) => c === '全部' || c === '最新' || !/[\u4e00-\u9fff]/.test(c))
+  const chips = [{ value: lead, label: filterLabel(lead) }]
+  if (mineValid) chips.push({ value: mine, label: '🚗 ' + mine, mine: true })
+  rest.forEach((c) => {
+    if (mineValid && c === mine) return // 已作为「我的车」前置，避免重复
+    chips.push({ value: c, label: filterLabel(c) })
+  })
+  return chips
 })
 
 // 置顶优先 + 排序（最新/最热）：pinned 始终在前，组内按模式排序
@@ -496,6 +512,13 @@ onMounted(async () => {
   } catch (e) { /* getRegion 失败则用兜底默认地区 */ }
   // 强制按当前地区对齐语言：无论 getRegion 是否成功，语言都与当前 region 一致（兜底默认 CN=中文）
   setLocale(REGION_LOCALE[currentRegion.value] || 'en')
+  // 取登录用户绑定车型（用于「我的车」快捷筛选 chip）
+  try {
+    const u = await bridge.getUserInfo().catch(() => ({}))
+    if (u && u.carModel && CAR_MODEL_LABELS.includes(u.carModel)) {
+      myCarModel.value = u.carModel
+    }
+  } catch (e) { /* getUserInfo 失败则无「我的车」chip */ }
   loading.value = true
   await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities(), fetchBanners()])
   loading.value = false
@@ -901,6 +924,17 @@ function showToast(msg) {
   background: var(--brand, #4A6CF7);
   font-weight: 600;
   line-height: 1;
+}
+/* 「我的车」专属 chip：默认即带品牌色描边，提示这是用户绑定车型 */
+.chip.mine {
+  background: rgba(74, 108, 247, 0.08);
+  color: var(--brand, #4A6CF7);
+  border: 1px solid var(--brand, #4A6CF7);
+  font-weight: 600;
+}
+.chip.mine.active {
+  color: #fff;
+  background: var(--brand, #4A6CF7);
 }
 .content {
   margin-top: 16px;
