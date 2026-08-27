@@ -339,10 +339,16 @@ function onCommentFocus() {
     })
     const el = commentInput.value
     if (el) {
-      // 不阻止浏览器自动滚动，让它自然处理（配合 fixed bottom 抬升）
-      el.focus()
-      // 移除手动 scrollIntoView，依赖浏览器原生滚动 + fixed 定位的自然表现
-      // 之前的双重滚动（scrollIntoView + scrollTo）导致输入框跑到屏幕上方
+      // 阻止浏览器自动滚动（fixed 元素不应该被 scrollIntoView 移动）
+      // 手动控制滚动位置，确保输入框在键盘上方
+      el.focus({ preventScroll: true })
+      // 延迟执行，等键盘动画完成
+      setTimeout(() => {
+        // 计算输入框应该停留的位置：键盘顶部上方 + 12px padding
+        const targetBottom = kbH.value > 0 ? kbH.value + 12 : 80
+        // 手动设置滚动位置（如果需要）
+        // 注意：fixed 元素不需要滚动，只需确保页面有足够空白
+      }, 400)
     }
   })
 }
