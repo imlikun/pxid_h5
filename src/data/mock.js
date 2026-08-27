@@ -164,11 +164,21 @@ export const feedItems = [
   },
 ]
 
-// 广场：车型展示（固定本地车型，不从精选/Shopify 商店拉取；精选当前仅单店且不支持 CN/BR 切换）
+// 广场：车型展示（固定本地车型，与精选/Shopify 无关，仅供发动态关联选车参考）
+// cover 用本地占位图（public/ 下 plaza_p*/feed_r*），不连精选商店
 export const plazaShowcase = [
   { id: 'scooter-F2', name: 'F2', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
   { id: 'ebike-P2', name: 'P2', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
   { id: 'motorcycle-P5', name: 'P5', cover: 'feed_r1.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-P1', name: 'P1', cover: 'plaza_p1.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-G1', name: 'G1', cover: 'plaza_p3.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-P3', name: 'P3', cover: 'plaza_p5.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-F1', name: 'F1', cover: 'plaza_p6.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P4', name: 'P4', cover: 'plaza_p7.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P6', name: 'P6', cover: 'plaza_p8.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P7', name: 'P7', cover: 'feed_r2.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P8', name: 'P8', cover: 'feed_r3.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P9', name: 'P9', cover: 'feed_r4.jpg', itemType: 'buy-vehicle' },
 ]
 
 // 真实车型 handle 全集（车型页「热门推荐」用；当前仍映射到 Shopify handle）
