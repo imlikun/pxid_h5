@@ -710,27 +710,35 @@ function visibleNotifClause(memberUserId, device) {
   return { clause: parts.join(' OR '), args }
 }
 
-// 通知列表
+// 通知列表（分页：page/pageSize，默认 20 条/页，倒序）
 app.get('/notifications', requireAuth, (req, res) => {
   const memberUserId = req.user && req.user.memberUserId
   const device = req.user && req.user.deviceId
   if (!memberUserId && !device) return res.json(err(401, '未授权'))
   const vc = visibleNotifClause(memberUserId, device)
+  const page = Math.max(1, parseInt(req.query.page) || 1)
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 20))
+  const totalRow = db
+    .prepare(`SELECT COUNT(*) c FROM notifications WHERE ${vc.clause}`)
+    .get(...vc.args)
   const rows = db
-    .prepare(`SELECT * FROM notifications WHERE ${vc.clause} ORDER BY id DESC LIMIT 100`)
-    .all(...vc.args)
-  res.json(ok({ list: rows.map((r) => ({
-    id: r.id,
-    type: r.type,
-    actorName: r.actor_name,
-    actorAvatar: r.actor_avatar,
-    targetType: r.target_type,
-    targetId: r.target_id,
-    content: r.content,
-    read: !!r.read,
-    createdAt: r.created_at,
-    demo: r.device_id === '__demo__',
-  })) }))
+    .prepare(`SELECT * FROM notifications WHERE ${vc.clause} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .all(...vc.args, pageSize, (page - 1) * pageSize)
+  res.json(ok({
+    total: totalRow.c,
+    list: rows.map((r) => ({
+      id: r.id,
+      type: r.type,
+      actorName: r.actor_name,
+      actorAvatar: r.actor_avatar,
+      targetType: r.target_type,
+      targetId: r.target_id,
+      content: r.content,
+      read: !!r.read,
+      createdAt: r.created_at,
+      demo: r.device_id === '__demo__',
+    })),
+  }))
 })
 
 // 未读计数

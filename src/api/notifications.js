@@ -7,14 +7,16 @@ async function authHeaders() {
   return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || '') }
 }
 
-export async function fetchNotifications() {
+// 分页拉取通知：返回 { list, total }
+export async function fetchNotifications(page = 1, pageSize = 20) {
   try {
-    const r = await fetch(`${API_BASE}/notifications`, { headers: await authHeaders() })
+    const r = await fetch(`${API_BASE}/notifications?page=${page}&pageSize=${pageSize}`, { headers: await authHeaders() })
     const j = await r.json()
-    return (j.data && j.data.list) || []
+    const d = j.data || {}
+    return { list: d.list || [], total: d.total || 0 }
   } catch (e) {
     console.error('[notif] fetch failed:', e.message || e)
-    return []
+    return { list: [], total: 0 }
   }
 }
 

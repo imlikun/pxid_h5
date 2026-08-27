@@ -34,7 +34,7 @@
         <div class="body">
           <div class="row">
             <span class="actor">{{ n.actorName || t('interaction.tab.system') }}</span>
-            <span class="time">{{ n.createdAt }}</span>
+            <span class="time">{{ formatTime(n.createdAt) }}</span>
           </div>
           <div class="content">{{ n.content }}</div>
         </div>
@@ -44,12 +44,18 @@
         <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--text-hint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M34 42H14a4 4 0 01-4-4V18l14-10 14 10v20a4 4 0 01-4 4z"/><path d="M10 18l14-10 14 10"/><path d="M20 42v-12h8v12"/></svg>
         <p>{{ t('interaction.empty') }}</p>
       </div>
+      <div v-if="loadingMore" class="loadmore">加载中…</div>
+      <div v-else-if="!hasMore && list.length" class="loadmore">没有更多了</div>
     </div>
+
+    <transition name="toast-fade">
+      <div v-if="toastMsg" class="itoast">{{ toastMsg }}</div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import { t } from '../i18n'
@@ -59,6 +65,11 @@ const router = useRouter()
 const list = ref([])
 const loading = ref(true)
 const activeCat = ref('all')
+const PAGE_SIZE = 20
+const page = ref(1)
+const total = ref(0)
+const loadingMore = ref(false)
+const hasMore = computed(() => list.value.length < total.value)
 
 const tabs = [
   { key: 'all' },
@@ -82,13 +93,58 @@ function goBack() {
   router.back()
 }
 
+// 时间人性化：刚刚 / x 分钟前 / x 小时前 / 昨天 / M-d / yyyy-MM-dd
+function formatTime(s) {
+  if (!s) return ''
+  const d = new Date(String(s).replace(' ', 'T'))
+  if (isNaN(d.getTime())) return String(s).slice(0, 16)
+  const diff = (Date.now() - d.getTime()) / 1000
+  if (diff < 60) return '刚刚'
+  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前'
+  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前'
+  if (diff < 172800) return '昨天'
+  const pad = (x) => String(x).padStart(2, '0')
+  const now = new Date()
+  if (d.getFullYear() === now.getFullYear()) return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 async function load() {
   loading.value = true
+  page.value = 1
   try {
-    list.value = await fetchNotifications()
+    const r = await fetchNotifications(1, PAGE_SIZE)
+    list.value = r.list
+    total.value = r.total
   } finally {
     loading.value = false
   }
+}
+
+async function loadMore() {
+  if (loadingMore.value || !hasMore.value) return
+  loadingMore.value = true
+  try {
+    const r = await fetchNotifications(page.value + 1, PAGE_SIZE)
+    list.value = list.value.concat(r.list)
+    total.value = r.total
+    page.value += 1
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+function onScroll() {
+  if (loadingMore.value || !hasMore.value) return
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 120) loadMore()
+}
+
+const toastMsg = ref('')
+let toastTimer = null
+function showToast(m) {
+  toastMsg.value = m
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toastMsg.value = ''), 1600)
 }
 
 async function onTap(n) {
@@ -96,13 +152,17 @@ async function onTap(n) {
     n.read = true
     await markNotificationRead(n.id)
   }
-  // 深度跳转：feed 类点开原文；其余走原生兜底路由（R-未定 path 时回退）
+  // 内容导向：点赞/评论消息 → 跳对应动态详情
   if (n.targetType === 'feed' && n.targetId) {
     router.push('/feed/' + n.targetId)
-  } else {
-    // Flutter 原生路由：互动对象为用户时跳用户主页（R2 待定 path，先 console）
-    console.log('[interaction] tap type=', n.type, 'target=', n.targetType, n.targetId)
+    return
   }
+  // 人导向：关注消息 → 对方主页（个人主页开发中，先提示）
+  if (n.type === 'follow') {
+    showToast('对方主页即将上线')
+    return
+  }
+  // system 等：无跳转
 }
 
 async function onMarkAll() {
@@ -110,9 +170,13 @@ async function onMarkAll() {
   await markAllRead()
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('scroll', onScroll, { passive: true })
+})
 // App.vue 用 <keep-alive> 缓存全部页面：再次进入（如新产生通知）时重新拉列表
 onActivated(load)
+onUnmounted(() => window.removeEventListener('scroll', onScroll))
 </script>
 
 <style scoped>
@@ -279,5 +343,36 @@ onActivated(load)
 .empty p {
   font-size: 14px;
   margin: 0;
+}
+
+/* ---- 分页加载提示 ---- */
+.loadmore {
+  text-align: center;
+  padding: 14px 0 22px;
+  font-size: 12px;
+  color: var(--text-hint);
+}
+
+/* ---- 轻提示 toast ---- */
+.itoast {
+  position: fixed;
+  left: 50%;
+  bottom: 15%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 22px;
+  z-index: 9999;
+  white-space: nowrap;
+}
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
 }
 </style>
