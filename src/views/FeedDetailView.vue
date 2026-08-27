@@ -136,7 +136,7 @@
       <div
         class="cinput"
         :class="{ 'cinput--fixed': commenting }"
-        :style="commenting && !KEYBOARD_ENV ? { bottom: kbH + ACTIONS_HEIGHT + 'px' } : null"
+        :style="commenting ? { bottom: `max(env(keyboard-inset-bottom, 0px), ${kbH}px)` } : null"
       >
         <div v-if="replyTo" class="cinput__reply">回复 {{ replyTo.name }} <span class="cinput__cancel" @click="replyTo = null">{{ t('feed.cancel') }}</span></div>
         <input
@@ -282,6 +282,8 @@ const KEYBOARD_ENV = (() => {
 const KB_RESERVE_RATIO = 0.5
 // actions 栏高度（padding-bottom 预留值）
 const ACTIONS_HEIGHT = 64
+// 键盘高度兜底估算 timer（覆盖模式 WebView 用）
+let fallbackKbTimer = null
 function calcKbH() {
   // 支持 CSS 键盘变量时交给 CSS（env 精确且零延迟），JS 不再抬升，避免 inline 覆盖
   if (KEYBOARD_ENV) return 0
@@ -297,6 +299,7 @@ function calcKbH() {
 }
 function syncKeyboard() {
   kbH.value = calcKbH()
+  if (commenting.value) applyDetailPadding()
 }
 // 输入栏预估高度（含 padding）。用于给主内容加 padding-bottom 让最后内容能滚到输入栏上方
 const CINPUT_RESERVE = 80
@@ -313,18 +316,30 @@ function clearDetailPadding() {
 }
 function onCommentFocus() {
   commenting.value = true
-  const el = commentInput.value
-  if (el) {
-    // 关键修复：preventScroll 阻止浏览器原生把焦点元素滚入可见区，
-    // 否则键盘弹出瞬间页面被整体顶上去，fixed 输入栏被推到屏幕顶部。
-    // 输入框靠 fixed + bottom:键盘高度 定位，不需要任何滚动。
-    el.focus({ preventScroll: true })
-  }
+  nextTick(() => {
+    syncKeyboard()
+    const el = commentInput.value
+    if (el) {
+      // 关键修复：preventScroll 阻止浏览器原生把焦点元素滚入可见区，
+      // 否则键盘弹出瞬间页面被整体顶上去，fixed 输入栏被推到屏幕顶部。
+      el.focus({ preventScroll: true })
+    }
+    // 部分 Android WebView（覆盖模式）不缩 viewport，visualViewport 拿不到键盘高。
+    // 等一帧仍拿不到时按屏高比例兜底估算，避免输入框被键盘压住。
+    clearTimeout(fallbackKbTimer)
+    fallbackKbTimer = setTimeout(() => {
+      if (!kbH.value) {
+        kbH.value = Math.round(window.innerHeight * KB_RESERVE_RATIO)
+      }
+    }, 180)
+  })
 }
 function onCommentBlur() {
   // 延迟复位，避免点击发送按钮先 blur 再 click 丢失
+  clearTimeout(fallbackKbTimer)
   setTimeout(() => {
     commenting.value = false
+    kbH.value = 0
     clearDetailPadding()
   }, 120)
 }
@@ -343,13 +358,24 @@ onBeforeUnmount(() => {
     window.visualViewport.removeEventListener('scroll', syncKeyboard)
   }
   window.removeEventListener('resize', syncKeyboard)
+  clearTimeout(fallbackKbTimer)
 })
 const showReport = ref(false)
 const reportReasons = ['色情低俗', '广告诈骗', '辱骂攻击', '违法违规', '其他']
 const replyTo = ref(null) // { commentId, name }
 function startReply(c, r) {
   replyTo.value = { commentId: c.id, name: r ? r.author : c.author }
-  nextTick(() => { commentInput.value && commentInput.value.focus({ preventScroll: true }) })
+  commenting.value = true
+  nextTick(() => {
+    syncKeyboard()
+    const el = commentInput.value
+    if (el) el.focus({ preventScroll: true })
+    // 覆盖模式 WebView 兜底
+    clearTimeout(fallbackKbTimer)
+    fallbackKbTimer = setTimeout(() => {
+      if (!kbH.value) kbH.value = Math.round(window.innerHeight * KB_RESERVE_RATIO)
+    }, 180)
+  })
 }
 async function doReport(reason) {
   showReport.value = false
@@ -619,9 +645,19 @@ function onPreview(img) {
   console.log('preview image:', img)
 }
 function onCommentBtn() {
+  commenting.value = true
   nextTick(() => {
     commentsBox.value && commentsBox.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    commentInput.value && commentInput.value.focus()
+    syncKeyboard()
+    const el = commentInput.value
+    if (el) {
+      el.focus({ preventScroll: true })
+      // 覆盖模式 WebView 兜底
+      clearTimeout(fallbackKbTimer)
+      fallbackKbTimer = setTimeout(() => {
+        if (!kbH.value) kbH.value = Math.round(window.innerHeight * KB_RESERVE_RATIO)
+      }, 180)
+    }
   })
 }
 async function submitComment() {
