@@ -106,7 +106,8 @@
         @click="onQuick(q)"
       >
           <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
-          <IconSvg class="quick__icon" :name="q.icon" :size="22" />
+          <img v-if="QUICK_ICON_SVG[q.icon]" class="quick__icon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
+          <IconSvg v-else class="quick__icon" :name="q.icon" :size="22" />
           <div class="quick__label">{{ t('discover.quick.' + q.key) }}</div>
         </div>
       </div>
@@ -213,6 +214,7 @@ import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
 import IconSvg from '../components/IconSvg.vue'
 import TopBar from '../components/TopBar.vue'
+import { QUICK_ICON_SVG } from '../assets/icons'
 import {
   discoverTabs,
   discoverQuick,

@@ -6,7 +6,8 @@
       class="qitem press"
       @click="$emit('tap', q)"
     >
-      <IconSvg class="qicon" :name="q.icon" :size="22" />
+      <img v-if="QUICK_ICON_SVG[q.icon]" class="qicon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
+      <IconSvg v-else class="qicon" :name="q.icon" :size="22" />
       <span class="qlabel">{{ q.label }}</span>
     </div>
   </div>
@@ -14,6 +15,7 @@
 
 <script setup>
 import IconSvg from './IconSvg.vue'
+import { QUICK_ICON_SVG } from '../assets/icons'
 defineProps({
   items: { type: Array, required: true },
 })
