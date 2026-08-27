@@ -64,8 +64,6 @@ function onBack() {
   position: sticky;
   top: 0;
   z-index: 10;
-  /* 沉浸式：自身 padding-top 把 tab 文字推到状态栏下方（2026-08-26 坤哥拍板），背景从屏幕最顶铺起 */
-  padding-top: env(safe-area-inset-top, 0px);
 }
 .tb-left,
 .tb-right {
@@ -93,7 +91,6 @@ function onBack() {
 }
 .tb-title {
   position: absolute;
-  top: env(safe-area-inset-top, 0px);
   left: 56px;
   right: 56px;
   text-align: center;
