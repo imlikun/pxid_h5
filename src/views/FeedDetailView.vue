@@ -341,16 +341,8 @@ function onCommentFocus() {
     if (el) {
       // 不阻止浏览器自动滚动，让它自然处理（配合 fixed bottom 抬升）
       el.focus()
-      // 延迟执行 scrollIntoView，等键盘动画完成后再滚动
-      // 原因：键盘弹出有动画（~300ms），立即 scrollIntoView 会被键盘动画打断
-      setTimeout(() => {
-        // 使用 block: 'end' 让输入框刚好出现在可见区域底部，避免滚过头
-        el.scrollIntoView({ behavior: 'smooth', block: 'end' })
-        // 150ms 后二次确认，确保位置正确
-        setTimeout(() => {
-          el.scrollIntoView({ behavior: 'instant', block: 'end' })
-        }, 150)
-      }, 350)
+      // 移除手动 scrollIntoView，依赖浏览器原生滚动 + fixed 定位的自然表现
+      // 之前的双重滚动（scrollIntoView + scrollTo）导致输入框跑到屏幕上方
     }
   })
 }
