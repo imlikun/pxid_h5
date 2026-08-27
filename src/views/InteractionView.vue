@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import { t } from '../i18n'
@@ -111,6 +111,8 @@ async function onMarkAll() {
 }
 
 onMounted(load)
+// App.vue 用 <keep-alive> 缓存全部页面：再次进入（如新产生通知）时重新拉列表
+onActivated(load)
 </script>
 
 <style scoped>

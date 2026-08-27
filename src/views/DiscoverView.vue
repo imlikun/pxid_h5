@@ -208,7 +208,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
@@ -551,6 +551,12 @@ onUnmounted(() => {
   if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null }
   window.removeEventListener('scroll', onScroll)
   if (videoPlayTimer) { clearTimeout(videoPlayTimer); videoPlayTimer = null }
+})
+
+// App.vue 用 <keep-alive> 缓存全部页面：从互动消息页返回时 onMounted 不会重跑，
+// 必须 onActivated 重新拉未读数，否则「点过已读红点不消失」
+onActivated(async () => {
+  interactionUnread.value = await fetchUnreadCount()
 })
 
 function onAdd() {

@@ -742,21 +742,21 @@ app.get('/notifications/unread-count', requireAuth, (req, res) => {
   res.json(ok({ count: row.c }))
 })
 
-// 标记单条已读（仅自己的，演示数据不标记）
+// 标记单条已读（自己的 + 全局演示 __demo__：演示数据点过红点应消失）
 app.post('/notifications/:id/read', requireAuth, (req, res) => {
   const memberUserId = req.user && req.user.memberUserId
   const device = req.user && req.user.deviceId
   if (!memberUserId && !device) return res.json(err(401, '未授权'))
-  db.prepare("UPDATE notifications SET read=1 WHERE id=? AND (device_id=? OR member_user_id=?)").run(req.params.id, String(device || ''), String(memberUserId || ''))
+  db.prepare("UPDATE notifications SET read=1 WHERE id=? AND (device_id=? OR member_user_id=? OR device_id='__demo__')").run(req.params.id, String(device || ''), String(memberUserId || ''))
   res.json(ok({}))
 })
 
-// 全部已读
+// 全部已读（自己的 + 全局演示 __demo__：演示数据点过红点应消失）
 app.post('/notifications/read-all', requireAuth, (req, res) => {
   const memberUserId = req.user && req.user.memberUserId
   const device = req.user && req.user.deviceId
   if (!memberUserId && !device) return res.json(err(401, '未授权'))
-  db.prepare("UPDATE notifications SET read=1 WHERE (device_id=? OR member_user_id=?)").run(String(device || ''), String(memberUserId || ''))
+  db.prepare("UPDATE notifications SET read=1 WHERE (device_id=? OR member_user_id=? OR device_id='__demo__')").run(String(device || ''), String(memberUserId || ''))
   res.json(ok({}))
 })
 
