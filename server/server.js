@@ -298,18 +298,19 @@ try { db.exec("ALTER TABLE notifications ADD COLUMN member_user_id TEXT NOT NULL
 try { db.exec("CREATE INDEX IF NOT EXISTS idx_notif_member ON notifications(member_user_id, id DESC)") } catch (_) {}
 
 // 启动种子：演示互动消息（device_id='__demo__' 对所有登录用户可见，便于先看效果）
+// 头像池：不同互动者不同头像（unsplash 相对路径，随 H5 站点 /nav/pxid-h5/ 可加载）
 ;(function seedDemoNotifications() {
   try {
     const cnt = db.prepare("SELECT COUNT(*) c FROM notifications WHERE device_id='__demo__'").get().c
     if (cnt > 0) return
     const rows = [
-      ['like', 'd_lily', 'Lily', '', 'feed', '12', '赞了你的动态', '刚刚骑了一段超棒的路线！'],
-      ['comment', 'd_max', 'Max', '', 'feed', '12', '评论了你的动态', '这车看着真帅，求链接~'],
-      ['follow', 'd_nora', 'Nora', '', 'user', '', '关注了你', ''],
-      ['system', '', 'PXID 官方', '', 'system', '', '欢迎加入 PXID 社区', '完成签到可领取新人积分礼包'],
+      { type: 'like', actorDevice: 'd_lily', actorName: 'Lily', actorAvatar: 'unsplash/photo-1494790108377-be9c29b29330_w_80_q_80.jpg', targetType: 'feed', targetId: '12', content: '赞了你的动态', extra: '刚刚骑了一段超棒的路线！' },
+      { type: 'comment', actorDevice: 'd_max', actorName: 'Max', actorAvatar: 'unsplash/photo-1507003211169-0a1dd7228f2d_w_80_q_80.jpg', targetType: 'feed', targetId: '12', content: '评论了你的动态', extra: '这车看着真帅，求链接~' },
+      { type: 'follow', actorDevice: 'd_nora', actorName: 'Nora', actorAvatar: 'unsplash/photo-1438761681033-6461ffad8d80_w_80_q_80.jpg', targetType: 'user', targetId: '', content: '关注了你', extra: '' },
+      { type: 'system', actorDevice: '', actorName: 'PXID 官方', actorAvatar: 'unsplash/photo-1544723795-3fb6469f5b39_w_80_q_80.jpg', targetType: 'system', targetId: '', content: '欢迎加入 PXID 社区', extra: '完成签到可领取新人积分礼包' },
     ]
     const ins = db.prepare('INSERT INTO notifications (device_id, type, actor_device, actor_name, actor_avatar, target_type, target_id, content, read, created_at) VALUES (?,?,?,?,?,?,?,?,0,?)')
-    rows.forEach((r, i) => ins.run('__demo__', r[0], r[1], r[2], r[3], r[4], r[5], r[6] + (r[7] ? '：' + r[7] : ''), fmtAgo(i)))
+    rows.forEach((r, i) => ins.run('__demo__', r.type, r.actorDevice, r.actorName, r.actorAvatar, r.targetType, r.targetId, r.content + (r.extra ? '：' + r.extra : ''), fmtAgo(i)))
   } catch (e) {
     console.error('[pxid-feed] seed demo notifications failed:', e.message || e)
   }
