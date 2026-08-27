@@ -164,22 +164,15 @@ export const feedItems = [
   },
 ]
 
-// 广场：车型展示（真实 Shopify handle；点击 → /vehicle/:handle → 车型详情页拉真实商品数据）
+// 广场：车型展示（固定本地车型，不从精选/Shopify 商店拉取；精选当前仅单店且不支持 CN/BR 切换）
 export const plazaShowcase = [
-  { id: 'ant5', name: 'ANT5', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/marsant_s_x-ANT5_300ee173-43dd-494f-9d7e-3172399253c6.jpg?v=1764830619', itemType: 'buy-vehicle' },
-  { id: 'long-range-20-inch-4-fat-tire-pedal-assist-ebike-ant6', name: 'ANT6', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/6_1e5b5268-e204-47e8-8da4-976d2b16738c.jpg?v=1764830364', itemType: 'buy-vehicle' },
-  { id: 'p2', name: 'P2', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/16_Inch_Light_Electric_Bike-p2.jpg?v=1746493054', itemType: 'buy-vehicle' },
-  { id: 'p4', name: 'P4', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/foldable_electric_bike_for_adults_16d407fe-4266-4116-b3a3-8824707dc585.jpg?v=1746511943', itemType: 'buy-vehicle' },
-  { id: '500w-48v-city-folding-electric-scooter-with-app', name: '城市滑板车', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/500W48VCityFoldingElectricScooter..jpg?v=1746580730', itemType: 'buy-vehicle' },
-  { id: 'light-weight-8-inch-electric-kick-scooter-for-adult', name: '轻便滑板车', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/Lightweight8-inchElectricKickScooter..jpg?v=1746585827', itemType: 'buy-vehicle' },
-  { id: '500w-48v-motor-off-road-electric-scooter-with-seat', name: '越野滑板车', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/Marsant_sxOffRoadElectricScooterWithSeatfoldableelectricscooter.jpg?v=1746523434', itemType: 'buy-vehicle' },
-  { id: '500w-2-dual-motor-three-wheel-electric-scooter', name: '三轮滑板车', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/Marsant_sxThreeWheelElectricScooterwitheasyfolddesign.jpg?v=1773730005', itemType: 'buy-vehicle' },
-  { id: 'ant5-1', name: 'ANT5 越野', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/electricoffroadbike_6ac0c18b-4b55-4605-b929-34f600fea919.jpg?v=1773729908', itemType: 'buy-vehicle' },
-  { id: '500w-2-dual-motor-three-wheel-electric-scooter-w2', name: 'W2 三轮', cover: 'https://cdn.shopify.com/s/files/1/0620/7874/6783/files/1000W_Dual_Motor_Long_Range_Three_Wheel_Electric_Scooter_W2_91b421e8-8995-4999-bea8-9b60fafeb5fe.jpg?v=1751956467', itemType: 'buy-vehicle' },
+  { id: 'scooter-F2', name: 'F2', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P2', name: 'P2', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P5', name: 'P5', cover: 'feed_r1.jpg', itemType: 'buy-vehicle' },
 ]
 
-// 真实车型 handle 全集（车型页「热门推荐」用）
-export const VEHICLE_HANDLES = plazaShowcase.map((p) => p.id)
+// 真实车型 handle 全集（车型页「热门推荐」用；当前仍映射到 Shopify handle）
+export const VEHICLE_HANDLES = ['ant5', 'p2', 'p4']
 
 // 帖子 carModel（内部代号）→ Shopify handle 临时映射
 // ⚠️ 临时兜底：mock 帖子的 carModel 是内部代号，与 Shopify handle 不对应；
