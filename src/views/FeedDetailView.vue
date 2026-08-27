@@ -344,10 +344,11 @@ function onCommentFocus() {
       // 延迟执行 scrollIntoView，等键盘动画完成后再滚动
       // 原因：键盘弹出有动画（~300ms），立即 scrollIntoView 会被键盘动画打断
       setTimeout(() => {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        // 再次确认位置（双重保险）
+        // 使用 block: 'end' 让输入框刚好出现在可见区域底部，避免滚过头
+        el.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        // 150ms 后二次确认，确保位置正确
         setTimeout(() => {
-          el.scrollIntoView({ behavior: 'instant', block: 'center' })
+          el.scrollIntoView({ behavior: 'instant', block: 'end' })
         }, 150)
       }, 350)
     }
