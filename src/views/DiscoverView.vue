@@ -513,10 +513,18 @@ onMounted(async () => {
   // 强制按当前地区对齐语言：无论 getRegion 是否成功，语言都与当前 region 一致（兜底默认 CN=中文）
   setLocale(REGION_LOCALE[currentRegion.value] || 'en')
   // 取登录用户绑定车型（用于「我的车」快捷筛选 chip）
+  // 第一方案：Flutter getUserInfo().carModel；回退方案：H5 localStorage 记忆（Flutter 未返回时使用）
   try {
     const u = await bridge.getUserInfo().catch(() => ({}))
-    if (u && u.carModel && CAR_MODEL_LABELS.includes(u.carModel)) {
-      myCarModel.value = u.carModel
+    let car = (u && u.carModel) || ''
+    if (!car) {
+      const lsCar = localStorage.getItem('pxid_my_car_model')
+      if (lsCar && CAR_MODEL_LABELS.includes(lsCar)) car = lsCar
+    }
+    if (car && CAR_MODEL_LABELS.includes(car)) {
+      myCarModel.value = car
+      // 双向同步：本地存一份，保证 Flutter 接上前后表现一致
+      try { localStorage.setItem('pxid_my_car_model', car) } catch (e) {}
     }
   } catch (e) { /* getUserInfo 失败则无「我的车」chip */ }
   loading.value = true

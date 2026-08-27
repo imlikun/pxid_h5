@@ -27,7 +27,7 @@
             :key="m"
             class="chip"
             :class="{ active: carModel === m }"
-            @click="carModel = m"
+            @click="selectCar(m)"
             >{{ m }}</span
           >
         </div>
@@ -148,10 +148,23 @@ const fileInputVideo = ref(null)
 
 const content = ref('')
 const carModel = ref('')
-// 从广场车型卡跳过来时预选车型（?carModel=P2）
+// 我的车型回退方案：H5 localStorage 记忆（Flutter getUserInfo 未返回 carModel 时使用）
+// 第一方案仍是 Flutter getUserInfo().carModel，此处仅作兜底
+const MY_CAR_KEY = 'pxid_my_car_model'
+function persistMyCar(model) {
+  if (model && carModels.includes(model)) {
+    try { localStorage.setItem(MY_CAR_KEY, model) } catch (e) {}
+  }
+}
+function selectCar(m) {
+  carModel.value = m
+  persistMyCar(m)
+}
+// 从广场车型卡跳过来时预选车型（?carModel=P2），并记忆
 const presetModel = route.query.carModel
 if (presetModel && carModels.includes(presetModel)) {
   carModel.value = presetModel
+  persistMyCar(presetModel)
 }
 // 已选图片：{ file, url(本地预览), uploadedUrl, uploading }
 const picked = ref([])
