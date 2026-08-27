@@ -315,9 +315,10 @@ function onCommentFocus() {
   commenting.value = true
   const el = commentInput.value
   if (el) {
-    // 最简单的方案：只 focus，不阻止滚动，不手动控制位置
-    // 让浏览器原生行为处理焦点和视口调整
-    el.focus()
+    // 关键修复：preventScroll 阻止浏览器原生把焦点元素滚入可见区，
+    // 否则键盘弹出瞬间页面被整体顶上去，fixed 输入栏被推到屏幕顶部。
+    // 输入框靠 fixed + bottom:键盘高度 定位，不需要任何滚动。
+    el.focus({ preventScroll: true })
   }
 }
 function onCommentBlur() {
@@ -348,7 +349,7 @@ const reportReasons = ['色情低俗', '广告诈骗', '辱骂攻击', '违法�
 const replyTo = ref(null) // { commentId, name }
 function startReply(c, r) {
   replyTo.value = { commentId: c.id, name: r ? r.author : c.author }
-  nextTick(() => { commentInput.value && commentInput.value.focus() })
+  nextTick(() => { commentInput.value && commentInput.value.focus({ preventScroll: true }) })
 }
 async function doReport(reason) {
   showReport.value = false
