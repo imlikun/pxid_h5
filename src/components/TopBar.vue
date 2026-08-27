@@ -93,6 +93,7 @@ function onBack() {
 }
 .tb-title {
   position: absolute;
+  top: env(safe-area-inset-top, 0px);
   left: 56px;
   right: 56px;
   text-align: center;
