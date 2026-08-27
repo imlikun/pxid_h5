@@ -12,8 +12,8 @@
       </template>
     </TopBar>
 
-    <!-- 作者卡 -->
-    <div class="author fade-up stagger-1">
+    <!-- 作者卡：点作者进个人主页（官方帖无 deviceId 不跳） -->
+    <div class="author fade-up stagger-1" @click="goAuthor">
       <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
       <div class="meta">
         <div class="name">
@@ -26,7 +26,7 @@
         v-if="!isOfficial"
         class="follow press"
         :class="{ followed }"
-        @click="onFollow"
+        @click.stop="onFollow"
       >{{ followed ? t('feed.follow.following') : t('feed.follow.follow') }}</button>
     </div>
 
@@ -535,6 +535,10 @@ function segClick(seg) {
 function onCar(model) {
   // 决策 8：车型详情归口购车车型页（原生承载）
   bridge.openNative('vehicle/' + model)
+}
+// 点作者 → 个人主页（他人/自己统一由主页按 id 识别）
+function goAuthor() {
+  if (item.value && item.value.deviceId) router.push('/user/' + encodeURIComponent(item.value.deviceId))
 }
 function onTopic(t) {
   console.log('tap topic:', t)

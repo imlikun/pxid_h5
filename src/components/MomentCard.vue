@@ -1,6 +1,6 @@
 <template>
   <div class="moment press" @click="open">
-    <div class="m-head">
+    <div class="m-head" @click.stop="goUser">
       <img class="m-avatar" :src="item.avatar || defaultAvatar" :alt="item.author" loading="lazy" />
       <div class="m-meta">
         <div class="m-name"><span v-if="item.pinned" class="m-pin">置顶</span>{{ item.author }}</div>
@@ -92,6 +92,10 @@ const cols = computed(() => {
 
 function open() {
   router.push('/feed/' + props.item.id)
+}
+// 点作者（头像/昵称）→ 个人主页（他人/自己统一由主页按 id 识别）
+function goUser() {
+  if (props.item && props.item.deviceId) router.push('/user/' + encodeURIComponent(props.item.deviceId))
 }
 function onPreview(img) {
   console.log('preview image:', img)

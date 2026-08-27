@@ -157,9 +157,9 @@ async function onTap(n) {
     router.push('/feed/' + n.targetId)
     return
   }
-  // 人导向：关注消息 → 对方主页（个人主页开发中，先提示）
+  // 人导向：关注消息 → 对方个人主页
   if (n.type === 'follow') {
-    showToast('对方主页即将上线')
+    if (n.actorDevice) router.push('/user/' + encodeURIComponent(n.actorDevice))
     return
   }
   // system 等：无跳转

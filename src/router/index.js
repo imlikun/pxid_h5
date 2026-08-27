@@ -39,6 +39,7 @@ const PointsMallView = () => import('../views/PointsMallView.vue')
 const PublishView = () => import('../views/PublishView.vue')
 const ActivityCenterView = () => import('../views/ActivityCenterView.vue')
 const InteractionView = () => import('../views/InteractionView.vue')
+const UserProfileView = () => import('../views/UserProfileView.vue')
 
 // 用 hash 路由：WebView 内加载任意域名/本地文件都不会 404，无需服务端 rewrite
 const routes = [
@@ -94,6 +95,8 @@ const routes = [
 
   // 互动消息中心（点赞/评论/关注/系统，自有后端 /notifications）
   { path: '/interactions', name: 'interactions', component: InteractionView, meta: { hideTabBar: true, title: '互动消息' } },
+  // 个人主页：/user/:id 他人主页；/user/me 自己的主页（App「我的」tab 入口，明天 Flutter 接）
+  { path: '/user/:id', name: 'user-profile', component: UserProfileView, meta: { hideTabBar: true, title: '个人主页' } },
 
   // H5 兜底页（无原生时由 bridge 兜底路由到此）
   { path: '/vehicle/:id', name: 'vehicle', component: VehicleDetailView, meta: { hideTabBar: true, title: '车型详情' } },

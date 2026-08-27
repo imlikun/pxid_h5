@@ -478,7 +478,7 @@ app.post('/auth/token', (req, res) => {
 
 // ---- 动态流 ----
 app.get('/feed', (req, res) => {
-  const { tab = 'dynamic', carModel, page = 1, pageSize = 20, offset, followerDevice, region, near, radius = 50 } = req.query
+  const { tab = 'dynamic', carModel, page = 1, pageSize = 20, offset, followerDevice, region, near, radius = 50, deviceId } = req.query
   const cm = carModel && carModel !== '全部' && carModel !== '最新' ? carModel : ''
   // 地区过滤：CN/BR/US，US 为全球公共池；请求某区时显示该区 + US 帖（三区均可见全球内容）
   const reg = String(region || '').toUpperCase()
@@ -496,6 +496,8 @@ app.get('/feed', (req, res) => {
     if (cm) { w += ' AND car_model = ?'; args.push(cm) }
   }
   if (regFiltered) { w += " AND region_code IN (?, 'US')"; args.push(regFiltered) }
+  // 个人主页动态流：按作者 device 过滤（deviceId 参数）
+  if (deviceId) { w += ' AND device_id = ?'; args.push(String(deviceId)) }
   // 附近 LBS：near=lat,lng（半径 radius km，默认 50）。SQLite 无三角函数，JS 算距离，数据量小内存筛
   let nearLat = null, nearLng = null
   const nearRad = Math.max(0.1, Number(radius) || 50)
@@ -551,6 +553,32 @@ app.get('/feed/users', (req, res) => {
     if (list.length >= 30) break
   }
   res.json(ok({ list }))
+})
+
+// ---- 个人主页：用户聚合信息（公开资料；身份可选，用于 isFollowing/isSelf）----
+// GET /users/:deviceId → { deviceId, nickname, avatar, carModel, followeeCount, followerCount, isFollowing, isSelf }
+app.get('/users/:deviceId', (req, res) => {
+  const deviceId = String(req.params.deviceId || '')
+  if (!deviceId) return res.json(err(400, '缺少 deviceId'))
+  const me = req.user || {}
+  const myDevice = me.deviceId || ''
+  // 资料取最近一条有效发帖（昵称/头像/车型）
+  const feed = db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(deviceId)
+  // 关注数 = 他关注了谁；粉丝数 = 谁关注了他
+  const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE follower_device=?').get(deviceId).c
+  const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE followee_device=?').get(deviceId).c
+  const isFollowing = myDevice ? !!db.prepare('SELECT 1 FROM follows WHERE follower_device=? AND followee_device=?').get(myDevice, deviceId) : false
+  const isSelf = myDevice === deviceId
+  res.json(ok({
+    deviceId,
+    nickname: (feed && feed.nickname) || '骑友',
+    avatar: (feed && feed.avatar) || '',
+    carModel: (feed && feed.car_model) || '',
+    followeeCount,
+    followerCount,
+    isFollowing,
+    isSelf,
+  }))
 })
 
 // ---- 发帖（用户侧，kind=user）----
@@ -731,6 +759,7 @@ app.get('/notifications', requireAuth, (req, res) => {
       type: r.type,
       actorName: r.actor_name,
       actorAvatar: r.actor_avatar,
+      actorDevice: r.actor_device,
       targetType: r.target_type,
       targetId: r.target_id,
       content: r.content,

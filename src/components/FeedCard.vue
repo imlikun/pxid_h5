@@ -7,7 +7,7 @@
     </div>
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
-      <div class="author">
+      <div class="author" @click.stop="goUser">
         <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" loading="lazy" />
         <span class="name">{{ item.author }}</span>
       </div>
@@ -46,6 +46,10 @@ function onImgErr(e) {
 
 function go() {
   router.push('/feed/' + props.item.id)
+}
+// 点作者 → 个人主页（他人/自己统一由主页按 id 识别）
+function goUser() {
+  if (props.item && props.item.deviceId) router.push('/user/' + encodeURIComponent(props.item.deviceId))
 }
 </script>
 

@@ -265,3 +265,25 @@ export async function fetchFeedUsers(region = '') {
     return []
   }
 }
+
+// ---- 个人主页：用户聚合信息（昵称/头像/车型 + 关注/粉丝 + 是否已关注/是否自己）----
+export async function fetchUserProfile(deviceId) {
+  if (!FEED_API || !deviceId) return null
+  try {
+    return await request('/users/' + encodeURIComponent(deviceId))
+  } catch (e) {
+    return null
+  }
+}
+
+// ---- 某人发布的动态（个人主页动态流，按 device 过滤）----
+export async function fetchUserFeeds(deviceId, params = {}) {
+  if (!FEED_API || !deviceId) return { list: [], total: 0 }
+  try {
+    const qs = new URLSearchParams({ tab: 'dynamic', deviceId, ...params }).toString()
+    const data = await request('/feed?' + qs)
+    return { list: (data.list || []).map(normalize), total: data.total || 0 }
+  } catch (e) {
+    return { list: [], total: 0 }
+  }
+}
