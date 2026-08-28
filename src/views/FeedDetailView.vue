@@ -14,7 +14,7 @@
 
     <!-- 作者卡：点作者进个人主页（官方帖无 deviceId 不跳） -->
     <div class="author fade-up stagger-1" @click="goAuthor">
-      <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" />
+      <img class="avatar" :src="authorAvatar" :alt="item.author" />
       <div class="meta">
         <div class="name">
           {{ item.author || t('feed.author.official') }}
@@ -219,15 +219,16 @@ import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, 
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
+import { resolveAvatar } from '../utils/avatar'
 
 const route = useRoute()
 const router = useRouter()
-const defaultAvatar = 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
 const isActivity = computed(() => route.path.startsWith('/activity'))
 const id = computed(() => Number(route.params.id))
+const authorAvatar = computed(() => resolveAvatar(item.value?.author, item.value?.avatar))
 
 // 真实数据源（从接口拉取，activity 从 mock 取）
 const item = ref(null)

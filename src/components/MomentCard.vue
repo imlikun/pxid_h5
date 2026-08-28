@@ -1,7 +1,7 @@
 <template>
   <div class="moment press" @click="open">
     <div class="m-head" @click.stop="goUser">
-      <img class="m-avatar" :src="item.avatar || defaultAvatar" :alt="item.author" loading="lazy" />
+      <img class="m-avatar" :src="avatarUrl" :alt="item.author" loading="lazy" />
       <div class="m-meta">
         <div class="m-name"><span v-if="item.pinned" class="m-pin">置顶</span>{{ item.author }}</div>
         <div class="m-time">{{ item.time }}</div>
@@ -57,7 +57,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import bridge from '../bridge'
-import { defaultAvatar } from '../data/mock'
+import { resolveAvatar } from '../utils/avatar'
 import { mediaUrl } from '../storage'
 import { requireLogin } from '../utils/auth'
 
@@ -75,6 +75,7 @@ const videoCoverUrl = computed(() => {
   const c = mediaUrl(props.item && props.item.videoCover)
   return c || FALLBACK
 })
+const avatarUrl = computed(() => resolveAvatar(props.item.author, props.item.avatar))
 const displayImages = computed(() => {
   const imgs = props.item && props.item.images
   return Array.isArray(imgs) ? imgs : []

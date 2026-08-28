@@ -1,6 +1,6 @@
 <template>
   <div class="cnode" :class="{ 'cnode--nested': depth > 0 }" :style="indentStyle">
-    <img class="cnode__avatar" :src="node.avatar || defaultAvatar" :alt="node.author" />
+    <img class="cnode__avatar" :src="avatarUrl" :alt="node.author" />
     <div class="cnode__main">
       <div class="cnode__name">{{ node.author }}</div>
       <div class="cnode__text">{{ node.content }}</div>
@@ -29,6 +29,7 @@
 <script setup>
 import { computed } from 'vue'
 import { t } from '../i18n'
+import { resolveAvatar } from '../utils/avatar'
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -36,7 +37,7 @@ const props = defineProps({
 })
 defineEmits(['reply'])
 
-const defaultAvatar = 'unsplash/photo-1535713875002-d1d0cf377fde_w_80_q_80.jpg'
+const avatarUrl = computed(() => resolveAvatar(props.node.author, props.node.avatar))
 
 // 缩进上限 4 级，避免无限嵌套时行宽失控；逻辑层级仍无上限
 const indentStyle = computed(() => {

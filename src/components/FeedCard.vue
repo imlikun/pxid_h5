@@ -8,7 +8,7 @@
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
       <div class="author" @click.stop="goUser">
-        <img class="avatar" :src="item.avatar || defaultAvatar" :alt="item.author" loading="lazy" />
+        <img class="avatar" :src="avatarUrl" :alt="item.author" loading="lazy" />
         <span class="name">{{ item.author }}</span>
       </div>
       <span class="like">
@@ -22,7 +22,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { defaultAvatar } from '../data/mock'
+import { resolveAvatar } from '../utils/avatar'
 import { mediaUrl } from '../storage'
 
 const props = defineProps({
@@ -39,6 +39,7 @@ const coverUrl = computed(() => {
   }
   return it.cover || (Array.isArray(it.images) && it.images[0]) || FALLBACK
 })
+const avatarUrl = computed(() => resolveAvatar(props.item.author, props.item.avatar))
 function onImgErr(e) {
   // 网络抖动/原图失效 → 换兜底（再失败也不再递归）
   if (e && e.target && e.target.src !== FALLBACK) e.target.src = FALLBACK
