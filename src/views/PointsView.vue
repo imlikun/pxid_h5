@@ -1,7 +1,7 @@
 <template>
   <div class="points">
     <!-- 顶部导航 -->
-    <TopBar :title="t('points.title')">
+    <TopBar :title="t('points.title')" :back="handlePointsBack">
       <template #right>
         <span class="nav__rule" @click="onRules">{{ t('points.rules') }}</span>
       </template>
@@ -131,6 +131,20 @@ import { pointsProducts } from '../data/mock'
 import TopBar from '../components/TopBar.vue'
 
 const router = useRouter()
+
+// 积分页返回对接（见《积分H5返回对接说明》）：
+// 原生 App「我的」页用 WebView 打开 #/points 并隐藏原生返回键，
+// 故 H5 自带返回按钮需主动通知原生关闭 WebView 回「我的」；
+// H5 / 精选等独立预览环境无 window.PXIDApp 时退回 router.back()。
+// 仅本页面顶部返回按钮使用，初始化/子页不调用。
+function handlePointsBack() {
+  const app = window.PXIDApp
+  if (app && typeof app.postMessage === 'function') {
+    app.postMessage('closeWebView')
+  } else {
+    router.back()
+  }
+}
 
 const profile = ref({ balance: 0, continuousDays: 0, signedToday: false, isDemo: false, level: {}, levelIndex: 0, groups: [], medals: [], monthSigns: [] })
 const medals = ref([])
