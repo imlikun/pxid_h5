@@ -330,14 +330,25 @@ export async function fetchFollowers(deviceId) {
     return []
   }
 }
-// 收藏 toggle：POST /feed/:id/favorite → { favorited }
+// 收藏 toggle：POST /feed/:id/favorite → { favorited, favorites }
 export async function toggleFavorite(feedId, favorited) {
   if (!FEED_API) return { ok: false }
   try {
     const data = await request('/feed/' + feedId + '/favorite', { method: 'POST', body: { favorited } })
-    return { ok: true, favorited: !!(data && data.favorited) }
+    return { ok: true, favorited: !!(data && data.favorited), favorites: data && data.favorites }
   } catch (e) {
     return { ok: false, message: e.message || '操作失败' }
+  }
+}
+
+// 查询当前登录用户是否收藏了某条动态（详情页初始化收藏态用）
+export async function checkFavorite(feedId) {
+  if (!FEED_API) return false
+  try {
+    const data = await request('/feed/' + feedId + '/favorite')
+    return !!(data && data.favorited)
+  } catch (e) {
+    return false
   }
 }
 // 记录浏览足迹：POST /footprints

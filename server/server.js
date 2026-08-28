@@ -639,6 +639,8 @@ function rowToFeed(r) {
     cover: (function(){ const c=r.cover||'', imgs=safeJsonArr(r.images); return c||(imgs.length?imgs[0]:''); })(),
     likes: r.likes,
     isLiked: false,
+    favorites: db.prepare('SELECT COUNT(*) c FROM favorites WHERE feed_id=?').get(r.id).c,
+    isFavorited: false,
     comments: db.prepare('SELECT COUNT(*) c FROM comments WHERE feed_id=?').get(r.id).c,
     createdAt: r.created_at,
     time: r.created_at,
@@ -936,6 +938,14 @@ app.get('/feed/liked', requireAuth, (req, res) => {
   res.json(ok({ total, list: rows.map((r) => { const x = rowToFeed(r); x.isLiked = true; return x }) }))
 })
 
+// ---- 查询当前登录用户是否收藏了某条动态（详情页初始化收藏态用）----
+// 必须前置注册，否则会被 /feed/:id 参数路由拦截。
+app.get('/feed/:id/favorite', requireAuth, (req, res) => {
+  const deviceId = (req.user && req.user.deviceId) || ''
+  const row = db.prepare('SELECT 1 FROM favorites WHERE device_id=? AND feed_id=?').get(deviceId, req.params.id)
+  res.json(ok({ favorited: !!row }))
+})
+
 // ---- 详情 ----
 app.get('/feed/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(req.params.id)
@@ -983,7 +993,7 @@ app.get('/favorites', requireAuth, (req, res) => {
   const rows = db.prepare(`SELECT f.* FROM feeds f JOIN favorites v ON f.id=v.feed_id WHERE v.device_id=? AND f.status=? ORDER BY v.created_at DESC LIMIT ? OFFSET ?`).all(deviceId, 'published', ps, off)
   res.json(ok({ total, list: rows.map(rowToFeed) }))
 })
-// POST /feed/:id/favorite → 收藏/取消 toggle → { favorited }
+// POST /feed/:id/favorite → 收藏/取消 toggle → { favorited, favorites }
 app.post('/feed/:id/favorite', requireAuth, (req, res) => {
   const row = db.prepare('SELECT 1 FROM feeds WHERE id=?').get(req.params.id)
   if (!row) return res.json(err(404, '动态不存在'))
@@ -993,7 +1003,8 @@ app.post('/feed/:id/favorite', requireAuth, (req, res) => {
   if (favorited && !already) db.prepare('INSERT OR IGNORE INTO favorites (device_id, feed_id, created_at) VALUES (?,?,?)').run(deviceId, req.params.id, now())
   else if (!favorited && already) db.prepare('DELETE FROM favorites WHERE device_id=? AND feed_id=?').run(deviceId, req.params.id)
   const isFav = db.prepare('SELECT 1 FROM favorites WHERE device_id=? AND feed_id=?').get(deviceId, req.params.id)
-  res.json(ok({ favorited: !!isFav }))
+  const favorites = db.prepare('SELECT COUNT(*) c FROM favorites WHERE feed_id=?').get(req.params.id).c
+  res.json(ok({ favorited: !!isFav, favorites }))
 })
 // POST /footprints → 记录浏览足迹（每设备每动态仅留最新一条）
 app.post('/footprints', requireAuth, (req, res) => {

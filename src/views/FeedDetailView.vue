@@ -172,24 +172,26 @@
     <button class="empty__back" @click="router.back()">{{ t('feed.back') }}</button>
   </div>
 
-  <!-- 底部互动栏 -->
+  <!-- 底部互动栏：左侧输入框 + 右侧点赞/收藏/评论（对齐 App 详情页习惯） -->
   <div v-if="item" class="actions" v-show="!commenting">
-    <button class="act pop press" :class="{ liked, on: liked }" @click="onLike">
-      <svg viewBox="0 0 24 24" width="22" height="22" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
-      <span>{{ likeCount }}</span>
-    </button>
-    <button class="act pop press" @click="onCommentBtn">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-      <span>{{ commentCount }}</span>
-    </button>
-    <button class="act pop press" :class="{ collected, on: collected }" @click="onCollect">
-      <svg viewBox="0 0 24 24" width="22" height="22" :fill="collected ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-      <span>{{ collected ? t('feed.collect.collected') : t('feed.collect.collect') }}</span>
-    </button>
-    <button class="act pop press" @click="onShare">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-      <span>{{ t('feed.share') }}</span>
-    </button>
+    <div class="actions__input press" @click="onCommentBtn">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      <span>{{ t('feed.writeComment') }}</span>
+    </div>
+    <div class="actions__icons">
+      <button class="actions__icon pop press" :class="{ liked }" @click="onLike">
+        <svg viewBox="0 0 24 24" width="22" height="22" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+        <span>{{ likeCount }}</span>
+      </button>
+      <button class="actions__icon pop press" :class="{ collected }" @click="onCollect">
+        <svg viewBox="0 0 24 24" width="22" height="22" :fill="collected ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        <span>{{ collectCount }}</span>
+      </button>
+      <button class="actions__icon pop press" @click="onCommentBtn">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+        <span>{{ commentCount }}</span>
+      </button>
+    </div>
   </div>
 
   <!-- 举报弹层：Teleport 到 body，避免被 .app-root 的 transform/will-change 包含块捕获
@@ -218,7 +220,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
 import { t } from '../i18n'
-import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint } from '../api/feed'
+import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite } from '../api/feed'
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
@@ -241,6 +243,7 @@ const loading = ref(true)
 const liked = ref(false)
 const likeCount = ref(0)
 const collected = ref(false)
+const collectCount = ref(0)
 const followed = ref(false)
 const comments = ref([])
 const commentText = ref('')
@@ -387,6 +390,8 @@ async function load() {
         item.value = data
         liked.value = !!data.isLiked
         likeCount.value = data.likes || 0
+        collected.value = !!data.isFavorited
+        collectCount.value = data.favorites || 0
         followed.value = !!data.followed
         // 后端详情 followed 硬编码 false（rowToFeed:304），用 /follow/check 补真实关注态
         if (data.deviceId) {
@@ -394,6 +399,10 @@ async function load() {
         }
         // 记录浏览足迹（H5 自管，个人主页「足迹」Tab 用；静默失败不影响阅读）
         recordFootprint(id.value)
+        // 有 token 时补收藏态（公开详情默认不带 isFavorited，避免未登录被 401）
+        checkFavorite(id.value).then((fav) => {
+          collected.value = fav
+        }).catch(() => {})
       }
     } catch (e) { /* keep null → show empty */ }
     if (item.value) {
@@ -586,8 +595,26 @@ async function onLike() {
 }
 async function onCollect() {
   // 同 onLike：不强制前置登录，由后端鉴权（避免 requireLogin 误判拉登录页）
-  collected.value = !collected.value
-  showToast(collected.value ? t('feed.toast.collected') : t('feed.toast.uncollected'))
+  const next = !collected.value
+  collected.value = next
+  collectCount.value += next ? 1 : -1
+  const rollback = () => {
+    collected.value = !next
+    collectCount.value -= next ? 1 : -1
+  }
+  try {
+    const r = await toggleFavorite(id.value, next)
+    if (r.ok) {
+      collected.value = !!r.favorited
+      if (typeof r.favorites === 'number') collectCount.value = r.favorites
+    } else {
+      rollback()
+      showToast(r.message || t('feed.toast.collectFail'))
+    }
+  } catch (e) {
+    rollback()
+    showToast(t('feed.toast.collectFail'))
+  }
 }
 async function onFollow() {
   if (!item.value || !item.value.deviceId) {
@@ -1013,7 +1040,7 @@ function showToast(msg) {
   padding: 7px 20px;
 }
 
-/* 底部互动栏 */
+/* 底部互动栏：左输入框 + 右图标 */
 .actions {
   position: fixed;
   left: 50%;
@@ -1023,21 +1050,43 @@ function showToast(msg) {
   max-width: 480px;
   display: flex;
   align-items: center;
-  justify-content: space-around;
-  padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  gap: 14px;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
   background: var(--card);
   border-top: 1px solid var(--line);
   z-index: 50;
+  box-sizing: border-box;
 }
-.act {
+.actions__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  background: var(--bg);
+  border-radius: var(--radius-pill);
+  padding: 0 14px;
+  font-size: 14px;
+  color: var(--text-hint);
+}
+.actions__icons {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.actions__icon {
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 13px;
   color: var(--text-sub);
+  background: none;
+  padding: 4px 0;
 }
-.act.liked { color: var(--price); }
-.act.collected { color: var(--brand); }
+.actions__icon.liked { color: var(--price); }
+.actions__icon.collected { color: var(--brand); }
 
 /* toast */
 .toast {
