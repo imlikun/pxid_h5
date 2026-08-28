@@ -986,6 +986,15 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
 app.get('/feed/:id/comments', (req, res) => {
   const rows = db.prepare('SELECT * FROM comments WHERE feed_id=? ORDER BY id ASC').all(req.params.id)
   const replyRows = db.prepare('SELECT * FROM comment_replies WHERE feed_id=? ORDER BY id ASC').all(req.params.id)
+  // 为回复中的 @某人 解析，预拉一级评论资料（含无身份时的 nickname+avatar 用于 alias）
+  const parentIds = [...new Set(replyRows.map((r) => r.parent_comment_id).filter(Boolean))]
+  const parentMap = {}
+  if (parentIds.length) {
+    const ph = parentIds.map(() => '?').join(',')
+    db.prepare(`SELECT * FROM comments WHERE id IN (${ph})`).all(...parentIds).forEach((p) => {
+      parentMap[p.id] = p
+    })
+  }
   const identities = []
   rows.forEach((c) => identities.push({ deviceId: c.device_id, memberUserId: c.member_user_id }))
   replyRows.forEach((r) => {
@@ -1002,7 +1011,10 @@ app.get('/feed/:id/comments', (req, res) => {
       const cp = getProfile(c.device_id, c.member_user_id, c.nickname, c.avatar)
       const replies = (replyMap[c.id] || []).map((r) => {
         const rp = getProfile(r.device_id, r.member_user_id, r.nickname, r.avatar)
-        const rtp = getProfile(r.reply_to_device_id, r.reply_to_member_user_id)
+        const parent = parentMap[r.parent_comment_id]
+        const rtp = parent
+          ? getProfile(r.reply_to_device_id, r.reply_to_member_user_id, parent.nickname, parent.avatar)
+          : getProfile(r.reply_to_device_id, r.reply_to_member_user_id)
         return {
           id: r.id,
           author: (rp && rp.nickname) || r.nickname,
