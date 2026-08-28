@@ -7,6 +7,7 @@
   --price: #e53935;                       /* 价格红 */
   --bg: #F5F5F4;                          /* 常规页面背景，统一对齐 App「我的」页背景 */
   --card: #ffffff;                        /* 卡片表面 surface */
+  --surface-2: #ECECEC;                   /* 浅灰表面：pill/输入框/标签底，比页面背景深一档，保证可见且层次和谐 */
   --text: #111111;                        /* 主文本 textPrimary */
   --text-sub: #666666;                    /* 次文本 textSecondary */
   --text-hint: #7F7F7F;                   /* 弱文本 textTertiary */

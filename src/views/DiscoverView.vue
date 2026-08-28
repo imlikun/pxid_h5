@@ -750,7 +750,7 @@ function showToast(msg) {
 .region-pill {
   font-size: 13px;
   color: var(--text-sub);
-  background: #F5F5F4;
+  background: var(--surface-2);
   border-radius: var(--radius-pill);
   padding: 6px 14px;
   line-height: 1;
@@ -775,7 +775,7 @@ function showToast(msg) {
 .search {
   margin: 10px 16px 0;
   height: 40px;
-  background: #F5F5F4;
+  background: var(--surface-2);
   border: none;
   border-radius: var(--radius-pill);
   display: flex;
@@ -936,7 +936,7 @@ function showToast(msg) {
   white-space: nowrap;
   padding: 6px 14px;
   border-radius: var(--radius-pill);
-  background: #F5F5F4;
+  background: var(--surface-2);
   transition: all 0.15s ease;
   font-weight: 500;
   flex-shrink: 0;
@@ -1096,7 +1096,7 @@ function showToast(msg) {
 .subtab {
   font-size: 13px;
   color: var(--text-sub);
-  background: #F5F5F4;
+  background: var(--surface-2);
   border-radius: 16px;
   padding: 6px 14px;
   font-weight: 500;
