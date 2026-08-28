@@ -1,6 +1,6 @@
 # PXID H5 × Flutter 原生对接总纲（Flutter 必读 · 唯一入口）
 
-> **最后更新**：2026-08-28 10:56 ｜ **基准代码**：`4087ee6`（对接五步语义版本）  
+> **最后更新**：2026-08-28 11:10 ｜ **基准代码**：`a7b0310`（Flutter 对接总纲，基于代码事实逐条核对版）
 > **读者**：Flutter 原生开发同学 ｜ **目的**：**一份文档说清所有 H5 ↔ Flutter 桥接契约与对接步骤**，不再分散到多个文档找来找去  
 > **配套（同仓库，按需深读）**：后端 API 见 `docs/PXID_ToC_后端接口规范.md`；视觉规范见 `docs/ToC_App_视觉开发规范.md`；Shopify 结账 Flutter 实现见 `docs/PXID_Shopify_结账桥接_Flutter版.md`  
 > **本文件按 🔴现状 / 🟠问题或卡点 / 🟡需要什么帮助 / 🟢怎么做 / 🔵最终效果 五步组织**
@@ -67,7 +67,6 @@
 | `navigateTo` | `(tab: string) => void` | P1 | 切底部 5 tab | `discover`/`featured`/`purchase`/`service`/`profile` |
 | `getRegion` | `() => Promise<string>` | P1 | 活动中心、发布、发现、商城 region | 返回 `CN` / `BR` / `US` |
 | `getDeviceId` | `() => Promise<string>` | P1 | 发帖封禁维度 | 返回设备唯一 ID |
-| `getOSSCredentials` | `() => Promise<{...}>` | P1 | 图片直传 | 返回 OSS 临时凭证；未实现则 H5 降级 |
 | `popPage` | `() => void` | P1 | 根页面侧滑空栈返回 | pop 当前承载 H5 的原生页 |
 | `callPhone` | `(phone: string) => void` | P2 | 门店/工单拨号 | 走原生拨号 |
 | `openMap` | `({lat, lng, name}) => void` | P2 | 门店/救援/工单导航 | 拉起系统/高德/百度地图 |
@@ -80,21 +79,24 @@
 | 方法 | 说明 |
 | --- | --- |
 | `openCheckout` | H5 目前**直接调用 `openShopify(url)`** 跳 Shopify 结账页，`openCheckout` 暂未启用。若产品后续要改为「Flutter cartCreate → WebView 结账」再接入。 |
+| `getOSSCredentials` | 当前 H5 业务代码**未调用**（图片直传暂未启用）。Flutter 可先不实现，H5 走降级；若后续启用图片直传再接入。 |
 
-### 1.3 `openNative` 标识全表（H5 真实调用点已收齐，共 21 个）
+### 1.3 `openNative` 标识全表（共 23 个约定标识）
+
+> 说明：下表 23 个为**约定全集**，每行备注已标注当前状态——服务类 6 个（`vehicle/check`、`vehicle/bind`、`manual/download`、`service/contact`、`service/cancelOrder`、`rescue/submit`）因 `router` 路由级屏蔽 `/service/*` 当前无法触发；`settings/language`、`address/list` 当前 H5 未主动调用（原生侧 / 后续接入）；`purchase/customize` 是 H5 兜底路由，非 openNative 主动触发；其余为 H5 当前实际触发的标识。
 
 | path | 触发场景 | 参数 | 备注 |
 | --- | --- | --- | --- |
 | `login` | 缺登录跳原生登录 | — | 全局登录 Gate |
 | `discover/publish` | 发现页「＋」发布 | 可带 `?content=` 预填文案 | 原生拉起发布器；H5 兜底 `/publish` |
-| `purchase/customize` | 立即定制 / 车型详情定制 | — | 购车 |
+| `purchase/customize` | H5 兜底路由 `/purchase/customize`（非 openNative 主动触发）；实际购车定制**提交**走 `buy/customize` | — | 购车（H5 兜底路由） |
 | `vehicle/<id>` | 车型卡 / 动态车型标签 / @车型 | id = 真实型号字符串，如 `P2`、`MOTA Z3` | 购车车型页 |
 | `vehicle/check?model=<m>` | 车辆体检 | model | 服务（H5 服务模块已屏蔽，实际触发不了） |
 | `vehicle/bind` | 切换/绑定车辆 | — | 服务（H5 服务模块已屏蔽，实际触发不了） |
 | `feed/interact?type=like&id=<id>` | 点赞 | type=like, id | 互动 |
 | `feed/follow?id=<id>` | 关注作者 | id | 互动 |
 | `share/feed?id=<id>` | 分享 | id | 原生分享面板；H5 兜底 Web Share / 复制链接 |
-| `address/list` | 结算选地址 | — | 下单 |
+| `address/list` | 结算选地址 | — | 下单（当前 H5 未主动调用，由原生 / 后续接入） |
 | `manual/download?model=<m>` | 说明书下载 | model | 服务（H5 服务模块已屏蔽，实际触发不了） |
 | `service/contact?orderId=<id>` | 工单联系客服 | orderId | 服务（H5 服务模块已屏蔽，实际触发不了） |
 | `service/cancelOrder?orderId=<id>` | 取消工单 | orderId | 服务（H5 服务模块已屏蔽，实际触发不了） |
@@ -105,7 +107,7 @@
 | `points/guide` | 玩转积分 banner | — | 积分（H5 等价页 `/points/guide`） |
 | `points/mall` | 积分商城「更多」 | — | 积分（H5 等价页 `/points/mall`） |
 | `points/exchange?id=<id>` | 积分商品兑换 | id | 积分（H5 等价页 `/points/mall`） |
-| `settings/language` | 语言/地区切换 | — | 多国 |
+| `settings/language` | 语言/地区切换 | — | 多国（当前 H5 未主动调用，由原生设置页触发 / 后续接入） |
 | `user/<name>` | **@用户跳用户主页** | name（需 encodeURIComponent） | `FeedDetailView:516` 调用；原生需承载用户主页 |
 | `app/exit` | 退出兜底 | — | `bridge.exit()` 未实现时兜底 `openNative('app/exit')` |
 
@@ -175,8 +177,8 @@
 ## 🟡 需要什么帮助（要 Flutter 同学提供 / 确认 / 做掉）
 
 1. **注入两套桥**：`window.PXIDBridge`（`isNative:true`）+ `window.PXIDApp`（`postMessage('closeWebView')`）。
-2. **实现 17 个当前 H5 真实调用的主桥方法**：P0 先交（`getToken`/`getUserInfo`/`getLocale`/`openNative`/`pickImages`/`openShopify`），其余 P1/P2 按排期。
-3. **解析 21 个 `openNative` 标识**：按 🔴.3 全表路由到对应原生页。
+2. **实现 16 个当前 H5 真实调用的主桥方法**（已剔除未调用的 `getOSSCredentials`，见 🔴.2）：P0 先交（`getToken`/`getUserInfo`/`getLocale`/`openNative`/`pickImages`/`openShopify`），其余 P1/P2 按排期。
+3. **解析 23 个 `openNative` 标识**：按 🔴.3 全表路由到对应原生页。
 4. **登录闭环**：登录成功后 `getToken` + `getUserInfo` 同时返回新值，且 `getUserInfo` 含 `email`/`nickname`/`avatar`/`carModel`/`token`。
 5. **我的车**：`getUserInfo` 返回 `carModel`（在售 12 车型之一）；字段兼容 `myCar`/`vehicle`/`bindVehicle`/`boundCar`。
 6. **积分 WebView**：「我的」页 WebView 打开 `#/points`、隐藏原生返回键、注入 `PXIDApp` 并响应 `closeWebView`。
@@ -218,7 +220,7 @@ window.PXIDApp = {
 ### 4.2 方法实现要点（按优先级）
 
 - **P0（阻塞联调）**：`getToken` / `getUserInfo` / `getLocale` / `openNative` / `pickImages` / `openShopify`。
-- **P1（核心功能）**：`navigateTo` / `requestPurchase` / `getRegion` / `getDeviceId` / `getOSSCredentials` / `popPage`。
+- **P1（核心功能）**：`navigateTo` / `requestPurchase` / `getRegion` / `getDeviceId` / `popPage`。（注：`getOSSCredentials` 当前 H5 未调用，已列入 🔴.2 预留表）
 - **P2（次要）**：`callPhone` / `openMap` / `getLocation` / `pickVideo` / `exit`。
 - **预留（暂不接入）**：`openCheckout`。
 
