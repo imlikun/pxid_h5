@@ -106,31 +106,12 @@
     <div class="comments fade-up stagger-7" ref="commentsBox">
       <div class="comments__head">{{ t('feed.commentsCount', { n: commentCount }) }}</div>
       <div v-if="comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
-      <div v-for="c in comments" :key="c.id" class="cmt">
-        <img class="cmt__avatar" :src="c.avatar || defaultAvatar" :alt="c.author" />
-        <div class="cmt__main">
-          <div class="cmt__name">{{ c.author }}</div>
-          <div class="cmt__text">{{ c.content }}</div>
-          <div class="cmt__foot">
-            <span class="cmt__time">{{ c.time }}</span>
-            <span class="cmt__reply" @click="startReply(c)">{{ t('feed.reply') }}</span>
-            <span class="cmt__like pop" :class="{ liked: c.isLiked }" @click="onCommentLike(c)">
-              <svg viewBox="0 0 24 24" width="14" height="14" :fill="c.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
-              <span>{{ c.likes }}</span>
-            </span>
-          </div>
-          <div v-if="c.replies && c.replies.length" class="replies">
-            <div v-for="r in c.replies" :key="r.id" class="reply" @click="startReply(c, r)">
-              <img class="reply__avatar" :src="r.avatar || defaultAvatar" :alt="r.author" />
-              <div class="reply__main">
-                <div class="reply__name">{{ r.author }}<span v-if="r.replyTo" class="reply__to"> 回复 {{ r.replyTo }}</span></div>
-                <div class="reply__text">{{ r.content }}</div>
-                <div class="reply__time">{{ r.time }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <CommentNode
+        v-for="c in comments"
+        :key="c.id"
+        :node="c"
+        @reply="onReplyNode"
+      />
 
       <!-- 输入栏：聚焦时变固定底部栏并顶到键盘上方（修复评论框被输入法遮挡） -->
       <div
@@ -237,6 +218,7 @@ import { t } from '../i18n'
 import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds } from '../api/feed'
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
+import CommentNode from '../components/CommentNode.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -362,9 +344,9 @@ onBeforeUnmount(() => {
 })
 const showReport = ref(false)
 const reportReasons = ['色情低俗', '广告诈骗', '辱骂攻击', '违法违规', '其他']
-const replyTo = ref(null) // { commentId, name }
-function startReply(c, r) {
-  replyTo.value = { commentId: c.id, name: r ? r.author : c.author }
+const replyTo = ref(null) // { id, name }
+function onReplyNode(node) {
+  replyTo.value = { id: node.id, name: node.author }
   commenting.value = true
   nextTick(() => {
     syncKeyboard()
@@ -446,8 +428,14 @@ function formatCommentTime(ts) {
 }
 
 const commentCount = computed(() => {
-  let n = comments.value.length
-  comments.value.forEach((c) => (n += (c.replies || []).length))
+  let n = 0
+  const walk = (list) => {
+    list.forEach((c) => {
+      n++
+      if (c.replies && c.replies.length) walk(c.replies)
+    })
+  }
+  walk(comments.value)
   return n
 })
 
@@ -673,8 +661,7 @@ async function submitComment() {
   ])
   const body = { content: text, nickname: profile.nickname, avatar: profile.avatar }
   if (replyTo.value) {
-    body.parentCommentId = replyTo.value.commentId
-    body.replyTo = replyTo.value.name
+    body.parentId = replyTo.value.id
   }
   try {
     const r = await fetch(`${API_BASE}/feed/${id.value}/comment`, {
@@ -684,32 +671,29 @@ async function submitComment() {
     })
     const j = await r.json()
     if (j.code === 0 && j.data) {
+      const newNode = {
+        id: j.data.id,
+        parentId: j.data.parentId || 0,
+        author: j.data.author,
+        avatar: j.data.avatar,
+        content: j.data.content,
+        time: formatCommentTime(j.data.createdAt),
+        createdAt: j.data.createdAt,
+        likes: 0,
+        isLiked: false,
+        replies: [],
+      }
       if (replyTo.value) {
-        const parent = comments.value.find((x) => x.id === replyTo.value.commentId)
+        const parent = findNode(comments.value, replyTo.value.id)
         if (parent) {
           parent.replies = parent.replies || []
-          parent.replies.unshift({
-            id: j.data.id,
-            author: j.data.author,
-            avatar: j.data.avatar,
-            content: j.data.content,
-            replyTo: replyTo.value.name,
-            time: formatCommentTime(j.data.createdAt),
-            likes: 0,
-            isLiked: false,
-          })
+          parent.replies.unshift(newNode)
+        } else {
+          comments.value.unshift(newNode)
         }
         replyTo.value = null
       } else {
-        comments.value.unshift({
-          id: j.data.id,
-          author: j.data.author,
-          avatar: j.data.avatar,
-          content: j.data.content,
-          time: formatCommentTime(j.data.createdAt),
-          likes: 0,
-          isLiked: false,
-        })
+        comments.value.unshift(newNode)
       }
       commentText.value = ''
       showToast(t('feed.toast.commentOk'))
@@ -720,9 +704,15 @@ async function submitComment() {
     showToast(t('feed.toast.commentFail'))
   }
 }
-function onCommentLike(c) {
-  c.isLiked = !c.isLiked
-  c.likes += c.isLiked ? 1 : -1
+function findNode(list, id) {
+  for (const n of list) {
+    if (n.id === id) return n
+    if (n.replies && n.replies.length) {
+      const found = findNode(n.replies, id)
+      if (found) return found
+    }
+  }
+  return null
 }
 function showToast(msg) {
   toast.value = msg

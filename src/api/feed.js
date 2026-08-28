@@ -136,15 +136,15 @@ export async function likeFeed(id) {
 }
 
 // ---- 评论 ----
-export async function commentFeed(id, text, { parentCommentId = 0, replyTo = '' } = {}) {
+export async function commentFeed(id, text, { parentId = 0 } = {}) {
   if (!FEED_API) return { ok: false }
   try {
-    // 后端评论字段名是 content（非 text）；parentCommentId>0 为楼中楼回复
+    // 后端评论字段名是 content（非 text）；parentId>0 为楼中楼回复（可任意层级）
     // 带 actor 身份（nickname/avatar）：通知作者 + 评论归属不能永远'骑友'
     const profile = await bridge.getUserInfo().catch(() => ({ nickname: '', avatar: '' }))
     const data = await request('/feed/' + id + '/comment', {
       method: 'POST',
-      body: { content: text, parentCommentId, replyTo, nickname: profile.nickname || '', avatar: profile.avatar || '' },
+      body: { content: text, parentId, nickname: profile.nickname || '', avatar: profile.avatar || '' },
     })
     return { ok: true, data }
   } catch (e) {

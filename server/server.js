@@ -200,17 +200,6 @@ CREATE TABLE IF NOT EXISTS reports (
   handled_at TEXT,
   created_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS comment_replies (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  feed_id INTEGER NOT NULL,
-  parent_comment_id INTEGER NOT NULL,
-  nickname TEXT NOT NULL DEFAULT '',
-  avatar TEXT NOT NULL DEFAULT '',
-  content TEXT NOT NULL DEFAULT '',
-  reply_to TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS moderation_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   feed_id INTEGER NOT NULL DEFAULT 0,
@@ -328,22 +317,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_alias_identity_nickname_avatar ON profile_
 CREATE INDEX IF NOT EXISTS idx_alias_nickname_avatar ON profile_aliases(nickname, avatar);
 `)
 
-// ---- comments / comment_replies 加身份字段（幂等迁移）----
+// ---- comments 加身份字段 + parent_id 自引用（幂等迁移；comment_replies 已并入 comments）----
 const commentCols = db.prepare('PRAGMA table_info(comments)').all().map((c) => c.name)
 function addCommentCol(name, def) {
   if (!commentCols.includes(name)) db.exec(`ALTER TABLE comments ADD COLUMN ${name} ${def}`)
 }
 addCommentCol('device_id', "TEXT NOT NULL DEFAULT ''")
 addCommentCol('member_user_id', "TEXT NOT NULL DEFAULT ''")
-
-const replyCols = db.prepare('PRAGMA table_info(comment_replies)').all().map((c) => c.name)
-function addReplyCol(name, def) {
-  if (!replyCols.includes(name)) db.exec(`ALTER TABLE comment_replies ADD COLUMN ${name} ${def}`)
-}
-addReplyCol('device_id', "TEXT NOT NULL DEFAULT ''")
-addReplyCol('member_user_id', "TEXT NOT NULL DEFAULT ''")
-addReplyCol('reply_to_device_id', "TEXT NOT NULL DEFAULT ''")
-addReplyCol('reply_to_member_user_id', "TEXT NOT NULL DEFAULT ''")
+addCommentCol('parent_id', "INTEGER NOT NULL DEFAULT 0")
 
 // 启动种子：演示互动消息（device_id='__demo__' 对所有登录用户可见，便于先看效果）
 // 头像池：不同互动者不同头像（unsplash 相对路径，随 H5 站点 /nav/pxid-h5/ 可加载）
@@ -516,13 +497,6 @@ function buildProfileMap(identities) {
   }
 }
 
-function resolveReplyToName(parentCommentId, fallback = '') {
-  const parent = db.prepare('SELECT device_id, member_user_id, nickname FROM comments WHERE id=?').get(parentCommentId)
-  if (!parent) return fallback
-  const p = resolveProfile({ deviceId: parent.device_id, memberUserId: parent.member_user_id, storedNickname: parent.nickname, storedAvatar: '' })
-  return p.nickname || fallback
-}
-
 function resolveIdentityFromSnapshot(nickname, avatar) {
   // 1) 优先从 feeds 作者身份匹配（发过帖的用户）
   const f = db
@@ -542,20 +516,32 @@ function backfillCommentIdentity() {
       const identity = resolveIdentityFromSnapshot(r.nickname, r.avatar)
       if (identity) updC.run(identity.device_id || '', identity.member_user_id || '', r.id)
     }
-    const repRows = db.prepare("SELECT id, nickname, avatar, reply_to, parent_comment_id FROM comment_replies WHERE COALESCE(device_id,'')='' AND COALESCE(member_user_id,'')=''").all()
-    const updR = db.prepare('UPDATE comment_replies SET device_id=?, member_user_id=?, reply_to_device_id=?, reply_to_member_user_id=? WHERE id=?')
-    for (const r of repRows) {
-      const identity = resolveIdentityFromSnapshot(r.nickname, r.avatar)
-      let rtd = '', rtm = ''
-      if (r.reply_to) {
-        const parent = db.prepare('SELECT device_id, member_user_id FROM comments WHERE id=?').get(r.parent_comment_id)
-        if (parent) { rtd = parent.device_id || ''; rtm = parent.member_user_id || '' }
-      }
-      updR.run(identity ? (identity.device_id || '') : '', identity ? (identity.member_user_id || '') : '', rtd, rtm, r.id)
-    }
-    console.log('[pxid-feed] backfilled comment identities:', cmtRows.length, repRows.length)
+    console.log('[pxid-feed] backfilled comment identities:', cmtRows.length)
   } catch (e) {
     console.error('[pxid-feed] backfill comment identities failed:', e.message || e)
+  }
+}
+
+// ---- 历史 comment_replies 数据一次性并入 comments（parent_id = 原 parent_comment_id）----
+// 幂等：表不存在则跳过；迁移成功后 DROP 旧表。必须早于其他引用 comment_replies 的逻辑。
+function migrateRepliesToComments() {
+  let hasTable = true
+  try {
+    db.prepare('SELECT 1 FROM comment_replies LIMIT 1').get()
+  } catch (e) {
+    hasTable = false
+  }
+  if (!hasTable) return
+  try {
+    const replies = db.prepare('SELECT * FROM comment_replies ORDER BY id ASC').all()
+    const ins = db.prepare('INSERT INTO comments (feed_id, parent_id, device_id, member_user_id, nickname, avatar, content, created_at) VALUES (?,?,?,?,?,?,?,?)')
+    for (const r of replies) {
+      ins.run(r.feed_id, r.parent_comment_id || 0, r.device_id || '', r.member_user_id || '', r.nickname || '骑友', r.avatar || '', r.content || '', r.created_at)
+    }
+    db.exec('DROP TABLE IF EXISTS comment_replies')
+    console.log('[pxid-feed] migrated comment_replies -> comments:', replies.length)
+  } catch (e) {
+    console.error('[pxid-feed] migrate replies -> comments failed:', e.message || e)
   }
 }
 
@@ -591,11 +577,7 @@ function seedAliasesFromExistingComments() {
     for (const r of cmtRows) {
       upsertProfileAlias({ deviceId: r.device_id, memberUserId: r.member_user_id, nickname: r.nickname, avatar: r.avatar })
     }
-    const repRows = db.prepare('SELECT DISTINCT device_id, member_user_id, nickname, avatar FROM comment_replies WHERE (length(device_id)>0 OR length(member_user_id)>0)').all()
-    for (const r of repRows) {
-      upsertProfileAlias({ deviceId: r.device_id, memberUserId: r.member_user_id, nickname: r.nickname, avatar: r.avatar })
-    }
-    console.log('[pxid-feed] seeded aliases from comments:', cmtRows.length, repRows.length)
+    console.log('[pxid-feed] seeded aliases from comments:', cmtRows.length)
   } catch (e) {
     console.error('[pxid-feed] seed aliases from comments failed:', e.message || e)
   }
@@ -641,7 +623,8 @@ function rowToFeed(r) {
   }
 }
 
-// 启动时一次性：回填历史评论身份 + 用 feeds 初始化用户资料 + 初始化别名映射
+// 启动时一次性：先把历史 comment_replies 并入 comments，再做身份回填/资料/别名初始化
+migrateRepliesToComments()
 seedAliasesFromProfiles()
 seedAliasesFromExistingComments()
 backfillCommentIdentity()
@@ -928,7 +911,7 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
 app.post('/feed/:id/comment', requireAuth, (req, res) => {
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(req.params.id)
   if (!row) return res.json(err(404, '动态不存在'))
-  const { content, nickname = '骑友', avatar = '', parentCommentId = 0, replyTo = '' } = req.body || {}
+  const { content, nickname = '骑友', avatar = '', parentId = 0 } = req.body || {}
   const text = String(content || '').trim()
   if (!text) return res.json(err(1, '评论内容不能为空'))
   const deviceId = (req.user && req.user.deviceId) || ''
@@ -942,102 +925,63 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
   // 评论时同步更新资料 truth source（以后改昵称/头像，历史评论会跟着刷新）
   upsertProfile({ deviceId, memberUserId, nickname, avatar })
 
-  // 楼中楼：回复某条一级评论 → 写 comment_replies
-  if (parentCommentId) {
-    const parentComment = db.prepare('SELECT device_id, member_user_id, nickname FROM comments WHERE id=?').get(Number(parentCommentId) || 0)
-    const replyToDeviceId = parentComment ? parentComment.device_id : ''
-    const replyToMemberUserId = parentComment ? parentComment.member_user_id : ''
-    const replyToName = parentComment
-      ? resolveProfile({ deviceId: replyToDeviceId, memberUserId: replyToMemberUserId, storedNickname: parentComment.nickname, storedAvatar: '' }).nickname
-      : String(replyTo || '').slice(0, 20)
-    const info = db
-      .prepare(`INSERT INTO comment_replies (feed_id, parent_comment_id, device_id, member_user_id, nickname, avatar, content, reply_to, reply_to_device_id, reply_to_member_user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(
-        row.id,
-        Number(parentCommentId) || 0,
-        String(deviceId || ''),
-        String(memberUserId || ''),
-        String(nickname).slice(0, 20),
-        String(avatar || ''),
-        text.slice(0, 500),
-        replyToName,
-        String(replyToDeviceId || ''),
-        String(replyToMemberUserId || ''),
-        now()
-      )
-    const c = db.prepare('SELECT * FROM comment_replies WHERE id=?').get(info.lastInsertRowid)
-    const p = resolveProfile({ deviceId: c.device_id, memberUserId: c.member_user_id, storedNickname: c.nickname, storedAvatar: c.avatar })
-    res.json(ok({ id: c.id, author: p.nickname, avatar: p.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))
-    return
+  // parentId：楼中楼可回复任意层级（自引用）；校验父评论存在且同属本动态，否则降级为一级评论
+  let parentIdNum = Number(parentId) || 0
+  if (parentIdNum) {
+    const parent = db.prepare('SELECT * FROM comments WHERE id=?').get(parentIdNum)
+    if (!parent || parent.feed_id !== row.id) parentIdNum = 0
   }
   const info = db
-    .prepare(`INSERT INTO comments (feed_id, device_id, member_user_id, nickname, avatar, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .run(row.id, String(deviceId || ''), String(memberUserId || ''), String(nickname).slice(0, 20), String(avatar || ''), text.slice(0, 500), now())
+    .prepare(`INSERT INTO comments (feed_id, parent_id, device_id, member_user_id, nickname, avatar, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(row.id, parentIdNum, String(deviceId || ''), String(memberUserId || ''), String(nickname).slice(0, 20), String(avatar || ''), text.slice(0, 500), now())
   const c = db.prepare('SELECT * FROM comments WHERE id=?').get(info.lastInsertRowid)
-  // 互动消息：评论通知作者（不通知自己；自检双维度：device 演示态 / memberUserId ToC 态）
-  const isSelf = (row.device_id && deviceId && row.device_id === deviceId) || (row.member_user_id && memberUserId && row.member_user_id === memberUserId)
-  if (!isSelf && (row.device_id || row.member_user_id)) {
-    emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'comment', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '评论了你的动态：' + text.slice(0, 40) })
+  // 互动消息：楼中楼回复通知父评论作者；一级评论通知动态作者（均不通知自己，双维度自检）
+  if (parentIdNum) {
+    const parent = db.prepare('SELECT * FROM comments WHERE id=?').get(parentIdNum)
+    if (parent) {
+      const isSelf = (parent.device_id && deviceId && parent.device_id === deviceId) || (parent.member_user_id && memberUserId && parent.member_user_id === memberUserId)
+      if (!isSelf && (parent.device_id || parent.member_user_id)) {
+        emitNotification({ deviceId: parent.device_id, memberUserId: parent.member_user_id, type: 'reply', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'comment', targetId: parentIdNum, content: '回复了你的评论：' + text.slice(0, 40) })
+      }
+    }
+  } else {
+    const isSelf = (row.device_id && deviceId && row.device_id === deviceId) || (row.member_user_id && memberUserId && row.member_user_id === memberUserId)
+    if (!isSelf && (row.device_id || row.member_user_id)) {
+      emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'comment', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '评论了你的动态：' + text.slice(0, 40) })
+    }
   }
   const p = resolveProfile({ deviceId: c.device_id, memberUserId: c.member_user_id, storedNickname: c.nickname, storedAvatar: c.avatar })
-  res.json(ok({ id: c.id, author: p.nickname, avatar: p.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))
+  res.json(ok({ id: c.id, parentId: c.parent_id, author: p.nickname, avatar: p.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))
 })
 
 app.get('/feed/:id/comments', (req, res) => {
   const rows = db.prepare('SELECT * FROM comments WHERE feed_id=? ORDER BY id ASC').all(req.params.id)
-  const replyRows = db.prepare('SELECT * FROM comment_replies WHERE feed_id=? ORDER BY id ASC').all(req.params.id)
-  // 为回复中的 @某人 解析，预拉一级评论资料（含无身份时的 nickname+avatar 用于 alias）
-  const parentIds = [...new Set(replyRows.map((r) => r.parent_comment_id).filter(Boolean))]
-  const parentMap = {}
-  if (parentIds.length) {
-    const ph = parentIds.map(() => '?').join(',')
-    db.prepare(`SELECT * FROM comments WHERE id IN (${ph})`).all(...parentIds).forEach((p) => {
-      parentMap[p.id] = p
-    })
-  }
-  const identities = []
-  rows.forEach((c) => identities.push({ deviceId: c.device_id, memberUserId: c.member_user_id }))
-  replyRows.forEach((r) => {
-    identities.push({ deviceId: r.device_id, memberUserId: r.member_user_id })
-    identities.push({ deviceId: r.reply_to_device_id, memberUserId: r.reply_to_member_user_id })
-  })
+  const identities = rows.map((c) => ({ deviceId: c.device_id, memberUserId: c.member_user_id }))
   const getProfile = buildProfileMap(identities)
-  const replyMap = {}
-  replyRows.forEach((r) => {
-    ;(replyMap[r.parent_comment_id] = replyMap[r.parent_comment_id] || []).push(r)
+  // 构建递归树：parent_id 指向任意评论（含楼中楼），顶层 parentId=0
+  const nodes = rows.map((c) => {
+    const p = getProfile(c.device_id, c.member_user_id, c.nickname, c.avatar)
+    return {
+      id: c.id,
+      parentId: c.parent_id || 0,
+      author: (p && p.nickname) || c.nickname,
+      avatar: (p && p.avatar) || c.avatar,
+      content: c.content,
+      createdAt: c.created_at,
+      time: c.created_at,
+      likes: 0,
+      isLiked: false,
+      replies: [],
+    }
   })
-  res.json(ok({
-    list: rows.map((c) => {
-      const cp = getProfile(c.device_id, c.member_user_id, c.nickname, c.avatar)
-      const replies = (replyMap[c.id] || []).map((r) => {
-        const rp = getProfile(r.device_id, r.member_user_id, r.nickname, r.avatar)
-        const parent = parentMap[r.parent_comment_id]
-        const rtp = parent
-          ? getProfile(r.reply_to_device_id, r.reply_to_member_user_id, parent.nickname, parent.avatar)
-          : getProfile(r.reply_to_device_id, r.reply_to_member_user_id)
-        return {
-          id: r.id,
-          author: (rp && rp.nickname) || r.nickname,
-          avatar: (rp && rp.avatar) || r.avatar,
-          content: r.content,
-          replyTo: (rtp && rtp.nickname) || r.reply_to,
-          createdAt: r.created_at,
-          time: r.created_at,
-          likes: 0,
-          isLiked: false,
-        }
-      })
-      return {
-        id: c.id,
-        author: (cp && cp.nickname) || c.nickname,
-        avatar: (cp && cp.avatar) || c.avatar,
-        content: c.content,
-        createdAt: c.created_at,
-        time: c.created_at,
-        replies,
-      }
-    }),
-  }))
+  const byId = {}
+  nodes.forEach((n) => { byId[n.id] = n })
+  const roots = []
+  nodes.forEach((n) => {
+    if (n.parentId && byId[n.parentId]) byId[n.parentId].replies.push(n)
+    else roots.push(n)
+  })
+  res.json(ok({ list: roots }))
 })
 
 // ============================================================
