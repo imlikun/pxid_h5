@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useSwipeBack } from './composables/useSwipeBack'
 import { bridge } from './bridge'
 
@@ -34,12 +34,30 @@ useSwipeBack(rootRef, {
   onToast: () => showSwipeToast('再按一次退出程序'),
   onExit: () => bridge.exit(),
 })
+
+// 修复：WebView 切后台冻结、回前台时根容器合成层点击命中区域错位
+// （表现为「能滚动不能点击」，刷新才恢复）。回前台时强制清除手势残留
+// transform，并重建合成层（临时 translateZ(0) + 双 rAF 移除）修复命中错位
+function onVisibilityChange() {
+  if (document.visibilityState !== 'visible') return
+  const el = rootRef.value
+  if (el) {
+    el.style.transition = ''
+    el.style.transform = ''
+  }
+  const doc = document.documentElement
+  doc.style.transform = 'translateZ(0)'
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { doc.style.transform = '' })
+  })
+}
+onMounted(() => document.addEventListener('visibilitychange', onVisibilityChange))
+onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
 </script>
 
 <style scoped>
 .app-root {
   min-height: 100vh;
-  will-change: transform;
   background: var(--bg, #f7f8fa);
 }
 .swipe-toast {

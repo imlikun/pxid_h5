@@ -38,6 +38,7 @@ export function useSwipeBack(elRef, opts = {}) {
     if (elRef && elRef.value) {
       elRef.value.style.transition = ''
       elRef.value.style.transform = ''
+      elRef.value.style.willChange = ''
     }
   }
 
@@ -63,6 +64,7 @@ export function useSwipeBack(elRef, opts = {}) {
       if (startEdge === 'left' && dx <= 0) { startEdge = null; return } // 方向不符
       if (startEdge === 'right' && dx >= 0) { startEdge = null; return }
       active = true
+      if (elRef && elRef.value) elRef.value.style.willChange = 'transform'
     }
     if (elRef && elRef.value) {
       elRef.value.style.transition = 'none'
