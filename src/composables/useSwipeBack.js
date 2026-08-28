@@ -44,6 +44,7 @@ export function useSwipeBack(elRef, opts = {}) {
 
   function onTouchStart(e) {
     if (e.touches.length !== 1 || isTyping()) return
+    resetEl() // 新 touch 前清掉历史残留的 will-change/transform（修复：残留会让 .app-root 成为 fixed 包含块，弹层错位「不居中/没样式」）
     const t = e.touches[0]
     const w = window.innerWidth
     startX = t.clientX
@@ -80,7 +81,14 @@ export function useSwipeBack(elRef, opts = {}) {
     if (el) el.style.transition = 'transform 0.28s ease'
 
     if (!pass) {
-      if (el) el.style.transform = 'translateX(0)'
+      if (el) {
+        el.style.transform = 'translateX(0)'
+        // 回弹动画结束彻底清除 transform（translateX(0) 仍是 transform，会创建包含块使 fixed 弹层错位）
+        let cleared = false
+        const clear = () => { if (cleared) return; cleared = true; resetEl() }
+        el.addEventListener('transitionend', clear, { once: true })
+        setTimeout(clear, 400) // 兜底：transitionend 不触发时也能清
+      }
       startEdge = null
       active = false
       return
@@ -122,16 +130,25 @@ export function useSwipeBack(elRef, opts = {}) {
   // 路由切换后清掉残留 transform（keep-alive 缓存页面可能带位移）
   const unwatch = router.afterEach(resetEl)
 
+  function onTouchCancel() {
+    resetEl()
+    startEdge = null
+    active = false
+    dx = 0
+  }
+
   onMounted(() => {
     window.addEventListener('touchstart', onTouchStart, { passive: true })
     window.addEventListener('touchmove', onTouchMove, { passive: true })
     window.addEventListener('touchend', onTouchEnd, { passive: true })
+    window.addEventListener('touchcancel', onTouchCancel, { passive: true })
   })
 
   onUnmounted(() => {
     window.removeEventListener('touchstart', onTouchStart)
     window.removeEventListener('touchmove', onTouchMove)
     window.removeEventListener('touchend', onTouchEnd)
+    window.removeEventListener('touchcancel', onTouchCancel)
     if (unwatch) unwatch()
     resetEl()
   })

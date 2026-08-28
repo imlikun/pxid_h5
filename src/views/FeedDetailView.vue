@@ -192,16 +192,19 @@
     </button>
   </div>
 
-  <!-- 举报弹层 -->
-  <transition name="fade">
-    <div v-if="showReport" class="sheet-mask" @click="showReport = false">
-      <div class="sheet" @click.stop>
-        <div class="sheet__title">{{ t('feed.reportTitle') }}</div>
-        <div v-for="r in reportReasons" :key="r" class="sheet__item" @click="doReport(r)">{{ r }}</div>
-        <div class="sheet__cancel" @click="showReport = false">{{ t('feed.cancel') }}</div>
+  <!-- 举报弹层：Teleport 到 body，避免被 .app-root 的 transform/will-change 包含块捕获
+       （真机边缘滑动返回被原生吞 touchend 时 .app-root 残留 will-change，会导致 fixed 弹层错位「不居中/没样式」） -->
+  <teleport to="body">
+    <transition name="fade">
+      <div v-if="showReport" class="sheet-mask" @click="showReport = false">
+        <div class="sheet" @click.stop>
+          <div class="sheet__title">{{ t('feed.reportTitle') }}</div>
+          <div v-for="r in reportReasons" :key="r" class="sheet__item" @click="doReport(r)">{{ r }}</div>
+          <div class="sheet__cancel" @click="showReport = false">{{ t('feed.cancel') }}</div>
+        </div>
       </div>
-    </div>
-  </transition>
+    </transition>
+  </teleport>
 
   <!-- toast -->
   <transition name="fade">
