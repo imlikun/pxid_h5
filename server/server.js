@@ -857,6 +857,9 @@ app.get('/users/:deviceId', (req, res) => {
   const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE followee_device=?').get(deviceId).c
   const isFollowing = myDevice ? !!db.prepare('SELECT 1 FROM follows WHERE follower_device=? AND followee_device=?').get(myDevice, deviceId) : false
   const isSelf = myDevice === deviceId
+  // 四宫格计数：发布数（公开动态数）/ 收藏数（仅自己可见，他人返回 0 不泄露私密）
+  const feedCount = db.prepare("SELECT COUNT(*) c FROM feeds WHERE device_id=? AND status='published'").get(deviceId).c
+  const favoriteCount = isSelf ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=?').get(deviceId).c : 0
   res.json(ok({
     deviceId,
     nickname: profile.nickname || (feed && feed.nickname) || '骑友',
@@ -864,6 +867,8 @@ app.get('/users/:deviceId', (req, res) => {
     carModel: profile.carModel || (feed && feed.car_model) || '',
     followeeCount,
     followerCount,
+    feedCount,
+    favoriteCount,
     isFollowing,
     isSelf,
   }))

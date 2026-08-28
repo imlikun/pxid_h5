@@ -14,10 +14,6 @@
           <span v-if="isSelf" class="u-me">我</span>
         </div>
         <div v-if="user && user.carModel" class="u-car">#{{ user.carModel }}</div>
-        <div class="u-stats">
-          <span class="u-stat" @click="gotoTab('follow')"><b>{{ user ? user.followeeCount : 0 }}</b> 关注</span>
-          <span class="u-stat" @click="gotoTab('followers')"><b>{{ user ? user.followerCount : 0 }}</b> 粉丝</span>
-        </div>
       </div>
       <!-- 自己：编辑资料；他人：关注 + 发消息 + 更多菜单 -->
       <div class="u-actions">
@@ -38,10 +34,26 @@
       </div>
     </div>
 
-    <!-- 分段 Tab -->
-    <div class="u-tabs">
+    <!-- 四宫格：发布 / 收藏 / 关注 / 粉丝 -->
+    <div class="u-grid">
+      <div class="u-grid__item" :class="{ on: activeGrid === 'publish' }" @click="selectGrid('publish')">
+        <b>{{ user ? user.feedCount : 0 }}</b><span>发布</span>
+      </div>
+      <div v-if="isSelf" class="u-grid__item" :class="{ on: activeGrid === 'favorites' }" @click="selectGrid('favorites')">
+        <b>{{ user ? user.favoriteCount : 0 }}</b><span>收藏</span>
+      </div>
+      <div class="u-grid__item" :class="{ on: activeGrid === 'follow' }" @click="selectGrid('follow')">
+        <b>{{ user ? user.followeeCount : 0 }}</b><span>关注</span>
+      </div>
+      <div class="u-grid__item" :class="{ on: activeGrid === 'followers' }" @click="selectGrid('followers')">
+        <b>{{ user ? user.followerCount : 0 }}</b><span>粉丝</span>
+      </div>
+    </div>
+
+    <!-- 发布子 Tab（仅 activeGrid=publish 时显示；足迹仅自己可见）-->
+    <div v-if="activeGrid === 'publish'" class="u-tabs">
       <button
-        v-for="t in tabs"
+        v-for="t in publishTabs"
         :key="t.key"
         class="u-tab"
         :class="{ on: activeTab === t.key }"
@@ -51,8 +63,8 @@
 
     <!-- 内容区 -->
     <div class="u-body">
-      <!-- feed 型 Tab：动态 / 赞过 / 收藏 / 足迹 -->
-      <template v-if="isFeedTab">
+      <!-- feed 型：动态 / 赞过 / 足迹 / 收藏 -->
+      <template v-if="isFeedList">
         <template v-if="feedList.length">
           <MomentCard v-for="it in feedList" :key="it.id" :item="it" />
           <div v-if="loadingMore" class="u-more">加载中…</div>
@@ -88,7 +100,6 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import MomentCard from '../components/MomentCard.vue'
-import { t } from '../i18n'
 import { getDeviceId } from '../api/feed'
 import {
   fetchUserProfile,
@@ -110,41 +121,37 @@ const router = useRouter()
 const user = ref(null)
 const isSelf = computed(() => route.params.id === 'me' || (user.value && user.value.isSelf))
 
-// ---- Tab 定义（私密性：足迹仅自己可见）----
-const FEED_TABS = ['dynamic', 'liked', 'favorites', 'footprints']
-const tabs = computed(() =>
+// ---- 一级：四宫格 ----
+const activeGrid = ref('publish') // publish | favorites | follow | followers
+// ---- 二级：发布子 Tab（动态 / 赞过 / 足迹[仅自己]）----
+const publishTabs = computed(() =>
   isSelf.value
     ? [
         { key: 'dynamic', label: '动态' },
         { key: 'liked', label: '赞过' },
-        { key: 'favorites', label: '收藏' },
-        { key: 'follow', label: '关注' },
-        { key: 'followers', label: '粉丝' },
         { key: 'footprints', label: '足迹' },
       ]
     : [
         { key: 'dynamic', label: '动态' },
         { key: 'liked', label: '赞过' },
-        { key: 'favorites', label: '收藏' },
-        { key: 'follow', label: '关注' },
-        { key: 'followers', label: '粉丝' },
       ]
 )
-const isFeedTab = computed(() => FEED_TABS.includes(activeTab.value))
+const activeTab = ref('dynamic') // dynamic | liked | footprints
+const isFeedList = computed(() => activeGrid.value === 'publish' || activeGrid.value === 'favorites')
+
 const emptyText = computed(() => {
+  if (activeGrid.value === 'favorites') return '还没有收藏的内容'
+  if (activeGrid.value === 'follow') return '还没有关注的人'
+  if (activeGrid.value === 'followers') return '还没有粉丝'
   const map = {
     dynamic: '暂无动态',
     liked: '还没有点赞过的内容',
-    favorites: '还没有收藏的内容',
     footprints: '还没有浏览记录',
-    follow: '还没有关注的人',
-    followers: '还没有粉丝',
   }
   return map[activeTab.value] || '暂无内容'
 })
 
 // ---- 状态 ----
-const activeTab = ref('dynamic')
 const feedList = ref([])
 const userList = ref([])
 const feedLoading = ref(true)
@@ -170,11 +177,26 @@ function goBack() {
   if (window.history.length > 1) router.back()
   else router.push('/discover')
 }
-function gotoTab(key) {
-  activeTab.value = key
-}
 function gotoUser(deviceId) {
   if (deviceId) router.push('/user/' + encodeURIComponent(deviceId))
+}
+
+// ---- 一级切换 ----
+function selectGrid(key) {
+  if (key === 'favorites' && !isSelf.value) return
+  if (key === activeGrid.value) return
+  activeGrid.value = key
+  menuOpen.value = false
+  if (key === 'publish' && !publishTabs.value.some((t) => t.key === activeTab.value)) {
+    activeTab.value = 'dynamic'
+  }
+  loadContent(true)
+}
+// ---- 二级切换（仅发布区）----
+function onTab(key) {
+  if (key === activeTab.value) return
+  activeTab.value = key
+  loadContent(true)
 }
 
 // ---- 加载 ----
@@ -185,19 +207,20 @@ async function loadProfile() {
   if (!user.value) showToast('用户信息加载失败')
 }
 
-async function loadTab(reset = true) {
-  const k = activeTab.value
-  if (FEED_TABS.includes(k)) {
+async function loadContent(reset = true) {
+  const grid = activeGrid.value
+  feedLoading.value = true
+  if (grid === 'publish' || grid === 'favorites') {
     if (reset) { page.value = 1; feedList.value = []; hasMore.value = true }
-    if (loadingMore.value || !hasMore.value) return
+    if (loadingMore.value || !hasMore.value) { feedLoading.value = false; return }
     loadingMore.value = true
     try {
       const d = targetDevice.value
       let r = { list: [], total: 0 }
-      if (k === 'dynamic') r = await fetchUserFeeds(d, { page: page.value, pageSize: PAGE_SIZE })
-      else if (k === 'liked') r = await fetchLikedFeeds({ page: page.value, pageSize: PAGE_SIZE })
-      else if (k === 'favorites') r = await fetchFavorites({ page: page.value, pageSize: PAGE_SIZE })
-      else if (k === 'footprints') r = await fetchFootprints({ page: page.value, pageSize: PAGE_SIZE })
+      if (grid === 'favorites') r = await fetchFavorites({ page: page.value, pageSize: PAGE_SIZE })
+      else if (activeTab.value === 'dynamic') r = await fetchUserFeeds(d, { page: page.value, pageSize: PAGE_SIZE })
+      else if (activeTab.value === 'liked') r = await fetchLikedFeeds({ page: page.value, pageSize: PAGE_SIZE })
+      else if (activeTab.value === 'footprints') r = await fetchFootprints({ page: page.value, pageSize: PAGE_SIZE })
       const list = r.list || []
       feedList.value = reset ? list : feedList.value.concat(list)
       hasMore.value = list.length >= PAGE_SIZE && feedList.value.length < (r.total || Infinity)
@@ -207,18 +230,11 @@ async function loadTab(reset = true) {
       feedLoading.value = false
     }
   } else {
-    // 用户型 Tab：关注 / 粉丝
     const d = targetDevice.value
-    const list = k === 'follow' ? await fetchFollowList(d) : await fetchFollowers(d)
+    const list = grid === 'follow' ? await fetchFollowList(d) : await fetchFollowers(d)
     userList.value = list || []
+    feedLoading.value = false
   }
-}
-
-function onTab(key) {
-  if (key === activeTab.value) return
-  activeTab.value = key
-  menuOpen.value = false
-  loadTab(true)
 }
 
 async function onToggleFollow() {
@@ -256,21 +272,36 @@ function onBlock() {
 }
 
 function onScroll() {
-  if (!isFeedTab.value || loadingMore.value || !hasMore.value) return
-  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 120) loadTab(false)
+  if (!isFeedList.value || loadingMore.value || !hasMore.value) return
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 120) loadContent(false)
+}
+
+// ---- 查询透传（App「我的」四宫格链接带 ?tab=&sub= 直接进对应页）----
+function applyQuery() {
+  const qTab = String(route.query.tab || '')
+  const qSub = String(route.query.sub || '')
+  if (['publish', 'favorites', 'follow', 'followers'].includes(qTab)) {
+    if (!(qTab === 'favorites' && !isSelf.value)) activeGrid.value = qTab
+  }
+  if (['dynamic', 'liked', 'footprints'].includes(qSub)) {
+    if (!(qSub === 'footprints' && !isSelf.value)) activeTab.value = qSub
+  }
 }
 
 watch(() => route.params.id, async () => {
   // 跨用户进入时重置
+  activeGrid.value = 'publish'
   activeTab.value = 'dynamic'
   userList.value = []
+  applyQuery()
   await loadProfile()
-  await loadTab(true)
+  await loadContent(true)
 })
 
 onMounted(async () => {
+  applyQuery()
   await loadProfile()
-  await loadTab(true)
+  await loadContent(true)
   window.addEventListener('scroll', onScroll, { passive: true })
 })
 onUnmounted(() => {
@@ -328,8 +359,6 @@ onUnmounted(() => {
   font-weight: 600;
 }
 .u-car { font-size: 12px; color: var(--text-sub); margin-top: 3px; }
-.u-stats { display: flex; gap: 16px; margin-top: 8px; font-size: 13px; color: var(--text-sub); }
-.u-stat b { color: var(--text); font-size: 15px; }
 
 /* 操作区 */
 .u-actions { flex: none; display: flex; align-items: center; gap: 8px; }
@@ -371,7 +400,30 @@ onUnmounted(() => {
 }
 .u-menu__item:active { background: #f5f6f8; }
 
-/* ---- Tab 条 ---- */
+/* ---- 四宫格 ---- */
+.u-grid {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+.u-grid__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease;
+}
+.u-grid__item b { font-size: 17px; color: var(--text); font-weight: 700; }
+.u-grid__item span { font-size: 12px; color: var(--text-sub); }
+.u-grid__item.on { border-bottom-color: var(--brand, #4a6cf7); }
+.u-grid__item.on b,
+.u-grid__item.on span { color: var(--brand, #4a6cf7); }
+
+/* ---- 发布子 Tab 条 ---- */
 .u-tabs {
   display: flex;
   gap: 4px;
