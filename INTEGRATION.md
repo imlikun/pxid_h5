@@ -127,6 +127,16 @@
 - **我的车 `carModel`**：H5 第一方案读 `getUserInfo().carModel`，Flutter 未返回时回退 `localStorage`（仅兜底）。
 - **token 不自签**：H5 已废弃自签 deviceId，登录态完全靠 Flutter 经 `getToken` / `getUserInfo` 注入。
 
+### 1.6 个人主页（H5 已上线，路由 `/user/:id`）
+
+- **页面**：`src/views/UserProfileView.vue` —— 资料卡（头像/昵称/「我」角标/车型标签/关注数/粉丝数/关注按钮）+ 动态流（复用 `MomentCard`，按 `device_id` 过滤后端 `/feeds?deviceId=`）。
+- **路由**：`/user/:id` 他人主页；`/user/me` 自己的主页（App「我的」tab 入口）。
+- **用户标识统一用 `device_id`（非昵称）**：后端 `/users/:deviceId` 返回资料，`fetchUserFeeds(deviceId)` 返回动态流。
+- **入口分两类**：
+  - H5 内点击（作者头像/昵称、`@用户`、互动消息 actor）→ 直接 `router.push('/user/<deviceId>')`，**不依赖原生**；
+  - 原生侧入口（Flutter 推送/消息里的 @）→ `openNative('user/<deviceId>')`，原生收到后**让 WebView 导航到 `/user/<deviceId>`**（原生把 deviceId 透传给 H5 路由，不自己渲染）。
+- **`@用户` 已修复**（2026-08-28 `c91aa17`）：发布时 `mentions` 带 `deviceId`，后端返回原样对象数组，解析 `@昵称` 反查 `deviceId` 后 H5 内跳转；旧注释「用户主页归原生承载 / H5 暂无用户页」已删除。
+
 ---
 
 ## 🟠 问题或者卡点（Flutter 对接还差什么、有哪些坑）
@@ -146,7 +156,7 @@
 
 ### 2.4 车型 / @用户 / 我的动态 边界
 - **我的车**：H5 第一方案 `getUserInfo().carModel`，Flutter 必须返回真实在售车型代号（F1/F2/P1/P2/P3/P4/P5/P6/P7/P8/G1/P9）。
-- **@用户**：`FeedDetailView` 调 `openNative('user/<name>')`，原生需承载用户主页。
+- **@用户 / 个人主页**：用户主页是 **H5 页面**（`UserProfileView`），**不是原生页**。H5 内点击作者头像/昵称/`@用户`/互动消息 → `router.push('/user/<deviceId>')`；原生侧入口走 `openNative('user/<deviceId>')` 透传 WebView（见 🔴.6 / 🟢.11）。
 - **我的动态**：H5 目前没有入口/路由，**需产品定夺**落点（跳 H5 还是原生页）。
 
 ### 2.5 服务类标识：H5 内已无法触发
@@ -184,7 +194,7 @@
 6. **积分 WebView**：「我的」页 WebView 打开 `#/points`、隐藏原生返回键、注入 `PXIDApp` 并响应 `closeWebView`。
 7. **商城结账**：当前阶段实现 `openShopify(url)` 即可——在 WebView 内打开 Shopify 结账 URL（由后端生成），保留返回按钮让用户能回 H5。
 8. **确认两件事（由产品负责人/坤哥定夺，H5 配合实现）**：
-   - **「我的动态」入口落点**：跳 H5 路由还是原生页？跳 H5 的话需新增路由并登记 `openNative` 标识（如 `user/<id>/moments`）。
+   - **「我的动态」入口**：**已落地**——`/user/me` 即「我的动态流」（H5 个人主页）。Flutter「我的」tab 进自己的主页：让 WebView 打开 `#/user/me`（或 `openNative('user/me')` 透传），无需新增路由。
    - **服务类标识是否保留原生入口**：`service/*`、`vehicle/check`、`vehicle/bind`、`manual/download`、`rescue/submit` 在 H5 内已无法触发，若原生 App 仍有入口，由原生自己决定承载方式，H5 无需改动。
 
 ---
@@ -283,6 +293,14 @@ window.PXIDApp = {
 3. H5 页内返回按钮：所有二级页顶部保留返回箭头，点击调 `history.back()`；原生应保证状态栏/刘海区域不遮挡该按钮。
 4. 切后台点击失效 bug 已修（见 🔴.5），Flutter 正常嵌 WebView 即可，无需额外处理。
 
+### 4.11 个人主页（H5 已上线，Flutter 需配合透传）
+
+1. H5 已完整实现 `UserProfileView`（`/user/:id` 他人、`/user/me` 自己），含资料卡 + 动态流 + 关注/取关。
+2. **H5 内入口已全部打通**：作者头像/昵称（`FeedCard`/`MomentCard`/`InteractionView`/`FeedDetailView`）、`@用户` 富文本 → `router.push('/user/<deviceId>')`。
+3. **原生侧入口**：Flutter 若需从原生页面（推送/消息/@提及）进入 H5 用户主页，调 `openNative('user/<deviceId>')`，收到后**让承载 H5 的 WebView 导航到 `#/user/<deviceId>`**（不要自己渲染用户页）。`deviceId` 用真机 `getUserInfo`/后端返回的 deviceId，勿用昵称。
+4. **「我的」tab**：进入自己的主页，让 WebView 打开 `#/user/me`（或 `openNative('user/me')`）；`/user/me` 内部用本机 `getDeviceId()` 识别自己。
+5. **标识统一 `device_id`**：所有 `user/<xxx>` 参数必须是 device_id（后端按 device_id 存/查），昵称会改、会重名，不可用于路由。
+
 ### 4.10 视觉规范
 
 - H5 颜色/字号/圆角/间距统一走 `tokens.css` 令牌，依据《ToC App 视觉开发规范》。
@@ -303,7 +321,9 @@ window.PXIDApp = {
 - [ ] 未登录点赞 / 评论 / 关注 → 跳原生登录 → 返回后已登录（无刷新）。
 - [ ] `getUserInfo` 返回 `email` / `nickname` / `avatar` / `carModel` 真实值（打印确认）。
 - [ ] 商品「去购买」→ `openShopify` 打开 Shopify 结账，可返回。
-- [ ] @用户 → `openNative('user/<name>')` 跳用户主页。
+- [ ] 作者头像/昵称、`@用户`、互动消息 actor → 进 H5 个人主页 `/user/<deviceId>`（真机验证可跳转、资料卡+动态流正常）。
+- [ ] 「我的」tab → 进自己的主页 `#/user/me`。
+- [ ] 原生侧 `openNative('user/<deviceId>')` 能让 WebView 跳到对应 H5 个人主页。
 - [ ] 积分页「我的」入口 WebView 打开 → 顶部返回键 `PXIDApp.postMessage('closeWebView')` 关 WebView 回「我的」。
 - [ ] 多语言 / 货币按 `getLocale` 返回初始化。
 - [ ] 视觉与《ToC App 视觉开发规范》一致。
