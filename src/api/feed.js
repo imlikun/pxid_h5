@@ -123,18 +123,6 @@ export async function fetchFeedDetail(id) {
   return all.find((i) => String(i.id) === String(id)) || null
 }
 
-// ---- 点赞 ----
-// TODO: dead code —— FeedDetailView.onLike 直接 fetch /feed/:id/like（带身份），此函数无调用方，待清理
-export async function likeFeed(id) {
-  if (!FEED_API) return { ok: false }
-  try {
-    await request('/feed/' + id + '/like', { method: 'POST', body: {} })
-    return { ok: true }
-  } catch (e) {
-    return { ok: false, message: e.message || '操作失败' }
-  }
-}
-
 // ---- 评论 ----
 export async function commentFeed(id, text, { parentId = 0 } = {}) {
   if (!FEED_API) return { ok: false }
@@ -285,5 +273,89 @@ export async function fetchUserFeeds(deviceId, params = {}) {
     return { list: (data.list || []).map(normalize), total: data.total || 0 }
   } catch (e) {
     return { list: [], total: 0 }
+  }
+}
+
+// ---- 个人主页六 Tab 数据（H5 自管后端，requireAuth）----
+// 赞过：GET /feed/liked（仅本人）
+export async function fetchLikedFeeds(params = {}) {
+  if (!FEED_API) return { list: [], total: 0 }
+  try {
+    const qs = new URLSearchParams(params).toString()
+    const data = await request('/feed/liked' + (qs ? '?' + qs : ''))
+    return { list: (data.list || []).map(normalize), total: data.total || 0 }
+  } catch (e) {
+    return { list: [], total: 0 }
+  }
+}
+// 收藏：GET /favorites（仅本人）
+export async function fetchFavorites(params = {}) {
+  if (!FEED_API) return { list: [], total: 0 }
+  try {
+    const qs = new URLSearchParams(params).toString()
+    const data = await request('/favorites' + (qs ? '?' + qs : ''))
+    return { list: (data.list || []).map(normalize), total: data.total || 0 }
+  } catch (e) {
+    return { list: [], total: 0 }
+  }
+}
+// 足迹：GET /footprints（仅本人）
+export async function fetchFootprints(params = {}) {
+  if (!FEED_API) return { list: [], total: 0 }
+  try {
+    const qs = new URLSearchParams(params).toString()
+    const data = await request('/footprints' + (qs ? '?' + qs : ''))
+    return { list: (data.list || []).map(normalize), total: data.total || 0 }
+  } catch (e) {
+    return { list: [], total: 0 }
+  }
+}
+// 关注列表：GET /follow/list（公开，返回对象数组）
+export async function fetchFollowList(deviceId) {
+  if (!FEED_API || !deviceId) return []
+  try {
+    const data = await request('/follow/list?device=' + encodeURIComponent(deviceId))
+    return data.list || []
+  } catch (e) {
+    return []
+  }
+}
+// 粉丝列表：GET /follow/followers（公开，返回对象数组）
+export async function fetchFollowers(deviceId) {
+  if (!FEED_API || !deviceId) return []
+  try {
+    const data = await request('/follow/followers?device=' + encodeURIComponent(deviceId))
+    return data.list || []
+  } catch (e) {
+    return []
+  }
+}
+// 收藏 toggle：POST /feed/:id/favorite → { favorited }
+export async function toggleFavorite(feedId, favorited) {
+  if (!FEED_API) return { ok: false }
+  try {
+    const data = await request('/feed/' + feedId + '/favorite', { method: 'POST', body: { favorited } })
+    return { ok: true, favorited: !!(data && data.favorited) }
+  } catch (e) {
+    return { ok: false, message: e.message || '操作失败' }
+  }
+}
+// 记录浏览足迹：POST /footprints
+export async function recordFootprint(feedId) {
+  if (!FEED_API || !feedId) return
+  try {
+    await request('/footprints', { method: 'POST', body: { feedId } })
+  } catch (e) { /* 静默失败，不影响阅读 */ }
+}
+
+// ---- 点赞（H5 自管：统一走后端，落 feed_likes 关系表）----
+// 供 MomentCard / 详情页共用；返回最新 isLiked/likes（替代旧的 openNative 委托，避免双源不一致）
+export async function likeFeed(id, { liked = true, nickname = '', avatar = '' } = {}) {
+  if (!FEED_API) return { ok: false }
+  try {
+    const data = await request('/feed/' + id + '/like', { method: 'POST', body: { liked, nickname, avatar } })
+    return { ok: true, isLiked: !!(data && data.isLiked), likes: data && data.likes }
+  } catch (e) {
+    return { ok: false, message: e.message || '操作失败' }
   }
 }

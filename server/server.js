@@ -190,6 +190,32 @@ CREATE TABLE IF NOT EXISTS follows (
   created_at TEXT NOT NULL,
   UNIQUE(follower_device, followee_device)
 );
+-- 用户级点赞关系（H5 自管，支撑「赞过」Tab；feeds.likes 计数器由本表实时汇总，避免双源不一致）
+CREATE TABLE IF NOT EXISTS feed_likes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  device_id TEXT NOT NULL,
+  feed_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(device_id, feed_id)
+);
+-- 收藏关系（H5 自管，支撑「收藏」Tab）
+CREATE TABLE IF NOT EXISTS favorites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  device_id TEXT NOT NULL,
+  feed_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(device_id, feed_id)
+);
+-- 浏览足迹（H5 自管，支撑「足迹」Tab；每设备每动态仅留最新一条，便于去重 + 最近优先）
+CREATE TABLE IF NOT EXISTS footprints (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  device_id TEXT NOT NULL,
+  feed_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_feed_likes_device ON feed_likes(device_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_device ON favorites(device_id);
+CREATE INDEX IF NOT EXISTS idx_footprints_device ON footprints(device_id);
 
 CREATE TABLE IF NOT EXISTS reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -889,22 +915,92 @@ app.get('/feed/:id', (req, res) => {
   res.json(ok(rowToFeed(row)))
 })
 
-// ---- 点赞（切换）----
+// ---- 点赞（切换，H5 自管关系表）----
+// 行为：liked=true 且未赞过 → 写入 feed_likes 并通知作者；liked=false 或已赞 → 移除。
+// feeds.likes 计数器由 feed_likes 实时汇总（REPLACE 式覆盖），杜绝「卡片走原生 / 详情走后端」双源不一致。
 app.post('/feed/:id/like', requireAuth, (req, res) => {
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(req.params.id)
   if (!row) return res.json(err(404, '动态不存在'))
   const deviceId = (req.user && req.user.deviceId) || ''
   const memberUserId = (req.user && req.user.memberUserId) || ''
   const { liked = true, nickname = '', avatar = '' } = req.body || {}
-  const likes = row.likes + (liked ? 1 : -1)
-  db.prepare('UPDATE feeds SET likes=? WHERE id=?').run(Math.max(0, likes), row.id)
-  // 互动消息：点赞通知作者（不通知自己；自检双维度：device 演示态 / memberUserId ToC 态）
-  // 修复：ToC 生产模式下 deviceId 恒为空串，旧逻辑 row.device_id !== deviceId 恒真 → 自己赞自己也通知
+  const already = !!db.prepare('SELECT 1 FROM feed_likes WHERE device_id=? AND feed_id=?').get(deviceId, row.id)
+  let isLiked = already
+  if (liked && !already) {
+    db.prepare('INSERT OR IGNORE INTO feed_likes (device_id, feed_id, created_at) VALUES (?,?,?)').run(deviceId, row.id, now())
+    isLiked = true
+  } else if (!liked && already) {
+    db.prepare('DELETE FROM feed_likes WHERE device_id=? AND feed_id=?').run(deviceId, row.id)
+    isLiked = false
+  }
+  const likes = db.prepare('SELECT COUNT(*) c FROM feed_likes WHERE feed_id=?').get(row.id).c
+  db.prepare('UPDATE feeds SET likes=? WHERE id=?').run(likes, row.id)
+  // 互动消息：仅「新点赞」时通知作者（不通知自己；自检双维度：device 演示态 / memberUserId ToC 态）
   const isSelf = (row.device_id && deviceId && row.device_id === deviceId) || (row.member_user_id && memberUserId && row.member_user_id === memberUserId)
-  if (liked && !isSelf && (row.device_id || row.member_user_id)) {
+  if (liked && !already && !isSelf && (row.device_id || row.member_user_id)) {
     emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'like', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '赞了你的动态' })
   }
-  res.json(ok({ isLiked: !!liked, likes: Math.max(0, likes) }))
+  res.json(ok({ isLiked, likes }))
+})
+
+// ---- 赞过列表（个人主页「赞过」Tab，H5 自管关系表）----
+// GET /feed/liked?page=&pageSize= → { total, list }（仅本人，requireAuth 从 token 取 deviceId；返回项 isLiked 恒 true）
+app.get('/feed/liked', requireAuth, (req, res) => {
+  const deviceId = (req.user && req.user.deviceId) || ''
+  if (!deviceId) return res.json(err(1, '无法识别用户'))
+  const page = Math.max(1, parseInt(req.query.page) || 1)
+  const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
+  const off = (page - 1) * ps
+  const total = db.prepare('SELECT COUNT(*) c FROM feed_likes l JOIN feeds f ON f.id=l.feed_id WHERE l.device_id=? AND f.status=?').get(deviceId, 'published').c
+  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN feed_likes l ON f.id=l.feed_id WHERE l.device_id=? AND f.status=? ORDER BY l.created_at DESC LIMIT ? OFFSET ?`).all(deviceId, 'published', ps, off)
+  res.json(ok({ total, list: rows.map((r) => { const x = rowToFeed(r); x.isLiked = true; return x }) }))
+})
+
+// ---- 收藏 / 足迹（H5 自管关系表，个人主页 Tab）----
+// GET /favorites?page=&pageSize= → { total, list }（仅本人）
+app.get('/favorites', requireAuth, (req, res) => {
+  const deviceId = (req.user && req.user.deviceId) || ''
+  if (!deviceId) return res.json(err(1, '无法识别用户'))
+  const page = Math.max(1, parseInt(req.query.page) || 1)
+  const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
+  const off = (page - 1) * ps
+  const total = db.prepare('SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE v.device_id=? AND f.status=?').get(deviceId, 'published').c
+  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN favorites v ON f.id=v.feed_id WHERE v.device_id=? AND f.status=? ORDER BY v.created_at DESC LIMIT ? OFFSET ?`).all(deviceId, 'published', ps, off)
+  res.json(ok({ total, list: rows.map(rowToFeed) }))
+})
+// POST /feed/:id/favorite → 收藏/取消 toggle → { favorited }
+app.post('/feed/:id/favorite', requireAuth, (req, res) => {
+  const row = db.prepare('SELECT 1 FROM feeds WHERE id=?').get(req.params.id)
+  if (!row) return res.json(err(404, '动态不存在'))
+  const deviceId = (req.user && req.user.deviceId) || ''
+  const { favorited = true } = req.body || {}
+  const already = !!db.prepare('SELECT 1 FROM favorites WHERE device_id=? AND feed_id=?').get(deviceId, req.params.id)
+  if (favorited && !already) db.prepare('INSERT OR IGNORE INTO favorites (device_id, feed_id, created_at) VALUES (?,?,?)').run(deviceId, req.params.id, now())
+  else if (!favorited && already) db.prepare('DELETE FROM favorites WHERE device_id=? AND feed_id=?').run(deviceId, req.params.id)
+  const isFav = db.prepare('SELECT 1 FROM favorites WHERE device_id=? AND feed_id=?').get(deviceId, req.params.id)
+  res.json(ok({ favorited: !!isFav }))
+})
+// POST /footprints → 记录浏览足迹（每设备每动态仅留最新一条）
+app.post('/footprints', requireAuth, (req, res) => {
+  const { feedId } = req.body || {}
+  if (!feedId) return res.json(err(1, '缺少 feedId'))
+  const row = db.prepare('SELECT 1 FROM feeds WHERE id=?').get(feedId)
+  if (!row) return res.json(err(404, '动态不存在'))
+  const deviceId = (req.user && req.user.deviceId) || ''
+  db.prepare('DELETE FROM footprints WHERE device_id=? AND feed_id=?').run(deviceId, feedId)
+  db.prepare('INSERT INTO footprints (device_id, feed_id, created_at) VALUES (?,?,?)').run(deviceId, feedId, now())
+  res.json(ok({ ok: true }))
+})
+// GET /footprints?page=&pageSize= → { total, list }（最近浏览，去重，最新优先）
+app.get('/footprints', requireAuth, (req, res) => {
+  const deviceId = (req.user && req.user.deviceId) || ''
+  if (!deviceId) return res.json(err(1, '无法识别用户'))
+  const page = Math.max(1, parseInt(req.query.page) || 1)
+  const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
+  const off = (page - 1) * ps
+  const total = db.prepare('SELECT COUNT(*) c FROM footprints p JOIN feeds f ON f.id=p.feed_id WHERE p.device_id=? AND f.status=?').get(deviceId, 'published').c
+  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN footprints p ON f.id=p.feed_id WHERE p.device_id=? AND f.status=? ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(deviceId, 'published', ps, off)
+  res.json(ok({ total, list: rows.map(rowToFeed) }))
 })
 
 // ---- 评论 ----
@@ -2159,11 +2255,32 @@ app.delete('/follow', requireAuth, (req, res) => {
   db.prepare('DELETE FROM follows WHERE follower_device=? AND followee_device=?').run(followerDevice, followeeDevice)
   res.json(ok({ following: false }))
 })
+// 解析某 deviceId 的公开简介（昵称/头像/车型），优先 user_profiles，回退最新发帖
+function userBrief(deviceId) {
+  const profile = resolveProfile({ deviceId, memberUserId: '', storedNickname: '', storedAvatar: '' })
+  const feed = !profile.nickname || profile.nickname === '骑友'
+    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(deviceId)
+    : null
+  return {
+    deviceId,
+    nickname: profile.nickname || (feed && feed.nickname) || '骑友',
+    avatar: profile.avatar || (feed && feed.avatar) || '',
+    carModel: profile.carModel || (feed && feed.car_model) || '',
+  }
+}
+// 关注列表：返回对象数组（头像/昵称/车型），便于 H5 直接渲染
 app.get('/follow/list', (req, res) => {
   const { device } = req.query
   if (!device) return res.json(err(1, '缺少 device'))
-  const rows = db.prepare('SELECT followee_device FROM follows WHERE follower_device=?').all(device)
-  res.json(ok({ list: rows.map((r) => r.followee_device) }))
+  const rows = db.prepare('SELECT followee_device FROM follows WHERE follower_device=? ORDER BY created_at DESC').all(device)
+  res.json(ok({ list: rows.map((r) => userBrief(r.followee_device)) }))
+})
+// 粉丝列表：关注我的人（同结构）
+app.get('/follow/followers', (req, res) => {
+  const { device } = req.query
+  if (!device) return res.json(err(1, '缺少 device'))
+  const rows = db.prepare('SELECT follower_device FROM follows WHERE followee_device=? ORDER BY created_at DESC').all(device)
+  res.json(ok({ list: rows.map((r) => userBrief(r.follower_device)) }))
 })
 app.get('/follow/check', (req, res) => {
   const { follower, followee } = req.query

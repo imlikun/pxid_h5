@@ -48,9 +48,18 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
           <span>{{ item.comments }}</span>
         </span>
+        <span class="m-act" :class="{ fav: favorited }" @click.stop="onFavorite">
+          <svg viewBox="0 0 24 24" width="16" height="16" :fill="favorited ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        </span>
+        <span class="m-act" @click.stop="onShare">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>
+        </span>
       </div>
     </div>
   </div>
+  <transition name="fade">
+    <div v-if="toast" class="m-toast">{{ toast }}</div>
+  </transition>
 </template>
 
 <script setup>
@@ -60,6 +69,7 @@ import bridge from '../bridge'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 import { mediaUrl } from '../storage'
 import { requireLogin } from '../utils/auth'
+import { likeFeed, toggleFavorite } from '../api/feed'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -68,6 +78,14 @@ const router = useRouter()
 
 const liked = ref(!!props.item.isLiked)
 const likeCount = ref(props.item.likes || 0)
+const favorited = ref(!!props.item.isFavorited)
+const toast = ref('')
+let toastTimer = null
+function showToast(m) {
+  toast.value = m
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toast.value = ''), 1600)
+}
 
 // 图列表兜底：原 images 数组；空就放占位图（FALLBACK）防 m-imgs 区域空白
 const FALLBACK = import.meta.env.BASE_URL + 'feed_default.jpg'
@@ -107,9 +125,42 @@ function onCar(model) {
 async function onLike() {
   const ok = await requireLogin()
   if (!ok) return
-  liked.value = !liked.value
-  likeCount.value += liked.value ? 1 : -1
-  bridge.openNative('feed/interact?type=like&id=' + props.item.id)
+  const next = !liked.value
+  liked.value = next
+  likeCount.value += next ? 1 : -1
+  // H5 自管：统一走后端 /feed/:id/like（落 feed_likes 关系表），不再委托 Flutter，保证「赞过」可查
+  const profile = await bridge.getUserInfo().catch(() => ({ nickname: '', avatar: '' }))
+  const r = await likeFeed(props.item.id, { liked: next, nickname: profile.nickname || '', avatar: profile.avatar || '' })
+  if (!r.ok) {
+    liked.value = !next
+    likeCount.value -= next ? 1 : -1
+    showToast('点赞失败，请重试')
+  } else {
+    liked.value = !!r.isLiked
+    if (typeof r.likes === 'number') likeCount.value = r.likes
+  }
+}
+async function onFavorite() {
+  const ok = await requireLogin()
+  if (!ok) return
+  const next = !favorited.value
+  favorited.value = next
+  const r = await toggleFavorite(props.item.id, next)
+  if (!r.ok) {
+    favorited.value = !next
+    showToast('收藏失败，请重试')
+  } else {
+    favorited.value = !!r.favorited
+    showToast(favorited.value ? '已收藏' : '已取消收藏')
+  }
+}
+async function onShare() {
+  // 唤起原生分享面板（契约 openNative('share/feed?id=')），无原生能力时静默降级
+  try {
+    await bridge.openNative('share/feed?id=' + props.item.id)
+  } catch (e) {
+    showToast('当前环境不支持分享')
+  }
 }
 async function onFollow() {
   const ok = await requireLogin()
@@ -245,4 +296,22 @@ async function onFollow() {
   color: var(--text-hint);
 }
 .m-act.liked { color: var(--price); }
+.m-act.fav { color: var(--price); }
+.m-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 15%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  z-index: 9999;
+  white-space: nowrap;
+}
+.fade-enter-active,
+.fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from,
+.fade-leave-to { opacity: 0; }
 </style>

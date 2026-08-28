@@ -218,7 +218,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
 import { t } from '../i18n'
-import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds } from '../api/feed'
+import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint } from '../api/feed'
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
@@ -392,6 +392,8 @@ async function load() {
         if (data.deviceId) {
           try { followed.value = await checkFollow(data.deviceId) } catch (e) {}
         }
+        // 记录浏览足迹（H5 自管，个人主页「足迹」Tab 用；静默失败不影响阅读）
+        recordFootprint(id.value)
       }
     } catch (e) { /* keep null → show empty */ }
     if (item.value) {
