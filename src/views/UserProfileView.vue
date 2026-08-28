@@ -5,7 +5,7 @@
     <!-- 用户资料卡 -->
     <div class="u-head">
       <div class="u-avatar">
-        <img v-if="user && user.avatar" :src="user.avatar" :alt="user.nickname" />
+        <img v-if="user && user.avatar" :src="user.avatar" :alt="user.nickname" @error="(e) => handleAvatarError(e, user.nickname)" />
         <span v-else class="u-avatar__ph">{{ avatarText }}</span>
       </div>
       <div class="u-meta">
@@ -52,6 +52,7 @@ import MomentCard from '../components/MomentCard.vue'
 import { t } from '../i18n'
 import { getDeviceId } from '../api/feed'
 import { fetchUserProfile, fetchUserFeeds, followUser, unfollowUser } from '../api/feed'
+import { handleAvatarError } from '../utils/avatar'
 
 const route = useRoute()
 const router = useRouter()

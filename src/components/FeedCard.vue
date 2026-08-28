@@ -8,7 +8,7 @@
     <div class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
       <div class="author" @click.stop="goUser">
-        <img class="avatar" :src="avatarUrl" :alt="item.author" loading="lazy" />
+        <img class="avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
         <span class="name">{{ item.author }}</span>
       </div>
       <span class="like">
@@ -22,7 +22,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { resolveAvatar } from '../utils/avatar'
+import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 import { mediaUrl } from '../storage'
 
 const props = defineProps({

@@ -106,7 +106,7 @@
         <p v-if="!v.reviews.length" class="rv-empty">暂无车主评价，欢迎前往 Shopify 商品页留言</p>
         <div v-for="(r, i) in v.reviews" :key="i" class="review-item">
           <div class="rv-head">
-            <img class="rv-avatar" :src="avatarUrl(r.avatar)" alt="" loading="lazy" />
+            <img class="rv-avatar" :src="avatarUrl(r.avatar)" alt="" loading="lazy" @error="(e) => handleAvatarError(e, r.author)" />
             <div class="rv-info">
               <span class="rv-author">{{ r.author }}</span>
               <span class="rv-time">{{ r.time }}</span>
@@ -167,6 +167,7 @@ import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { fetchProducts, fetchProductDetail, getProductByHandle, sym, initRegion } from '../api/shop'
 import { plazaShowcase, VEHICLE_HANDLES, carModelToHandle } from '../data/mock'
+import { handleAvatarError } from '../utils/avatar'
 
 const router = useRouter()
 const route = useRoute()

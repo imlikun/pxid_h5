@@ -14,7 +14,7 @@
 
     <!-- 作者卡：点作者进个人主页（官方帖无 deviceId 不跳） -->
     <div class="author fade-up stagger-1" @click="goAuthor">
-      <img class="avatar" :src="authorAvatar" :alt="item.author" />
+      <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.value?.author)" />
       <div class="meta">
         <div class="name">
           {{ item.author || t('feed.author.official') }}
@@ -219,7 +219,7 @@ import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, 
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
-import { resolveAvatar } from '../utils/avatar'
+import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 
 const route = useRoute()
 const router = useRouter()

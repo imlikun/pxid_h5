@@ -28,7 +28,7 @@
         @click="onTap(n)"
       >
         <div class="avatar">
-          <img v-if="n.actorAvatar" :src="n.actorAvatar" alt="" />
+          <img v-if="n.actorAvatar" :src="n.actorAvatar" alt="" @error="(e) => handleAvatarError(e, n.actorName)" />
           <span v-else class="avatar__ph">{{ avatarText(n) }}</span>
         </div>
         <div class="body">
@@ -60,6 +60,7 @@ import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import { t } from '../i18n'
 import { fetchNotifications, markNotificationRead, markAllRead } from '../api/notifications'
+import { handleAvatarError } from '../utils/avatar'
 
 const router = useRouter()
 const list = ref([])

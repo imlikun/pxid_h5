@@ -1,6 +1,6 @@
 <template>
   <div class="cnode" :class="{ 'cnode--nested': depth > 0 }" :style="indentStyle">
-    <img class="cnode__avatar" :src="avatarUrl" :alt="node.author" />
+    <img class="cnode__avatar" :src="avatarUrl" :alt="node.author" @error="(e) => handleAvatarError(e, node.author)" />
     <div class="cnode__main">
       <div class="cnode__name">{{ node.author }}</div>
       <div class="cnode__text">{{ node.content }}</div>
@@ -29,7 +29,7 @@
 <script setup>
 import { computed } from 'vue'
 import { t } from '../i18n'
-import { resolveAvatar } from '../utils/avatar'
+import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 
 const props = defineProps({
   node: { type: Object, required: true },
