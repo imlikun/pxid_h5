@@ -313,6 +313,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_profile_device ON user_profiles(device_id)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_profile_member ON user_profiles(member_user_id) WHERE length(member_user_id)>0;
 `)
 
+// ---- 用户资料别名表：记录同一身份用过的昵称+头像，用于历史评论/回复改名后仍能解析到最新资料 ----
+db.exec(`
+CREATE TABLE IF NOT EXISTS profile_aliases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  device_id TEXT NOT NULL DEFAULT '',
+  member_user_id TEXT NOT NULL DEFAULT '',
+  nickname TEXT NOT NULL DEFAULT '',
+  avatar TEXT NOT NULL DEFAULT '',
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_alias_identity_nickname_avatar ON profile_aliases(device_id, member_user_id, nickname, avatar);
+CREATE INDEX IF NOT EXISTS idx_alias_nickname_avatar ON profile_aliases(nickname, avatar);
+`)
+
 // ---- comments / comment_replies 加身份字段（幂等迁移）----
 const commentCols = db.prepare('PRAGMA table_info(comments)').all().map((c) => c.name)
 function addCommentCol(name, def) {
@@ -386,6 +401,25 @@ function safeJsonArr(s) {
   }
 }
 
+function upsertProfileAlias({ deviceId = '', memberUserId = '', nickname = '', avatar = '' }) {
+  const id = String(deviceId || '')
+  const mid = String(memberUserId || '')
+  if (!id && !mid) return
+  const nick = String(nickname || '').slice(0, 20)
+  const ava = String(avatar || '').slice(0, 500)
+  const t = now()
+  const existing = db
+    .prepare('SELECT 1 FROM profile_aliases WHERE device_id=? AND member_user_id=? AND nickname=? AND avatar=?')
+    .get(id, mid, nick, ava)
+  if (existing) {
+    db.prepare('UPDATE profile_aliases SET last_seen_at=? WHERE device_id=? AND member_user_id=? AND nickname=? AND avatar=?')
+      .run(t, id, mid, nick, ava)
+  } else {
+    db.prepare('INSERT INTO profile_aliases (device_id, member_user_id, nickname, avatar, first_seen_at, last_seen_at) VALUES (?,?,?,?,?,?)')
+      .run(id, mid, nick, ava, t, t)
+  }
+}
+
 // ---- 用户资料解析：发帖/评论时 upsert，读取时按身份解析为最新昵称/头像 ----
 function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', avatar = '', carModel = '' }) {
   const id = String(deviceId || '')
@@ -395,12 +429,23 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', 
     ? db.prepare("SELECT * FROM user_profiles WHERE device_id=? AND length(device_id)>0").get(id)
     : db.prepare("SELECT * FROM user_profiles WHERE member_user_id=? AND length(member_user_id)>0").get(mid)
   if (existing) {
+    // 昵称/头像变更前，先把旧资料快照存为 alias，保证历史评论能按旧昵称+头像找到当前身份
+    const oldNick = String(existing.nickname || '')
+    const oldAvatar = String(existing.avatar || '')
+    const newNick = nickname !== undefined ? String(nickname).slice(0, 20) : oldNick
+    const newAvatar = avatar !== undefined ? String(avatar || '').slice(0, 500) : oldAvatar
+    if ((newNick && newNick !== oldNick) || (newAvatar && newAvatar !== oldAvatar)) {
+      upsertProfileAlias({ deviceId, memberUserId, nickname: oldNick, avatar: oldAvatar })
+    }
     const sets = []
     const args = []
-    if (nickname !== undefined) { sets.push('nickname=?'); args.push(String(nickname).slice(0, 20)) }
-    if (avatar !== undefined) { sets.push('avatar=?'); args.push(String(avatar).slice(0, 500)) }
-    if (carModel !== undefined) { sets.push('car_model=?'); args.push(String(carModel).slice(0, 30)) }
-    if (!sets.length) return
+    if (nickname !== undefined) { sets.push('nickname=?'); args.push(newNick) }
+    if (avatar !== undefined) { sets.push('avatar=?'); args.push(newAvatar) }
+    if (carModel !== undefined) { sets.push('car_model=?'); args.push(String(carModel || '').slice(0, 30)) }
+    if (!sets.length) {
+      upsertProfileAlias({ deviceId, memberUserId, nickname: newNick, avatar: newAvatar })
+      return
+    }
     sets.push('updated_at=?')
     args.push(now())
     if (mid) {
@@ -414,6 +459,7 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', 
     db.prepare('INSERT INTO user_profiles (device_id, member_user_id, nickname, avatar, car_model, updated_at) VALUES (?,?,?,?,?,?)')
       .run(id, mid, String(nickname || '骑友').slice(0, 20), String(avatar || '').slice(0, 500), String(carModel || '').slice(0, 30), now())
   }
+  upsertProfileAlias({ deviceId, memberUserId, nickname, avatar })
 }
 
 function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '骑友', storedAvatar = '' }) {
@@ -430,6 +476,13 @@ function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '�
   }
 }
 
+function resolveIdentityByAlias(nickname = '', avatar = '') {
+  const row = db
+    .prepare('SELECT device_id, member_user_id FROM profile_aliases WHERE nickname=? AND avatar=? ORDER BY last_seen_at DESC LIMIT 1')
+    .get(String(nickname).slice(0, 20), String(avatar).slice(0, 500))
+  return row || null
+}
+
 function buildProfileMap(identities) {
   const deviceIds = [...new Set(identities.map((i) => i.deviceId).filter(Boolean))]
   const memberIds = [...new Set(identities.map((i) => i.memberUserId).filter(Boolean))]
@@ -444,11 +497,21 @@ function buildProfileMap(identities) {
     const rows = db.prepare(`SELECT * FROM user_profiles WHERE member_user_id IN (${ph}) AND length(member_user_id)>0`).all(...memberIds)
     rows.forEach((r) => map.set('m:' + r.member_user_id, r))
   }
-  return (deviceId = '', memberUserId = '') => {
+  return (deviceId = '', memberUserId = '', nickname = '', avatar = '') => {
     const mid = String(memberUserId || '')
     const id = String(deviceId || '')
     if (mid && map.has('m:' + mid)) return map.get('m:' + mid)
     if (id && map.has('d:' + id)) return map.get('d:' + id)
+    // 无身份时，用 nickname+avatar 找 alias 对应的 identity，再解析最新资料
+    if (!mid && !id) {
+      const alias = resolveIdentityByAlias(nickname, avatar)
+      if (alias) {
+        const aliasMid = String(alias.member_user_id || '')
+        const aliasId = String(alias.device_id || '')
+        if (aliasMid && map.has('m:' + aliasMid)) return map.get('m:' + aliasMid)
+        if (aliasId && map.has('d:' + aliasId)) return map.get('d:' + aliasId)
+      }
+    }
     return null
   }
 }
@@ -460,26 +523,35 @@ function resolveReplyToName(parentCommentId, fallback = '') {
   return p.nickname || fallback
 }
 
-// ---- 历史评论身份回填 + 用现有 feeds 初始化资料（启动一次，幂等/可重入）----
+function resolveIdentityFromSnapshot(nickname, avatar) {
+  // 1) 优先从 feeds 作者身份匹配（发过帖的用户）
+  const f = db
+    .prepare("SELECT device_id, member_user_id FROM feeds WHERE nickname=? AND avatar=? AND (length(device_id)>0 OR length(member_user_id)>0) ORDER BY id DESC LIMIT 1")
+    .get(nickname, avatar)
+  if (f && (f.device_id || f.member_user_id)) return f
+  // 2) 再用 profile_aliases（记录过该昵称+头像的身份）
+  return resolveIdentityByAlias(nickname, avatar)
+}
+
+// ---- 历史评论身份回填 + 用现有 feeds/aliases 初始化资料（启动一次，幂等/可重入）----
 function backfillCommentIdentity() {
   try {
     const cmtRows = db.prepare("SELECT id, nickname, avatar FROM comments WHERE COALESCE(device_id,'')='' AND COALESCE(member_user_id,'')=''").all()
     const updC = db.prepare('UPDATE comments SET device_id=?, member_user_id=? WHERE id=?')
     for (const r of cmtRows) {
-      const f = db.prepare("SELECT device_id, member_user_id FROM feeds WHERE nickname=? AND avatar=? AND (length(device_id)>0 OR length(member_user_id)>0) ORDER BY id DESC LIMIT 1").get(r.nickname, r.avatar)
-      if (f) updC.run(f.device_id || '', f.member_user_id || '', r.id)
+      const identity = resolveIdentityFromSnapshot(r.nickname, r.avatar)
+      if (identity) updC.run(identity.device_id || '', identity.member_user_id || '', r.id)
     }
     const repRows = db.prepare("SELECT id, nickname, avatar, reply_to, parent_comment_id FROM comment_replies WHERE COALESCE(device_id,'')='' AND COALESCE(member_user_id,'')=''").all()
     const updR = db.prepare('UPDATE comment_replies SET device_id=?, member_user_id=?, reply_to_device_id=?, reply_to_member_user_id=? WHERE id=?')
     for (const r of repRows) {
-      const f = db.prepare("SELECT device_id, member_user_id FROM feeds WHERE nickname=? AND avatar=? AND (length(device_id)>0 OR length(member_user_id)>0) ORDER BY id DESC LIMIT 1").get(r.nickname, r.avatar)
-      const pf = f || { device_id: '', member_user_id: '' }
+      const identity = resolveIdentityFromSnapshot(r.nickname, r.avatar)
       let rtd = '', rtm = ''
       if (r.reply_to) {
         const parent = db.prepare('SELECT device_id, member_user_id FROM comments WHERE id=?').get(r.parent_comment_id)
         if (parent) { rtd = parent.device_id || ''; rtm = parent.member_user_id || '' }
       }
-      updR.run(pf.device_id || '', pf.member_user_id || '', rtd, rtm, r.id)
+      updR.run(identity ? (identity.device_id || '') : '', identity ? (identity.member_user_id || '') : '', rtd, rtm, r.id)
     }
     console.log('[pxid-feed] backfilled comment identities:', cmtRows.length, repRows.length)
   } catch (e) {
@@ -497,6 +569,35 @@ function seedProfilesFromFeeds() {
     console.log('[pxid-feed] seeded profiles from feeds:', rows.length)
   } catch (e) {
     console.error('[pxid-feed] seed profiles from feeds failed:', e.message || e)
+  }
+}
+
+function seedAliasesFromProfiles() {
+  try {
+    const rows = db.prepare('SELECT device_id, member_user_id, nickname, avatar FROM user_profiles').all()
+    for (const r of rows) {
+      if (!r.device_id && !r.member_user_id) continue
+      upsertProfileAlias({ deviceId: r.device_id, memberUserId: r.member_user_id, nickname: r.nickname, avatar: r.avatar })
+    }
+    console.log('[pxid-feed] seeded aliases from profiles:', rows.length)
+  } catch (e) {
+    console.error('[pxid-feed] seed aliases from profiles failed:', e.message || e)
+  }
+}
+
+function seedAliasesFromExistingComments() {
+  try {
+    const cmtRows = db.prepare('SELECT DISTINCT device_id, member_user_id, nickname, avatar FROM comments WHERE (length(device_id)>0 OR length(member_user_id)>0)').all()
+    for (const r of cmtRows) {
+      upsertProfileAlias({ deviceId: r.device_id, memberUserId: r.member_user_id, nickname: r.nickname, avatar: r.avatar })
+    }
+    const repRows = db.prepare('SELECT DISTINCT device_id, member_user_id, nickname, avatar FROM comment_replies WHERE (length(device_id)>0 OR length(member_user_id)>0)').all()
+    for (const r of repRows) {
+      upsertProfileAlias({ deviceId: r.device_id, memberUserId: r.member_user_id, nickname: r.nickname, avatar: r.avatar })
+    }
+    console.log('[pxid-feed] seeded aliases from comments:', cmtRows.length, repRows.length)
+  } catch (e) {
+    console.error('[pxid-feed] seed aliases from comments failed:', e.message || e)
   }
 }
 
@@ -540,7 +641,9 @@ function rowToFeed(r) {
   }
 }
 
-// 启动时一次性：回填历史评论身份 + 用 feeds 初始化用户资料
+// 启动时一次性：回填历史评论身份 + 用 feeds 初始化用户资料 + 初始化别名映射
+seedAliasesFromProfiles()
+seedAliasesFromExistingComments()
 backfillCommentIdentity()
 seedProfilesFromFeeds()
 
@@ -896,9 +999,9 @@ app.get('/feed/:id/comments', (req, res) => {
   })
   res.json(ok({
     list: rows.map((c) => {
-      const cp = getProfile(c.device_id, c.member_user_id)
+      const cp = getProfile(c.device_id, c.member_user_id, c.nickname, c.avatar)
       const replies = (replyMap[c.id] || []).map((r) => {
-        const rp = getProfile(r.device_id, r.member_user_id)
+        const rp = getProfile(r.device_id, r.member_user_id, r.nickname, r.avatar)
         const rtp = getProfile(r.reply_to_device_id, r.reply_to_member_user_id)
         return {
           id: r.id,
