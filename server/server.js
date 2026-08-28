@@ -210,6 +210,7 @@ CREATE TABLE IF NOT EXISTS comment_replies (
   reply_to TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS moderation_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   feed_id INTEGER NOT NULL DEFAULT 0,
@@ -297,6 +298,38 @@ CREATE INDEX IF NOT EXISTS idx_notif_device ON notifications(device_id, id DESC)
 try { db.exec("ALTER TABLE notifications ADD COLUMN member_user_id TEXT NOT NULL DEFAULT ''") } catch (_) {}
 try { db.exec("CREATE INDEX IF NOT EXISTS idx_notif_member ON notifications(member_user_id, id DESC)") } catch (_) {}
 
+// ---- 用户资料表：device / member_user_id 双维度，作为昵称/头像唯一真相源 ----
+db.exec(`
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  device_id TEXT NOT NULL DEFAULT '',
+  member_user_id TEXT NOT NULL DEFAULT '',
+  nickname TEXT NOT NULL DEFAULT '骑友',
+  avatar TEXT NOT NULL DEFAULT '',
+  car_model TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profile_device ON user_profiles(device_id) WHERE length(device_id)>0;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profile_member ON user_profiles(member_user_id) WHERE length(member_user_id)>0;
+`)
+
+// ---- comments / comment_replies 加身份字段（幂等迁移）----
+const commentCols = db.prepare('PRAGMA table_info(comments)').all().map((c) => c.name)
+function addCommentCol(name, def) {
+  if (!commentCols.includes(name)) db.exec(`ALTER TABLE comments ADD COLUMN ${name} ${def}`)
+}
+addCommentCol('device_id', "TEXT NOT NULL DEFAULT ''")
+addCommentCol('member_user_id', "TEXT NOT NULL DEFAULT ''")
+
+const replyCols = db.prepare('PRAGMA table_info(comment_replies)').all().map((c) => c.name)
+function addReplyCol(name, def) {
+  if (!replyCols.includes(name)) db.exec(`ALTER TABLE comment_replies ADD COLUMN ${name} ${def}`)
+}
+addReplyCol('device_id', "TEXT NOT NULL DEFAULT ''")
+addReplyCol('member_user_id', "TEXT NOT NULL DEFAULT ''")
+addReplyCol('reply_to_device_id', "TEXT NOT NULL DEFAULT ''")
+addReplyCol('reply_to_member_user_id', "TEXT NOT NULL DEFAULT ''")
+
 // 启动种子：演示互动消息（device_id='__demo__' 对所有登录用户可见，便于先看效果）
 // 头像池：不同互动者不同头像（unsplash 相对路径，随 H5 站点 /nav/pxid-h5/ 可加载）
 ;(function seedDemoNotifications() {
@@ -352,15 +385,134 @@ function safeJsonArr(s) {
     return s.split(',').map(x => x.trim()).filter(Boolean)
   }
 }
+
+// ---- 用户资料解析：发帖/评论时 upsert，读取时按身份解析为最新昵称/头像 ----
+function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', avatar = '', carModel = '' }) {
+  const id = String(deviceId || '')
+  const mid = String(memberUserId || '')
+  if (!id && !mid) return
+  const existing = id
+    ? db.prepare("SELECT * FROM user_profiles WHERE device_id=? AND length(device_id)>0").get(id)
+    : db.prepare("SELECT * FROM user_profiles WHERE member_user_id=? AND length(member_user_id)>0").get(mid)
+  if (existing) {
+    const sets = []
+    const args = []
+    if (nickname !== undefined) { sets.push('nickname=?'); args.push(String(nickname).slice(0, 20)) }
+    if (avatar !== undefined) { sets.push('avatar=?'); args.push(String(avatar).slice(0, 500)) }
+    if (carModel !== undefined) { sets.push('car_model=?'); args.push(String(carModel).slice(0, 30)) }
+    if (!sets.length) return
+    sets.push('updated_at=?')
+    args.push(now())
+    if (mid) {
+      args.push(mid)
+      db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE member_user_id=? AND length(member_user_id)>0`).run(...args)
+    } else {
+      args.push(id)
+      db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE device_id=? AND length(device_id)>0`).run(...args)
+    }
+  } else {
+    db.prepare('INSERT INTO user_profiles (device_id, member_user_id, nickname, avatar, car_model, updated_at) VALUES (?,?,?,?,?,?)')
+      .run(id, mid, String(nickname || '骑友').slice(0, 20), String(avatar || '').slice(0, 500), String(carModel || '').slice(0, 30), now())
+  }
+}
+
+function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '骑友', storedAvatar = '' }) {
+  const id = String(deviceId || '')
+  const mid = String(memberUserId || '')
+  let p = null
+  if (mid) p = db.prepare("SELECT * FROM user_profiles WHERE member_user_id=? AND length(member_user_id)>0").get(mid)
+  if (!p && id) p = db.prepare("SELECT * FROM user_profiles WHERE device_id=? AND length(device_id)>0").get(id)
+  if (!p) return { nickname: storedNickname || '骑友', avatar: storedAvatar || '', carModel: '' }
+  return {
+    nickname: p.nickname || storedNickname || '骑友',
+    avatar: p.avatar || storedAvatar || '',
+    carModel: p.car_model || '',
+  }
+}
+
+function buildProfileMap(identities) {
+  const deviceIds = [...new Set(identities.map((i) => i.deviceId).filter(Boolean))]
+  const memberIds = [...new Set(identities.map((i) => i.memberUserId).filter(Boolean))]
+  const map = new Map()
+  if (deviceIds.length) {
+    const ph = deviceIds.map(() => '?').join(',')
+    const rows = db.prepare(`SELECT * FROM user_profiles WHERE device_id IN (${ph}) AND length(device_id)>0`).all(...deviceIds)
+    rows.forEach((r) => map.set('d:' + r.device_id, r))
+  }
+  if (memberIds.length) {
+    const ph = memberIds.map(() => '?').join(',')
+    const rows = db.prepare(`SELECT * FROM user_profiles WHERE member_user_id IN (${ph}) AND length(member_user_id)>0`).all(...memberIds)
+    rows.forEach((r) => map.set('m:' + r.member_user_id, r))
+  }
+  return (deviceId = '', memberUserId = '') => {
+    const mid = String(memberUserId || '')
+    const id = String(deviceId || '')
+    if (mid && map.has('m:' + mid)) return map.get('m:' + mid)
+    if (id && map.has('d:' + id)) return map.get('d:' + id)
+    return null
+  }
+}
+
+function resolveReplyToName(parentCommentId, fallback = '') {
+  const parent = db.prepare('SELECT device_id, member_user_id, nickname FROM comments WHERE id=?').get(parentCommentId)
+  if (!parent) return fallback
+  const p = resolveProfile({ deviceId: parent.device_id, memberUserId: parent.member_user_id, storedNickname: parent.nickname, storedAvatar: '' })
+  return p.nickname || fallback
+}
+
+// ---- 历史评论身份回填 + 用现有 feeds 初始化资料（启动一次，幂等/可重入）----
+function backfillCommentIdentity() {
+  try {
+    const cmtRows = db.prepare("SELECT id, nickname, avatar FROM comments WHERE COALESCE(device_id,'')='' AND COALESCE(member_user_id,'')=''").all()
+    const updC = db.prepare('UPDATE comments SET device_id=?, member_user_id=? WHERE id=?')
+    for (const r of cmtRows) {
+      const f = db.prepare("SELECT device_id, member_user_id FROM feeds WHERE nickname=? AND avatar=? AND (length(device_id)>0 OR length(member_user_id)>0) ORDER BY id DESC LIMIT 1").get(r.nickname, r.avatar)
+      if (f) updC.run(f.device_id || '', f.member_user_id || '', r.id)
+    }
+    const repRows = db.prepare("SELECT id, nickname, avatar, reply_to, parent_comment_id FROM comment_replies WHERE COALESCE(device_id,'')='' AND COALESCE(member_user_id,'')=''").all()
+    const updR = db.prepare('UPDATE comment_replies SET device_id=?, member_user_id=?, reply_to_device_id=?, reply_to_member_user_id=? WHERE id=?')
+    for (const r of repRows) {
+      const f = db.prepare("SELECT device_id, member_user_id FROM feeds WHERE nickname=? AND avatar=? AND (length(device_id)>0 OR length(member_user_id)>0) ORDER BY id DESC LIMIT 1").get(r.nickname, r.avatar)
+      const pf = f || { device_id: '', member_user_id: '' }
+      let rtd = '', rtm = ''
+      if (r.reply_to) {
+        const parent = db.prepare('SELECT device_id, member_user_id FROM comments WHERE id=?').get(r.parent_comment_id)
+        if (parent) { rtd = parent.device_id || ''; rtm = parent.member_user_id || '' }
+      }
+      updR.run(pf.device_id || '', pf.member_user_id || '', rtd, rtm, r.id)
+    }
+    console.log('[pxid-feed] backfilled comment identities:', cmtRows.length, repRows.length)
+  } catch (e) {
+    console.error('[pxid-feed] backfill comment identities failed:', e.message || e)
+  }
+}
+
+function seedProfilesFromFeeds() {
+  try {
+    const rows = db.prepare("SELECT DISTINCT device_id, member_user_id FROM feeds WHERE length(nickname)>0 AND (length(device_id)>0 OR length(member_user_id)>0)").all()
+    for (const r of rows) {
+      const latest = db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND member_user_id=? ORDER BY id DESC LIMIT 1').get(r.device_id || '', r.member_user_id || '')
+      if (latest) upsertProfile({ deviceId: r.device_id, memberUserId: r.member_user_id, nickname: latest.nickname, avatar: latest.avatar, carModel: latest.car_model })
+    }
+    console.log('[pxid-feed] seeded profiles from feeds:', rows.length)
+  } catch (e) {
+    console.error('[pxid-feed] seed profiles from feeds failed:', e.message || e)
+  }
+}
+
 function rowToFeed(r) {
+  const isUser = (r.kind || 'user') !== 'official'
+  const profile = isUser && (r.device_id || r.member_user_id)
+    ? resolveProfile({ deviceId: r.device_id, memberUserId: r.member_user_id, storedNickname: r.nickname, storedAvatar: r.avatar })
+    : { nickname: r.nickname, avatar: r.avatar }
   return {
     id: r.id,
     deviceId: r.device_id || '',
     memberUserId: r.member_user_id || '',
     kind: r.kind || 'user',
     itemType: 'moment',
-    author: r.nickname,
-    avatar: r.avatar,
+    author: profile.nickname,
+    avatar: profile.avatar,
     title: (r.content || '').slice(0, 20) || '我的动态',
     content: r.content,
     images: safeJsonArr(r.images),
@@ -387,6 +539,10 @@ function rowToFeed(r) {
     videoCover: r.cover_url || '',
   }
 }
+
+// 启动时一次性：回填历史评论身份 + 用 feeds 初始化用户资料
+backfillCommentIdentity()
+seedProfilesFromFeeds()
 
 function rowToActivity(r) {
   return {
@@ -570,8 +726,11 @@ app.get('/users/:deviceId', (req, res) => {
       if (payload) myDevice = payload.deviceId || ''
     }
   } catch (e) { /* 忽略，按未登录处理 */ }
-  // 资料取最近一条有效发帖（昵称/头像/车型）
-  const feed = db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(deviceId)
+  // 资料优先取 user_profiles truth source，未命中再回退到最近一条有效发帖
+  const profile = resolveProfile({ deviceId, memberUserId: '', storedNickname: '', storedAvatar: '' })
+  const feed = !profile.nickname || profile.nickname === '骑友'
+    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(deviceId)
+    : null
   // 关注数 = 他关注了谁；粉丝数 = 谁关注了他
   const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE follower_device=?').get(deviceId).c
   const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE followee_device=?').get(deviceId).c
@@ -579,9 +738,9 @@ app.get('/users/:deviceId', (req, res) => {
   const isSelf = myDevice === deviceId
   res.json(ok({
     deviceId,
-    nickname: (feed && feed.nickname) || '骑友',
-    avatar: (feed && feed.avatar) || '',
-    carModel: (feed && feed.car_model) || '',
+    nickname: profile.nickname || (feed && feed.nickname) || '骑友',
+    avatar: profile.avatar || (feed && feed.avatar) || '',
+    carModel: profile.carModel || (feed && feed.car_model) || '',
     followeeCount,
     followerCount,
     isFollowing,
@@ -628,6 +787,8 @@ app.post('/feed', requireAuth, (req, res) => {
       now()
     )
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(info.lastInsertRowid)
+  // 同步/更新用户资料 truth source（昵称/头像/车型以最新一次发帖为准）
+  upsertProfile({ deviceId, memberUserId, nickname, avatar, carModel })
   // 内容安全②：阿里云异步复核（配置 AK 后生效；命中高危自动下架）
   moderation.reviewFeed(row, db)
   // 视频异步转码（增强，可选）：有 ffmpeg 才转，失败静默，不影响发布
@@ -667,56 +828,99 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
   const { content, nickname = '骑友', avatar = '', parentCommentId = 0, replyTo = '' } = req.body || {}
   const text = String(content || '').trim()
   if (!text) return res.json(err(1, '评论内容不能为空'))
+  const deviceId = (req.user && req.user.deviceId) || ''
+  const memberUserId = (req.user && req.user.memberUserId) || ''
   // 内容安全①：本地词库同步拦截（评论同样「有违禁词发不出」）
   const mc = moderation.checkText(text + ' ' + String(nickname || ''))
   if (!mc.pass) {
     moderation.logLocalBlock(db, row.id, text, mc.words)
     return res.json(err(1, '评论包含违禁词「' + mc.words.slice(0, 5).join('、') + '」，请修改后发送'))
   }
+  // 评论时同步更新资料 truth source（以后改昵称/头像，历史评论会跟着刷新）
+  upsertProfile({ deviceId, memberUserId, nickname, avatar })
+
   // 楼中楼：回复某条一级评论 → 写 comment_replies
   if (parentCommentId) {
+    const parentComment = db.prepare('SELECT device_id, member_user_id, nickname FROM comments WHERE id=?').get(Number(parentCommentId) || 0)
+    const replyToDeviceId = parentComment ? parentComment.device_id : ''
+    const replyToMemberUserId = parentComment ? parentComment.member_user_id : ''
+    const replyToName = parentComment
+      ? resolveProfile({ deviceId: replyToDeviceId, memberUserId: replyToMemberUserId, storedNickname: parentComment.nickname, storedAvatar: '' }).nickname
+      : String(replyTo || '').slice(0, 20)
     const info = db
-      .prepare(`INSERT INTO comment_replies (feed_id, parent_comment_id, nickname, avatar, content, reply_to, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(row.id, Number(parentCommentId) || 0, String(nickname).slice(0, 20), String(avatar || ''), text.slice(0, 500), String(replyTo || '').slice(0, 20), now())
+      .prepare(`INSERT INTO comment_replies (feed_id, parent_comment_id, device_id, member_user_id, nickname, avatar, content, reply_to, reply_to_device_id, reply_to_member_user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(
+        row.id,
+        Number(parentCommentId) || 0,
+        String(deviceId || ''),
+        String(memberUserId || ''),
+        String(nickname).slice(0, 20),
+        String(avatar || ''),
+        text.slice(0, 500),
+        replyToName,
+        String(replyToDeviceId || ''),
+        String(replyToMemberUserId || ''),
+        now()
+      )
     const c = db.prepare('SELECT * FROM comment_replies WHERE id=?').get(info.lastInsertRowid)
-    res.json(ok({ id: c.id, author: c.nickname, avatar: c.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))
+    const p = resolveProfile({ deviceId: c.device_id, memberUserId: c.member_user_id, storedNickname: c.nickname, storedAvatar: c.avatar })
+    res.json(ok({ id: c.id, author: p.nickname, avatar: p.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))
     return
   }
   const info = db
-    .prepare(`INSERT INTO comments (feed_id, nickname, avatar, content, created_at) VALUES (?, ?, ?, ?, ?)`)
-    .run(row.id, String(nickname).slice(0, 20), String(avatar || ''), text.slice(0, 500), now())
+    .prepare(`INSERT INTO comments (feed_id, device_id, member_user_id, nickname, avatar, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(row.id, String(deviceId || ''), String(memberUserId || ''), String(nickname).slice(0, 20), String(avatar || ''), text.slice(0, 500), now())
   const c = db.prepare('SELECT * FROM comments WHERE id=?').get(info.lastInsertRowid)
-  const deviceId = (req.user && req.user.deviceId) || ''
-  const memberUserId = (req.user && req.user.memberUserId) || ''
   // 互动消息：评论通知作者（不通知自己；自检双维度：device 演示态 / memberUserId ToC 态）
   const isSelf = (row.device_id && deviceId && row.device_id === deviceId) || (row.member_user_id && memberUserId && row.member_user_id === memberUserId)
   if (!isSelf && (row.device_id || row.member_user_id)) {
     emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'comment', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '评论了你的动态：' + text.slice(0, 40) })
   }
-  res.json(ok({ id: c.id, author: c.nickname, avatar: c.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))
+  const p = resolveProfile({ deviceId: c.device_id, memberUserId: c.member_user_id, storedNickname: c.nickname, storedAvatar: c.avatar })
+  res.json(ok({ id: c.id, author: p.nickname, avatar: p.avatar, content: c.content, createdAt: c.created_at, time: c.created_at }))
 })
 
 app.get('/feed/:id/comments', (req, res) => {
   const rows = db.prepare('SELECT * FROM comments WHERE feed_id=? ORDER BY id ASC').all(req.params.id)
   const replyRows = db.prepare('SELECT * FROM comment_replies WHERE feed_id=? ORDER BY id ASC').all(req.params.id)
+  const identities = []
+  rows.forEach((c) => identities.push({ deviceId: c.device_id, memberUserId: c.member_user_id }))
+  replyRows.forEach((r) => {
+    identities.push({ deviceId: r.device_id, memberUserId: r.member_user_id })
+    identities.push({ deviceId: r.reply_to_device_id, memberUserId: r.reply_to_member_user_id })
+  })
+  const getProfile = buildProfileMap(identities)
   const replyMap = {}
   replyRows.forEach((r) => {
     ;(replyMap[r.parent_comment_id] = replyMap[r.parent_comment_id] || []).push(r)
   })
   res.json(ok({
     list: rows.map((c) => {
-      const replies = (replyMap[c.id] || []).map((r) => ({
-        id: r.id,
-        author: r.nickname,
-        avatar: r.avatar,
-        content: r.content,
-        replyTo: r.reply_to,
-        createdAt: r.created_at,
-        time: r.created_at,
-        likes: 0,
-        isLiked: false,
-      }))
-      return { id: c.id, author: c.nickname, avatar: c.avatar, content: c.content, createdAt: c.created_at, time: c.created_at, replies }
+      const cp = getProfile(c.device_id, c.member_user_id)
+      const replies = (replyMap[c.id] || []).map((r) => {
+        const rp = getProfile(r.device_id, r.member_user_id)
+        const rtp = getProfile(r.reply_to_device_id, r.reply_to_member_user_id)
+        return {
+          id: r.id,
+          author: (rp && rp.nickname) || r.nickname,
+          avatar: (rp && rp.avatar) || r.avatar,
+          content: r.content,
+          replyTo: (rtp && rtp.nickname) || r.reply_to,
+          createdAt: r.created_at,
+          time: r.created_at,
+          likes: 0,
+          isLiked: false,
+        }
+      })
+      return {
+        id: c.id,
+        author: (cp && cp.nickname) || c.nickname,
+        avatar: (cp && cp.avatar) || c.avatar,
+        content: c.content,
+        createdAt: c.created_at,
+        time: c.created_at,
+        replies,
+      }
     }),
   }))
 })
