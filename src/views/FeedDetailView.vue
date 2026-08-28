@@ -486,6 +486,11 @@ async function loadRelated() {
 const segments = computed(() => {
   if (!item.value) return []
   const text = item.value.content || ''
+  // 用昵称→deviceId 反查映射，把 @昵称 解析出可跳转的 deviceId
+  const mentionMap = {}
+  ;(item.value.mentions || []).forEach((m) => {
+    if (m && m.nickname) mentionMap[String(m.nickname)] = m.deviceId || ''
+  })
   const re = /(#[^#]+#|@[\u4e00-\u9fa5A-Za-z0-9_]+)/g
   const out = []
   let last = 0
@@ -494,7 +499,10 @@ const segments = computed(() => {
     if (m.index > last) out.push({ t: 'text', v: text.slice(last, m.index) })
     const tok = m[0]
     if (tok.startsWith('#')) out.push({ t: 'car', v: tok.slice(1, -1) })
-    else out.push({ t: 'at', v: tok.slice(1) })
+    else {
+      const name = tok.slice(1)
+      out.push({ t: 'at', v: name, deviceId: mentionMap[name] || '' })
+    }
     last = m.index + tok.length
   }
   if (last < text.length) out.push({ t: 'text', v: text.slice(last) })
@@ -515,13 +523,13 @@ function segClass(seg) {
   if (seg.t === 'at') return 'seg seg--at'
   return 'seg'
 }
-function onAt(name) {
-  // @用户：用户主页归 Flutter 原生承载；原生未实现时静默（H5 暂无用户页）
-  bridge.openNative('user/' + encodeURIComponent(name))
+function onAt(name, deviceId) {
+  // 个人主页是 H5 页面（UserProfileView），有 deviceId 时 H5 内直接跳转；无则静默（评论 @ 暂无 deviceId 不可点）
+  if (deviceId) router.push('/user/' + encodeURIComponent(deviceId))
 }
 function segClick(seg) {
   if (seg.t === 'car') onCar(seg.v)
-  else if (seg.t === 'at') onAt(seg.v)
+  else if (seg.t === 'at') onAt(seg.v, seg.deviceId)
 }
 
 function onCar(model) {

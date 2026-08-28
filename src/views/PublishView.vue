@@ -435,7 +435,7 @@ async function onPublish() {
         deviceId: await bridge.getDeviceId(),
         lat: lat.value,
         lng: lng.value,
-        mentions: mentions.value.map((m) => m.nickname),
+        mentions: mentions.value.map((m) => ({ deviceId: m.deviceId, nickname: m.nickname })),
         video: videoKey,
         cover: coverKey,
       }),

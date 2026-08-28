@@ -617,7 +617,7 @@ function rowToFeed(r) {
     regionCode: r.region_code || 'US',
     lat: r.lat != null ? Number(r.lat) : null,
     lng: r.lng != null ? Number(r.lng) : null,
-    mentions: safeJsonArr(r.mentions).map((m) => String(m)),
+    mentions: safeJsonArr(r.mentions).map((m) => (typeof m === 'object' && m ? m : { nickname: String(m || ''), deviceId: '' })),
     videoUrl: r.video_url || '',
     videoCover: r.cover_url || '',
   }
