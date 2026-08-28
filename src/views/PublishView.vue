@@ -52,7 +52,6 @@
           </div>
           <div v-if="picked.length < 9" class="gitem add" @click="onPickImageClick">
             <input
-              v-show="!bridge.isNative()"
               ref="fileInput"
               type="file"
               accept="image/jpeg,image/png,image/webp"
@@ -71,15 +70,14 @@
       <div class="card section">
         <div class="label">{{ t('publish.video') }}</div>
         <div v-if="!videoFile" class="vadd" style="position:relative;" @click="onPickVideoClick">
-          <input
-            v-show="!bridge.isNative()"
-            ref="fileInputVideo"
-            type="file"
-            accept="video/mp4,video/webm,video/quicktime"
-            style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;z-index:1;"
-            @change="onPickVideo"
-            @click.stop
-          />
+            <input
+              ref="fileInputVideo"
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+              style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;z-index:1;"
+              @change="onPickVideo"
+              @click.stop
+            />
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
           <span>{{ t('publish.addVideo') }}</span>
         </div>
@@ -241,25 +239,16 @@ function pickMention(u) {
 
 const canPost = computed(() => content.value.trim().length > 0 && !uploading.value)
 
-// 图片选择入口：浏览器走 file input，原生走 bridge
+// 图片/视频选择入口：双保险 —— H5 <input type=file> 优先（WebView 需 Flutter 开启文件选择 delegate），
+// 原生桥 pickImages/pickVideo 保留作兜底（见下方 pickImagesNative / pickVideoNative，当前不主动调用）
 function onPickImageClick() {
-  if (bridge.isNative()) {
-    pickImagesNative()
-  } else {
-    fileInput.value && fileInput.value.click()
-  }
+  if (fileInput.value) fileInput.value.click()
 }
-
-// 视频选择入口：浏览器走 file input，原生走 bridge
 function onPickVideoClick() {
-  if (bridge.isNative()) {
-    pickVideoNative()
-  } else {
-    fileInputVideo.value && fileInputVideo.value.click()
-  }
+  if (fileInputVideo.value) fileInputVideo.value.click()
 }
 
-// 原生图片选择（Flutter 需实现 window.PXIDBridge.pickImages）
+// 原生图片选择（Flutter 实现 window.PXIDBridge.pickImages 时可用，作 H5 file input 的兜底通道）
 async function pickImagesNative() {
   try {
     const remain = 9 - picked.value.length
@@ -277,7 +266,7 @@ async function pickImagesNative() {
   }
 }
 
-// 原生视频选择（Flutter 需实现 window.PXIDBridge.pickVideo）
+// 原生视频选择（Flutter 实现 window.PXIDBridge.pickVideo 时可用，作 H5 file input 的兜底通道）
 async function pickVideoNative() {
   try {
     const video = await bridge.pickVideo({ maxDuration: 60 })
@@ -348,27 +337,16 @@ function captureFrame(file, atSec = 0.1) {
   })
 }
 
-// 逐张上传图片（/media/upload）
+// 逐张上传图片（统一走 storage/uploadMedia，local 模式即 /media/upload，返回完整 URL 与 images 字段约定一致）
 async function uploadImages() {
   const token = await bridge.getAuthToken()
   if (!token) throw new Error('NO_TOKEN')
-  const pending = picked.value.filter((g) => !g.uploadedUrl)
+  const pending = picked.value.filter((g) => !g.uploadedUrl && g.file)
   if (!pending.length) return
   for (const g of pending) {
     g.uploading = true
-    const fd = new FormData()
-    fd.append('file', g.file)
-    const r = await fetch(API_BASE + '/media/upload', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token },
-      body: fd,
-    })
-    const j = await r.json()
-    if (j.code === 0 && j.data && j.data.url) {
-      g.uploadedUrl = j.data.url
-    } else {
-      throw new Error(j.message || 'UPLOAD_FAIL')
-    }
+    const r = await uploadMedia(g.file, token)
+    g.uploadedUrl = r.url
     g.uploading = false
   }
 }
@@ -388,11 +366,7 @@ function showToast(m) {
 
 async function onPublish() {
   if (!canPost.value) return
-  // 原生环境：交由原生发布器承载（契约一致，媒体在原生侧处理）
-  if (bridge.isNative()) {
-    bridge.openNative('discover/publish?content=' + encodeURIComponent(content.value.trim()))
-    return
-  }
+  // 统一走 H5 自管发布（选→传→发），不再甩回原生 openNative，确保图片/视频都能上传
   uploading.value = true
   try {
     const token = await bridge.getAuthToken()
