@@ -432,9 +432,10 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', 
   const id = String(deviceId || '')
   const mid = String(memberUserId || '')
   if (!id && !mid) return
-  const existing = id
-    ? db.prepare("SELECT * FROM user_profiles WHERE device_id=? AND length(device_id)>0").get(id)
-    : db.prepare("SELECT * FROM user_profiles WHERE member_user_id=? AND length(member_user_id)>0").get(mid)
+  // 任一身份键命中即视为同一人（兼容 device_id 与 member_user_id 任一变化/缺失），避免重复 INSERT 触发 UNIQUE 约束 500
+  const existing = db.prepare(
+    `SELECT * FROM user_profiles WHERE (length(device_id)>0 AND device_id=?) OR (length(member_user_id)>0 AND member_user_id=?)`,
+  ).get(id, mid)
   if (existing) {
     // 昵称/头像变更前，先把旧资料快照存为 alias，保证历史评论能按旧昵称+头像找到当前身份
     const oldNick = String(existing.nickname || '')
@@ -449,22 +450,30 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', 
     if (nickname !== undefined) { sets.push('nickname=?'); args.push(newNick) }
     if (avatar !== undefined) { sets.push('avatar=?'); args.push(newAvatar) }
     if (carModel !== undefined) { sets.push('car_model=?'); args.push(String(carModel || '').slice(0, 30)) }
-    if (!sets.length) {
-      upsertProfileAlias({ deviceId, memberUserId, nickname: newNick, avatar: newAvatar })
-      return
-    }
     sets.push('updated_at=?')
     args.push(now())
-    if (mid) {
-      args.push(mid)
-      db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE member_user_id=? AND length(member_user_id)>0`).run(...args)
-    } else {
-      args.push(id)
-      db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE device_id=? AND length(device_id)>0`).run(...args)
-    }
+    args.push(id)
+    args.push(mid)
+    db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE (length(device_id)>0 AND device_id=?) OR (length(member_user_id)>0 AND member_user_id=?)`).run(...args)
   } else {
-    db.prepare('INSERT INTO user_profiles (device_id, member_user_id, nickname, avatar, car_model, updated_at) VALUES (?,?,?,?,?,?)')
-      .run(id, mid, String(nickname || '骑友').slice(0, 20), String(avatar || '').slice(0, 500), String(carModel || '').slice(0, 30), now())
+    try {
+      db.prepare('INSERT INTO user_profiles (device_id, member_user_id, nickname, avatar, car_model, updated_at) VALUES (?,?,?,?,?,?)')
+        .run(id, mid, String(nickname || '骑友').slice(0, 20), String(avatar || '').slice(0, 500), String(carModel || '').slice(0, 30), now())
+    } catch (e) {
+      if (String(e.message || '').includes('UNIQUE')) {
+        // 极端并发冲突：重建为更新，避免 500
+        const newNick = String(nickname || '骑友').slice(0, 20)
+        const newAvatar = String(avatar || '').slice(0, 500)
+        const newCar = String(carModel || '').slice(0, 30)
+        if (mid) {
+          db.prepare(`UPDATE user_profiles SET nickname=?, avatar=?, car_model=?, updated_at=? WHERE member_user_id=? AND length(member_user_id)>0`).run(newNick, newAvatar, newCar, now(), mid)
+        } else if (id) {
+          db.prepare(`UPDATE user_profiles SET nickname=?, avatar=?, car_model=?, updated_at=? WHERE device_id=? AND length(device_id)>0`).run(newNick, newAvatar, newCar, now(), id)
+        }
+      } else {
+        throw e
+      }
+    }
   }
   upsertProfileAlias({ deviceId, memberUserId, nickname, avatar })
 }

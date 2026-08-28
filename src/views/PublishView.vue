@@ -239,13 +239,21 @@ function pickMention(u) {
 
 const canPost = computed(() => content.value.trim().length > 0 && !uploading.value)
 
-// 图片/视频选择入口：双保险 —— H5 <input type=file> 优先（WebView 需 Flutter 开启文件选择 delegate），
-// 原生桥 pickImages/pickVideo 保留作兜底（见下方 pickImagesNative / pickVideoNative，当前不主动调用）
-function onPickImageClick() {
-  if (fileInput.value) fileInput.value.click()
+// 图片/视频选择入口：WebView（Flutter 注入桥）内 <input type=file> 默认不响应（需 Flutter 配 file-chooser delegate），
+// 故原生桥 pickImages/pickVideo 优先；浏览器独立预览环境无原生桥，降级用 <input type=file>
+async function onPickImageClick() {
+  if (bridge.isNative()) {
+    await pickImagesNative()
+  } else if (fileInput.value) {
+    fileInput.value.click()
+  }
 }
-function onPickVideoClick() {
-  if (fileInputVideo.value) fileInputVideo.value.click()
+async function onPickVideoClick() {
+  if (bridge.isNative()) {
+    await pickVideoNative()
+  } else if (fileInputVideo.value) {
+    fileInputVideo.value.click()
+  }
 }
 
 // 原生图片选择（Flutter 实现 window.PXIDBridge.pickImages 时可用，作 H5 file input 的兜底通道）
