@@ -908,6 +908,20 @@ app.post('/feed', requireAuth, (req, res) => {
   res.json(ok(rowToFeed(row)))
 })
 
+// ---- 赞过列表（个人主页「赞过」Tab，H5 自管关系表）----
+// GET /feed/liked?page=&pageSize= → { total, list }（仅本人，requireAuth 从 token 取 deviceId；返回项 isLiked 恒 true）
+// ⚠️ 必须定义在 app.get('/feed/:id') 之前，否则会被 /feed/:id 参数路由抢匹配返回 404
+app.get('/feed/liked', requireAuth, (req, res) => {
+  const deviceId = (req.user && req.user.deviceId) || ''
+  if (!deviceId) return res.json(err(1, '无法识别用户'))
+  const page = Math.max(1, parseInt(req.query.page) || 1)
+  const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
+  const off = (page - 1) * ps
+  const total = db.prepare('SELECT COUNT(*) c FROM feed_likes l JOIN feeds f ON f.id=l.feed_id WHERE l.device_id=? AND f.status=?').get(deviceId, 'published').c
+  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN feed_likes l ON f.id=l.feed_id WHERE l.device_id=? AND f.status=? ORDER BY l.created_at DESC LIMIT ? OFFSET ?`).all(deviceId, 'published', ps, off)
+  res.json(ok({ total, list: rows.map((r) => { const x = rowToFeed(r); x.isLiked = true; return x }) }))
+})
+
 // ---- 详情 ----
 app.get('/feed/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(req.params.id)
@@ -941,19 +955,6 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
     emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'like', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '赞了你的动态' })
   }
   res.json(ok({ isLiked, likes }))
-})
-
-// ---- 赞过列表（个人主页「赞过」Tab，H5 自管关系表）----
-// GET /feed/liked?page=&pageSize= → { total, list }（仅本人，requireAuth 从 token 取 deviceId；返回项 isLiked 恒 true）
-app.get('/feed/liked', requireAuth, (req, res) => {
-  const deviceId = (req.user && req.user.deviceId) || ''
-  if (!deviceId) return res.json(err(1, '无法识别用户'))
-  const page = Math.max(1, parseInt(req.query.page) || 1)
-  const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
-  const off = (page - 1) * ps
-  const total = db.prepare('SELECT COUNT(*) c FROM feed_likes l JOIN feeds f ON f.id=l.feed_id WHERE l.device_id=? AND f.status=?').get(deviceId, 'published').c
-  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN feed_likes l ON f.id=l.feed_id WHERE l.device_id=? AND f.status=? ORDER BY l.created_at DESC LIMIT ? OFFSET ?`).all(deviceId, 'published', ps, off)
-  res.json(ok({ total, list: rows.map((r) => { const x = rowToFeed(r); x.isLiked = true; return x }) }))
 })
 
 // ---- 收藏 / 足迹（H5 自管关系表，个人主页 Tab）----
