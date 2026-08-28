@@ -5,7 +5,7 @@
   --brand-gradient: linear-gradient(90deg, #7DA2FF, #4D7CFF);
   --brand-soft: #EEF3FF;                  /* 主色浅底（选中/标签底） */
   --price: #e53935;                       /* 价格红 */
-  --bg: #F5F7FA;                          /* 常规页面背景 appBackground */
+  --bg: #F5F5F4;                          /* 常规页面背景，统一对齐 App「我的」页背景 */
   --card: #ffffff;                        /* 卡片表面 surface */
   --text: #111111;                        /* 主文本 textPrimary */
   --text-sub: #666666;                    /* 次文本 textSecondary */
