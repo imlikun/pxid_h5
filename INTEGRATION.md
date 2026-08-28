@@ -127,15 +127,37 @@
 - **我的车 `carModel`**：H5 第一方案读 `getUserInfo().carModel`，Flutter 未返回时回退 `localStorage`（仅兜底）。
 - **token 不自签**：H5 已废弃自签 deviceId，登录态完全靠 Flutter 经 `getToken` / `getUserInfo` 注入。
 
-### 1.6 个人主页（H5 已上线，路由 `/user/:id`）
+### 1.6 个人主页（H5 已上线六 Tab，路由 `/user/:id` / `/user/me`）
 
-- **页面**：`src/views/UserProfileView.vue` —— 资料卡（头像/昵称/「我」角标/车型标签/关注数/粉丝数/关注按钮）+ 动态流（复用 `MomentCard`，按 `device_id` 过滤后端 `/feeds?deviceId=`）。
+- **页面**：`src/views/UserProfileView.vue` —— 资料卡（头像/昵称/「我」角标/车型标签/关注数/粉丝数 + 自己「编辑资料」/他人「关注+发消息+⋯菜单」）+ 分段 Tab。
 - **路由**：`/user/:id` 他人主页；`/user/me` 自己的主页（App「我的」tab 入口）。
+- **六 Tab（核心交互升级，2026-08-28 上线）**：
+  - **自己 `/user/me`**：动态 · 赞过 · 收藏 · 关注 · 粉丝 · 足迹
+  - **他人 `/user/:id`**：动态 · 赞过 · 收藏 · 关注 · 粉丝（**收藏/足迹对他人隐藏**，私密数据不外泄；足迹仅自己可见）
 - **用户标识统一用 `device_id`（非昵称）**：后端 `/users/:deviceId` 返回资料，`fetchUserFeeds(deviceId)` 返回动态流。
 - **入口分两类**：
   - H5 内点击（作者头像/昵称、`@用户`、互动消息 actor）→ 直接 `router.push('/user/<deviceId>')`，**不依赖原生**；
   - 原生侧入口（Flutter 推送/消息里的 @）→ `openNative('user/<deviceId>')`，原生收到后**让 WebView 导航到 `/user/<deviceId>`**（原生把 deviceId 透传给 H5 路由，不自己渲染）。
 - **`@用户` 已修复**（2026-08-28 `c91aa17`）：发布时 `mentions` 带 `deviceId`，后端返回原样对象数组，解析 `@昵称` 反查 `deviceId` 后 H5 内跳转；旧注释「用户主页归原生承载 / H5 暂无用户页」已删除。
+- **点赞改 H5 自管（重要契约变更）**：`MomentCard` 点赞不再委托 `openNative('feed/interact')`，改为直接调后端 `POST /feed/:id/like`（`requireAuth`），落 `feed_likes` 关系表、计数器由表实时汇总。**旧契约 `openNative('feed/interact?type=like')` 已废弃**，Flutter 无需再处理点赞（避免双源不一致）。
+- **收藏/赞过/足迹数据归属（拍板：H5 自管）**：均存 H5 后端（`favorites`/`feed_likes`/`footprints` 表），不依赖 Flutter。
+
+### 1.7 个人主页后端接口契约（H5 自管，2026-08-28）
+
+| 接口 | 方法 | 说明 | 鉴权 | 状态 |
+|---|---|---|---|---|
+| `/users/:deviceId` | GET | 公开资料 + isSelf/isFollowing | 可选(Bearer) | 已有 |
+| `/feed?deviceId=` | GET | TA 的动态流 | 公开 | 已有 |
+| `/feed/liked` | GET | 我赞过的动态（返回项 `isLiked` 恒 `true`） | requireAuth | **新增** |
+| `/favorites` | GET | 我收藏的动态 | requireAuth | **新增** |
+| `/footprints` | GET | 我浏览过的动态（最近优先、去重） | requireAuth | **新增** |
+| `POST /feed/:id/favorite` | POST | 收藏/取消 toggle → `{favorited}` | requireAuth | **新增** |
+| `POST /footprints` | POST | 记录浏览足迹 `{feedId}`（详情页打开即记录） | requireAuth | **新增** |
+| `/follow/list?device=` | GET | 关注列表（**改返回对象数组** `{deviceId,nickname,avatar,carModel}`） | 公开 | **改** |
+| `/follow/followers?device=` | GET | 粉丝列表（同结构） | 公开 | **新增** |
+| `POST /feed/:id/like` | POST | 点赞 toggle，落 `feed_likes`，实时汇总计数器 → `{isLiked,likes}` | requireAuth | **改（自管）** |
+
+> 私密性：赞过/收藏/足迹均按 `device_id`（token 解析）隔离，他人不可查。二期能力（私信/编辑资料/举报/拉黑）本期未做：他人主页「发消息」走 `openNative('message/user?deviceId=')` 占位，无原生时 H5 提示「即将上线」。
 
 ---
 
@@ -157,7 +179,7 @@
 ### 2.4 车型 / @用户 / 我的动态 边界
 - **我的车**：H5 第一方案 `getUserInfo().carModel`，Flutter 必须返回真实在售车型代号（F1/F2/P1/P2/P3/P4/P5/P6/P7/P8/G1/P9）。
 - **@用户 / 个人主页**：用户主页是 **H5 页面**（`UserProfileView`），**不是原生页**。H5 内点击作者头像/昵称/`@用户`/互动消息 → `router.push('/user/<deviceId>')`；原生侧入口走 `openNative('user/<deviceId>')` 透传 WebView（见 🔴.6 / 🟢.11）。
-- **我的动态**：H5 目前没有入口/路由，**需产品定夺**落点（跳 H5 还是原生页）。
+- **我的动态**：即 `/user/me` 个人主页（六 Tab 含「动态」），已落地，无需原生页；Flutter「我的」tab 让 WebView 打开 `#/user/me` 即可。
 
 ### 2.5 服务类标识：H5 内已无法触发
 - `router/index.js` 已对所有 `/service/*` 路由做拦截并重定向到 `/discover`；`src/App.vue` 也不再渲染服务 tab。
@@ -293,13 +315,15 @@ window.PXIDApp = {
 3. H5 页内返回按钮：所有二级页顶部保留返回箭头，点击调 `history.back()`；原生应保证状态栏/刘海区域不遮挡该按钮。
 4. 切后台点击失效 bug 已修（见 🔴.5），Flutter 正常嵌 WebView 即可，无需额外处理。
 
-### 4.11 个人主页（H5 已上线，Flutter 需配合透传）
+### 4.11 个人主页（H5 已上线六 Tab，Flutter 需配合透传）
 
-1. H5 已完整实现 `UserProfileView`（`/user/:id` 他人、`/user/me` 自己），含资料卡 + 动态流 + 关注/取关。
+1. H5 已完整实现 `UserProfileView`（`/user/:id` 他人、`/user/me` 自己），含资料卡 + **六 Tab**：动态 / 赞过 / 收藏 / 关注 / 粉丝 / 足迹（他人隐藏收藏·足迹）。
 2. **H5 内入口已全部打通**：作者头像/昵称（`FeedCard`/`MomentCard`/`InteractionView`/`FeedDetailView`）、`@用户` 富文本 → `router.push('/user/<deviceId>')`。
 3. **原生侧入口**：Flutter 若需从原生页面（推送/消息/@提及）进入 H5 用户主页，调 `openNative('user/<deviceId>')`，收到后**让承载 H5 的 WebView 导航到 `#/user/<deviceId>`**（不要自己渲染用户页）。`deviceId` 用真机 `getUserInfo`/后端返回的 deviceId，勿用昵称。
 4. **「我的」tab**：进入自己的主页，让 WebView 打开 `#/user/me`（或 `openNative('user/me')`）；`/user/me` 内部用本机 `getDeviceId()` 识别自己。
 5. **标识统一 `device_id`**：所有 `user/<xxx>` 参数必须是 device_id（后端按 device_id 存/查），昵称会改、会重名，不可用于路由。
+6. **收藏/赞过/足迹/点赞全部 H5 自管**（详见 §1.7 契约表）：Flutter 无需处理点赞（`openNative('feed/interact?type=like')` 已废弃）；关注列表接口 `/follow/list` 已改返回对象数组，粉丝列表 `/follow/followers` 新增。
+7. **二期（未做，本期占位）**：私信、编辑资料、举报、拉黑。他人主页「发消息」暂走 `openNative('message/user?deviceId=')`，无原生时 H5 提示「即将上线」，不阻塞浏览。
 
 ### 4.10 视觉规范
 
@@ -322,6 +346,9 @@ window.PXIDApp = {
 - [ ] `getUserInfo` 返回 `email` / `nickname` / `avatar` / `carModel` 真实值（打印确认）。
 - [ ] 商品「去购买」→ `openShopify` 打开 Shopify 结账，可返回。
 - [ ] 作者头像/昵称、`@用户`、互动消息 actor → 进 H5 个人主页 `/user/<deviceId>`（真机验证可跳转、资料卡+动态流正常）。
+- [ ] 个人主页六 Tab 加载正常：`/user/me` 显 动态/赞过/收藏/关注/粉丝/足迹；他人 `/user/:id` 仅显 动态/赞过/收藏/关注/粉丝（足迹不可见）。
+- [ ] 点赞/收藏走 H5 后端（Flutter 不再收到 `feed/interact` 点赞）；赞过/收藏 Tab 数据正确回显，刷新不丢。
+- [ ] 关注/粉丝列表展示头像+昵称+车型，点人进其主页形成闭环。
 - [ ] 「我的」tab → 进自己的主页 `#/user/me`。
 - [ ] 原生侧 `openNative('user/<deviceId>')` 能让 WebView 跳到对应 H5 个人主页。
 - [ ] 积分页「我的」入口 WebView 打开 → 顶部返回键 `PXIDApp.postMessage('closeWebView')` 关 WebView 回「我的」。
