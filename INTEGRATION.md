@@ -38,6 +38,7 @@
 | `feed/interact?type=like&id=<id>` | 点赞 | 互动 |
 | `feed/follow?id=<id>` | 关注作者 | 互动 |
 | `share/feed?id=<id>` | 分享：原生拉起分享面板；H5 预览兜底 Web Share / 复制链接 | 互动 |
+| `user/<name>` | **@用户跳用户主页**（原生承载，H5 无用户页）；`name` 需 `encodeURIComponent` | 互动 |
 | `address/list` | 结算页选地址 | 下单 |
 | `manual/download?model=<m>` | 说明书下载 | 服务 |
 | `vehicle/check?model=<m>` | 车辆体检 | 服务 |
@@ -113,7 +114,7 @@ H5 这边已全部完成并推送到 `origin/master` 与 `gitlab/main`，构建�
 
 H5 本身无法直接接管系统侧滑手势。约定如下：
 
-1. **底部 tab 由原生提供**：H5 默认按嵌入模式渲染（URL 无 `?standalone=1` 时不显示底部 tab），原生底部 5 个 tab 通过 `navigateTo(tab)` 控制 H5 路由。
+1. **底部 tab 已彻底移除**：H5（`src/App.vue`）不再渲染底部 tab bar，由原生 tab 始终接管，`isEmbed` 不再控制 tab 显隐（原 `?standalone=1` 逻辑已无作用）。`navigateTo(tab)` 仍用于原生 tab 间切换。
 2. **侧滑返回由原生处理**：Flutter 监听用户侧滑返回手势，优先调用 WebView 的 `goBack()`（H5 为 hash 路由，`history.back()` 即可回退）。当 WebView 的 H5 历史栈已空（无法 goBack）时，再由原生决定是否关闭 WebView 或返回上一级原生页。
 3. **H5 页内返回按钮**：所有二级页顶部均保留返回箭头，点击调用 `history.back()`；原生应保证状态栏/刘海区域不遮挡该按钮。
 
