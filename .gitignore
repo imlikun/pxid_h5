@@ -22,3 +22,5 @@ shots/
 .legacy-20260822/
 # WorkBuddy 运行态数据（自动化 memory 等），属本地状态非源码，不入库
 .workbuddy/
+
+dist/
