@@ -58,7 +58,7 @@
 | 方法 | 签名 | 优先级 | H5 调用场景 | Flutter 职责 |
 | --- | --- | --- | --- | --- |
 | `getToken` | `() => Promise<string>` | P0 | 登录 Gate、发帖、点赞、评论、订单 | 返回登录态 token；**未登录返回空串** |
-| `getUserInfo` | `() => Promise<{email?, nickname?, token?, avatar?, carModel?}>` | P0 | 评论/点赞/发帖带身份、我的车、订单 | 登录后必须返回 `email`/`nickname`/`avatar`/`carModel`；未登录返回 `null` 或空对象 |
+| `getUserInfo` | `() => Promise<{email?, nickname?, token?, avatar?, carModel?}>` | P0 | 评论/点赞/发帖带身份、我的车、订单 | 登录后必须返回 `email`/`nickname`/`avatar`/`carModel`；未登录返回 `null` 或空对象。**`avatar` 必须是 https 完整 URL**——禁止 `http://` 明文（H5 跑在 HTTPS 环境，http 头像会被浏览器混合内容策略拦截导致不显示；H5 侧已做 http→https 自动升级兜底，但原生侧应直接给 https） |
 | `getLocale` | `() => Promise<{locale, country, currency}>` | P0（多国） | 启动初始化 i18n 与货币 | 返回如 `{locale:'zh-CN', country:'CN', currency:'CNY'}` |
 | `openNative` | `(path: string) => void` | P0 | 见 🔴.4 全部标识 | 解析 `module/action?param=value` 字符串，路由到对应原生页 |
 | `pickImages` | `({maxCount}) => Promise<[{uri, url, ...}]>` | P0（发布） | 发动态选图 | 唤起原生多选；返回线上 URL 或本地 uri 数组 |
