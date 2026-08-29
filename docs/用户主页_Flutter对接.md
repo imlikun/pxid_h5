@@ -26,7 +26,10 @@
   - **点「收藏」→ 收藏列表**（仅自己可见）。
   - **点「关注」→ 关注列表**；**点「粉丝」→ 粉丝列表**。
   - 私密性：收藏、足迹对他人隐藏；他人主页四宫格无「收藏」入口。
-- **数据全部 H5 自管**（不依赖 Flutter）：点赞/收藏/赞过/足迹/关注对象数组均存 H5 后端（`feed_likes`/`favorites`/`footprints`/`follows` 表）。
+- **数据归属（2026-08-29 架构敲定：发布/收藏 H5 自管，关注/粉丝走 Flutter 桥）**：
+  - **发布 / 收藏 / 赞过 / 足迹**：用户在 H5 内发生的动作，存 H5 后端（`feed_likes`/`favorites`/`footprints`/`follows` 表），H5 自管。
+  - **关注对象数组 / 粉丝列表**：属于 App 账号关系，真实数据在 Flutter 侧；H5 通过桥 `getFollowList()` / `getFansList()` 向 Flutter 取，**不自管、也不直连 ToC**。H5 在「自己 + 原生」场景下调桥取数，预览/他人主页回退 H5 本地 `/follow/list`、`/follow/followers`（本地仅有种子数据，真机以桥为准）。
+  - **关注动作本身**仍走原生 `openNative('feed/follow?id=')`（见 🟠 第 2 点），H5 不自己发关注请求。
 - **H5 内所有「进用户主页」都是 `router.push('/user/<deviceId>')`，不调 openNative**——作者头像/昵称、`@用户`、互动消息 actor、关注/粉丝列表点人，全部 H5 内闭环。
 - **标识统一 `device_id`**：路由参数必须是 device_id（后端按 device_id 存/查），昵称会变、会重名，绝不可用于路由。
 
@@ -35,7 +38,8 @@
 ## 🟠 问题或卡点（易踩的坑）
 
 1. **deviceId 是唯一标识**：原生侧任何 `user/<xxx>` 透传都必须用真机 `getUserInfo`/后端返回的 deviceId，不能用昵称。
-2. **点赞已改 H5 自管**：旧契约 `openNative('feed/interact?type=like')` **已废弃**，Flutter 不要再处理点赞（避免双源不一致）。但**关注仍走 `openNative('feed/follow?id=')`**，Flutter 需保留现有原生关注逻辑。
+2. **点赞已改 H5 自管**：旧契约 `openNative('feed/interact?type=like')` **已废弃**，Flutter 不要再处理点赞（避免双源不一致）。但**关注动作仍走 `openNative('feed/follow?id=')`**，Flutter 需保留现有原生关注逻辑。
+3. **关注/粉丝列表改走桥**：H5「关注/粉丝」宫格在原生环境通过 `getFollowList()` / `getFansList()` 向 Flutter 取真实列表（见 🟡 第 6 点 + 🟢 桥契约），**不再依赖 H5 后端 follows 表**。Flutter 必须实现这两个桥方法，否则真机「我的 → 关注/粉丝」为空。
 3. **私信是二期占位**：他人主页「发消息」→ `openNative('message/user?deviceId=')`；Flutter 未实现时 H5 会 toast「即将上线」并**不报错**，不阻塞浏览。
 4. **混合内容**：`getUserInfo.avatar` 必须返回 **https** 完整 URL，禁止 `http://` 明文（HTTPS 页加载 http 头像会被浏览器拦截）。
 
@@ -53,6 +57,7 @@
 3. **`getUserInfo` 返回真实资料**：`deviceId`/`email`/`nickname`/`avatar`(https)/`carModel`，供 H5 识别自己与填充资料卡。
 4. **保留 `feed/follow?id=` 关注处理**（现状不变）。
 5. **（二期）** 实现 `message/user?deviceId=` 私信入口，或确认继续用 H5 占位提示。
+6. **实现桥方法 `getFollowList()` / `getFansList()`**（关键，新需求）：返回当前用户「关注的人」/「粉丝」列表，结构 `[{ deviceId, nickname, avatar(https), carModel }]`。H5「我的 → 关注/粉丝」在原生环境直接调这两个桥取数（详见 `Flutter_桥方法对接.md`）。**未实现则真机关注/粉丝为空**。
 
 ---
 
@@ -141,10 +146,11 @@ if (path.startsWith('message/user?deviceId=')) {
 | 赞过列表 | `GET /feed/liked` | `feeds[]` | 需登录；「发布」子 Tab `sub=liked` |
 | 足迹列表 | `POST /footprints`(写) + 本地读 | — | 仅自己可见；「发布」子 Tab `sub=footprints` |
 | 收藏列表 | `GET /favorites` | `feeds[]` | 仅自己可见；「收藏」宫格 |
-| 关注列表 | `GET /follow/list` | `[{deviceId,nickname,avatar,carModel}]` | 「关注」宫格 |
-| 粉丝列表 | `GET /follow/followers` | `[{deviceId,nickname,avatar,carModel}]` | 「粉丝」宫格 |
+| 关注列表 | 原生：`getFollowList()` 桥；回退：`GET /follow/list` | `[{deviceId,nickname,avatar,carModel}]` | 「关注」宫格（原生环境走桥，H5 不自管） |
+| 粉丝列表 | 原生：`getFansList()` 桥；回退：`GET /follow/followers` | `[{deviceId,nickname,avatar,carModel}]` | 「粉丝」宫格（同上） |
 
-- 收藏/赞过/足迹/关注对象数组均存 H5 后端（`favorites`/`feed_likes`/`footprints`/`follows` 表），**不依赖 Flutter**，Flutter 只需拉上述接口渲染即可。
+- **发布 / 收藏 / 赞过 / 足迹**：存 H5 后端（`favorites`/`feed_likes`/`footprints` 表），不依赖 Flutter。
+- **关注 / 粉丝**：App 账号关系，真实数据经 Flutter 桥 `getFollowList()` / `getFansList()` 返回，H5 不自管、也不直连 ToC；仅预览/他人主页回退 H5 本地（本地仅种子数据）。
 - `tab`/`sub` query 为 H5 前端路由参数，不在接口层；Flutter 打开对应 `#/user/me?tab=...` URL 即可，数据由 H5 按上表自行拉取。
 
 ---
@@ -161,7 +167,8 @@ if (path.startsWith('message/user?deviceId=')) {
 - [ ] （二期）`message/user?deviceId=` 私信入口可用，或 H5 占位提示正常不报错。
 - [ ] **（2026-08-29 新增）** `GET /users/:deviceId` 返回含 `stats:{posts,favorites,following,followers}` 四格真实值（字段名固定；他人 `favorites` 返回 0 不泄露私密）。
 - [ ] **（2026-08-29 新增）** 原生环境点 H5 返回按钮 → `window.PXIDApp.postMessage('closeWebView')` 直接回到 Flutter「我的」页；浏览器预览退回 `router.back()`。
+- [ ] **（2026-08-29 新增 · 架构敲定）** Flutter 实现 `getFollowList()` / `getFansList()` 桥方法；真机「我的 → 关注/粉丝」显示 App 真实列表（H5 不自管、不直连 ToC）。发布/收藏仍走 H5 后端，数据不丢。
 
 ---
 
-*文档版本：2026-08-29 · 对应 H5 四宫格重构（发布/收藏/关注/粉丝 + 发布子Tab 动态/赞过/足迹）+ 四格统计 stats 契约 + closeWebView 返回 · 单一真相源 `INTEGRATION.md`*
+*文档版本：2026-08-29（更新：关注/粉丝改走 Flutter 桥 `getFollowList`/`getFansList`，发布/收藏仍 H5 自管）· 对应 H5 四宫格重构（发布/收藏/关注/粉丝 + 发布子Tab 动态/赞过/足迹）+ 四格统计 stats 契约 + closeWebView 返回 · 单一真相源 `INTEGRATION.md`*

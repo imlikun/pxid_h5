@@ -341,7 +341,7 @@ window.PXIDApp = {
 3. **原生侧入口**：Flutter 若需从原生页面（推送/消息/@提及）进入 H5 用户主页，调 `openNative('user/<deviceId>')`，收到后**让承载 H5 的 WebView 导航到 `#/user/<deviceId>`**（不要自己渲染用户页）。`deviceId` 用真机 `getUserInfo`/后端返回的 deviceId，勿用昵称。
 4. **「我的」tab 四宫格入口**：App「我的」头像下【发布】【收藏】【关注】【粉丝】四个入口都需链接进 H5 且分别直达对应宫格。让 WebView 打开带 `tab`/`sub` query 的 URL：`#/user/me?tab=publish`（发布，可加 `&sub=liked|footprints`）/ `?tab=favorites` / `?tab=follow` / `?tab=followers`；`/user/me` 内部用本机 `getDeviceId()` 识别自己。
 5. **标识统一 `device_id`**：所有 `user/<xxx>` 参数必须是 device_id（后端按 device_id 存/查），昵称会改、会重名，不可用于路由。
-6. **收藏/赞过/足迹/点赞全部 H5 自管**（详见 §1.7 契约表）：Flutter 无需处理点赞（`openNative('feed/interact?type=like')` 已废弃）；关注列表接口 `/follow/list` 已改返回对象数组，粉丝列表 `/follow/followers` 新增。
+6. **数据归属（2026-08-29 敲定）**：**发布/收藏/赞过/足迹/点赞 = H5 自管**（详见 §1.7 契约表，Flutter 无需处理点赞）；**关注列表/粉丝列表 = App 账号关系，走 Flutter 桥 `getFollowList()` / `getFansList()`**（H5 不自管、不直连 ToC），仅预览/他人主页回退 H5 本地 `/follow/list`、`/follow/followers`（本地仅种子数据）。Flutter 必须实现这两个桥方法，否则真机关注/粉丝为空。
 7. **二期（未做，本期占位）**：私信、编辑资料、举报、拉黑。他人主页「发消息」暂走 `openNative('message/user?deviceId=')`，无原生时 H5 提示「即将上线」，不阻塞浏览。
 
 ### 4.10 视觉规范
