@@ -131,7 +131,7 @@ import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
 import TopBar from '../components/TopBar.vue'
 import { featuredQuick } from '../data/mock'
-import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym } from '../api/shop'
+import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym, API_BASE } from '../api/shop'
 import { bridge } from '../bridge'
 import { t } from '../i18n'
 
@@ -141,10 +141,32 @@ const store = ref('')
 const loading = ref(true)
 const error = ref('')
 
+// 精选栏目运营配置（后台 pxid-admin「精选配置」维护；读取失败回退默认值，不白屏）
+const cfg = ref({
+  bannerHandles: ['p4', '500w-48v-city-folding-electric-scooter-with-app', 'ant5'],
+  hotCount: 4,
+  springCollection: 'spring',
+  bikesCollection: 'bikes',
+})
+async function fetchFeaturedConfig() {
+  try {
+    const r = await fetch(`${API_BASE}/featured-config`)
+    if (!r.ok) return
+    const j = await r.json()
+    const d = (j && j.data) || j || {}
+    if (Array.isArray(d.bannerHandles) && d.bannerHandles.length) cfg.value.bannerHandles = d.bannerHandles
+    if (typeof d.hotCount === 'number') cfg.value.hotCount = d.hotCount
+    if (d.springCollection) cfg.value.springCollection = d.springCollection
+    if (d.bikesCollection) cfg.value.bikesCollection = d.bikesCollection
+  } catch (e) {
+    console.warn('[featured] 读取精选配置失败，使用默认值:', e.message || e)
+  }
+}
+
 onMounted(async () => {
   try {
     await initRegion()
-    await fetchProducts()
+    await Promise.all([fetchProducts(), fetchFeaturedConfig()])
     store.value = getStore()
     error.value = getLastError()
   } finally {
@@ -158,13 +180,12 @@ function enterStore() {
   if (store.value) bridge.openShopify('https://' + store.value)
 }
 
-// ---- 顶部 Banner 产品轮播（仅展示指定的 3 个在售车型）----
+// ---- 顶部 Banner 产品轮播（展示后台配置的车型 handles）----
 const current = ref(0)
 let _bannerTimer = null
-const BANNER_HANDLES = ['p4', '500w-48v-city-folding-electric-scooter-with-app', 'ant5']
 const bannerList = computed(() =>
   all.value.filter(
-    (p) => BANNER_HANDLES.includes(p.handle) || BANNER_HANDLES.includes(String(p.id))
+    (p) => cfg.value.bannerHandles.includes(p.handle) || cfg.value.bannerHandles.includes(String(p.id))
   )
 )
 
@@ -216,18 +237,18 @@ const featuredQuickI18n = computed(() =>
 )
 
 const all = computed(() => getProducts())
-const hotProducts = computed(() => all.value.slice(0, 4))
+const hotProducts = computed(() => all.value.slice(0, cfg.value.hotCount))
 const springProducts = computed(() => {
   const list = all.value
   const f = list.filter(
-    (p) => p.collection === 'spring' || (p.tags || []).includes('spring')
+    (p) => p.collection === cfg.value.springCollection || (p.tags || []).includes(cfg.value.springCollection)
   )
   return f.length ? f : list
 })
 const bikeProducts = computed(() => {
   const list = all.value
   const f = list.filter(
-    (p) => p.collection === 'bikes' || (p.tags || []).includes('bike')
+    (p) => p.collection === cfg.value.bikesCollection || (p.tags || []).includes(cfg.value.bikesCollection)
   )
   return f.length ? f : list
 })

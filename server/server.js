@@ -171,6 +171,15 @@ CREATE TABLE IF NOT EXISTS plaza_grid (
   status TEXT NOT NULL DEFAULT 'on',
   created_at TEXT NOT NULL
 );
+-- 精选栏目运营可配置项（单行 id=1，由 pxid-admin「精选配置」模块维护）
+CREATE TABLE IF NOT EXISTS featured_config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  banner_handles TEXT NOT NULL DEFAULT 'p4,500w-48v-city-folding-electric-scooter-with-app,ant5',
+  hot_count INTEGER NOT NULL DEFAULT 4,
+  spring_collection TEXT NOT NULL DEFAULT 'spring',
+  bikes_collection TEXT NOT NULL DEFAULT 'bikes',
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS activities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL DEFAULT '',
@@ -370,6 +379,16 @@ addCommentCol('parent_id', "INTEGER NOT NULL DEFAULT 0")
     console.error('[pxid-feed] seed demo notifications failed:', e.message || e)
   }
 })()
+
+// 确保精选配置单行存在（defaults 已由建表 DDL 提供，这里只 INSERT OR IGNORE 兜底）
+;(function seedFeaturedConfig() {
+  try {
+    db.prepare('INSERT OR IGNORE INTO featured_config (id, updated_at) VALUES (1, ?)').run(new Date().toISOString())
+  } catch (e) {
+    console.error('[pxid-feed] seed featured_config failed:', e.message || e)
+  }
+})()
+
 function fmtAgo(min) {
   const d = new Date(Date.now() - min * 60000)
   return d.toISOString().slice(0, 19).replace('T', ' ')
@@ -1973,6 +1992,26 @@ app.get('/banners', (req, res) => {
   const rows = db.prepare("SELECT * FROM banners WHERE status='on' ORDER BY sort ASC, id DESC").all()
   res.json(ok({ list: rows }))
 })
+
+// 精选栏目运营配置（公开只读，供 C 端 H5 /featured 拉取）
+function featuredConfigToApi(row) {
+  const handles = String((row && row.banner_handles) || '')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+  return {
+    bannerHandles: handles,
+    hotCount: Number(row && row.hot_count) || 4,
+    springCollection: (row && row.spring_collection) || 'spring',
+    bikesCollection: (row && row.bikes_collection) || 'bikes',
+  }
+}
+app.get('/featured-config', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM featured_config WHERE id=1').get()
+    res.json(ok(featuredConfigToApi(row)))
+  } catch (e) {
+    res.json(err(500, '读取精选配置失败：' + e.message))
+  }
+})
 app.get('/admin/banners', requireAdmin, (req, res) => {
   const rows = db.prepare('SELECT * FROM banners ORDER BY sort ASC, id DESC').all()
   res.json(ok({ list: rows }))
@@ -1998,6 +2037,35 @@ app.put('/admin/banners/:id', requireAdmin, (req, res) => {
 app.delete('/admin/banners/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM banners WHERE id=?').run(req.params.id)
   res.json(ok({ id: req.params.id }))
+})
+
+// ---- 精选栏目配置（单行 id=1，运营后台可视化维护）----
+app.get('/admin/featured-config', requireAdmin, (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM featured_config WHERE id=1').get()
+    res.json(ok(featuredConfigToApi(row)))
+  } catch (e) {
+    res.json(err(500, '读取精选配置失败：' + e.message))
+  }
+})
+app.put('/admin/featured-config', requireAdmin, (req, res) => {
+  const body = req.body || {}
+  const sets = []; const args = []
+  if (body.bannerHandles !== undefined) {
+    const v = Array.isArray(body.bannerHandles)
+      ? body.bannerHandles.join(',')
+      : String(body.bannerHandles || '')
+    sets.push('banner_handles = ?'); args.push(v)
+  }
+  if (body.hotCount !== undefined) { sets.push('hot_count = ?'); args.push(parseInt(body.hotCount) || 0) }
+  if (body.springCollection !== undefined) { sets.push('spring_collection = ?'); args.push(String(body.springCollection || 'spring')) }
+  if (body.bikesCollection !== undefined) { sets.push('bikes_collection = ?'); args.push(String(body.bikesCollection || 'bikes')) }
+  if (!sets.length) return res.json(err(1, '无可更新字段'))
+  sets.push('updated_at = ?'); args.push(now())
+  args.push(1)
+  db.prepare(`UPDATE featured_config SET ${sets.join(', ')} WHERE id=?`).run(...args)
+  const row = db.prepare('SELECT * FROM featured_config WHERE id=1').get()
+  res.json(ok(featuredConfigToApi(row)))
 })
 
 // ---- 广场四宫格跳转配置 CRUD ----
