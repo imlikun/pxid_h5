@@ -188,10 +188,11 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 }
 .markall {
   font-size: 13px;
-  color: var(--brand, #4A6CF7);
-  font-weight: 500;
-  padding: 4px 8px;
-  border-radius: 6px;
+  color: var(--brand);
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-soft);
   transition: opacity 0.15s;
 }
 .markall:active { opacity: 0.6; }
@@ -226,22 +227,25 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   box-shadow: 0 2px 8px rgba(74, 108, 247, 0.25);
 }
 
-/* ---- 列表 ---- */
+/* ---- 列表（浮动卡片，对齐车型详情页鸿蒙智行风） ---- */
 .list {
-  padding: 4px 14px 0;
-  background: #fff;
-  min-height: calc(100vh - 120px);
-  border-radius: 16px 16px 0 0;
+  margin: 14px 16px 0;
+  padding: 0;
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  min-height: calc(100vh - 180px);
 }
 .item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 4px;
-  border-bottom: 0.5px solid var(--line, #f0f0f2);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
   position: relative;
   transition: background 0.15s;
 }
+.item:last-child { border-bottom: none; }
 .item:active { background: rgba(0, 0, 0, 0.02); }
 .item.unread {
   background: linear-gradient(90deg, rgba(74, 108, 247, 0.05), transparent 70%);
@@ -259,7 +263,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #e8ecf4 0%, #dfe3ef 100%);
+  background: linear-gradient(135deg, var(--brand-soft) 0%, #dfe3ef 100%);
   display: flex;
   align-items: center;
   justify-content: center;

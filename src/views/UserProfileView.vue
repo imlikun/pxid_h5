@@ -363,14 +363,17 @@ onUnmounted(() => {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* ---- 资料卡 ---- */
+/* ---- 资料卡（浮动卡片，对齐车型详情页鸿蒙智行风） ---- */
 .u-head {
   position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 22px 16px 18px;
-  background: #fff;
+  margin: 14px 16px 0;
+  padding: 18px 16px;
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
 }
 .u-avatar {
   width: 68px;
@@ -378,7 +381,7 @@ onUnmounted(() => {
   border-radius: 50%;
   overflow: hidden;
   flex: none;
-  background: linear-gradient(135deg, #e8ecf4 0%, #dfe3ef 100%);
+  background: linear-gradient(135deg, var(--brand-soft) 0%, #dfe3ef 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -411,14 +414,14 @@ onUnmounted(() => {
 .u-btn {
   font-size: 13px;
   font-weight: 600;
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   padding: 7px 16px;
   border: none;
 }
-.u-edit { color: var(--text-sub); background: #f0f1f3; }
-.u-follow { color: #fff; background: var(--brand, #4a6cf7); }
-.u-follow.on { color: var(--text-sub); background: #f0f1f3; }
-.u-msg { color: var(--brand, #4a6cf7); background: var(--brand-soft, rgba(74, 108, 247, 0.1)); }
+.u-edit { color: var(--text-sub); background: var(--surface-2); }
+.u-follow { color: #fff; background: var(--brand-gradient); box-shadow: 0 2px 8px rgba(77, 124, 255, 0.3); }
+.u-follow.on { color: var(--text-sub); background: var(--surface-2); box-shadow: none; }
+.u-msg { color: var(--brand); background: var(--brand-soft); }
 .u-more-btn {
   width: 30px; height: 30px;
   border-radius: 50%;
@@ -433,7 +436,7 @@ onUnmounted(() => {
   top: 58px;
   right: 12px;
   background: #fff;
-  border-radius: 10px;
+  border-radius: var(--radius);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   z-index: 50;
@@ -446,11 +449,13 @@ onUnmounted(() => {
 }
 .u-menu__item:active { background: #f5f6f8; }
 
-/* ---- 四宫格 ---- */
+/* ---- 四宫格（浮动卡片） ---- */
 .u-grid {
   display: flex;
-  background: #fff;
-  border-bottom: 1px solid #eee;
+  margin: 14px 16px 0;
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
 }
 .u-grid__item {
   flex: 1;
@@ -469,13 +474,14 @@ onUnmounted(() => {
 .u-grid__item.on b,
 .u-grid__item.on span { color: var(--brand, #4a6cf7); }
 
-/* ---- 发布子 Tab 条 ---- */
+/* ---- 发布子 Tab 条（浮动卡片） ---- */
 .u-tabs {
   display: flex;
   gap: 4px;
   padding: 0 12px;
-  background: #fff;
-  border-bottom: 1px solid #eee;
+  margin: 14px 16px 0;
+  background: var(--card);
+  border-radius: var(--radius-xl);
   position: sticky;
   top: 44px;
   z-index: 10;
@@ -503,19 +509,25 @@ onUnmounted(() => {
 }
 
 /* ---- 内容区 ---- */
-.u-body { padding-top: 10px; }
+.u-body { padding-top: 14px; }
 .u-more { text-align: center; padding: 14px 0 22px; font-size: 12px; color: var(--text-hint); }
 .u-empty { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--text-hint); }
 
-/* 用户列表（关注/粉丝）*/
-.u-users { background: #fff; }
+/* 用户列表（关注/粉丝，浮动卡片）*/
+.u-users {
+  margin: 0 16px;
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
 .u-user {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid #f2f3f5;
+  border-bottom: 1px solid var(--line);
 }
+.u-user:last-child { border-bottom: none; }
 .u-user__av { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; background: #eef0f4; }
 .u-user__meta { flex: 1; min-width: 0; }
 .u-user__name { font-size: 15px; font-weight: 600; color: var(--text); }
