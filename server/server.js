@@ -484,9 +484,14 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', 
     args.push(mid)
     db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE (length(device_id)>0 AND device_id=?) OR (length(member_user_id)>0 AND member_user_id=?)`).run(...args)
   } else {
+    // 首次写：未提供的字段回退到 feeds 真实身份，避免「只改昵称」把头像/车型清空
+    const fe = resolveFeedsIdentity(id, mid) || {}
+    const insNick = (nickname && nickname !== '骑友') ? String(nickname).slice(0, 20) : (String(fe.nickname || '').slice(0, 20) || '骑友')
+    const insAvatar = (avatar !== undefined && avatar !== null) ? String(avatar || '').slice(0, 500) : (String(fe.avatar || '').slice(0, 500))
+    const insCar = (carModel !== undefined && carModel !== null) ? String(carModel || '').slice(0, 30) : (String(fe.car_model || '').slice(0, 30))
     try {
       db.prepare('INSERT INTO user_profiles (device_id, member_user_id, nickname, avatar, car_model, updated_at) VALUES (?,?,?,?,?,?)')
-        .run(id, mid, String(nickname || '骑友').slice(0, 20), String(avatar || '').slice(0, 500), String(carModel || '').slice(0, 30), now())
+        .run(id, mid, insNick, insAvatar, insCar, now())
     } catch (e) {
       if (String(e.message || '').includes('UNIQUE')) {
         // 极端并发冲突：重建为更新，避免 500
@@ -504,6 +509,14 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', 
     }
   }
   upsertProfileAlias({ deviceId, memberUserId, nickname, avatar })
+}
+
+// 从动态表回退取作者最新身份（昵称/头像/车型），用于「首次写 profile 缺字段」时补全，避免清空真实头像。
+function resolveFeedsIdentity(deviceId = '', memberUserId = '') {
+  const id = String(deviceId || '')
+  const mid = String(memberUserId || '')
+  if (!id && !mid) return null
+  return db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(id, mid) || null
 }
 
 function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '骑友', storedAvatar = '' }) {
@@ -1069,6 +1082,7 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
   if (!row) return res.json(err(404, '动态不存在'))
   const deviceId = (req.user && req.user.deviceId) || ''
   const memberUserId = (req.user && req.user.memberUserId) || ''
+  if (!deviceId && !memberUserId) return res.status(401).json(err(401, '未授权：无法识别用户身份'))
   const { liked = true, nickname = '', avatar = '' } = req.body || {}
   const already = !!db.prepare('SELECT 1 FROM feed_likes WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, row.id)
   let isLiked = already
@@ -1107,6 +1121,7 @@ app.post('/feed/:id/favorite', requireAuth, (req, res) => {
   if (!row) return res.json(err(404, '动态不存在'))
   const deviceId = (req.user && req.user.deviceId) || ''
   const memberUserId = (req.user && req.user.memberUserId) || ''
+  if (!deviceId && !memberUserId) return res.status(401).json(err(401, '未授权：无法识别用户身份'))
   const { favorited = true } = req.body || {}
   const already = !!db.prepare('SELECT 1 FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, req.params.id)
   if (favorited && !already) db.prepare('INSERT OR IGNORE INTO favorites (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, req.params.id, now())
@@ -1123,6 +1138,7 @@ app.post('/footprints', requireAuth, (req, res) => {
   if (!row) return res.json(err(404, '动态不存在'))
   const deviceId = (req.user && req.user.deviceId) || ''
   const memberUserId = (req.user && req.user.memberUserId) || ''
+  if (!deviceId && !memberUserId) return res.status(401).json(err(401, '未授权：无法识别用户身份'))
   db.prepare('DELETE FROM footprints WHERE (device_id=? OR member_user_id=?) AND feed_id=?').run(deviceId, memberUserId, feedId)
   db.prepare('INSERT INTO footprints (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, feedId, now())
   res.json(ok({ ok: true }))
