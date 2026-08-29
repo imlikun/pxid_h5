@@ -1,22 +1,15 @@
-// 简化鉴权：每台浏览器/设备一个稳定 ID（localStorage 持久化）
-// 首次访问生成 UUID，之后随发帖提交（后端用于去重 / 关联用户）
-const KEY = 'pxid_h5_device_id_v1'
-function uuid() {
-  // RFC4122 v4 简化
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
-  })
-}
-export function getDeviceId() {
+// 设备身份统一出口：直接委托原生桥。
+// 真机（Flutter 注入 window.PXIDBridge.getDeviceId）返回真实设备 ID，
+// 与发帖/互动后端落地身份一致；浏览器预览返回稳定的 mock 匿名 ID。
+// 不再本地自造 UUID（旧 pxid_h5_device_id_v1），避免两套身份割裂导致
+// 「我的」动态/收藏/关注/粉丝全部对不上（2026-08-29 根因修复）。
+import bridge from '../bridge'
+
+export async function getDeviceId() {
   try {
-    let id = localStorage.getItem(KEY)
-    if (!id) {
-      id = uuid()
-      localStorage.setItem(KEY, id)
-    }
-    return id
+    const id = await bridge.getDeviceId()
+    return id || ''
   } catch (e) {
-    return 'web-' + Date.now()
+    return ''
   }
 }

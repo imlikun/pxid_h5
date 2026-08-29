@@ -163,9 +163,15 @@ let toastTimer = null
 const PAGE_SIZE = 15
 const menuOpen = ref(false)
 
+// 「我的」入口（App「我的」四宫格）进 /user/me：身份走原生桥真实设备 ID，
+// 与发帖/收藏/关注的落地身份一致（2026-08-29 修复两套 ID 割裂）。
+const myDeviceId = ref('')
 const targetDevice = computed(() =>
-  route.params.id === 'me' ? getDeviceId() || '' : String(route.params.id || '')
+  route.params.id === 'me' ? myDeviceId.value : String(route.params.id || '')
 )
+async function resolveMyDevice() {
+  myDeviceId.value = await getDeviceId()
+}
 const avatarText = computed(() => (user.value && user.value.nickname ? user.value.nickname.slice(0, 1).toUpperCase() : '?'))
 
 function showToast(m) {
@@ -303,12 +309,14 @@ watch(() => route.params.id, async () => {
   activeTab.value = 'dynamic'
   userList.value = []
   applyQuery()
+  await resolveMyDevice()
   await loadProfile()
   await loadContent(true)
 })
 
 onMounted(async () => {
   applyQuery()
+  await resolveMyDevice()
   await loadProfile()
   await loadContent(true)
   window.addEventListener('scroll', onScroll, { passive: true })

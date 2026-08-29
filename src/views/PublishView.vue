@@ -132,6 +132,7 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { carModels } from '../data/mock'
 import bridge from '../bridge'
+import { getDeviceId } from '../utils/device'
 import { t } from '../i18n'
 import { fetchFeedUsers } from '../api/feed'
 import { uploadMedia } from '../storage'
@@ -414,7 +415,7 @@ async function onPublish() {
         region,
         nickname: profile.nickname || '骑友',
         avatar: profile.avatar || '',
-        deviceId: await bridge.getDeviceId(),
+        deviceId: await getDeviceId(),
         lat: lat.value,
         lng: lng.value,
         mentions: mentions.value.map((m) => ({ deviceId: m.deviceId, nickname: m.nickname })),

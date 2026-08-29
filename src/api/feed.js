@@ -56,7 +56,7 @@ export async function fetchFeeds(tab = 'dynamic', params = {}) {
     try {
       const qsParams = { tab, ...params }
       // 动态：关注流，传当前设备 ID 让后端按「关注 + 官方」过滤；near 模式显式传 followerDevice='' 则不过滤
-      if (tab === 'dynamic' && params.followerDevice === undefined) qsParams.followerDevice = getDeviceId()
+      if (tab === 'dynamic' && params.followerDevice === undefined) qsParams.followerDevice = await getDeviceId()
       const qs = new URLSearchParams(qsParams).toString()
       const data = await request('/feed?' + qs)
       return { list: (data.list || []).map(normalize), total: data.total || 0 }
@@ -209,7 +209,7 @@ export async function fetchActivities(params = {}) {
 // ---- 关注 / 取关 / 检查（动态关注流）----
 export async function followUser(followeeDevice) {
   try {
-    await request('/follow', { method: 'POST', body: { followerDevice: getDeviceId(), followeeDevice } })
+    await request('/follow', { method: 'POST', body: { followerDevice: await getDeviceId(), followeeDevice } })
     return { ok: true }
   } catch (e) {
     return { ok: false, message: e.message || '关注失败' }
@@ -217,7 +217,7 @@ export async function followUser(followeeDevice) {
 }
 export async function unfollowUser(followeeDevice) {
   try {
-    await request(`/follow?followerDevice=${encodeURIComponent(getDeviceId())}&followeeDevice=${encodeURIComponent(followeeDevice)}`, { method: 'DELETE' })
+    await request(`/follow?followerDevice=${encodeURIComponent(await getDeviceId())}&followeeDevice=${encodeURIComponent(followeeDevice)}`, { method: 'DELETE' })
     return { ok: true }
   } catch (e) {
     return { ok: false, message: e.message || '取关失败' }
@@ -225,7 +225,7 @@ export async function unfollowUser(followeeDevice) {
 }
 export async function checkFollow(followeeDevice) {
   try {
-    const data = await request(`/follow/check?follower=${encodeURIComponent(getDeviceId())}&followee=${encodeURIComponent(followeeDevice)}`)
+    const data = await request(`/follow/check?follower=${encodeURIComponent(await getDeviceId())}&followee=${encodeURIComponent(followeeDevice)}`)
     return !!data.following
   } catch (e) {
     return false
@@ -235,7 +235,7 @@ export async function checkFollow(followeeDevice) {
 // ---- 举报（UGC 内容安全闭环）----
 export async function reportFeed(id, reason) {
   try {
-    await request(`/feed/${id}/report`, { method: 'POST', body: { reason, reporterDevice: getDeviceId() } })
+    await request(`/feed/${id}/report`, { method: 'POST', body: { reason, reporterDevice: await getDeviceId() } })
     return { ok: true }
   } catch (e) {
     return { ok: false, message: e.message || '举报失败' }
