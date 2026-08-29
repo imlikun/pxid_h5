@@ -280,9 +280,10 @@ function calcKbH() {
     const h = Math.max(0, window.innerHeight - vv.height)
     if (h > 40) return h
   }
-  // 兜底：覆盖模式键盘（部分国产 WebView 不缩 viewport）
-  // 不用 screen.height - innerHeight，因为会把系统底部导航栏算进去。
-  return Math.round(window.innerHeight * 0.45)
+  // 算不出来时返回 0，不要凭空估一个比例值（如 0.45*innerHeight），
+  // 否则输入框会悬空在键盘上方。交给 CSS env(keyboard-inset-bottom, 0px) 处理，
+  // 并由 focus 后的 scrollIntoView 兜底避免被键盘遮住。
+  return 0
 }
 let lastKbH = 0
 function syncKeyboard(force) {
@@ -293,10 +294,15 @@ function syncKeyboard(force) {
   kbH.value = h
   if (commenting.value) applyDetailPadding()
 }
-// 输入栏固定定位样式：bottom 精确等于键盘高度，贴紧键盘顶边
+// 输入栏固定定位样式：
+// - 能算出真实键盘高度（visualViewport 差值 > 40）时，bottom = 键盘高度，贴紧键盘顶边；
+// - 算不出时，不要凭空兜底一个比例值（会导致输入框悬空在键盘上方），直接 fallthrough 到 CSS：
+//   CSS 里 bottom: env(keyboard-inset-bottom, 0px) 会让支持的 WebView 自动贴键盘，
+//   不支持的 WebView 则 bottom: 0 贴屏幕底，再由 focus 后的 scrollIntoView 兜底避免被键盘遮住。
 const cinputStyle = computed(() => {
   if (!commenting.value) return {}
-  return { bottom: kbH.value + 'px' }
+  if (kbH.value > 40) return { bottom: kbH.value + 'px' }
+  return {}
 })
 function applyDetailPadding() {
   const detailEl = document.querySelector('.detail')
@@ -320,6 +326,16 @@ function scheduleKeyboardSyncs() {
   ;[0, 80, 180, 320].forEach((ms) => {
     kbTimers.push(setTimeout(() => syncKeyboard(ms === 0), ms))
   })
+  // 兜底：如果键盘高度最终仍检测不到（kbH < 80），说明当前 WebView 不暴露键盘高度。
+  // 此时输入栏会贴在屏幕底部，可能被键盘遮住；把输入框滚进可视区，保证用户能继续输入。
+  kbTimers.push(setTimeout(() => {
+    if (kbH.value < 80) {
+      const el = commentInput.value
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    }
+  }, 360))
 }
 function onCommentFocus() {
   commenting.value = true
@@ -948,12 +964,15 @@ function showToast(msg) {
   gap: 10px;
   padding: 12px 0 14px;
 }
-/* 聚焦时变固定底部栏，bottom 由 JS 精确计算为键盘高度，贴紧键盘顶边 */
+/* 聚焦时变固定底部栏。
+   优先用 CSS env(keyboard-inset-bottom) —— iOS 17+/新 Android WebView 能给出精确键盘高度；
+   不支持时 bottom:0 贴屏幕底部。JS 只在能精确算出键盘高度时内联 bottom 覆盖此值。 */
 .cinput--fixed {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
+  bottom: env(keyboard-inset-bottom, 0px);
   z-index: 60;
   max-width: 480px;
   margin: 0 auto;
