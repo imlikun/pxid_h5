@@ -240,49 +240,65 @@ function pickMention(u) {
 
 const canPost = computed(() => content.value.trim().length > 0 && !uploading.value)
 
-// 图片/视频选择入口：WebView（Flutter 注入桥）内 <input type=file> 默认不响应（需 Flutter 配 file-chooser delegate），
-// 故原生桥 pickImages/pickVideo 优先；浏览器独立预览环境无原生桥，降级用 <input type=file>
+// 图片/视频选择入口：原生环境优先走 Flutter 桥 pickImages/pickVideo；若桥未实现则回退 <input type=file>
+// （需 Flutter 配 WebView file-chooser delegate 才有用）。浏览器独立预览环境无原生桥，直接用 <input type=file>。
 async function onPickImageClick() {
   if (bridge.isNative()) {
-    await pickImagesNative()
+    const handled = await pickImagesNative()
+    // 桥未实现（Flutter 没注入 pickImages）→ 回退 H5 file input，并提示需原生支持
+    if (!handled && fileInput.value) {
+      fileInput.value.click()
+    }
   } else if (fileInput.value) {
     fileInput.value.click()
   }
 }
 async function onPickVideoClick() {
   if (bridge.isNative()) {
-    await pickVideoNative()
+    const handled = await pickVideoNative()
+    if (!handled && fileInputVideo.value) {
+      fileInputVideo.value.click()
+    }
   } else if (fileInputVideo.value) {
     fileInputVideo.value.click()
   }
 }
 
-// 原生图片选择（Flutter 实现 window.PXIDBridge.pickImages 时可用，作 H5 file input 的兜底通道）
+// 原生图片选择（Flutter 实现 window.PXIDBridge.pickImages 时可用）。返回 true=已处理（成功或已提示），false=桥不存在
+function hasNativePick(fn) {
+  return !!(window.PXIDBridge && typeof window.PXIDBridge[fn] === 'function')
+}
 async function pickImagesNative() {
+  if (!hasNativePick('pickImages')) return false
   try {
     const remain = 9 - picked.value.length
-    if (remain <= 0) return
+    if (remain <= 0) return true
     const images = await bridge.pickImages({ maxCount: remain })
-    if (!Array.isArray(images)) { showToast('选择图片失败'); return }
+    if (!Array.isArray(images)) { showToast('选择图片失败'); return true }
     for (const img of images) {
-      const url = img.url || img.path || ''
+      const url = img.url || img.path || img.uri || ''
       if (url) {
         picked.value.push({ file: null, url, uploadedUrl: url, uploading: false })
       }
     }
+    return true
   } catch (e) {
     showToast(e.message || '选择图片失败')
+    return true
   }
 }
 
-// 原生视频选择（Flutter 实现 window.PXIDBridge.pickVideo 时可用，作 H5 file input 的兜底通道）
+// 原生视频选择（Flutter 实现 window.PXIDBridge.pickVideo 时可用）
 async function pickVideoNative() {
+  if (!hasNativePick('pickVideo')) return false
   try {
     const video = await bridge.pickVideo({ maxDuration: 60 })
-    if (!video || !video.url) { showToast('选择视频失败'); return }
+    if (!video || !video.url) { showToast('选择视频失败'); return true }
     videoFile.value = { file: null, url: video.url, duration: video.duration || 0 }
+    return true
   } catch (e) {
     showToast(e.message || '选择视频失败')
+    return true
   }
 }
 
