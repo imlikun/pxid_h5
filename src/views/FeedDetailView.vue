@@ -113,8 +113,9 @@
         @reply="onReplyNode"
       />
 
-      <!-- 输入栏：聚焦时变固定底部栏并顶到键盘上方（修复评论框被输入法遮挡） -->
+      <!-- 输入栏：仅在点击「写评论」/评论图标聚焦(commenting)时浮起；非评论态隐藏，避免与底部 .actions 栏重复出现两个回复框 -->
       <div
+        v-show="commenting"
         class="cinput"
         :class="{ 'cinput--fixed': commenting }"
         :style="commenting ? { bottom: `max(env(keyboard-inset-bottom, 0px), ${kbH}px)` } : null"
