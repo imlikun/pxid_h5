@@ -118,7 +118,7 @@
         v-show="commenting"
         class="cinput"
         :class="{ 'cinput--fixed': commenting }"
-        :style="commenting ? { bottom: `max(env(keyboard-inset-bottom, 0px), ${kbH}px)` } : null"
+        :style="cinputStyle"
       >
         <div v-if="replyTo" class="cinput__reply">回复 {{ replyTo.name }} <span class="cinput__cancel" @click="replyTo = null">{{ t('feed.cancel') }}</span></div>
         <input
@@ -259,53 +259,72 @@ const commentInput = ref(null)
 // 修复：scrollIntoView 需在键盘稳定后执行；actions 栏高度需预留
 const commenting = ref(false)
 const kbH = ref(0)
-const KEYBOARD_ENV = (() => {
-  try {
-    return typeof CSS !== 'undefined' && !!CSS.supports && CSS.supports('bottom: env(keyboard-inset-bottom)')
-  } catch (e) {
-    return false
-  }
-})()
-// 悬浮窗输入法兜底高度（占屏幕比例）。
-// 0.5 基于 vivo X300 Pro + 微信输入法实测截图（键盘约 50% 屏高）；
-// 微信/搜狗/讯飞等悬浮窗输入法普遍 45-55%，可按实测机型调整。
-const KB_RESERVE_RATIO = 0.5
-// actions 栏高度（padding-bottom 预留值）
-const ACTIONS_HEIGHT = 64
-// 键盘高度兜底估算 timer（覆盖模式 WebView 用）
-let fallbackKbTimer = null
-function calcKbH() {
-  // 支持 CSS 键盘变量时交给 CSS（env 精确且零延迟），JS 不再抬升，避免 inline 覆盖
-  if (KEYBOARD_ENV) return 0
-  const vv = window.visualViewport
-  if (vv && typeof vv.height === 'number') {
-    // iOS / 新 Android WebView：键盘高度 = 布局视口 - 视觉视口 - 顶部偏移
-    return Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
-  }
-  // 降级：无 visualViewport（旧 Android WebView）
-  //   adjustResize 模式：innerHeight 已缩小，fixed bottom:0 天然位于键盘上方 → 0 即正确
-  //   覆盖模式：取不到键盘高度 → 靠 onCommentFocus 里的 scrollIntoView 兜底
-  return 0
-}
-function syncKeyboard() {
-  kbH.value = calcKbH()
-  if (commenting.value) applyDetailPadding()
-}
 // 输入栏预估高度（含 padding）。用于给主内容加 padding-bottom 让最后内容能滚到输入栏上方
 const CINPUT_RESERVE = 80
+// 键盘高度兜底估算 timer（覆盖模式 WebView 用）
+let fallbackKbTimer = null
+// 滚动位置锁：聚焦时禁止页面上下移动，避免 fixed 输入栏跟着内容“乱跑”
+let scrollLockTimer = null
+let savedScrollY = 0
+function calcKbH() {
+  // 优先 visualViewport：键盘高度 = 布局视口 - 视觉视口 - 视觉视口顶部偏移
+  const vv = window.visualViewport
+  if (vv && typeof vv.height === 'number') {
+    const h = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
+    if (h > 40) return h
+  }
+  // 兜底：覆盖模式键盘（部分国产 WebView 不缩 viewport，visualViewport 无变化）
+  //   用 screen.height - window.innerHeight 估算，过滤状态栏/导航栏等小幅变化
+  try {
+    const sh = window.screen?.height || window.innerHeight
+    const wh = window.innerHeight
+    if (sh - wh > 80) return sh - wh
+  } catch (e) {}
+  return 0
+}
+let lastKbH = 0
+function syncKeyboard() {
+  const h = calcKbH()
+  // 变化小于 2px 忽略，避免键盘稳定过程中的微抖动让输入框上下跳
+  if (Math.abs(h - lastKbH) < 2) return
+  lastKbH = h
+  kbH.value = h
+  if (commenting.value) applyDetailPadding()
+}
+// 输入栏固定定位样式：bottom 精确等于键盘高度，贴紧键盘顶边
+const cinputStyle = computed(() => {
+  if (!commenting.value) return {}
+  return { bottom: kbH.value + 'px' }
+})
 function applyDetailPadding() {
   const detailEl = document.querySelector('.detail')
   if (!detailEl) return
-  const kb = kbH.value || Math.round(window.innerHeight * KB_RESERVE_RATIO)
-  // 主内容底部留白 = 键盘高 + 输入栏高 + actions 栏高，让滚动后内容不被固定输入栏遮挡
-  detailEl.style.paddingBottom = kb + CINPUT_RESERVE + ACTIONS_HEIGHT + 'px'
+  const kb = kbH.value
+  if (!kb) return
+  // 主内容底部留白 = 键盘高 + 输入栏高，让滚动后内容不被固定输入栏遮挡
+  detailEl.style.paddingBottom = kb + CINPUT_RESERVE + 'px'
 }
 function clearDetailPadding() {
   const detailEl = document.querySelector('.detail')
   if (detailEl) detailEl.style.paddingBottom = ''
 }
+function lockScroll() {
+  savedScrollY = window.scrollY || window.pageYOffset || 0
+  document.body.style.overflow = 'hidden'
+  document.body.style.position = 'fixed'
+  document.body.style.top = '-' + savedScrollY + 'px'
+  document.body.style.width = '100%'
+}
+function unlockScroll() {
+  document.body.style.overflow = ''
+  document.body.style.position = ''
+  document.body.style.top = ''
+  document.body.style.width = ''
+  window.scrollTo(0, savedScrollY)
+}
 function onCommentFocus() {
   commenting.value = true
+  lockScroll()
   nextTick(() => {
     syncKeyboard()
     const el = commentInput.value
@@ -314,12 +333,16 @@ function onCommentFocus() {
       // 否则键盘弹出瞬间页面被整体顶上去，fixed 输入栏被推到屏幕顶部。
       el.focus({ preventScroll: true })
     }
-    // 部分 Android WebView（覆盖模式）不缩 viewport，visualViewport 拿不到键盘高。
-    // 等一帧仍拿不到时按屏高比例兜底估算，避免输入框被键盘压住。
+    // 覆盖模式 WebView 兜底：等一帧仍拿不到键盘高时，按屏高比例估算
     clearTimeout(fallbackKbTimer)
     fallbackKbTimer = setTimeout(() => {
       if (!kbH.value) {
-        kbH.value = Math.round(window.innerHeight * KB_RESERVE_RATIO)
+        const sh = window.screen?.height || window.innerHeight
+        const wh = window.innerHeight
+        const fallback = sh - wh > 80 ? sh - wh : Math.round(window.innerHeight * 0.45)
+        kbH.value = fallback
+        lastKbH = fallback
+        applyDetailPadding()
       }
     }, 180)
   })
@@ -327,10 +350,13 @@ function onCommentFocus() {
 function onCommentBlur() {
   // 延迟复位，避免点击发送按钮先 blur 再 click 丢失
   clearTimeout(fallbackKbTimer)
+  clearTimeout(scrollLockTimer)
   setTimeout(() => {
     commenting.value = false
     kbH.value = 0
+    lastKbH = 0
     clearDetailPadding()
+    unlockScroll()
   }, 120)
 }
 onMounted(() => {
@@ -356,6 +382,7 @@ const replyTo = ref(null) // { id, name }
 function onReplyNode(node) {
   replyTo.value = { id: node.id, name: node.author }
   commenting.value = true
+  lockScroll()
   nextTick(() => {
     syncKeyboard()
     const el = commentInput.value
@@ -363,7 +390,14 @@ function onReplyNode(node) {
     // 覆盖模式 WebView 兜底
     clearTimeout(fallbackKbTimer)
     fallbackKbTimer = setTimeout(() => {
-      if (!kbH.value) kbH.value = Math.round(window.innerHeight * KB_RESERVE_RATIO)
+      if (!kbH.value) {
+        const sh = window.screen?.height || window.innerHeight
+        const wh = window.innerHeight
+        const fallback = sh - wh > 80 ? sh - wh : Math.round(window.innerHeight * 0.45)
+        kbH.value = fallback
+        lastKbH = fallback
+        applyDetailPadding()
+      }
     }, 180)
   })
 }
@@ -680,8 +714,8 @@ function onPreview(img) {
 }
 function onCommentBtn() {
   commenting.value = true
+  lockScroll()
   nextTick(() => {
-    commentsBox.value && commentsBox.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
     syncKeyboard()
     const el = commentInput.value
     if (el) {
@@ -689,7 +723,14 @@ function onCommentBtn() {
       // 覆盖模式 WebView 兜底
       clearTimeout(fallbackKbTimer)
       fallbackKbTimer = setTimeout(() => {
-        if (!kbH.value) kbH.value = Math.round(window.innerHeight * KB_RESERVE_RATIO)
+        if (!kbH.value) {
+          const sh = window.screen?.height || window.innerHeight
+          const wh = window.innerHeight
+          const fallback = sh - wh > 80 ? sh - wh : Math.round(window.innerHeight * 0.45)
+          kbH.value = fallback
+          lastKbH = fallback
+          applyDetailPadding()
+        }
       }, 180)
     }
   })
@@ -952,12 +993,12 @@ function showToast(msg) {
   gap: 10px;
   padding: 12px 0 14px;
 }
-/* 聚焦时变固定底部栏，顶到软键盘上方（bottom 优先 CSS 原生键盘变量，回退 JS 动态计算） */
+/* 聚焦时变固定底部栏，bottom 由 JS 精确计算为键盘高度，贴紧键盘顶边 */
 .cinput--fixed {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: env(keyboard-inset-bottom, 0px);
+  bottom: 0;
   z-index: 60;
   max-width: 480px;
   margin: 0 auto;
@@ -967,6 +1008,7 @@ function showToast(msg) {
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
   /* 确保输入框不被父容器 overflow 裁剪 */
   transform: translateZ(0);
+  will-change: bottom;
 }
 .cinput__field {
   flex: 1;
