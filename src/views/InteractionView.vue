@@ -90,8 +90,17 @@ function avatarText(n) {
   return { like: '♥', comment: '💬', follow: '＋', system: '!' }[n.type] || '!'
 }
 
+// 返回上一级：原生全屏 WebView（App「我的」消息入口）调 PXIDApp.closeWebView 回 Flutter「我的」页；
+// 有 H5 历史（如从动态详情/他人主页点进来）先回上一页，无历史则关 WebView；浏览器预览退回 router.back()。
+// 注意：关闭桥是 window.PXIDApp.postMessage('closeWebView')，不是 PXIDBridge.closeWebView（不存在）。
 function goBack() {
-  router.back()
+  const app = window.PXIDApp
+  if (app && typeof app.postMessage === 'function') {
+    if (window.history.length > 1) router.back()
+    else app.postMessage('closeWebView')
+  } else if (window.history.length > 1) {
+    router.back()
+  }
 }
 
 // 时间人性化：刚刚 / x 分钟前 / x 小时前 / 昨天 / M-d / yyyy-MM-dd
