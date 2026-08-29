@@ -255,12 +255,10 @@ export async function fetchFeedUsers(region = '') {
 }
 
 // ---- 个人主页：用户聚合信息（昵称/头像/车型 + 关注/粉丝 + 是否已关注/是否自己）----
-// isSelf=true 时追加 ?self=1，告知服务端走 ToC 真身 memberUserId 代理四宫格计数（option A）
-export async function fetchUserProfile(deviceId, isSelf = false) {
+export async function fetchUserProfile(deviceId) {
   if (!FEED_API || !deviceId) return null
   try {
-    const qs = isSelf ? '?self=1' : ''
-    return await request('/users/' + encodeURIComponent(deviceId) + qs)
+    return await request('/users/' + encodeURIComponent(deviceId))
   } catch (e) {
     return null
   }
