@@ -218,7 +218,7 @@ function onTab(key) {
 async function loadProfile() {
   const d = targetDevice.value
   if (!d) { showToast('无法识别用户'); return }
-  user.value = await fetchUserProfile(d)
+  user.value = await fetchUserProfile(d, route.params.id === 'me')
   if (!user.value) showToast('用户信息加载失败')
 }
 

@@ -836,11 +836,12 @@ app.get('/feed/users', (req, res) => {
 
 // ---- 个人主页：用户聚合信息（公开资料；身份可选，用于 isFollowing/isSelf）----
 // GET /users/:deviceId → { deviceId, nickname, avatar, carModel, followeeCount, followerCount, isFollowing, isSelf }
-app.get('/users/:deviceId', (req, res) => {
+app.get('/users/:deviceId', async (req, res) => {
   const deviceId = String(req.params.deviceId || '')
   if (!deviceId) return res.json(err(400, '缺少 deviceId'))
   // 可选身份：带有效 Bearer token 则解析（未登录也能看公开资料，只是 isFollowing/isSelf=false）
   let myDevice = ''
+  let selfMemberUserId = ''
   try {
     const h = req.headers.authorization || ''
     const t = h.startsWith('Bearer ') ? h.slice(7) : ''
@@ -849,19 +850,39 @@ app.get('/users/:deviceId', (req, res) => {
       if (payload) myDevice = payload.deviceId || ''
     }
   } catch (e) { /* 忽略，按未登录处理 */ }
+
+  // option A：查看自己（self=1）+ ToC 关系接口已配置 → 用真身 memberUserId 代理四宫格计数
+  let followeeCount, followerCount, favoriteCount
+  if (req.query.self === '1' && (TOC_FOLLOWING_URL || TOC_FOLLOWERS_URL || TOC_FAVORITES_URL)) {
+    try { selfMemberUserId = (await peekRequester(req)).memberUserId } catch (e) { /* 回退本地 */ }
+    if (selfMemberUserId) {
+      try {
+        const [fl, fr, fv] = await Promise.all([
+          TOC_FOLLOWING_URL ? fetchTocList(TOC_FOLLOWING_URL, selfMemberUserId) : [],
+          TOC_FOLLOWERS_URL ? fetchTocList(TOC_FOLLOWERS_URL, selfMemberUserId) : [],
+          TOC_FAVORITES_URL ? fetchTocList(TOC_FAVORITES_URL, selfMemberUserId) : [],
+        ])
+        followeeCount = (fl || []).length
+        followerCount = (fr || []).length
+        favoriteCount = (fv || []).length
+      } catch (e) { console.warn('[users/:id] ToC stats 代理失败，回退本地:', e.message) }
+    }
+  }
+  if (followeeCount === undefined) {
+    followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE follower_device=?').get(deviceId).c
+    followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE followee_device=?').get(deviceId).c
+    favoriteCount = (myDevice === deviceId) ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=?').get(deviceId).c : 0
+  }
+
   // 资料优先取 user_profiles truth source，未命中再回退到最近一条有效发帖
   const profile = resolveProfile({ deviceId, memberUserId: '', storedNickname: '', storedAvatar: '' })
   const feed = !profile.nickname || profile.nickname === '骑友'
     ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(deviceId)
     : null
-  // 关注数 = 他关注了谁；粉丝数 = 谁关注了他
-  const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE follower_device=?').get(deviceId).c
-  const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE followee_device=?').get(deviceId).c
   const isFollowing = myDevice ? !!db.prepare('SELECT 1 FROM follows WHERE follower_device=? AND followee_device=?').get(myDevice, deviceId) : false
-  const isSelf = myDevice === deviceId
-  // 四宫格计数：发布数（公开动态数）/ 收藏数（仅自己可见，他人返回 0 不泄露私密）
+  const isSelf = (myDevice === deviceId) || (req.query.self === '1' && !!selfMemberUserId)
+  // 四宫格计数：发布数（公开动态数，本地 feeds 表）
   const feedCount = db.prepare("SELECT COUNT(*) c FROM feeds WHERE device_id=? AND status='published'").get(deviceId).c
-  const favoriteCount = isSelf ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=?').get(deviceId).c : 0
   res.json(ok({
     deviceId,
     nickname: profile.nickname || (feed && feed.nickname) || '骑友',
@@ -991,7 +1012,16 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
 
 // ---- 收藏 / 足迹（H5 自管关系表，个人主页 Tab）----
 // GET /favorites?page=&pageSize= → { total, list }（仅本人）
-app.get('/favorites', requireAuth, (req, res) => {
+app.get('/favorites', requireAuth, async (req, res) => {
+  // option A：配置 TOC_FAVORITES_URL 时代理到 ToC 真身库（按 memberUserId 取数），否则本地 SQLite
+  const memberUserId = (req.user && req.user.memberUserId) || ''
+  if (TOC_FAVORITES_URL && memberUserId) {
+    try {
+      const list = await fetchTocList(TOC_FAVORITES_URL, memberUserId)
+      // ToC 收藏列表应返回 FeedItem 兼容结构；原样透传，前端 normalize 复用
+      return res.json(ok({ total: (list || []).length, list: list || [] }))
+    } catch (e) { console.warn('[favorites] ToC 代理失败，回退本地:', e.message) }
+  }
   const deviceId = (req.user && req.user.deviceId) || ''
   if (!deviceId) return res.json(err(1, '无法识别用户'))
   const page = Math.max(1, parseInt(req.query.page) || 1)
@@ -1502,6 +1532,80 @@ function verifyDiscoverSignature(rawBody, headers, secret) {
   const expected = crypto.createHmac('sha256', secret).update(ts + '\n' + nonce + '\n' + rawBody).digest('hex')
   const a = Buffer.from(String(sig)), b = Buffer.from(expected)
   return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
+// ============================================================
+// ToC 关系数据代理（option A：关注 / 粉丝 / 收藏 代理到 ToC 真身库）
+// ------------------------------------------------------------
+// 设计：仅当对应 TOC_*_URL 环境变量配置时启用代理；未配置则走本地 SQLite，
+//       行为与改造前完全一致（零风险、可随时回退）。
+// 启用前置（需 raulin / ToC 同学提供）：
+//   ① TOC_BASE_URL / TOC_CLIENT_ID / TOC_CLIENT_SECRET（userinfo 换可信 memberUserId，见 requireAuth）
+//   ② 以下三个关系列表接口的真实路径 + 请求/响应结构（当前为规范推测值，待对齐后微调）
+//   ③ 请求方式默认 POST + X-Discover-* HMAC 签名（与 userinfo 同构）
+// 注：本地 follows / favorites 表均为 device 维度（无 member_user_id 列），
+//     真身关系数据只在 ToC 库，故「我的」页真实内容必须走此代理。
+// ============================================================
+const TOC_FOLLOWING_URL = process.env.TOC_FOLLOWING_URL || (TOC_BASE_URL ? TOC_BASE_URL + '/toc-api/open/discover/following' : '')
+const TOC_FOLLOWERS_URL = process.env.TOC_FOLLOWERS_URL || (TOC_BASE_URL ? TOC_BASE_URL + '/toc-api/open/discover/followers' : '')
+const TOC_FAVORITES_URL = process.env.TOC_FAVORITES_URL || (TOC_BASE_URL ? TOC_BASE_URL + '/toc-api/open/discover/favorites' : '')
+
+// 受限 token → ToC userinfo 换可信 memberUserId（供代理时定位真身；复用 requireAuth 的本地缓存）
+async function fetchTocUserinfo(token) {
+  const bodyStr = JSON.stringify({ accessToken: token })
+  const sign = discoverSign(bodyStr)
+  const r = await fetch(TOC_USERINFO_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...sign },
+    body: bodyStr,
+  })
+  if (r.status === 401) return null
+  if (!r.ok) throw new Error('userinfo HTTP ' + r.status)
+  const j = await r.json().catch(() => ({}))
+  const u = j.data || j
+  u.memberUserId = u.memberUserId || u.member_user_id || ''
+  return u
+}
+
+// 从请求头 Bearer token 轻量解析身份（不 401，供公开列表接口用）：生产→memberUserId，演示→deviceId
+async function peekRequester(req) {
+  const h = req.headers.authorization || ''
+  const t = h.startsWith('Bearer ') ? h.slice(7) : ''
+  if (!t) return { memberUserId: '', deviceId: '' }
+  if (TOC_USERINFO_URL && TOC_CLIENT_ID && TOC_CLIENT_SECRET) {
+    try {
+      const cached = getCachedUserinfo(t)
+      const u = cached || (await fetchTocUserinfo(t))
+      if (u && u.memberUserId) return { memberUserId: u.memberUserId, deviceId: '' }
+    } catch (e) { /* 回退 device 维度 */ }
+  }
+  if (USER_TOKEN_SECRET) {
+    const p = verifyUserToken(t)
+    if (p) return { memberUserId: p.memberUserId || '', deviceId: p.deviceId || '' }
+  }
+  return { memberUserId: '', deviceId: '' }
+}
+
+// 调 ToC 关系列表接口（统一响应包 { code:0, data:{ list:[...] } } 或 { code:0, data:[...] }）
+async function fetchTocList(url, memberUserId) {
+  const bodyStr = JSON.stringify({ memberUserId })
+  const sign = discoverSign(bodyStr)
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...sign }, body: bodyStr })
+  if (!r.ok) throw new Error('ToC list HTTP ' + r.status)
+  const j = await r.json().catch(() => null)
+  const data = j && (j.data !== undefined ? j.data : j)
+  return Array.isArray(data) ? data : (data && data.list) || []
+}
+
+// 关注/粉丝人物归一化（兼容 ToC 可能返回的字段别名）
+function normalizePerson(p) {
+  if (!p) return null
+  return {
+    deviceId: p.deviceId || p.memberUserId || p.id || '',
+    nickname: p.nickname || p.name || p.userName || '',
+    avatar: p.avatar || p.avatarUrl || p.headImgUrl || p.headimgurl || '',
+    carModel: p.carModel || p.car_model || p.vehicle || '',
+  }
 }
 
 // requireAuth 缓存（§6.3：本地缓存 userinfo 结果，读 5min / banned 写 60s）
@@ -2303,14 +2407,33 @@ function userBrief(deviceId) {
   }
 }
 // 关注列表：返回对象数组（头像/昵称/车型），便于 H5 直接渲染
-app.get('/follow/list', (req, res) => {
+// option A：配置 TOC_FOLLOWING_URL 时代理到 ToC 真身库（按 memberUserId 取数），否则本地 SQLite
+app.get('/follow/list', async (req, res) => {
+  if (TOC_FOLLOWING_URL) {
+    const { memberUserId } = await peekRequester(req)
+    if (memberUserId) {
+      try {
+        const list = (await fetchTocList(TOC_FOLLOWING_URL, memberUserId)).map(normalizePerson).filter(Boolean)
+        return res.json(ok({ list }))
+      } catch (e) { console.warn('[follow/list] ToC 代理失败，回退本地:', e.message) }
+    }
+  }
   const { device } = req.query
   if (!device) return res.json(err(1, '缺少 device'))
   const rows = db.prepare('SELECT followee_device FROM follows WHERE follower_device=? ORDER BY created_at DESC').all(device)
   res.json(ok({ list: rows.map((r) => userBrief(r.followee_device)) }))
 })
 // 粉丝列表：关注我的人（同结构）
-app.get('/follow/followers', (req, res) => {
+app.get('/follow/followers', async (req, res) => {
+  if (TOC_FOLLOWERS_URL) {
+    const { memberUserId } = await peekRequester(req)
+    if (memberUserId) {
+      try {
+        const list = (await fetchTocList(TOC_FOLLOWERS_URL, memberUserId)).map(normalizePerson).filter(Boolean)
+        return res.json(ok({ list }))
+      } catch (e) { console.warn('[follow/followers] ToC 代理失败，回退本地:', e.message) }
+    }
+  }
   const { device } = req.query
   if (!device) return res.json(err(1, '缺少 device'))
   const rows = db.prepare('SELECT follower_device FROM follows WHERE followee_device=? ORDER BY created_at DESC').all(device)
