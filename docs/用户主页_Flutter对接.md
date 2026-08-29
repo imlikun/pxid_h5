@@ -130,6 +130,23 @@ if (path.startsWith('message/user?deviceId=')) {
 4. **【字段名】** 是，固定 `posts/favorites/following/followers`（关注=following，粉丝=followers；Flutter 自行把 `followers` 映射到第 4 格 `fans` 展示）。
 5. **【兜底】** 是，未登录/接口失败返回 `stats` 全 0，不报错不阻断我的页渲染。
 
+### 6.5 数据接口清单（四宫格数字与列表的数据源）
+
+> 以下接口基地址均为 `https://pxid-api.appin.site`（详见文首「联调域名」）。所有接口除标注外均 `Authorization: Bearer <token>`（token 取自 `getUserInfo().token`）。
+
+| 用途 | 方法 + 路径 | 返回关键字段 | 说明 |
+| --- | --- | --- | --- |
+| 四宫格数字 | `GET /users/:deviceId` | `stats{posts,favorites,following,followers}` | 数字源；他人 `favorites` 返回 0 不泄露私密 |
+| 发布列表（我发的） | `GET /feed?tab=dynamic&deviceId=:id` | `feeds[]` | 「发布」宫格默认子 Tab |
+| 赞过列表 | `GET /feed/liked` | `feeds[]` | 需登录；「发布」子 Tab `sub=liked` |
+| 足迹列表 | `POST /footprints`(写) + 本地读 | — | 仅自己可见；「发布」子 Tab `sub=footprints` |
+| 收藏列表 | `GET /favorites` | `feeds[]` | 仅自己可见；「收藏」宫格 |
+| 关注列表 | `GET /follow/list` | `[{deviceId,nickname,avatar,carModel}]` | 「关注」宫格 |
+| 粉丝列表 | `GET /follow/followers` | `[{deviceId,nickname,avatar,carModel}]` | 「粉丝」宫格 |
+
+- 收藏/赞过/足迹/关注对象数组均存 H5 后端（`favorites`/`feed_likes`/`footprints`/`follows` 表），**不依赖 Flutter**，Flutter 只需拉上述接口渲染即可。
+- `tab`/`sub` query 为 H5 前端路由参数，不在接口层；Flutter 打开对应 `#/user/me?tab=...` URL 即可，数据由 H5 按上表自行拉取。
+
 ---
 
 ## 🔵 最终效果是啥（个人主页联调验收清单）
