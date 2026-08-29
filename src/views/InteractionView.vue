@@ -1,44 +1,31 @@
 <template>
   <div class="interaction">
-    <TopBar sticky :title="t('interaction.title')" :back="goBack">
-      <template #right>
-        <span class="markall press" @click="onMarkAll">{{ t('interaction.markAll') }}</span>
-      </template>
-    </TopBar>
+    <TopBar sticky :title="t('interaction.title')" :back="goBack" />
 
-    <!-- 分类 tabs -->
-    <div class="tabs">
-      <span
-        v-for="c in tabs"
-        :key="c.key"
-        class="tab"
-        :class="{ active: activeCat === c.key }"
-        @click="activeCat = c.key"
-        >{{ t('interaction.tab.' + c.key) }}</span
-      >
-    </div>
-
-    <!-- 列表 -->
+    <!-- 时间线消息列表（对齐车辆消息样式：时间居中 + 左侧系统头像 + 右侧气泡卡片） -->
     <div class="list">
       <div
         v-for="n in filtered"
         :key="n.id"
-        class="item"
+        class="msg-group"
         :class="{ unread: !n.read }"
         @click="onTap(n)"
       >
-        <div class="avatar">
-          <img v-if="n.actorAvatar" :src="n.actorAvatar" alt="" @error="(e) => handleAvatarError(e, n.actorName)" />
-          <span v-else class="avatar__ph">{{ avatarText(n) }}</span>
-        </div>
-        <div class="body">
-          <div class="row">
-            <span class="actor">{{ n.actorName || t('interaction.tab.system') }}</span>
-            <span class="time">{{ formatTime(n.createdAt) }}</span>
+        <div class="time">{{ formatDateTime(n.createdAt) }}</div>
+        <div class="msg-row">
+          <div class="avatar">
+            <img v-if="n.actorAvatar" :src="n.actorAvatar" alt="" @error="(e) => handleAvatarError(e, n.actorName)" />
+            <template v-else-if="n.type === 'system'">
+              <svg class="bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </template>
+            <span v-else class="avatar__ph">{{ avatarText(n) }}</span>
+            <span v-if="!n.read" class="dot"></span>
           </div>
-          <div class="content">{{ n.content }}</div>
+          <div class="bubble">
+            <div class="actor">{{ n.actorName || t('interaction.tab.system') }}</div>
+            <div class="content">{{ n.content }}</div>
+          </div>
         </div>
-        <span v-if="!n.read" class="dot"></span>
       </div>
       <div v-if="!filtered.length && !loading" class="empty">
         <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--text-hint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M34 42H14a4 4 0 01-4-4V18l14-10 14 10v20a4 4 0 01-4 4z"/><path d="M10 18l14-10 14 10"/><path d="M20 42v-12h8v12"/></svg>
@@ -71,14 +58,6 @@ const page = ref(1)
 const total = ref(0)
 const loadingMore = ref(false)
 const hasMore = computed(() => list.value.length < total.value)
-
-const tabs = [
-  { key: 'all' },
-  { key: 'like' },
-  { key: 'comment' },
-  { key: 'follow' },
-  { key: 'system' },
-]
 
 const filtered = computed(() => {
   if (activeCat.value === 'all') return list.value
@@ -117,6 +96,15 @@ function formatTime(s) {
   const now = new Date()
   if (d.getFullYear() === now.getFullYear()) return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// 时间线样式：08/27 17:12
+function formatDateTime(s) {
+  if (!s) return ''
+  const d = new Date(String(s).replace(' ', 'T'))
+  if (isNaN(d.getTime())) return String(s).slice(0, 16)
+  const pad = (x) => String(x).padStart(2, '0')
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 async function load() {
@@ -195,154 +183,107 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   background: var(--bg, #f7f8fa);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.markall {
-  font-size: 13px;
-  color: var(--brand);
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: var(--radius-pill);
-  background: var(--brand-soft);
-  transition: opacity 0.15s;
-}
-.markall:active { opacity: 0.6; }
-
-/* ---- 分类 tabs ---- */
-.tabs {
-  display: flex;
-  gap: 8px;
-  padding: 12px 14px 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  background: var(--bg, #f7f8fa);
-}
-.tabs::-webkit-scrollbar { display: none; }
-.tab {
-  flex: none;
-  font-size: 13px;
-  color: var(--text-sub);
-  padding: 7px 16px;
-  border-radius: 20px;
-  background: #fff;
-  line-height: 1;
-  border: 1px solid var(--line, #e8e8ea);
-  transition: all 0.2s ease;
-  font-weight: 500;
-}
-.tab.active {
-  color: #fff;
-  background: var(--brand, #4A6CF7);
-  border-color: transparent;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(74, 108, 247, 0.25);
-}
-
-/* ---- 列表（浮动卡片，对齐车型详情页鸿蒙智行风） ---- */
+/* ---- 时间线消息列表 ---- */
 .list {
-  margin: 14px 16px 0;
-  padding: 0;
-  background: var(--card);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  min-height: calc(100vh - 180px);
+  padding: 8px 16px calc(20px + env(safe-area-inset-bottom));
+  background: var(--bg, #f7f8fa);
+  min-height: calc(100vh - 100px);
 }
-.item {
+.msg-group {
+  margin-bottom: 18px;
+}
+.msg-group:last-child {
+  margin-bottom: 0;
+}
+.msg-group .time {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-hint);
+  margin-bottom: 10px;
+}
+.msg-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
-  position: relative;
-  transition: background 0.15s;
-}
-.item:last-child { border-bottom: none; }
-.item:active { background: rgba(0, 0, 0, 0.02); }
-.item.unread {
-  background: linear-gradient(90deg, rgba(74, 108, 247, 0.05), transparent 70%);
-}
-.item.unread .actor {
-  font-weight: 800;
-}
-.item.unread .content {
-  color: var(--text);
-  font-weight: 500;
+  align-items: flex-start;
+  gap: 10px;
 }
 
-/* ---- 头像 ---- */
+/* ---- 头像（车辆消息：浅灰圆底 + 白色铃铛） ---- */
 .avatar {
-  width: 46px;
-  height: 46px;
+  position: relative;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--brand-soft) 0%, #dfe3ef 100%);
+  background: #ebedf2;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
   overflow: hidden;
   border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 .avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
+.avatar .bell {
+  width: 20px;
+  height: 20px;
+  color: #9ca3af;
+}
 .avatar__ph {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--brand, #4A6CF7);
   letter-spacing: -0.5px;
 }
 
-/* ---- 内容区 ---- */
-.body {
+/* ---- 气泡卡片 ---- */
+.bubble {
   flex: 1;
   min-width: 0;
+  background: var(--card, #fff);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: background 0.15s;
 }
-.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.msg-group:active .bubble {
+  background: #f9f9fb;
+}
+.msg-group.unread .bubble {
+  background: #fff;
 }
 .actor {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text);
+  margin-bottom: 4px;
 }
-.time {
-  font-size: 12px;
-  color: var(--text-hint);
-  white-space: nowrap;
-  flex-shrink: 0;
+.msg-group.unread .actor {
+  color: var(--brand, #4A6CF7);
 }
 .content {
   font-size: 14px;
   color: var(--text-sub);
-  margin-top: 4px;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 /* ---- 未读红点 ---- */
 .dot {
   position: absolute;
-  top: 18px;
-  right: 2px;
-  width: 9px;
-  height: 9px;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--price, #E53E3E);
-  border: 2px solid #fff;
+  border: 2px solid var(--bg, #f7f8fa);
   box-shadow: 0 1px 3px rgba(229, 62, 62, 0.35);
-  animation: dot-pulse 2s ease infinite;
 }
-@keyframes dot-pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.15); opacity: 0.85; }
-}
+
+/* ---- 空状态 ---- */
 
 /* ---- 空状态 ---- */
 .empty {
