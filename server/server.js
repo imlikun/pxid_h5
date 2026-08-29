@@ -322,6 +322,15 @@ CREATE INDEX IF NOT EXISTS idx_notif_device ON notifications(device_id, id DESC)
 try { db.exec("ALTER TABLE notifications ADD COLUMN member_user_id TEXT NOT NULL DEFAULT ''") } catch (_) {}
 try { db.exec("CREATE INDEX IF NOT EXISTS idx_notif_member ON notifications(member_user_id, id DESC)") } catch (_) {}
 
+// ---- 活动关系表补 member_user_id 维度 ----
+// 生产 ToC 态下 device_id 可能为空，仅按 device_id 查会漏掉数据；改为双身份(设备/会员)均可命中。
+// ALTER ADD COLUMN 幂等，失败忽略（旧库已存在则跳过），不影响启动。
+;['feed_likes', 'favorites', 'footprints'].forEach((t) => {
+  try { db.exec(`ALTER TABLE ${t} ADD COLUMN member_user_id TEXT NOT NULL DEFAULT ''`) } catch (_) {}
+})
+try { db.exec("ALTER TABLE follows ADD COLUMN follower_member_user_id TEXT NOT NULL DEFAULT ''") } catch (_) {}
+try { db.exec("ALTER TABLE follows ADD COLUMN followee_member_user_id TEXT NOT NULL DEFAULT ''") } catch (_) {}
+
 // ---- 用户资料表：device / member_user_id 双维度，作为昵称/头像唯一真相源 ----
 db.exec(`
 CREATE TABLE IF NOT EXISTS user_profiles (
@@ -509,6 +518,19 @@ function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '�
     avatar: p.avatar || storedAvatar || '',
     carModel: p.car_model || '',
   }
+}
+
+// 按 token 双身份(设备/会员)构造 OR 匹配子句：避免 ToC 态 device_id 为空导致活动数据查不到。
+// 仅对非空身份生成条件；若两者皆空则匹配恒假(1=0)，不误返回他人数据。
+function userIdentityMatch(idCol, midCol, user) {
+  const u = user || {}
+  const d = u.deviceId || u.device_id || (u.raw && (u.raw.deviceId || u.raw.device_id)) || ''
+  const m = u.memberUserId || u.member_user_id || (u.raw && (u.raw.memberUserId || u.raw.member_user_id)) || ''
+  const parts = []
+  const args = []
+  if (d) { parts.push(`${idCol} = ?`); args.push(d) }
+  if (m) { parts.push(`${midCol} = ?`); args.push(m) }
+  return { clause: parts.length ? `(${parts.join(' OR ')})` : '(1=0)', args }
 }
 
 function resolveIdentityByAlias(nickname = '', avatar = '') {
@@ -855,34 +877,43 @@ app.get('/feed/users', (req, res) => {
 
 // ---- 个人主页：用户聚合信息（公开资料；身份可选，用于 isFollowing/isSelf）----
 // GET /users/:deviceId → { deviceId, nickname, avatar, carModel, followeeCount, followerCount, isFollowing, isSelf }
+// 兼容：deviceId 参数既可能是 device_id 也可能是 member_user_id（App「我的」入口传的是 member_user_id），
+// 资料与计数一律按「device_id OR member_user_id」双身份命中，避免 ToC 态只存 member_user_id 时查不到。
 app.get('/users/:deviceId', (req, res) => {
-  const deviceId = String(req.params.deviceId || '')
-  if (!deviceId) return res.json(err(400, '缺少 deviceId'))
+  const raw = String(req.params.deviceId || '')
+  if (!raw) return res.json(err(400, '缺少 deviceId'))
   // 可选身份：带有效 Bearer token 则解析（未登录也能看公开资料，只是 isFollowing/isSelf=false）
   let myDevice = ''
+  let myMid = ''
   try {
     const h = req.headers.authorization || ''
     const t = h.startsWith('Bearer ') ? h.slice(7) : ''
     if (t && USER_TOKEN_SECRET) {
       const payload = verifyUserToken(t)
-      if (payload) myDevice = payload.deviceId || ''
+      if (payload) { myDevice = payload.deviceId || ''; myMid = payload.memberUserId || '' }
     }
   } catch (e) { /* 忽略，按未登录处理 */ }
-  // 资料优先取 user_profiles truth source，未命中再回退到最近一条有效发帖
-  const profile = resolveProfile({ deviceId, memberUserId: '', storedNickname: '', storedAvatar: '' })
+  // 解析资料：优先按 device_id；若参数本身是数字（member_user_id）则再按 member_user_id 补一次
+  let profile = resolveProfile({ deviceId: raw, memberUserId: '', storedNickname: '', storedAvatar: '' })
+  if ((!profile.nickname || profile.nickname === '骑友') && /^\d+$/.test(raw)) {
+    const byMid = resolveProfile({ deviceId: '', memberUserId: raw, storedNickname: '', storedAvatar: '' })
+    if (byMid.nickname) profile = byMid
+  }
   const feed = !profile.nickname || profile.nickname === '骑友'
-    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(deviceId)
+    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
     : null
-  // 关注数 = 他关注了谁；粉丝数 = 谁关注了他
-  const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE follower_device=?').get(deviceId).c
-  const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE followee_device=?').get(deviceId).c
-  const isFollowing = myDevice ? !!db.prepare('SELECT 1 FROM follows WHERE follower_device=? AND followee_device=?').get(myDevice, deviceId) : false
-  const isSelf = myDevice === deviceId
+  // 关注/粉丝数：H5 follows 表按 设备/会员 双身份
+  const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE follower_device=? OR follower_member_user_id=?').get(raw, raw).c
+  const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE followee_device=? OR followee_member_user_id=?').get(raw, raw).c
+  const isFollowing = (myDevice || myMid)
+    ? !!db.prepare('SELECT 1 FROM follows WHERE (follower_device=? OR follower_member_user_id=?) AND (followee_device=? OR followee_member_user_id=?)').get(myDevice, myMid, raw, raw)
+    : false
+  const isSelf = (myDevice && myDevice === raw) || (myMid && myMid === raw)
   // 四宫格计数：发布数（公开动态数）/ 收藏数（仅自己可见，他人返回 0 不泄露私密）
-  const feedCount = db.prepare("SELECT COUNT(*) c FROM feeds WHERE device_id=? AND status='published'").get(deviceId).c
-  const favoriteCount = isSelf ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=?').get(deviceId).c : 0
+  const feedCount = db.prepare("SELECT COUNT(*) c FROM feeds WHERE (device_id=? OR member_user_id=?) AND status='published'").get(raw, raw).c
+  const favoriteCount = isSelf ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=? OR member_user_id=?').get(raw, raw).c : 0
   res.json(ok({
-    deviceId,
+    deviceId: raw,
     nickname: profile.nickname || (feed && feed.nickname) || '骑友',
     avatar: profile.avatar || (feed && feed.avatar) || '',
     carModel: profile.carModel || (feed && feed.car_model) || '',
@@ -901,6 +932,55 @@ app.get('/users/:deviceId', (req, res) => {
     isFollowing,
     isSelf,
   }))
+})
+
+// ---- 个人主页（自己）：用登录 token 身份解析，最可靠 ----
+// GET /users/me → 同 /users/:deviceId 结构，但身份来自 req.user（member_user_id / device_id 双维度），
+// 解决「App「我的」入口只持有 member_user_id、profile 只存 member_user_id」时按 device_id 查不到的问题。
+app.get('/users/me', requireAuth, (req, res) => {
+  const u = req.user || {}
+  const d = u.deviceId || u.device_id || ''
+  const m = u.memberUserId || u.member_user_id || ''
+  const profile = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
+  const feed = !profile.nickname || profile.nickname === '骑友'
+    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(d, m)
+    : null
+  const im = userIdentityMatch('f.device_id', 'f.member_user_id', u)
+  const feedCount = db.prepare(`SELECT COUNT(*) c FROM feeds f WHERE ${im.clause} AND f.status='published'`).get(...im.args).c
+  const favIm = userIdentityMatch('v.device_id', 'v.member_user_id', u)
+  const favoriteCount = db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${favIm.clause} AND f.status='published'`).get(...favIm.args).c
+  const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (follower_device=? OR follower_member_user_id=?)').get(d, m).c
+  const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (followee_device=? OR followee_member_user_id=?)').get(d, m).c
+  res.json(ok({
+    deviceId: d,
+    memberUserId: m,
+    nickname: profile.nickname || (feed && feed.nickname) || '骑友',
+    avatar: profile.avatar || (feed && feed.avatar) || '',
+    carModel: profile.carModel || (feed && feed.car_model) || '',
+    followeeCount,
+    followerCount,
+    feedCount,
+    favoriteCount,
+    stats: { posts: feedCount, favorites: favoriteCount, following: followeeCount, followers: followerCount },
+    isSelf: true,
+  }))
+})
+
+// ---- 编辑资料（自己）：更新昵称/头像/车型，写入 user_profiles 唯一真相源 ----
+// PUT /users/profile { nickname?, avatar?, carModel? } → 按 token 身份 upsert
+app.put('/users/profile', requireAuth, (req, res) => {
+  const u = req.user || {}
+  const d = u.deviceId || u.device_id || ''
+  const m = u.memberUserId || u.member_user_id || ''
+  if (!d && !m) return res.status(401).json(err(401, '未授权：无法识别用户'))
+  const { nickname, avatar, carModel } = req.body || {}
+  const patch = {}
+  if (nickname !== undefined) patch.nickname = String(nickname).slice(0, 20)
+  if (avatar !== undefined) patch.avatar = String(avatar || '').slice(0, 500)
+  if (carModel !== undefined) patch.carModel = String(carModel || '').slice(0, 30)
+  upsertProfile({ deviceId: d, memberUserId: m, nickname: patch.nickname !== undefined ? patch.nickname : undefined, avatar: patch.avatar !== undefined ? patch.avatar : undefined, carModel: patch.carModel !== undefined ? patch.carModel : undefined })
+  const p = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
+  res.json(ok({ nickname: p.nickname, avatar: p.avatar, carModel: p.carModel }))
 })
 
 // ---- 发帖（用户侧，kind=user）----
@@ -955,21 +1035,21 @@ app.post('/feed', requireAuth, (req, res) => {
 // GET /feed/liked?page=&pageSize= → { total, list }（仅本人，requireAuth 从 token 取 deviceId；返回项 isLiked 恒 true）
 // ⚠️ 必须定义在 app.get('/feed/:id') 之前，否则会被 /feed/:id 参数路由抢匹配返回 404
 app.get('/feed/liked', requireAuth, (req, res) => {
-  const deviceId = (req.user && req.user.deviceId) || ''
-  if (!deviceId) return res.json(err(1, '无法识别用户'))
+  const im = userIdentityMatch('l.device_id', 'l.member_user_id', req.user)
+  if (!im.args.length) return res.json(err(1, '无法识别用户'))
   const page = Math.max(1, parseInt(req.query.page) || 1)
   const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
   const off = (page - 1) * ps
-  const total = db.prepare('SELECT COUNT(*) c FROM feed_likes l JOIN feeds f ON f.id=l.feed_id WHERE l.device_id=? AND f.status=?').get(deviceId, 'published').c
-  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN feed_likes l ON f.id=l.feed_id WHERE l.device_id=? AND f.status=? ORDER BY l.created_at DESC LIMIT ? OFFSET ?`).all(deviceId, 'published', ps, off)
+  const total = db.prepare(`SELECT COUNT(*) c FROM feed_likes l JOIN feeds f ON f.id=l.feed_id WHERE ${im.clause} AND f.status=?`).get(...im.args, 'published').c
+  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN feed_likes l ON f.id=l.feed_id WHERE ${im.clause} AND f.status=? ORDER BY l.created_at DESC LIMIT ? OFFSET ?`).all(...im.args, 'published', ps, off)
   res.json(ok({ total, list: rows.map((r) => { const x = rowToFeed(r); x.isLiked = true; return x }) }))
 })
 
 // ---- 查询当前登录用户是否收藏了某条动态（详情页初始化收藏态用）----
 // 必须前置注册，否则会被 /feed/:id 参数路由拦截。
 app.get('/feed/:id/favorite', requireAuth, (req, res) => {
-  const deviceId = (req.user && req.user.deviceId) || ''
-  const row = db.prepare('SELECT 1 FROM favorites WHERE device_id=? AND feed_id=?').get(deviceId, req.params.id)
+  const im = userIdentityMatch('device_id', 'member_user_id', req.user)
+  const row = db.prepare(`SELECT 1 FROM favorites WHERE ${im.clause} AND feed_id=?`).get(...im.args, req.params.id)
   res.json(ok({ favorited: !!row }))
 })
 
@@ -989,13 +1069,13 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
   const deviceId = (req.user && req.user.deviceId) || ''
   const memberUserId = (req.user && req.user.memberUserId) || ''
   const { liked = true, nickname = '', avatar = '' } = req.body || {}
-  const already = !!db.prepare('SELECT 1 FROM feed_likes WHERE device_id=? AND feed_id=?').get(deviceId, row.id)
+  const already = !!db.prepare('SELECT 1 FROM feed_likes WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, row.id)
   let isLiked = already
   if (liked && !already) {
-    db.prepare('INSERT OR IGNORE INTO feed_likes (device_id, feed_id, created_at) VALUES (?,?,?)').run(deviceId, row.id, now())
+    db.prepare('INSERT OR IGNORE INTO feed_likes (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, row.id, now())
     isLiked = true
   } else if (!liked && already) {
-    db.prepare('DELETE FROM feed_likes WHERE device_id=? AND feed_id=?').run(deviceId, row.id)
+    db.prepare('DELETE FROM feed_likes WHERE (device_id=? OR member_user_id=?) AND feed_id=?').run(deviceId, memberUserId, row.id)
     isLiked = false
   }
   const likes = db.prepare('SELECT COUNT(*) c FROM feed_likes WHERE feed_id=?').get(row.id).c
@@ -1011,13 +1091,13 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
 // ---- 收藏 / 足迹（H5 自管关系表，个人主页 Tab）----
 // GET /favorites?page=&pageSize= → { total, list }（仅本人）
 app.get('/favorites', requireAuth, (req, res) => {
-  const deviceId = (req.user && req.user.deviceId) || ''
-  if (!deviceId) return res.json(err(1, '无法识别用户'))
+  const im = userIdentityMatch('v.device_id', 'v.member_user_id', req.user)
+  if (!im.args.length) return res.json(err(1, '无法识别用户'))
   const page = Math.max(1, parseInt(req.query.page) || 1)
   const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
   const off = (page - 1) * ps
-  const total = db.prepare('SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE v.device_id=? AND f.status=?').get(deviceId, 'published').c
-  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN favorites v ON f.id=v.feed_id WHERE v.device_id=? AND f.status=? ORDER BY v.created_at DESC LIMIT ? OFFSET ?`).all(deviceId, 'published', ps, off)
+  const total = db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${im.clause} AND f.status=?`).get(...im.args, 'published').c
+  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN favorites v ON f.id=v.feed_id WHERE ${im.clause} AND f.status=? ORDER BY v.created_at DESC LIMIT ? OFFSET ?`).all(...im.args, 'published', ps, off)
   res.json(ok({ total, list: rows.map(rowToFeed) }))
 })
 // POST /feed/:id/favorite → 收藏/取消 toggle → { favorited, favorites }
@@ -1025,11 +1105,12 @@ app.post('/feed/:id/favorite', requireAuth, (req, res) => {
   const row = db.prepare('SELECT 1 FROM feeds WHERE id=?').get(req.params.id)
   if (!row) return res.json(err(404, '动态不存在'))
   const deviceId = (req.user && req.user.deviceId) || ''
+  const memberUserId = (req.user && req.user.memberUserId) || ''
   const { favorited = true } = req.body || {}
-  const already = !!db.prepare('SELECT 1 FROM favorites WHERE device_id=? AND feed_id=?').get(deviceId, req.params.id)
-  if (favorited && !already) db.prepare('INSERT OR IGNORE INTO favorites (device_id, feed_id, created_at) VALUES (?,?,?)').run(deviceId, req.params.id, now())
-  else if (!favorited && already) db.prepare('DELETE FROM favorites WHERE device_id=? AND feed_id=?').run(deviceId, req.params.id)
-  const isFav = db.prepare('SELECT 1 FROM favorites WHERE device_id=? AND feed_id=?').get(deviceId, req.params.id)
+  const already = !!db.prepare('SELECT 1 FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, req.params.id)
+  if (favorited && !already) db.prepare('INSERT OR IGNORE INTO favorites (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, req.params.id, now())
+  else if (!favorited && already) db.prepare('DELETE FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').run(deviceId, memberUserId, req.params.id)
+  const isFav = db.prepare('SELECT 1 FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, req.params.id)
   const favorites = db.prepare('SELECT COUNT(*) c FROM favorites WHERE feed_id=?').get(req.params.id).c
   res.json(ok({ favorited: !!isFav, favorites }))
 })
@@ -1040,19 +1121,20 @@ app.post('/footprints', requireAuth, (req, res) => {
   const row = db.prepare('SELECT 1 FROM feeds WHERE id=?').get(feedId)
   if (!row) return res.json(err(404, '动态不存在'))
   const deviceId = (req.user && req.user.deviceId) || ''
-  db.prepare('DELETE FROM footprints WHERE device_id=? AND feed_id=?').run(deviceId, feedId)
-  db.prepare('INSERT INTO footprints (device_id, feed_id, created_at) VALUES (?,?,?)').run(deviceId, feedId, now())
+  const memberUserId = (req.user && req.user.memberUserId) || ''
+  db.prepare('DELETE FROM footprints WHERE (device_id=? OR member_user_id=?) AND feed_id=?').run(deviceId, memberUserId, feedId)
+  db.prepare('INSERT INTO footprints (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, feedId, now())
   res.json(ok({ ok: true }))
 })
 // GET /footprints?page=&pageSize= → { total, list }（最近浏览，去重，最新优先）
 app.get('/footprints', requireAuth, (req, res) => {
-  const deviceId = (req.user && req.user.deviceId) || ''
-  if (!deviceId) return res.json(err(1, '无法识别用户'))
+  const im = userIdentityMatch('p.device_id', 'p.member_user_id', req.user)
+  if (!im.args.length) return res.json(err(1, '无法识别用户'))
   const page = Math.max(1, parseInt(req.query.page) || 1)
   const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
   const off = (page - 1) * ps
-  const total = db.prepare('SELECT COUNT(*) c FROM footprints p JOIN feeds f ON f.id=p.feed_id WHERE p.device_id=? AND f.status=?').get(deviceId, 'published').c
-  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN footprints p ON f.id=p.feed_id WHERE p.device_id=? AND f.status=? ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(deviceId, 'published', ps, off)
+  const total = db.prepare(`SELECT COUNT(*) c FROM footprints p JOIN feeds f ON f.id=p.feed_id WHERE ${im.clause} AND f.status=?`).get(...im.args, 'published').c
+  const rows = db.prepare(`SELECT f.* FROM feeds f JOIN footprints p ON f.id=p.feed_id WHERE ${im.clause} AND f.status=? ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(...im.args, 'published', ps, off)
   res.json(ok({ total, list: rows.map(rowToFeed) }))
 })
 
@@ -2334,14 +2416,16 @@ app.get('/admin/activities-stats', requireAdmin, (req, res) => {
 
 // ---- 关注 / 取关（动态关注流）----
 app.post('/follow', requireAuth, (req, res) => {
-  const { followerDevice, followeeDevice, followeeMemberUserId } = req.body || {}
+  const { followerDevice, followeeDevice, followeeMemberUserId, followerMemberUserId } = req.body || {}
   if (!followerDevice || !followeeDevice) return res.json(err(1, '缺少 followerDevice / followeeDevice'))
   if (followerDevice === followeeDevice) return res.json(err(1, '不能关注自己'))
-  db.prepare('INSERT OR IGNORE INTO follows (follower_device, followee_device, created_at) VALUES (?,?,?)').run(followerDevice, followeeDevice, now())
+  const followerMid = String(followerMemberUserId || (req.user && req.user.memberUserId) || '')
+  const followeeMid = String(followeeMemberUserId || '')
+  db.prepare('INSERT OR IGNORE INTO follows (follower_device, followee_device, follower_member_user_id, followee_member_user_id, created_at) VALUES (?,?,?,?,?)').run(followerDevice, followeeDevice, followerMid, followeeMid, now())
   // 互动消息：关注通知被关注者（真身份优先 memberUserId，演示态回退 device）
   emitNotification({
     deviceId: followeeDevice,
-    memberUserId: followeeMemberUserId || '',
+    memberUserId: followeeMid,
     type: 'follow',
     actorDevice: String(followerDevice || ''),
     actorName: String((req.user && req.user.raw && req.user.raw.nickname) || ''),
@@ -2354,7 +2438,7 @@ app.post('/follow', requireAuth, (req, res) => {
 app.delete('/follow', requireAuth, (req, res) => {
   const { followerDevice, followeeDevice } = req.query
   if (!followerDevice || !followeeDevice) return res.json(err(1, '缺少 followerDevice / followeeDevice'))
-  db.prepare('DELETE FROM follows WHERE follower_device=? AND followee_device=?').run(followerDevice, followeeDevice)
+  db.prepare('DELETE FROM follows WHERE (follower_device=? OR follower_member_user_id=?) AND (followee_device=? OR followee_member_user_id=?)').run(followerDevice, followerDevice, followeeDevice, followeeDevice)
   res.json(ok({ following: false }))
 })
 // 解析某 deviceId 的公开简介（昵称/头像/车型），优先 user_profiles，回退最新发帖
@@ -2372,22 +2456,23 @@ function userBrief(deviceId) {
 }
 // 关注列表：返回对象数组（头像/昵称/车型），便于 H5 直接渲染
 app.get('/follow/list', (req, res) => {
-  const { device } = req.query
-  if (!device) return res.json(err(1, '缺少 device'))
-  const rows = db.prepare('SELECT followee_device FROM follows WHERE follower_device=? ORDER BY created_at DESC').all(device)
+  const { device, member } = req.query
+  if (!device && !member) return res.json(err(1, '缺少 device / member'))
+  const rows = db.prepare('SELECT followee_device FROM follows WHERE (follower_device=? OR follower_member_user_id=?) ORDER BY created_at DESC').all(String(device || ''), String(member || ''))
   res.json(ok({ list: rows.map((r) => userBrief(r.followee_device)) }))
 })
 // 粉丝列表：关注我的人（同结构）
 app.get('/follow/followers', (req, res) => {
-  const { device } = req.query
-  if (!device) return res.json(err(1, '缺少 device'))
-  const rows = db.prepare('SELECT follower_device FROM follows WHERE followee_device=? ORDER BY created_at DESC').all(device)
+  const { device, member } = req.query
+  if (!device && !member) return res.json(err(1, '缺少 device / member'))
+  const rows = db.prepare('SELECT follower_device FROM follows WHERE (followee_device=? OR followee_member_user_id=?) ORDER BY created_at DESC').all(String(device || ''), String(member || ''))
   res.json(ok({ list: rows.map((r) => userBrief(r.follower_device)) }))
 })
 app.get('/follow/check', (req, res) => {
-  const { follower, followee } = req.query
-  if (!follower || !followee) return res.json(err(1, '缺少 follower / followee'))
-  const row = db.prepare('SELECT 1 FROM follows WHERE follower_device=? AND followee_device=?').get(follower, followee)
+  const { follower, followee, followerMember, followeeMember } = req.query
+  if (!follower && !followerMember) return res.json(err(1, '缺少 follower / followerMember'))
+  if (!followee && !followeeMember) return res.json(err(1, '缺少 followee / followeeMember'))
+  const row = db.prepare('SELECT 1 FROM follows WHERE (follower_device=? OR follower_member_user_id=?) AND (followee_device=? OR followee_member_user_id=?)').get(String(follower || ''), String(followerMember || ''), String(followee || ''), String(followeeMember || ''))
   res.json(ok({ following: !!row }))
 })
 

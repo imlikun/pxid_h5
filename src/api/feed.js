@@ -264,6 +264,42 @@ export async function fetchUserProfile(deviceId) {
   }
 }
 
+// 自己的主页资料：优先 /users/me（用 token 身份，最可靠），失败回退 /users/:deviceId
+export async function fetchMyProfile(deviceId) {
+  if (!FEED_API) return null
+  try {
+    return await request('/users/me')
+  } catch (e) {
+    if (deviceId) {
+      try { return await request('/users/' + encodeURIComponent(deviceId)) } catch (_) {}
+    }
+    return null
+  }
+}
+
+// 更新自己的资料（昵称/头像/车型），写入 user_profiles 唯一真相源
+export async function updateMyProfile(payload) {
+  try {
+    return await request('/users/profile', { method: 'PUT', body: payload })
+  } catch (e) {
+    throw e
+  }
+}
+
+// 上传媒体（头像等）：multipart/form-data → /media/upload，返回可访问 URL
+export async function uploadMedia(file) {
+  const tk = await getAuthTokenSafe()
+  const form = new FormData()
+  form.append('file', file)
+  const headers = {}
+  if (tk) headers.Authorization = 'Bearer ' + tk
+  const res = await fetch(FEED_API + '/media/upload', { method: 'POST', headers, body: form })
+  if (!res.ok) throw new Error('HTTP ' + res.status)
+  const json = await res.json()
+  if (json.code !== 0) throw new Error(json.message || '上传失败')
+  return json.data.url
+}
+
 // ---- 某人发布的动态（个人主页动态流，按 device 过滤）----
 export async function fetchUserFeeds(deviceId, params = {}) {
   if (!FEED_API || !deviceId) return { list: [], total: 0 }

@@ -103,6 +103,7 @@ import MomentCard from '../components/MomentCard.vue'
 import { getDeviceId } from '../api/feed'
 import {
   fetchUserProfile,
+  fetchMyProfile,
   fetchUserFeeds,
   followUser,
   unfollowUser,
@@ -220,7 +221,8 @@ function onTab(key) {
 async function loadProfile() {
   const d = targetDevice.value
   if (!d) { showToast('无法识别用户'); return }
-  user.value = await fetchUserProfile(d)
+  // 自己：优先 /users/me（token 身份最可靠）；他人：/users/:deviceId
+  user.value = isSelf.value ? await fetchMyProfile(d) : await fetchUserProfile(d)
   if (!user.value) { showToast('用户信息加载失败'); return }
   // 自己 + 原生：关注/粉丝来自 Flutter 桥（App 账号关系，H5 不自管），预拉取并校正四宫格计数
   if (isSelf.value && bridge.isNative()) {
@@ -297,7 +299,8 @@ async function onToggleFollow() {
 // ---- 他人主页动作（发消息 / 编辑 / 举报 / 拉黑）----
 // 私信、举报、拉黑为二期能力：本期先桥接原生入口，无原生时给出占位提示，不阻断浏览
 function onEdit() {
-  try { bridge.openNative('profile/edit') } catch (e) { showToast('编辑资料功能即将上线') }
+  // 编辑资料改为 H5 自管页（可控、即时生效），不再依赖原生跳转
+  router.push('/profile/edit')
 }
 function onMessage() {
   try { bridge.openNative('message/user?deviceId=' + encodeURIComponent(targetDevice.value)) }
