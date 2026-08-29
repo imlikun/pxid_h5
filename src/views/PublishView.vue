@@ -240,66 +240,60 @@ function pickMention(u) {
 
 const canPost = computed(() => content.value.trim().length > 0 && !uploading.value)
 
-// 图片/视频选择入口：原生环境优先走 Flutter 桥 pickImages/pickVideo；若桥未实现则回退 <input type=file>
-// （需 Flutter 配 WebView file-chooser delegate 才有用）。浏览器独立预览环境无原生桥，直接用 <input type=file>。
+// 图片/视频选择入口
+// ⚠️ 关键修复：Flutter WebView 内 <input type=file> 没有 file-chooser delegate 时点击会「完全没反应」。
+//   旧逻辑在 native 环境下若桥未实现就静默回退 file input，正是「点击加号没反应」的真因之一。
+//   现改为：native 环境必须真正发起 bridge.pickImages/pickVideo 调用（让 Flutter 侧产生 request 日志），
+//   桥缺失/失败后给出明确 toast 并打印诊断，绝不再静默回退 file input。
+//   判据用 window.PXIDBridge.isNative 的 truthy（而非严格 ===true），容错 Flutter 误传字符串 'true'。
+function isFlutterEnv() {
+  return !!(window.PXIDBridge && window.PXIDBridge.isNative)
+}
 async function onPickImageClick() {
-  if (bridge.isNative()) {
-    const handled = await pickImagesNative()
-    // 桥未实现（Flutter 没注入 pickImages）→ 回退 H5 file input，并提示需原生支持
-    if (!handled && fileInput.value) {
-      fileInput.value.click()
+  if (isFlutterEnv()) {
+    try {
+      const remain = 9 - picked.value.length
+      if (remain <= 0) return
+      const images = await bridge.pickImages({ maxCount: remain })
+      if (Array.isArray(images)) {
+        for (const img of images) {
+          const url = img.url || img.path || img.uri || ''
+          if (url) picked.value.push({ file: null, url, uploadedUrl: url, uploading: false })
+        }
+      } else {
+        showToast('选择图片失败')
+      }
+    } catch (e) {
+      console.error('[Publish] pickImages failed:', e, {
+        isNative: window.PXIDBridge && window.PXIDBridge.isNative,
+        hasPickImages: !!(window.PXIDBridge && typeof window.PXIDBridge.pickImages === 'function'),
+      })
+      showToast(e && e.message ? e.message : '选择图片失败')
     }
-  } else if (fileInput.value) {
-    fileInput.value.click()
+    return
   }
+  // 独立预览（浏览器）：走原生文件选择
+  if (fileInput.value) fileInput.value.click()
 }
 async function onPickVideoClick() {
-  if (bridge.isNative()) {
-    const handled = await pickVideoNative()
-    if (!handled && fileInputVideo.value) {
-      fileInputVideo.value.click()
-    }
-  } else if (fileInputVideo.value) {
-    fileInputVideo.value.click()
-  }
-}
-
-// 原生图片选择（Flutter 实现 window.PXIDBridge.pickImages 时可用）。返回 true=已处理（成功或已提示），false=桥不存在
-function hasNativePick(fn) {
-  return !!(window.PXIDBridge && typeof window.PXIDBridge[fn] === 'function')
-}
-async function pickImagesNative() {
-  if (!hasNativePick('pickImages')) return false
-  try {
-    const remain = 9 - picked.value.length
-    if (remain <= 0) return true
-    const images = await bridge.pickImages({ maxCount: remain })
-    if (!Array.isArray(images)) { showToast('选择图片失败'); return true }
-    for (const img of images) {
-      const url = img.url || img.path || img.uri || ''
-      if (url) {
-        picked.value.push({ file: null, url, uploadedUrl: url, uploading: false })
+  if (isFlutterEnv()) {
+    try {
+      const video = await bridge.pickVideo({ maxDuration: 60 })
+      if (video && video.url) {
+        videoFile.value = { file: null, url: video.url, duration: video.duration || 0 }
+      } else {
+        showToast('选择视频失败')
       }
+    } catch (e) {
+      console.error('[Publish] pickVideo failed:', e, {
+        isNative: window.PXIDBridge && window.PXIDBridge.isNative,
+        hasPickVideo: !!(window.PXIDBridge && typeof window.PXIDBridge.pickVideo === 'function'),
+      })
+      showToast(e && e.message ? e.message : '选择视频失败')
     }
-    return true
-  } catch (e) {
-    showToast(e.message || '选择图片失败')
-    return true
+    return
   }
-}
-
-// 原生视频选择（Flutter 实现 window.PXIDBridge.pickVideo 时可用）
-async function pickVideoNative() {
-  if (!hasNativePick('pickVideo')) return false
-  try {
-    const video = await bridge.pickVideo({ maxDuration: 60 })
-    if (!video || !video.url) { showToast('选择视频失败'); return true }
-    videoFile.value = { file: null, url: video.url, duration: video.duration || 0 }
-    return true
-  } catch (e) {
-    showToast(e.message || '选择视频失败')
-    return true
-  }
+  if (fileInputVideo.value) fileInputVideo.value.click()
 }
 
 function onPick(e) {
