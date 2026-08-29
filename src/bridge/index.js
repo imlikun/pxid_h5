@@ -159,6 +159,19 @@ const mockBridge = {
     })
   },
 
+  // 关注列表：当前用户关注的人（App 账号关系，H5 不自管，由 Flutter 经桥返回真实数据）
+  // 真机由 Flutter 注入实现；H5 预览返回空（走 H5 本地 /follow/list 兜底）
+  getFollowList() {
+    logMock('getFollowList')
+    return Promise.resolve([])
+  },
+
+  // 粉丝列表：关注当前用户的人（同上，App 账号关系）
+  getFansList() {
+    logMock('getFansList')
+    return Promise.resolve([])
+  },
+
   // 切换到原生底部 tab：'discover' | 'featured' | 'purchase' | 'service' | 'profile'
   navigateTo(tab) {
     logMock('navigateTo', tab)
@@ -290,6 +303,11 @@ export const bridge = {
     return null
   },
   getUserInfo: () => Promise.resolve(window.PXIDBridge.getUserInfo()).then(normalizeProfile),
+  // 关注列表 / 粉丝列表（App 账号关系，Flutter 经桥返回；原生未实现时 reject，由上层回退 H5 本地）
+  getFollowList: () =>
+    window.PXIDBridge.getFollowList ? window.PXIDBridge.getFollowList() : Promise.reject(new Error('getFollowList 未实现')),
+  getFansList: () =>
+    window.PXIDBridge.getFansList ? window.PXIDBridge.getFansList() : Promise.reject(new Error('getFansList 未实现')),
   getRegion: () => window.PXIDBridge.getRegion(),
   getDeviceId: () => window.PXIDBridge.getDeviceId(),
   getLocale: () => window.PXIDBridge.getLocale(),

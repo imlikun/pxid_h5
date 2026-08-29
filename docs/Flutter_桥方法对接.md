@@ -32,6 +32,7 @@
 
 - **发布页**：图片/视频选择、上传（`/media/upload`）、发帖（`POST /feed`）均由 H5 自管，但**选择动作依赖原生桥**（WebView 内 `<input type=file>` 不响应）。
 - **个人主页**：四宫格（发布/收藏/关注/粉丝）+ 发布子 Tab 已上线，返回「我的」页依赖 `closeWebView`。
+  - **数据归属（关键）**：**发布 / 收藏** 由 H5 自管后端（`pxid-api.appin.site`）提供；**关注 / 粉丝** 是 App 账号关系，**经 Flutter 桥 `getFollowList` / `getFansList` 返回**，H5 不自管、也**绝不直连 ToC**。H5 在「自己 + 原生」场景下调桥取数，预览/他人主页回退 H5 本地 `/follow/list`、`/follow/followers`。
 - **身份**：所有上传/发帖/互动走 `getUserInfo().token` 鉴权。
 
 ---
@@ -58,6 +59,8 @@
 | `pickImages`   | `pickImages({ maxCount })`                   | `[{ url }]` 或 `[{ path }]`，H5 取 `url \|\| path`                        | 多选图片，≤maxCount 张                             |
 | `pickVideo`    | `pickVideo({ maxDuration: 60 })`             | `{ url, duration }`（duration 单位秒）                                      | 单选视频，≤maxDuration 秒                          |
 | `closeWebView` | `window.PXIDApp.postMessage('closeWebView')` | —                                                                      | 个人主页返回「我的」；**注意是 `PXIDApp` 不是 `PXIDBridge`** |
+| `getFollowList` | `getFollowList()`                           | `[{ deviceId, nickname, avatar, carModel }]`                           | 当前用户**关注**的人（App 账号关系，H5 不自管）；原生必须实现，预览返回空 |
+| `getFansList`   | `getFansList()`                             | `[{ deviceId, nickname, avatar, carModel }]`                           | 当前用户的**粉丝**（同上，App 账号关系）；原生必须实现         |
 
 ### P1 建议（不实现会降级但不崩）
 
@@ -110,6 +113,18 @@ window.PXIDBridge = {
   }),
 
   getToken: async () => '<登录态 JWT>',
+
+  // 关注列表：返回当前用户关注的人（App 账号关系，H5 不自管）
+  getFollowList: async () => {
+    const list = await nativeGetFollowList() // Flutter 从 App 账号层取
+    return list.map((it) => ({ deviceId: it.id, nickname: it.name, avatar: it.avatarUrl, carModel: it.carModel || '' }))
+  },
+
+  // 粉丝列表：返回当前用户的粉丝（同上）
+  getFansList: async () => {
+    const list = await nativeGetFansList()
+    return list.map((it) => ({ deviceId: it.id, nickname: it.name, avatar: it.avatarUrl, carModel: it.carModel || '' }))
+  },
 
   // —— P1 ——
   getLocation: async () => {
@@ -169,6 +184,7 @@ window.PXIDApp.postMessage('closeWebView')
 - [ ] 进个人主页 `/user/me`，点返回 → 调 `PXIDApp.postMessage('closeWebView')`，回到「我的」页。
 - [ ] 进入「我的」拉 `GET /users/:deviceId` 返回 `stats{posts,favorites,following,followers}` 四宫格数字正确。
 - [ ] 点四宫格打开 `#/user/me?tab=publish|favorites|follow|followers`（发布可加 `&sub=liked|footprints`）对应页正常。
+- [ ] 自己 + 原生进入「关注 / 粉丝」→ 调 `getFollowList` / `getFansList`，列表显示 App 真实关注/粉丝（不再空白）。
 
 ---
 
