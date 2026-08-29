@@ -69,15 +69,14 @@ function avatarText(n) {
   return { like: '♥', comment: '💬', follow: '＋', system: '!' }[n.type] || '!'
 }
 
-// 返回上一级：原生全屏 WebView（App「我的」消息入口）调 PXIDApp.closeWebView 回 Flutter「我的」页；
-// 有 H5 历史（如从动态详情/他人主页点进来）先回上一页，无历史则关 WebView；浏览器预览退回 router.back()。
-// 注意：关闭桥是 window.PXIDApp.postMessage('closeWebView')，不是 PXIDBridge.closeWebView（不存在）。
+// 返回上一级：对齐积分页 PointsView.handlePointsBack。
+// 原生 App「我的」页用 WebView 打开互动消息并隐藏原生返回键，故 H5 自带返回按钮需主动通知原生关闭 WebView 回「我的」；
+// H5 / 浏览器独立预览环境无 window.PXIDApp 时退回 router.back()。
 function goBack() {
   const app = window.PXIDApp
   if (app && typeof app.postMessage === 'function') {
-    if (window.history.length > 1) router.back()
-    else app.postMessage('closeWebView')
-  } else if (window.history.length > 1) {
+    app.postMessage('closeWebView')
+  } else {
     router.back()
   }
 }
@@ -182,6 +181,10 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   min-height: 100vh;
   background: var(--bg, #f7f8fa);
   padding-bottom: env(safe-area-inset-bottom);
+}
+/* 防御性覆盖：确保顶栏背景为浅色，避免某些 WebView/深色模式下被渲染成黑色 */
+:deep(.tb-bar) {
+  background: var(--card, #ffffff);
 }
 /* ---- 时间线消息列表 ---- */
 .list {
