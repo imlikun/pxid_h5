@@ -222,7 +222,6 @@ import {
   plazaShowcase,
   recommendFilters,
   dynamicFilters,
-  notices,
 } from '../data/mock'
 import { CAR_MODEL_LABELS } from '../data/carModels'
 import { clearNewMoment } from '../store/ui'
@@ -230,6 +229,9 @@ import { publishState } from '../store/publish'
 import bridge from '../bridge'
 import { t, initLocale, setLocale } from '../i18n'
 import { fetchUnreadCount } from '../api/notifications'
+// 官方公告未读数（驱动发现页快捷区红点）：必须走响应式 store
+// 直接读 mock.notices 的 isRead 不会触发更新 —— mock 是普通数组，属性变化不会被 computed 追踪
+import { noticeUnread } from '../store/noticeStore'
 import { fetchFeeds, fetchActivities } from '../api/feed'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
@@ -364,8 +366,7 @@ const dynamicList = computed(() => {
   return rankList(list)
 })
 
-// 官方公告未读数（驱动发现页快捷区红点）
-const noticeUnread = computed(() => notices.filter((n) => !n.isRead).length)
+// 官方公告未读数 noticeUnread 见顶部 import（noticeStore）：进入详情即写已读，返回后红点自动消失
 
 // 当前 tab 的 feed 分页 key（触底加载提示用）
 const currentFeedKey = computed(() =>

@@ -15,7 +15,7 @@
         v-for="n in list"
         :key="n.id"
         class="card press"
-        :class="{ unread: !n.isRead }"
+        :class="{ unread: !isNoticeRead(n.id) }"
         @click="toDetail(n.id)"
       >
         <!-- 渐变封面（按公告类型着色，无需外链图，不破图） -->
@@ -36,7 +36,7 @@
             </span>
           </div>
         </div>
-        <span v-if="!n.isRead" class="dot"></span>
+        <span v-if="!isNoticeRead(n.id)" class="dot"></span>
       </div>
     </div>
 
@@ -50,13 +50,15 @@ import { useRouter } from 'vue-router'
 import { notices } from '../data/mock'
 import { t } from '../i18n'
 import TopBar from '../components/TopBar.vue'
+import { isNoticeRead, isNoticeAcked } from '../store/noticeStore'
 
 const router = useRouter()
 
-// 每次进入重新读取（含详情页确认后的最新 isRead）
+// 列表数据快照；未读态一律以 noticeStore 为准（详情页进入即写入已读，红点/圆点实时联动）
 const list = reactive(notices.map((n) => ({ ...n })))
 
-const recallOpen = computed(() => list.find((n) => n.type === 'recall' && !n.isRead) || null)
+// 召回横幅：由「已确认(ack)」驱动 —— 不因点开看过而消失，保留安全合规强提醒
+const recallOpen = computed(() => list.find((n) => n.type === 'recall' && !isNoticeAcked(n.id)) || null)
 
 const TYPE_META = {
   recall: { label: '召回升级', c1: '#FF4D4F', c2: '#FF7A45', icon: 'M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z' },
