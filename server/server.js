@@ -456,7 +456,7 @@ function upsertProfileAlias({ deviceId = '', memberUserId = '', nickname = '', a
 }
 
 // ---- 用户资料解析：发帖/评论时 upsert，读取时按身份解析为最新昵称/头像 ----
-function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', avatar = '', carModel = '' }) {
+function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', avatar, carModel }) {
   const id = String(deviceId || '')
   const mid = String(memberUserId || '')
   if (!id && !mid) return
