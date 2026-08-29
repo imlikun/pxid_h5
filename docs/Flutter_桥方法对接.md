@@ -10,10 +10,12 @@
 
 > ⚠️ 这是最基础的联调信息，先确认域名再动手。
 
-| 用途 | 地址 |
-| --- | --- |
+
+
+| 用途                     | 地址                                |
+| ---------------------- | --------------------------------- |
 | **H5 静态站（WebView 加载）** | `https://appin.site/nav/pxid-h5/` |
-| **API 基地址（所有后端接口）** | `https://pxid-api.appin.site` |
+| **API 基地址（所有后端接口）**    | `https://pxid-api.appin.site`     |
 
 - **所有接口都挂在 `https://pxid-api.appin.site` 下**，例如：
   - `GET https://pxid-api.appin.site/users/:deviceId`（个人主页四宫格 stats）
@@ -49,31 +51,31 @@
 
 ### P0 必做（不做功能直接废）
 
-| 方法 | 调用签名 | 返回 | 说明 |
-|---|---|---|---|
-| `isNative` | `true`（属性） | — | 标记真实原生桥，缺了 H5 走 mock |
-| `getUserInfo` | `getUserInfo()` | `{ deviceId, nickname, avatar(https), email, carModel, token(登录JWT) }` | token 是发布/上传/发帖鉴权关键；avatar 必须 https |
-| `pickImages` | `pickImages({ maxCount })` | `[{ url }]` 或 `[{ path }]`，H5 取 `url \|\| path` | 多选图片，≤maxCount 张 |
-| `pickVideo` | `pickVideo({ maxDuration: 60 })` | `{ url, duration }`（duration 单位秒） | 单选视频，≤maxDuration 秒 |
-| `closeWebView` | `window.PXIDApp.postMessage('closeWebView')` | — | 个人主页返回「我的」；**注意是 `PXIDApp` 不是 `PXIDBridge`** |
+| 方法             | 调用签名                                         | 返回                                                                     | 说明                                           |
+| -------------- | -------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------- |
+| `isNative`     | `true`（属性）                                   | —                                                                      | 标记真实原生桥，缺了 H5 走 mock                         |
+| `getUserInfo`  | `getUserInfo()`                              | `{ deviceId, nickname, avatar(https), email, carModel, token(登录JWT) }` | token 是发布/上传/发帖鉴权关键；avatar 必须 https          |
+| `pickImages`   | `pickImages({ maxCount })`                   | `[{ url }]` 或 `[{ path }]`，H5 取 `url \|\| path`                        | 多选图片，≤maxCount 张                             |
+| `pickVideo`    | `pickVideo({ maxDuration: 60 })`             | `{ url, duration }`（duration 单位秒）                                      | 单选视频，≤maxDuration 秒                          |
+| `closeWebView` | `window.PXIDApp.postMessage('closeWebView')` | —                                                                      | 个人主页返回「我的」；**注意是 `PXIDApp` 不是 `PXIDBridge`** |
 
 ### P1 建议（不实现会降级但不崩）
 
-| 方法 | 调用签名 | 返回 | 说明 |
-|---|---|---|---|
-| `getLocation` | `getLocation()` | `{ lat, lng }` 或 `null` | 位置打卡；不实现时 H5 降级浏览器定位 |
-| `getToken` | `getToken()` | `string`（登录 JWT） | `getUserInfo.token` 的兜底通道 |
-| `getRegion` | `getRegion()` | `'CN' \| 'BR' \| 'US'` | 区域路由（发现/精选/发布） |
-| `getLocale` | `getLocale()` | `'zh' \| 'en' \| 'pt'` | 语言 |
-| `getDeviceId` | `getDeviceId()` | `string` | 设备唯一 ID |
-| `navigateTo` | `navigateTo(tab)` | — | 切换原生 tab：`discover\|featured\|purchase\|service\|profile` |
-| `openNative` | `openNative(path)` | — | 打开原生页（如 `vehicle/P2`、`points/guide`） |
-| `openMap` | `openMap({ lat, lng, name })` | — | 拉起地图导航 |
-| `callPhone` | `callPhone(phone)` | — | 拨号 |
-| `openShopify` | `openShopify(url)` | — | 打开 Shopify 商品/页 |
-| `openCheckout` | `openCheckout(lines)` | `Promise<boolean>` | Headless 结账 |
-| `requestPurchase` | `requestPurchase(payload)` | `Promise<boolean>` | 拉起原生购买 |
-| `exit` | `exit()` | — | 退出 App |
+| 方法                | 调用签名                          | 返回                      | 说明                                                        |
+| ----------------- | ----------------------------- | ----------------------- | --------------------------------------------------------- |
+| `getLocation`     | `getLocation()`               | `{ lat, lng }` 或 `null` | 位置打卡；不实现时 H5 降级浏览器定位                                      |
+| `getToken`        | `getToken()`                  | `string`（登录 JWT）        | `getUserInfo.token` 的兜底通道                                 |
+| `getRegion`       | `getRegion()`                 | `'CN' \| 'BR' \| 'US'`  | 区域路由（发现/精选/发布）                                            |
+| `getLocale`       | `getLocale()`                 | `'zh' \| 'en' \| 'pt'`  | 语言                                                        |
+| `getDeviceId`     | `getDeviceId()`               | `string`                | 设备唯一 ID                                                   |
+| `navigateTo`      | `navigateTo(tab)`             | —                       | 切换原生 tab：`discover\|featured\|purchase\|service\|profile` |
+| `openNative`      | `openNative(path)`            | —                       | 打开原生页（如 `vehicle/P2`、`points/guide`）                      |
+| `openMap`         | `openMap({ lat, lng, name })` | —                       | 拉起地图导航                                                    |
+| `callPhone`       | `callPhone(phone)`            | —                       | 拨号                                                        |
+| `openShopify`     | `openShopify(url)`            | —                       | 打开 Shopify 商品/页                                           |
+| `openCheckout`    | `openCheckout(lines)`         | `Promise<boolean>`      | Headless 结账                                               |
+| `requestPurchase` | `requestPurchase(payload)`    | `Promise<boolean>`      | 拉起原生购买                                                    |
+| `exit`            | `exit()`                      | —                       | 退出 App                                                    |
 
 ---
 
@@ -136,6 +138,7 @@ window.PXIDApp = {
 ```
 
 **H5 侧已锁定的调用契约（供你核对，Flutter 不用改）**
+
 ```js
 // 图片选择入口（native 下唯一通道）
 if (bridge.isNative()) await bridge.pickImages({ maxCount: 9 - picked.length })
