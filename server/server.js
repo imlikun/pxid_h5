@@ -871,6 +871,14 @@ app.get('/users/:deviceId', (req, res) => {
     followerCount,
     feedCount,
     favoriteCount,
+    // 四宫格统计（对齐 Flutter「我的」页 l10n 字段名，固定不可改）：
+    // posts=发布动态数, favorites=收藏数(仅自己可见,他人0), following=关注数, followers=粉丝数
+    stats: {
+      posts: feedCount,
+      favorites: favoriteCount,
+      following: followeeCount,
+      followers: followerCount,
+    },
     isFollowing,
     isSelf,
   }))

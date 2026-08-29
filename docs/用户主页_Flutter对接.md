@@ -96,6 +96,40 @@ if (path.startsWith('message/user?deviceId=')) {
 
 ---
 
+## 六、四宫格统计对接（2026-08-29 Flutter 来文追加 · 已落地）
+
+> 来源：Flutter 侧《我的页_四格统计与个人主页_Flutter对接-2026-08-29.md》（已存仓 `docs/Flutter_我的页四格统计对接-2026-08-29.md`）。以下为八戒答复与最终契约。
+
+### 6.1 四格真实值：`stats` 字段（方式 A，已落地）
+- H5 在 `GET /users/:deviceId` 返回中**新增 `stats` 对象**，字段名固定不可改：
+  | 字段 | 含义 | 映射自 H5 原有 |
+  | --- | --- | --- |
+  | `posts` | 发布/动态数（对应「发布」格） | `feedCount` |
+  | `favorites` | 收藏数（仅自己可见，他人返回 0） | `favoriteCount` |
+  | `following` | 关注数（对应「关注」格） | `followeeCount` |
+  | `followers` | 粉丝数（对应「粉丝」格） | `followerCount` |
+- 原顶层 `feedCount/favoriteCount/followeeCount/followerCount` **保留不删**（H5 前端宫格仍用，向后兼容）。
+- Flutter 进入「我的」页拉一次、从 H5 返回再拉一次；`>99` 显示 `99+`。
+- 兜底：未登录/token 失效也返回 `stats` 全 0，不报错不阻断渲染。
+
+### 6.2 返回按钮：`PXIDApp.postMessage('closeWebView')`（已落地）
+- H5 个人主页顶部返回按钮：原生环境（`window.PXIDApp.postMessage` 存在）调 `app.postMessage('closeWebView')` 回 Flutter「我的」页；浏览器预览退回 `router.back()`。
+- ⚠️ 不是 `window.PXIDBridge.closeWebView()`（该方法不存在），关闭桥固定是 `PXIDApp.postMessage('closeWebView')`（与积分页一致）。
+- 实现细节：`goBack()` 中 `if (window.history.length > 1) router.back(); else app.postMessage('closeWebView')`——根页（无 H5 历史）关 WebView，深层进入（如点粉丝进他人主页）先回上一页。
+
+### 6.3 Tab 值确认（最终）
+- `tab=publish | favorites | follow | followers` 即线上最终值，无别名/大小写差异。
+- `tab=publish` 是「发布」容器，默认子 Tab = 动态（`sub=dynamic`）；`&sub=liked` 赞过、`&sub=footprints` 足迹（仅自己）。不等于单独「动态」页，而是发布聚合。
+
+### 6.4 答复 Flutter 待答复清单
+1. **【接口】** 方式 A：`GET /users/:deviceId` 返回内增 `stats` 对象（见 6.1 表）。
+2. **【返回按钮】** 是，已按 2.2 调 `PXIDApp.postMessage('closeWebView')`（见 6.2）。
+3. **【Tab 值】** 是，`publish/favorites/follow/followers` 为最终值；`publish` 默认显示动态。
+4. **【字段名】** 是，固定 `posts/favorites/following/followers`（关注=following，粉丝=followers；Flutter 自行把 `followers` 映射到第 4 格 `fans` 展示）。
+5. **【兜底】** 是，未登录/接口失败返回 `stats` 全 0，不报错不阻断我的页渲染。
+
+---
+
 ## 🔵 最终效果是啥（个人主页联调验收清单）
 
 - [ ] 原生入口 / 推送 / @提及 → `openNative('user/<deviceId>')` → WebView 跳到对应 H5 个人主页（资料卡 + 四宫格 + 内容区正常）。
@@ -106,7 +140,9 @@ if (path.startsWith('message/user?deviceId=')) {
 - [ ] 关注走原生 `feed/follow?id=`（保持现状）；关注/粉丝列表展示头像+昵称+车型，点人进其主页形成闭环。
 - [ ] `getUserInfo` 返回真实 `deviceId`/`avatar`(https)/`carModel`。
 - [ ] （二期）`message/user?deviceId=` 私信入口可用，或 H5 占位提示正常不报错。
+- [ ] **（2026-08-29 新增）** `GET /users/:deviceId` 返回含 `stats:{posts,favorites,following,followers}` 四格真实值（字段名固定；他人 `favorites` 返回 0 不泄露私密）。
+- [ ] **（2026-08-29 新增）** 原生环境点 H5 返回按钮 → `window.PXIDApp.postMessage('closeWebView')` 直接回到 Flutter「我的」页；浏览器预览退回 `router.back()`。
 
 ---
 
-*文档版本：2026-08-28 · 对应 H5 四宫格重构（发布/收藏/关注/粉丝 + 发布子Tab 动态/赞过/足迹）· 单一真相源 `INTEGRATION.md`*
+*文档版本：2026-08-29 · 对应 H5 四宫格重构（发布/收藏/关注/粉丝 + 发布子Tab 动态/赞过/足迹）+ 四格统计 stats 契约 + closeWebView 返回 · 单一真相源 `INTEGRATION.md`*
