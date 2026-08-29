@@ -47,6 +47,7 @@ import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import { t } from '../i18n'
 import { fetchNotifications, markNotificationRead, markAllRead } from '../api/notifications'
+import { cacheNotifications } from '../store/notificationStore'
 import { handleAvatarError } from '../utils/avatar'
 
 const router = useRouter()
@@ -113,6 +114,7 @@ async function load() {
     const r = await fetchNotifications(1, PAGE_SIZE)
     list.value = r.list
     total.value = r.total
+    cacheNotifications(r.list)
   } finally {
     loading.value = false
   }
@@ -126,6 +128,7 @@ async function loadMore() {
     list.value = list.value.concat(r.list)
     total.value = r.total
     page.value += 1
+    cacheNotifications(r.list)
   } finally {
     loadingMore.value = false
   }
@@ -149,17 +152,9 @@ async function onTap(n) {
     n.read = true
     await markNotificationRead(n.id)
   }
-  // 内容导向：点赞/评论消息 → 跳对应动态详情
-  if (n.targetType === 'feed' && n.targetId) {
-    router.push('/feed/' + n.targetId)
-    return
-  }
-  // 人导向：关注消息 → 对方个人主页
-  if (n.type === 'follow') {
-    if (n.actorDevice) router.push('/user/' + encodeURIComponent(n.actorDevice))
-    return
-  }
-  // system 等：无跳转
+  // 统一进入消息详情页：展示对方发来的内容（评论正文/系统消息）+ 关联原动态预览，
+  // 详情页内再提供"查看原动态 / 去TA主页"等后续动作。
+  router.push('/interaction/' + n.id)
 }
 
 async function onMarkAll() {

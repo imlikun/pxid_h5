@@ -39,6 +39,7 @@ const PointsMallView = () => import('../views/PointsMallView.vue')
 const PublishView = () => import('../views/PublishView.vue')
 const ActivityCenterView = () => import('../views/ActivityCenterView.vue')
 const InteractionView = () => import('../views/InteractionView.vue')
+const InteractionDetailView = () => import('../views/InteractionDetailView.vue')
 const UserProfileView = () => import('../views/UserProfileView.vue')
 const ProfileEditView = () => import('../views/ProfileEditView.vue')
 
@@ -96,6 +97,7 @@ const routes = [
 
   // 互动消息中心（点赞/评论/关注/系统，自有后端 /notifications）
   { path: '/interactions', name: 'interactions', component: InteractionView, meta: { hideTabBar: true, title: '互动消息' } },
+  { path: '/interaction/:id', name: 'interaction-detail', component: InteractionDetailView, meta: { hideTabBar: true, title: '消息详情' } },
   // 个人主页：/user/:id 他人主页；/user/me 自己的主页（App「我的」tab 入口，明天 Flutter 接）
   { path: '/user/:id', name: 'user-profile', component: UserProfileView, meta: { hideTabBar: true, title: '个人主页' } },
   // 编辑资料（H5 自管，写入 user_profiles 唯一真相源）

@@ -580,6 +580,8 @@ function onAdd() {
 function onNotice() { router.push('/interactions') }
 function onQuick(q) {
   if (q.key === 'notice') { router.push('/notices'); return }
+  // 智能助手（HIMA）→ H5 助手页
+  if (q.key === 'ai') { router.push('/message'); return }
   // 决策 2：立即定制 → 跳转 H5 车型定制页（鸿蒙智行风格，VehicleDetailView）
   if (q.key === 'custom') { router.push('/vehicle/scooter-F2'); return }
   if (q.key === 'points') { router.push('/points'); return }
