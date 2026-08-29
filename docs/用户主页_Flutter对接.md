@@ -4,6 +4,8 @@
 
 ## 背景（1 分钟读懂）
 
+> ⚠️ **联调域名（最基础）**：H5 静态站 `https://appin.site/nav/pxid-h5/`；所有后端接口（含 `GET /users/:deviceId`）基地址 `https://pxid-api.appin.site`。**不是**裸 `appin.site`，**不是** `toc.pxidiot.com:446`（那是 Flutter App 自己的后端，H5 不连）。
+
 - H5 是内嵌在 Flutter WebView 的 Vue3 应用，通过两套桥与 Flutter 通信：
   - **主桥 `window.PXIDBridge`**（`isNative:true`）：`getToken` / `getUserInfo` / `openNative` / `pickImages` / `openShopify` 等。
   - **积分子桥 `window.PXIDApp`**：仅 `postMessage('closeWebView')` 用于积分页返回。
@@ -101,7 +103,7 @@ if (path.startsWith('message/user?deviceId=')) {
 > 来源：Flutter 侧《我的页_四格统计与个人主页_Flutter对接-2026-08-29.md》（已存仓 `docs/Flutter_我的页四格统计对接-2026-08-29.md`）。以下为八戒答复与最终契约。
 
 ### 6.1 四格真实值：`stats` 字段（方式 A，已落地）
-- H5 在 `GET /users/:deviceId` 返回中**新增 `stats` 对象**，字段名固定不可改：
+- H5 在 `GET https://pxid-api.appin.site/users/:deviceId` 返回中**新增 `stats` 对象**，字段名固定不可改：
   | 字段 | 含义 | 映射自 H5 原有 |
   | --- | --- | --- |
   | `posts` | 发布/动态数（对应「发布」格） | `feedCount` |

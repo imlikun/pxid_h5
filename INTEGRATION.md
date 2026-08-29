@@ -23,6 +23,23 @@
 
 ---
 
+## 基础环境（联调域名 · 最基础信息，先确认再动手）
+
+| 用途 | 地址 |
+| --- | --- |
+| **H5 静态站（WebView 加载）** | `https://appin.site/nav/pxid-h5/` |
+| **API 基地址（所有后端接口）** | `https://pxid-api.appin.site` |
+
+- 所有 `/users`、`/feed`、`/media`、`/growth`、`/follow` 等接口都挂在 `https://pxid-api.appin.site` 下，例如：
+  - `GET https://pxid-api.appin.site/users/:deviceId`（个人主页四宫格 stats）
+  - `POST https://pxid-api.appin.site/feed`（发帖）
+  - `POST https://pxid-api.appin.site/media/upload`（媒体上传）
+- ❌ **不是**裸 `appin.site`（那是静态站，不承载接口）。
+- ❌ **不是** `toc.pxidiot.com:446`（那是 Flutter App / tocApp **自己**的后端，H5 完全不连它）。若你看到这个域名，那是 Flutter 侧惯例，与 H5 联调无关。
+- 线上 nginx 将 `pxid-api.appin.site` 反代到 ECS `:8700`（Node + better-sqlite3）。
+
+---
+
 ## 🔴 现状（H5 侧已经做好什么、契约是什么）
 
 ### 1.1 两套桥契约（H5 已经定义、等你注入）
