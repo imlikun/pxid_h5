@@ -875,6 +875,56 @@ app.get('/feed/users', (req, res) => {
   res.json(ok({ list }))
 })
 
+// ---- 个人主页（自己）：用登录 token 身份解析，最可靠 ----
+// GET /users/me → 同 /users/:deviceId 结构，但身份来自 req.user（member_user_id / device_id 双维度），
+// 解决「App「我的」入口只持有 member_user_id、profile 只存 member_user_id」时按 device_id 查不到的问题。
+// ⚠️ 必须定义在 /users/:deviceId 之前，否则会被参数路由抢匹配成 deviceId='me'。
+app.get('/users/me', requireAuth, (req, res) => {
+  const u = req.user || {}
+  const d = u.deviceId || u.device_id || ''
+  const m = u.memberUserId || u.member_user_id || ''
+  const profile = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
+  const feed = !profile.nickname || profile.nickname === '骑友'
+    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(d, m)
+    : null
+  const im = userIdentityMatch('f.device_id', 'f.member_user_id', u)
+  const feedCount = db.prepare(`SELECT COUNT(*) c FROM feeds f WHERE ${im.clause} AND f.status='published'`).get(...im.args).c
+  const favIm = userIdentityMatch('v.device_id', 'v.member_user_id', u)
+  const favoriteCount = db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${favIm.clause} AND f.status='published'`).get(...favIm.args).c
+  const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (follower_device=? OR follower_member_user_id=?)').get(d, m).c
+  const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (followee_device=? OR followee_member_user_id=?)').get(d, m).c
+  res.json(ok({
+    deviceId: d,
+    memberUserId: m,
+    nickname: profile.nickname || (feed && feed.nickname) || '骑友',
+    avatar: profile.avatar || (feed && feed.avatar) || '',
+    carModel: profile.carModel || (feed && feed.car_model) || '',
+    followeeCount,
+    followerCount,
+    feedCount,
+    favoriteCount,
+    stats: { posts: feedCount, favorites: favoriteCount, following: followeeCount, followers: followerCount },
+    isSelf: true,
+  }))
+})
+
+// ---- 编辑资料（自己）：更新昵称/头像/车型，写入 user_profiles 唯一真相源 ----
+// PUT /users/profile { nickname?, avatar?, carModel? } → 按 token 身份 upsert
+app.put('/users/profile', requireAuth, (req, res) => {
+  const u = req.user || {}
+  const d = u.deviceId || u.device_id || ''
+  const m = u.memberUserId || u.member_user_id || ''
+  if (!d && !m) return res.status(401).json(err(401, '未授权：无法识别用户'))
+  const { nickname, avatar, carModel } = req.body || {}
+  const patch = {}
+  if (nickname !== undefined) patch.nickname = String(nickname).slice(0, 20)
+  if (avatar !== undefined) patch.avatar = String(avatar || '').slice(0, 500)
+  if (carModel !== undefined) patch.carModel = String(carModel || '').slice(0, 30)
+  upsertProfile({ deviceId: d, memberUserId: m, nickname: patch.nickname !== undefined ? patch.nickname : undefined, avatar: patch.avatar !== undefined ? patch.avatar : undefined, carModel: patch.carModel !== undefined ? patch.carModel : undefined })
+  const p = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
+  res.json(ok({ nickname: p.nickname, avatar: p.avatar, carModel: p.carModel }))
+})
+
 // ---- 个人主页：用户聚合信息（公开资料；身份可选，用于 isFollowing/isSelf）----
 // GET /users/:deviceId → { deviceId, nickname, avatar, carModel, followeeCount, followerCount, isFollowing, isSelf }
 // 兼容：deviceId 参数既可能是 device_id 也可能是 member_user_id（App「我的」入口传的是 member_user_id），
@@ -932,55 +982,6 @@ app.get('/users/:deviceId', (req, res) => {
     isFollowing,
     isSelf,
   }))
-})
-
-// ---- 个人主页（自己）：用登录 token 身份解析，最可靠 ----
-// GET /users/me → 同 /users/:deviceId 结构，但身份来自 req.user（member_user_id / device_id 双维度），
-// 解决「App「我的」入口只持有 member_user_id、profile 只存 member_user_id」时按 device_id 查不到的问题。
-app.get('/users/me', requireAuth, (req, res) => {
-  const u = req.user || {}
-  const d = u.deviceId || u.device_id || ''
-  const m = u.memberUserId || u.member_user_id || ''
-  const profile = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
-  const feed = !profile.nickname || profile.nickname === '骑友'
-    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(d, m)
-    : null
-  const im = userIdentityMatch('f.device_id', 'f.member_user_id', u)
-  const feedCount = db.prepare(`SELECT COUNT(*) c FROM feeds f WHERE ${im.clause} AND f.status='published'`).get(...im.args).c
-  const favIm = userIdentityMatch('v.device_id', 'v.member_user_id', u)
-  const favoriteCount = db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${favIm.clause} AND f.status='published'`).get(...favIm.args).c
-  const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (follower_device=? OR follower_member_user_id=?)').get(d, m).c
-  const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (followee_device=? OR followee_member_user_id=?)').get(d, m).c
-  res.json(ok({
-    deviceId: d,
-    memberUserId: m,
-    nickname: profile.nickname || (feed && feed.nickname) || '骑友',
-    avatar: profile.avatar || (feed && feed.avatar) || '',
-    carModel: profile.carModel || (feed && feed.car_model) || '',
-    followeeCount,
-    followerCount,
-    feedCount,
-    favoriteCount,
-    stats: { posts: feedCount, favorites: favoriteCount, following: followeeCount, followers: followerCount },
-    isSelf: true,
-  }))
-})
-
-// ---- 编辑资料（自己）：更新昵称/头像/车型，写入 user_profiles 唯一真相源 ----
-// PUT /users/profile { nickname?, avatar?, carModel? } → 按 token 身份 upsert
-app.put('/users/profile', requireAuth, (req, res) => {
-  const u = req.user || {}
-  const d = u.deviceId || u.device_id || ''
-  const m = u.memberUserId || u.member_user_id || ''
-  if (!d && !m) return res.status(401).json(err(401, '未授权：无法识别用户'))
-  const { nickname, avatar, carModel } = req.body || {}
-  const patch = {}
-  if (nickname !== undefined) patch.nickname = String(nickname).slice(0, 20)
-  if (avatar !== undefined) patch.avatar = String(avatar || '').slice(0, 500)
-  if (carModel !== undefined) patch.carModel = String(carModel || '').slice(0, 30)
-  upsertProfile({ deviceId: d, memberUserId: m, nickname: patch.nickname !== undefined ? patch.nickname : undefined, avatar: patch.avatar !== undefined ? patch.avatar : undefined, carModel: patch.carModel !== undefined ? patch.carModel : undefined })
-  const p = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
-  res.json(ok({ nickname: p.nickname, avatar: p.avatar, carModel: p.carModel }))
 })
 
 // ---- 发帖（用户侧，kind=user）----
