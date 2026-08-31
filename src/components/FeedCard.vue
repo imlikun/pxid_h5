@@ -2,7 +2,7 @@
   <div class="fcard press" @click="go">
     <div class="fcard__coverwrap">
       <img class="fcard__cover" :src="coverUrl" :alt="item.title" loading="lazy" @error="onImgErr" />
-      <span v-if="item.pinned" class="fcard__pin">置顶</span>
+      <span v-if="item.pinned" class="fcard__pin">{{ t('feed.pinned') }}</span>
       <span v-if="item.videoUrl" class="fcard__play"><svg viewBox="0 0 24 24" width="18" height="18" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
     </div>
     <div class="fcard__title">{{ item.title }}</div>
@@ -22,6 +22,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { t } from '../i18n'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 import { mediaUrl } from '../storage'
 

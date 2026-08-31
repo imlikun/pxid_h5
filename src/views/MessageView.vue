@@ -1,7 +1,12 @@
 <template>
   <div class="hima">
     <!-- 顶栏 -->
-    <TopBar sticky title="智能助手" :back="goBack">
+    <TopBar sticky :back="goBack">
+      <template #title>
+        <div class="title-marquee">
+          <span>{{ t('assistant.title') }}</span>
+        </div>
+      </template>
       <template #right>
         <span class="more" @click="onMore">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
@@ -94,6 +99,7 @@ import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import bridge from '../bridge'
+import { t } from '../i18n'
 
 const router = useRouter()
 
@@ -222,10 +228,27 @@ function goBack() {
   color: var(--text);
 }
 
+/* 顶栏标题滚动：英文/葡语较长时避免换行或省略 */
+.title-marquee {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.title-marquee span {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: marquee-title 8s linear infinite;
+}
+@keyframes marquee-title {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
 .chat {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 14px 8px;
+  padding: 64px 14px 8px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -236,7 +259,7 @@ function goBack() {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 18px 0 22px;
+  padding: 0 0 22px;
 }
 .hero__avatar {
   width: 72px;

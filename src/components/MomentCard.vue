@@ -3,7 +3,7 @@
     <div class="m-head" @click.stop="goUser">
       <img class="m-avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
       <div class="m-meta">
-        <div class="m-name"><span v-if="item.pinned" class="m-pin">置顶</span>{{ item.author }}</div>
+        <div class="m-name"><span v-if="item.pinned" class="m-pin">{{ t('feed.pinned') }}</span>{{ item.author }}</div>
         <div class="m-time">{{ item.time }}</div>
       </div>
       <button
@@ -66,6 +66,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import bridge from '../bridge'
+import { t } from '../i18n'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 import { mediaUrl } from '../storage'
 import { requireLogin } from '../utils/auth'
