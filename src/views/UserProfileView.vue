@@ -5,7 +5,7 @@
     <!-- 用户资料卡 -->
     <div class="u-head">
       <div class="u-avatar">
-        <img v-if="user && user.avatar" :src="user.avatar" :alt="user.nickname" @error="(e) => handleAvatarError(e, user.nickname)" />
+        <img v-if="user" :src="resolveAvatar(user.nickname, user.avatar)" :alt="user.nickname" @error="(e) => handleAvatarError(e, user.nickname)" />
         <span v-else class="u-avatar__ph">{{ avatarText }}</span>
       </div>
       <div class="u-meta">
@@ -17,7 +17,7 @@
       </div>
       <!-- 自己：编辑资料；他人：关注 + 发消息 + 更多菜单 -->
       <div class="u-actions">
-        <button v-if="isSelf" class="u-btn u-edit" @click="onEdit">编辑资料</button>
+        <button v-if="false" class="u-btn u-edit" @click="onEdit">编辑资料</button>
         <template v-else>
           <button class="u-btn u-follow" :class="{ on: user && user.isFollowing }" @click="onToggleFollow">
             {{ user && user.isFollowing ? '已关注' : '+ 关注' }}
@@ -48,17 +48,6 @@
       <div class="u-grid__item" :class="{ on: activeGrid === 'followers' }" @click="selectGrid('followers')">
         <b>{{ user ? user.followerCount : 0 }}</b><span>粉丝</span>
       </div>
-    </div>
-
-    <!-- 发布子 Tab（仅 activeGrid=publish 时显示；足迹仅自己可见）-->
-    <div v-if="activeGrid === 'publish'" class="u-tabs">
-      <button
-        v-for="t in publishTabs"
-        :key="t.key"
-        class="u-tab"
-        :class="{ on: activeTab === t.key }"
-        @click="onTab(t.key)"
-      >{{ t.label }}</button>
     </div>
 
     <!-- 内容区 -->
@@ -107,9 +96,7 @@ import {
   fetchUserFeeds,
   followUser,
   unfollowUser,
-  fetchLikedFeeds,
   fetchFavorites,
-  fetchFootprints,
   fetchFollowList,
   fetchFollowers,
 } from '../api/feed'
@@ -124,20 +111,8 @@ const isSelf = computed(() => route.params.id === 'me' || (user.value && user.va
 
 // ---- 一级：四宫格 ----
 const activeGrid = ref('publish') // publish | favorites | follow | followers
-// ---- 二级：发布子 Tab（动态 / 赞过 / 足迹[仅自己]）----
-const publishTabs = computed(() =>
-  isSelf.value
-    ? [
-        { key: 'dynamic', label: '动态' },
-        { key: 'liked', label: '赞过' },
-        { key: 'footprints', label: '足迹' },
-      ]
-    : [
-        { key: 'dynamic', label: '动态' },
-        { key: 'liked', label: '赞过' },
-      ]
-)
-const activeTab = ref('dynamic') // dynamic | liked | footprints
+// 动态/赞过/足迹子 Tab 已下线，发布区固定显示「动态」
+const activeTab = ref('dynamic') // static
 const isFeedList = computed(() => activeGrid.value === 'publish' || activeGrid.value === 'favorites')
 
 const emptyText = computed(() => {
@@ -205,15 +180,7 @@ function selectGrid(key) {
   if (key === activeGrid.value) return
   activeGrid.value = key
   menuOpen.value = false
-  if (key === 'publish' && !publishTabs.value.some((t) => t.key === activeTab.value)) {
-    activeTab.value = 'dynamic'
-  }
-  loadContent(true)
-}
-// ---- 二级切换（仅发布区）----
-function onTab(key) {
-  if (key === activeTab.value) return
-  activeTab.value = key
+  activeTab.value = 'dynamic'
   loadContent(true)
 }
 
@@ -248,9 +215,7 @@ async function loadContent(reset = true) {
       const d = targetDevice.value
       let r = { list: [], total: 0 }
       if (grid === 'favorites') r = await fetchFavorites({ page: page.value, pageSize: PAGE_SIZE })
-      else if (activeTab.value === 'dynamic') r = await fetchUserFeeds(d, { page: page.value, pageSize: PAGE_SIZE })
-      else if (activeTab.value === 'liked') r = await fetchLikedFeeds({ page: page.value, pageSize: PAGE_SIZE })
-      else if (activeTab.value === 'footprints') r = await fetchFootprints({ page: page.value, pageSize: PAGE_SIZE })
+      else r = await fetchUserFeeds(d, { page: page.value, pageSize: PAGE_SIZE })
       const list = r.list || []
       feedList.value = reset ? list : feedList.value.concat(list)
       hasMore.value = list.length >= PAGE_SIZE && feedList.value.length < (r.total || Infinity)
@@ -323,13 +288,10 @@ function onScroll() {
 // ---- 查询透传（App「我的」四宫格链接带 ?tab=&sub= 直接进对应页）----
 function applyQuery() {
   const qTab = String(route.query.tab || '')
-  const qSub = String(route.query.sub || '')
   if (['publish', 'favorites', 'follow', 'followers'].includes(qTab)) {
     if (!(qTab === 'favorites' && !isSelf.value)) activeGrid.value = qTab
   }
-  if (['dynamic', 'liked', 'footprints'].includes(qSub)) {
-    if (!(qSub === 'footprints' && !isSelf.value)) activeTab.value = qSub
-  }
+  // 动态/赞过/足迹子 Tab 已下线，忽略 qSub
 }
 
 watch(() => route.params.id, async () => {

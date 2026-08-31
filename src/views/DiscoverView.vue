@@ -137,6 +137,15 @@
           :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
         />
       </div>
+      <!-- 空态：此前筛选无结果/无数据时整片空白，容易被误认为「帖子不显示」 -->
+      <div v-if="!recommendList.length && !loading" class="empty-tab">
+        {{ recommendEmptyText }}
+        <span
+          v-if="activeFilter !== '全部'"
+          class="empty-tab__reset press"
+          @click="activeFilter = '全部'"
+        >{{ t('discover.clearFilter') }}</span>
+      </div>
       <div v-if="currentFeedKey && recommendList.length" class="load-more">
         <span v-if="loadingMore">{{ t('discover.loadingMore') }}</span>
         <span v-else-if="!feedPage[currentFeedKey].hasMore">{{ t('discover.noMore') }}</span>
@@ -208,7 +217,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onActivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
@@ -358,6 +367,10 @@ const recommendList = computed(() => {
   const list = f === '全部' ? recommendData.value : recommendData.value.filter((i) => i.carModel === f)
   return rankList(list)
 })
+// 推荐区空态文案：车型筛选无结果 vs 全部无数据，语义分开给，避免白屏无解释
+const recommendEmptyText = computed(() =>
+  activeFilter.value === '全部' ? t('discover.emptyAll') : t('discover.emptyDynamic')
+)
 // 动态：按车型筛选，最新=全部 + 置顶优先 + 排序；附近子栏用 nearList
 const dynamicList = computed(() => {
   const src = dynamicSubtab.value === 'near' ? nearList.value : dynamicData.value
@@ -379,6 +392,10 @@ const interactionUnread = ref(0)
 function setTab(t) {
   activeTab.value = t
   activeFilter.value = t === '推荐' ? '全部' : '最新'
+  // 切 tab 必须退出搜索态：搜索态会整块隐藏列表（Banner/快捷入口/筛选/帖子），
+  // 不重置会让新 tab 同样一片空白，表现为「帖子不显示」
+  showSearchResults.value = false
+  keyword.value = ''
   if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
 }
 
@@ -672,6 +689,12 @@ function onSearch() {
   if (!k) { showSearchResults.value = false; return }
   showSearchResults.value = true
 }
+
+// 关键词被清空（用户手动删完 / 点清除）立即退出搜索态：
+// 否则列表仍被搜索态整块隐藏，页面只剩「0 个结果」，看起来就像「帖子不显示」
+watch(keyword, (k) => {
+  if (!String(k || '').trim()) showSearchResults.value = false
+})
 
 const toast = ref('')
 let toastTimer = null
@@ -973,6 +996,16 @@ function showToast(msg) {
   font-size: 13px;
   color: var(--text-hint);
   padding: 40px 0;
+}
+.empty-tab__reset {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill, 999px);
+  color: var(--brand, #4a6cf7);
+  background: var(--brand-soft, rgba(74, 108, 247, 0.1));
+  font-size: 12px;
+  font-weight: 600;
 }
 .load-more {
   text-align: center;
