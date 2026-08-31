@@ -52,6 +52,14 @@ app.use((req, res, next) => {
   next()
 })
 
+// ---- 请求日志（真机排障临时启用，稳定后移除）----
+app.use((req, res, next) => {
+  const ip = (req.headers['x-forwarded-for'] && req.headers['x-forwarded-for'].split(',')[0].trim()) || req.ip || req.socket.remoteAddress || 'unknown'
+  const auth = String(req.headers.authorization || '').slice(0, 60)
+  console.log(`[req] ${req.method} ${req.path} ip=${ip} auth=${auth}`)
+  next()
+})
+
 // ---- 限流（内存滑动窗口，单实例足够；多实例可换 Redis）----
 const rlBuckets = new Map()
 function rateLimit(windowMs, max) {
@@ -936,6 +944,7 @@ app.get('/users/me', requireAuth, (req, res) => {
     const im = userIdentityMatch('followee_device', 'followee_member_user_id', u)
     return db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${im.clause}`).get(...im.args).c
   })()
+  console.log(`[user-me] d=${d} m=${m} nick=${profile.nickname || (feed && feed.nickname) || '骑友'} car=${profile.carModel || (feed && feed.car_model) || ''} stats=${feedCount}/${favoriteCount}/${followeeCount}/${followerCount}`)
   res.json(ok({
     deviceId: d,
     memberUserId: m,
@@ -1009,6 +1018,7 @@ app.get('/users/:deviceId', (req, res) => {
   // 四宫格计数：发布数（公开动态数）/ 收藏数（仅自己可见，他人返回 0 不泄露私密）
   const feedCount = db.prepare("SELECT COUNT(*) c FROM feeds WHERE (device_id=? OR member_user_id=?) AND status='published'").get(raw, raw).c
   const favoriteCount = isSelf ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=? OR member_user_id=?').get(raw, raw).c : 0
+  console.log(`[user-id] raw=${raw} myD=${myDevice} myM=${myMid} tD=${tDevice} tM=${tMid} nick=${nickname} car=${carModel} stats=${feedCount}/${favoriteCount}/${followeeCount}/${followerCount} isSelf=${isSelf}`)
   res.json(ok({
     deviceId: tDevice,
     memberUserId: tMid,
