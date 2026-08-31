@@ -17,6 +17,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useSwipeBack } from './composables/useSwipeBack'
 import { bridge } from './bridge'
+import { initLocale } from './i18n'
 
 // 底部 tab bar 已彻底移除：之前依赖 Flutter 桥注入（isEmbed）切换显示，但 Flutter 直接链接加载没注入桥也会显示。
 // 既然 App 原生自带 tab，H5 这层完全多余，直接拿掉，省一道桥依赖。
@@ -40,6 +41,9 @@ useSwipeBack(rootRef, {
 // transform，并重建合成层（临时 translateZ(0) + 双 rAF 移除）修复命中错位
 function onVisibilityChange() {
   if (document.visibilityState !== 'visible') return
+  // 切回前台时刷新界面语言：用户在系统设置里改了语言，切回 App 即生效，无需重启 App
+  // （语言只跟手机系统语言走，与地区无关，见 docs/语言与地区规则_Flutter对接.md）
+  initLocale()
   const el = rootRef.value
   if (el) {
     el.style.transition = ''
