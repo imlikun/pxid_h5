@@ -715,18 +715,31 @@ function showToast(msg) {
   display: flex;
   align-items: center;
   gap: 16px;
+  /* TopBar 自带 padding:0 8px，这里再左推 8px，整体 16px 与下方卡片 margin 对齐 */
+  margin-left: 8px;
 }
 .tab {
-  font-size: 16px;
+  position: relative;
+  font-size: 18px;
   color: var(--text-sub);
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.2;
-  transform-origin: bottom center;
-  transform: scale(0.96);
+  padding: 4px 0;
 }
 .tab.active {
   color: #000000;
   font-weight: 700;
+}
+.tab.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--brand, #4a6cf7);
 }
 .topacts {
   display: flex;
