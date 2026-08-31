@@ -1,182 +1,148 @@
-# 语言与地区规则（H5 ↔ Flutter 对接）
+# 语言切换对接文档（H5 ↔ Flutter）—— Flutter 侧需要做什么
 
 > 定版：2026-08-31（坤哥拍板）  
-> 适用：PXID ToC H5（内嵌 Flutter WebView）
+> 适用：PXID ToC H5（内嵌 Flutter WebView）  
+> 本文是**给 Flutter 同学看的契约**——讲清楚 H5 已经做了什么、你这边必须做什么、给什么值、怎么验收。
 
 ---
 
-## 核心原则（一句话）
+## 一句话结论
 
-**语言同时决定「界面语言」和「内容地区」。地区不是独立可切换的维度，而是由当前语言映射出来的结果。**
+**界面语言 + 内容地区，都只由「手机/App 语言」一个东西决定。** Flutter 把这一个语言值喂给 H5，剩下的 H5 自己搞定（语言映射成地区、拉对应内容）。**你不用管地区，也不用实现地区切换器。**
 
-| 语言 | 界面 | 内容地区 | 看到的内容池 |
-|---|---|---|---|
-| `zh` 中文 | 中文 | `CN` | 中国内容 |
-| `pt` 葡萄牙语 | 葡语 | `BR` | 巴西内容 |
-| `en` 英文 | 英文 | `US` | 全球内容 |
+| Flutter 喂给 H5 的语言 | H5 界面 | H5 自动拉的内容 |
+|---|---|---|
+| `zh` 中文 | 中文 | 中国内容（CN） |
+| `pt` 葡萄牙语 | 葡语 | 巴西内容（BR） |
+| `en` 英文 | 英文 | 全球内容（US） |
 
-> 中国人去美国：手机语言仍是中文 → **界面中文 + 中国内容**。  
-> 在巴西把手机语言切成葡语 → **界面葡语 + 巴西内容**。  
-> 不存在「界面中文但看巴西内容」或「界面葡语但看中国内容」的独立组合。
-
-这条原则推翻了此前两个错误表述：
-1. **语言由地区反推**（`US→英文 / CN→中文 / BR→葡语`）—— 已移除 `REGION_LOCALE` 映射。
-2. **语言与地区完全解耦**（语言管界面、地区管内容）—— 已删除发现页 / 活动中心独立的地区切换器。
+> 中国人去美国、手机语言没改 → 仍中文 + 中国内容。  
+> 在巴西把手机语言切葡语 → 界面葡语 + 巴西内容。  
+> 不存在「界面中文但看巴西内容」这种组合。
 
 ---
 
-## 🔴 现状：已经有什么
+## 🔴 现状：H5 已经做了什么
 
-### 1. H5 支持三语
-
-`zh` 中文 / `en` 英文 / `pt` 葡萄牙语，文案集中在 `src/i18n/index.js`，页面统一用 `t(key)` 取词。
-
-### 2. 语言 → 地区映射已固化
-
-`src/i18n/index.js`：
-
-```js
-export const LOCALE_REGION = {
-  zh: 'CN',
-  pt: 'BR',
-  en: 'US',
-}
-
-export function regionFromLocale(loc) {
-  return LOCALE_REGION[loc] || LOCALE_REGION[locale.value] || 'US'
-}
-```
-
-所有内容请求（帖子、活动、商城、发布）均通过 `regionFromLocale(locale.value)` 取地区。
-
-### 3. H5 需要的桥方法只剩一个
-
-| 桥方法 | 返回值 | 语义 | mock 默认 | 大小写 |
-|---|---|---|---|---|
-| `window.PXIDBridge.getLocale()` | `'zh' \| 'en' \| 'pt'` | **语言**（同时决定界面和内容） | `'zh'` | 小写 |
-
-`getRegion()` 不再需要传给 H5；H5 不再调用它来决定内容。Flutter 可以保留该方法用于其他原生逻辑，但 H5 侧忽略。
-
-### 4. 语言取值优先级（`src/i18n/index.js` → `initLocale()`）
-
-```
-URL ?lang=  >  bridge.getLocale()  >  navigator.language（系统语言兜底）  >  zh
-```
-
-- `URL ?lang=` 优先级最高，方便实测 / 联调。
-- `bridge.getLocale()` 取 App 内语言设置；没有设置时取手机系统语言。
-- `navigator.language` 是原生未实现 `getLocale()` 时的兜底。
-
-### 5. 环境信息
-
-| 项 | 地址 |
-|---|---|
-| H5 站点 | `https://appin.site/nav/pxid-h5/` |
-| 接口基地址 | `https://pxid-api.appin.site` |
+1. H5 支持三语（`zh`/`en`/`pt`），文案集中在 `src/i18n/index.js`。
+2. H5 内部写了「语言 → 地区」固定映射，内容请求自动带地区，无需 Flutter 参与：
+   ```js
+   // src/i18n/index.js
+   export const LOCALE_REGION = { zh: 'CN', pt: 'BR', en: 'US' }
+   export function regionFromLocale(loc) {
+     return LOCALE_REGION[loc] || LOCALE_REGION[locale.value] || 'US'
+   }
+   ```
+3. H5 取语言的优先级（**运行时主路径是 bridge，URL 仅联调**）：
+   ```
+   URL ?lang=  >  bridge.getLocale()  >  navigator.language（兜底）  >  zh
+   ```
+4. 发现页 / 活动中心 / 精选页 / 商品详情 / 车型详情 / 发布页 / 帖子详情，全部已按上述规则取地区并拉内容；**没有任何独立地区切换器**。
+5. 改系统语言后切回 App 前台，H5 自动刷新，**无需重启 App**（监听 `visibilitychange`）。
 
 ---
 
-## 🟠 卡点与易错点
+## 🟠 卡点与易错点（Flutter 千万别踩）
 
-1. **不要再给 H5 传 `getRegion()` 来决定内容**。H5 的内容地区完全由 `getLocale()` 映射，多传一个 region 只会造成口径不一致。
-2. **大小写约定**：`getLocale()` 返回小写 `zh/en/pt`。H5 内部做了 `toLowerCase()` 容错，但请按约定传。
-3. **系统 Locale 归一化**：手机系统可能返回 `zh-CN`、`zh-Hans`、`pt-BR`、`en-US` 等，Flutter 需要在注入前归一化为 `zh` / `en` / `pt`，不能原样丢给 H5。
-4. **不实现 `getLocale()` 会怎样**：H5 退回读 `navigator.language`（WebView 里通常等于系统语言），但各机型表现不一致，**建议显式实现**。
-5. **H5 浏览器预览态**（未注入真实桥）：mock 的 `getLocale()` 返回 `zh`，对应地区 `CN`。
-6. **改系统语言后无需重启 App**：`App.vue` 监听 `visibilitychange`，切回前台自动执行 `initLocale()`。
+1. **不要再给 H5 传 `getRegion()` 来决定内容**。H5 内容地区完全由语言映射；多传 region 只会口径不一致。（`getRegion()` 桥方法 H5 已不再用于内容，你留着做别的原生逻辑也行，但别指望它驱动 H5 内容。）
+2. **系统 Locale 必须归一化再传**。手机系统返回的是 `zh-CN` / `pt-BR` / `en-US` 这种，H5 只要 `zh` / `en` / `pt` 三个小写值。不归一化会落空、掉到英文兜底。
+3. **必须带 `isNative: true`**。不带的桥会被 H5 当成预览态（走 mock、显示底部 tab），不是你要的嵌入态。
+4. **不实现 `getLocale()` 的后果**：H5 退回去读 `navigator.language`，WebView 里各机型表现不一致，内容地区可能错。建议显式实现。
 
 ---
 
-## 🟡 需要 Flutter 提供什么
+## 🟡 需要 Flutter 提供什么（核心待办）
 
-### 方案 A：URL 参数（推荐 · 零 JS 通道，最简单）
+### P0 · 必须做
 
-打开 H5 的 WebView 时，直接把语言拼在地址上：
+**1. 实现并注入 `window.PXIDBridge.getLocale()`**
 
-```
-https://appin.site/nav/pxid-h5/?lang=zh
-```
+在加载 H5 之前注入，返回 `'zh' | 'en' | 'pt'`（小写）。
 
-- `lang`：`zh` / `en` / `pt`（取 App 内语言设置，无则取手机系统语言）
-
-**优点**：不用写任何 JS 通道；H5 优先级最高，联调和实测都方便。  
-**注意**：不要再带 `region=`，带了也会被忽略；地区由 `lang` 自动映射。
-
-### 方案 B：实现桥方法
-
-```js
-window.PXIDBridge = {
-  isNative: true,                                    // 必须带，否则 H5 认为是预览态
-  getLocale: () => Promise.resolve('zh'),            // 'zh' | 'en' | 'pt'
-  // ...其余桥方法
-}
-```
-
-`getLocale()` 取值建议：
+**2. 取值优先级（Flutter 侧）**
 
 ```
 App 内语言设置（若有）  >  手机系统语言  >  兜底 'zh'
 ```
 
-系统 Locale 归一化规则：
+**3. 系统 Locale 归一化规则（注入前必须做）**
 
 | 系统值示例 | 传给 H5 |
 |---|---|
 | `zh-CN` / `zh-Hans` / `zh-Hant` / `zh-TW` | `zh` |
 | `pt-BR` / `pt-PT` | `pt` |
-| `en-US` / `en-GB` 及其余一切 | `en` |
+| `en-US` / `en-GB` / 其余一切 | `en` |
+
+**4. 注入时带 `isNative: true`**
+
+### 不用做（澄清，避免多此一举）
+
+- ❌ 不要实现「地区切换器」——地区跟着语言走，没有独立地区概念。
+- ❌ 不要传 `region=CN/BR/US` 给 H5——H5 自己映射。
+- ❌ 不需要为内容地区调任何接口——H5 已经在 `regionFromLocale()` 里解决。
+
+### 可选 · 联调 / 预览
+
+- H5 预览可用 `?lang=zh|en|pt` 强制指定语言，**不用接桥也能看三语效果**：
+  - 中文：`https://appin.site/nav/pxid-h5/?lang=zh`
+  - 英文：`https://appin.site/nav/pxid-h5/?lang=en`
+  - 葡语：`https://appin.site/nav/pxid-h5/?lang=pt`
 
 ---
 
-## 🟢 怎么做（H5 侧已落地的实现路径）
+## 🟢 怎么做（Flutter 侧代码示例）
 
-| 文件 | 职责 |
-|---|---|
-| `src/i18n/index.js` | `initLocale()` 按优先级定语言；`LOCALE_REGION` / `regionFromLocale()` 把语言映射为地区 |
-| `src/views/DiscoverView.vue` | 无地区切换器；`currentRegion = computed(() => regionFromLocale(locale.value))`；内容请求带该 region |
-| `src/views/ActivityCenterView.vue` | 同上，活动列表随语言变化自动重拉 |
-| `src/views/FeaturedView.vue` | `onMounted` 先 `initLocale()`，商城按语言取对应店铺 |
-| `src/views/ProductDetailView.vue` | `load()` 先 `initLocale()`，详情/加购按语言取对应店铺 |
-| `src/views/VehicleDetailView.vue` | `load()` 先 `initLocale()` |
-| `src/views/PublishView.vue` | 发布内容所属地区由当前语言映射 |
-| `src/views/FeedDetailView.vue` | 相关推荐按当前语言映射的地区拉取 |
-| `src/api/shop.js` | `getRegion()` 返回 `regionFromLocale(locale.value)`；下单/购物车带 region |
-| `src/App.vue` | 监听 `visibilitychange`：切回前台自动执行 `initLocale()` |
+### Dart：归一化 + 注入桥
 
-**内容请求链路**（region 由语言映射，仅此而已）：
+```dart
+// 归一化系统/App 语言 → H5 三语之一
+String normalizeLocale(String raw) {
+  final l = raw.toLowerCase();
+  if (l.startsWith('zh')) return 'zh';
+  if (l.startsWith('pt')) return 'pt';
+  return 'en'; // 其余一律英文兜底
+}
 
+// 取语言：App 设置优先，否则手机系统语言
+String getH5Locale() {
+  final appLang = AppSettings.language;            // 可能为 null
+  final sysLang = Platform.localeName;             // 如 "zh-CN"
+  return normalizeLocale(appLang ?? sysLang);
+}
+
+// 加载 H5 前注入（只列语言相关，其余桥方法照旧）
+final locale = getH5Locale();
+await webViewController.runJavascript('''
+  window.PXIDBridge = window.PXIDBridge || {};
+  window.PXIDBridge.isNative = true;
+  window.PXIDBridge.getLocale = function () {
+    return Promise.resolve('$locale');
+  };
+''');
 ```
-/feed?tab=recommend&region=CN&page=1&pageSize=15     → 帖子（中文时）
-/activities?region=BR                                 → 热门活动（葡语时）
-/mall-api/products?region=US                          → 商城商品/店铺（英文时）
-```
+
+> 简化写法：若 WebView 框架支持直接注入 `window.PXIDBridge` 对象（而非 runJavascript 拼字符串），把 `getLocale` 写成返回 `Future<String>` / `Promise<'zh'|'en'|'pt'>` 即可。关键是**返回归一化后的小写三语值**。
 
 ---
 
 ## 🔵 最终效果与验收清单
 
-| # | 场景 | 期望结果 |
+| # | 场景 | 期望 |
 |---|---|---|
-| 1 | 手机系统=中文 | 界面**中文** + **中国内容** |
-| 2 | 中国人去美国（手机语言不变） | 界面**中文** + **中国内容** ✅ 关键 |
-| 3 | 在巴西把手机语言切成葡语 | 界面**葡语** + **巴西内容** ✅ 关键 |
-| 4 | 手机系统=英文 | 界面**英文** + **全球内容(US)** |
-| 5 | 手机系统切语言后切回 App 前台 | 界面和内容地区自动刷新，**无需重启 App** |
-| 6 | 发现页、活动中心、精选页、商品详情页 | 均无独立的「全球/中国/巴西」地区切换器 |
+| 1 | 手机系统=中文 | 界面中文 + 中国内容 |
+| 2 | 中国人去美国（语言不变） | 界面中文 + 中国内容 ✅ |
+| 3 | 巴西把手机语言切葡语 | 界面葡语 + 巴西内容 ✅ |
+| 4 | 手机系统=英文 | 界面英文 + 全球内容(US) |
+| 5 | 改系统语言后切回 App 前台 | 自动刷新，**无需重启 App** |
+| 6 | 发现/活动/精选/详情页 | 均无独立「全球/中国/巴西」切换器 |
 
-### H5 预览实测链接（用 `?lang=` 模拟手机语言）
-
-| 验证点 | 链接 |
-|---|---|
-| 中文 + 中国内容 | `https://appin.site/nav/pxid-h5/?lang=zh` |
-| 英文 + 全球内容 | `https://appin.site/nav/pxid-h5/?lang=en` |
-| 葡语 + 巴西内容 | `https://appin.site/nav/pxid-h5/?lang=pt` |
+**Flutter 联调自测**：改手机系统语言（或 App 内语言设置）→ 切到后台再回前台 → H5 界面语言和内容一起变。
 
 ---
 
 ## 变更记录
 
-| 日期 | 说明 |
-|---|---|
-| 2026-08-31 | 第一版：语言与地区解耦（语言管界面、地区管内容），提交 `f366c37` |
-| 2026-08-31 | 定版修正：坤哥拍板「语言同时决定界面和内容地区」，移除发现页/活动中心独立地区切换器，删除 `REGION_LOCALE`，新增 `LOCALE_REGION` 映射；提交 `待补` |
+| 日期 | 说明 | 提交 |
+|---|---|---|
+| 2026-08-31 | 初版：语言与地区「解耦」（语言管界面、地区管内容） | `f366c37` |
+| 2026-08-31 | 定版修正：坤哥拍板「语言同时决定界面和内容地区」，移除独立地区切换器、`REGION_LOCALE`，新增 `LOCALE_REGION` + `regionFromLocale()` | `0431601` |
