@@ -2,6 +2,17 @@
   <div class="interaction">
     <TopBar sticky :title="t('interaction.title')" :back="goBack" />
 
+    <!-- 分类切换：全部 / 评论 / 赞 / 关注 / 系统（对应通知 type） -->
+    <div class="cats">
+      <span
+        v-for="c in cats"
+        :key="c.key"
+        class="cat"
+        :class="{ active: activeCat === c.key }"
+        @click="activeCat = c.key"
+      >{{ t('interaction.tab.' + c.key) }}</span>
+    </div>
+
     <!-- 时间线消息列表（对齐车辆消息样式：时间居中 + 左侧系统头像 + 右侧气泡卡片） -->
     <div class="list">
       <div
@@ -54,6 +65,14 @@ const router = useRouter()
 const list = ref([])
 const loading = ref(true)
 const activeCat = ref('all')
+// 分类 tab：key 即通知 type（'all' 表示全部）；与 interaction.tab.* i18n 键对应
+const cats = [
+  { key: 'all' },
+  { key: 'comment' },
+  { key: 'like' },
+  { key: 'follow' },
+  { key: 'system' },
+]
 const PAGE_SIZE = 20
 const page = ref(1)
 const total = ref(0)
@@ -187,6 +206,35 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   background: var(--bg, #f7f8fa);
   min-height: calc(100vh - 100px);
 }
+/* ---- 分类切换 tab ---- */
+.cats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--card, #fff);
+  border-bottom: 1px solid var(--line, #eee);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.cats::-webkit-scrollbar { display: none; }
+.cat {
+  flex: none;
+  font-size: 14px;
+  color: var(--text-sub);
+  background: var(--surface-2, #f0f1f3);
+  border-radius: 16px;
+  padding: 6px 16px;
+  font-weight: 500;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+.cat.active {
+  color: #fff;
+  background: var(--brand, #4A6CF7);
+  font-weight: 600;
+}
+.cat:active { transform: scale(0.96); }
 .msg-group {
   margin-bottom: 18px;
 }

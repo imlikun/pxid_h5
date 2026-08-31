@@ -55,7 +55,13 @@ function onVisibilityChange() {
     requestAnimationFrame(() => { doc.style.transform = '' })
   })
 }
-onMounted(() => document.addEventListener('visibilitychange', onVisibilityChange))
+onMounted(() => {
+  // 首屏立即按系统语言初始化（修复：从 Flutter「我的」等全新 WebView 入口进来时，
+  // 没有 visibilitychange 事件触发，必须由首屏兜底初始化，否则页面语言停在默认中文，
+  // 不跟随 App 系统语言切换。切前台刷新逻辑见 onVisibilityChange）。
+  initLocale()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
 onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
 </script>
 

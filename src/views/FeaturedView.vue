@@ -15,14 +15,28 @@
         </div>
       </template>
       <template #right>
-        <span class="search-ico">
+        <span class="search-ico" @click="showSearch = !showSearch">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         </span>
       </template>
     </TopBar>
 
+    <!-- 精选搜索（点击右上角图标展开，按商品名本地过滤） -->
+    <div v-if="showSearch" class="fsearch">
+      <span class="fsearch__icon">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </span>
+      <input
+        class="fsearch__input"
+        v-model="kw"
+        :placeholder="t('featured.searchPlaceholder')"
+        @keyup.enter="kw = kw.trim()"
+      />
+      <span class="fsearch__close" @click="showSearch = false; kw = ''">✕</span>
+    </div>
+
     <!-- 推荐 -->
-    <template v-if="activeTab === 'rec'">
+    <template v-if="activeTab === 'rec' && !showSearch">
       <!-- 加载中 -->
       <div v-if="loading" class="load-tip">{{ t('featured.loading') }}</div>
 
@@ -96,7 +110,7 @@
     </template>
 
     <!-- 踏春装备 -->
-    <template v-else-if="activeTab === 'spring'">
+    <template v-else-if="activeTab === 'spring' && !showSearch">
       <SectionHeader :title="t('featured.springTitle')" :sub="t('featured.springSub')" :more="t('featured.more')" />
       <div class="grid2">
         <ProductCard
@@ -109,7 +123,7 @@
     </template>
 
     <!-- Bikes -->
-    <template v-else>
+    <template v-else-if="!showSearch">
       <SectionHeader :title="t('featured.bikesTitle')" :sub="t('featured.bikesSub')" />
       <div class="grid2">
         <ProductCard
@@ -118,6 +132,21 @@
           :product="p"
           :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
         />
+      </div>
+    </template>
+
+    <!-- 搜索结果（内联过滤当前已加载商品，按名称匹配） -->
+    <template v-else>
+      <div class="content">
+        <div class="grid2">
+          <ProductCard
+            v-for="(p, i) in searchResults"
+            :key="p.id"
+            :product="p"
+            :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+          />
+        </div>
+        <div v-if="!searchResults.length" class="empty-tab">{{ t('featured.searchEmpty') }}</div>
       </div>
     </template>
   </div>
@@ -232,6 +261,17 @@ const topTabs = computed(() => [
 ])
 const activeTab = ref('rec')
 
+// 精选搜索：点击右上角图标展开，按商品名本地过滤（仅对当前已加载商品生效）
+const showSearch = ref(false)
+const kw = ref('')
+const searchResults = computed(() => {
+  const k = (kw.value || '').trim().toLowerCase()
+  if (!k) return []
+  return all.value.filter(
+    (p) => (p.name || '').toLowerCase().includes(k) || (p.title || '').toLowerCase().includes(k)
+  )
+})
+
 // 精选快捷入口：label 走 i18n（key 不变，展示文案随语言切换）
 const featuredQuickI18n = computed(() =>
   featuredQuick.map((q) => ({ ...q, label: t('featured.quick.' + q.key) }))
@@ -320,6 +360,37 @@ async function retry() {
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+}
+.fsearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px 0;
+  height: 40px;
+  background: var(--surface-2, #f0f1f3);
+  border-radius: var(--radius-pill, 999px);
+  padding: 0 14px;
+}
+.fsearch__icon {
+  color: var(--text-hint);
+  display: flex;
+  align-items: center;
+}
+.fsearch__input {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.fsearch__input::placeholder { color: var(--text-hint); }
+.fsearch__close {
+  color: var(--text-hint);
+  font-size: 16px;
+  padding: 4px;
+  cursor: pointer;
 }
 .banner {
   position: relative;

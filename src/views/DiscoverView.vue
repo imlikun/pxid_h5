@@ -96,7 +96,11 @@
           <img v-if="QUICK_ICON_SVG[q.icon]" class="quick__icon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
           <IconSvg v-else class="quick__icon" :name="q.icon" :size="22" />
           <div class="quick__label">
-            <span class="quick__label__text">{{ t('discover.quick.' + q.key) }}</span>
+            <span
+              class="quick__label__text"
+              :class="{ overflow: quickOverflow[i] }"
+              :ref="(el) => (quickLabelEls[i] = el)"
+            >{{ t('discover.quick.' + q.key) }}</span>
           </div>
         </div>
       </div>
@@ -282,6 +286,13 @@ const activeFilter = ref('全部')
 // 当前登录用户绑定的车型（来自 getUserInfo().carModel）；仅当其属于在售 12 车型时才在筛选条前置「我的车」
 const myCarModel = ref('')
 
+// 4 宫格标签：仅当文字宽度超出容器时才启用滚动动画（避免短标签「看起来没滚 / 长标签才滚」的不一致）
+const quickLabelEls = ref([])
+const quickOverflow = ref([])
+function measureQuick() {
+  quickOverflow.value = quickLabelEls.value.map((el) => !!el && el.scrollWidth > el.clientWidth + 1)
+}
+
 // ---- 地区由语言映射（2026-08-31 定）：语言同时决定界面和内容 ----
 // zh → CN 中国内容，pt → BR 巴西内容，en → US 全球内容
 const currentRegion = computed(() => regionFromLocale(locale.value))
@@ -463,6 +474,8 @@ async function onRegionChanged() {
 watch(currentRegion, (newRegion, oldRegion) => {
   if (oldRegion && newRegion !== oldRegion) onRegionChanged()
 })
+// 语言切换后宫格文案长度变化，重新检测哪些需要滚动
+watch(locale, () => measureQuick())
 
 // 发现页 banner：拉运营后台配置的 banner（status=on），点击跳 banner.url
 async function fetchBanners() {
@@ -527,6 +540,8 @@ onMounted(async () => {
     setTab(publishState.pendingTab)
     publishState.pendingTab = null
   }
+  // 4 宫格标签溢出检测（渲染完成后量一次；语言切换后文案长度变化需重测）
+  measureQuick()
   // 拉取互动消息未读数（铃铛红点）
   interactionUnread.value = await fetchUnreadCount()
   // Banner 轮播自动播放：统一 4s/张，视频 slide 也定时切走（不再等 @ended，避免视频 loop 卡在第一张）
@@ -886,6 +901,9 @@ function showToast(msg) {
 .quick__label__text {
   display: inline-block;
   white-space: nowrap;
+}
+/* 仅当文字溢出容器才滚动，短标签保持静止——保证 4 宫格表现一致 */
+.quick__label__text.overflow {
   animation: q-marquee 4.5s linear infinite;
 }
 @keyframes q-marquee {

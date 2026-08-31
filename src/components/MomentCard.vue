@@ -60,6 +60,8 @@
   <transition name="fade">
     <div v-if="toast" class="m-toast">{{ toast }}</div>
   </transition>
+
+  <ShareSheet v-model="showShare" :title="item.title" @share="onShareChannel" />
 </template>
 
 <script setup>
@@ -72,6 +74,7 @@ import { formatTime } from '../utils/time'
 import { mediaUrl } from '../storage'
 import { requireLogin } from '../utils/auth'
 import { likeFeed, toggleFavorite } from '../api/feed'
+import ShareSheet from './ShareSheet.vue'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -82,6 +85,7 @@ const liked = ref(!!props.item.isLiked)
 const likeCount = ref(props.item.likes || 0)
 const favorited = ref(!!props.item.isFavorited)
 const toast = ref('')
+const showShare = ref(false)
 let toastTimer = null
 function showToast(m) {
   toast.value = m
@@ -157,11 +161,35 @@ async function onFavorite() {
   }
 }
 async function onShare() {
-  // 唤起原生分享面板（契约 openNative('share/feed?id=')），无原生能力时静默降级
+  // 唤起本地分享面板（微信/朋友圈/复制链接/更多）；不再直接依赖原生未实现的 share/feed 路由，
+  // 原生环境下面板里的「微信/朋友圈」仍走 openNative 兜底，保证功能可用。
+  showShare.value = true
+}
+
+async function onShareChannel({ channel }) {
+  const url = location.origin + location.pathname + '#/feed/' + props.item.id
+  const title = props.item.title || 'PXID'
+  const text = (props.item.content || '').slice(0, 60)
+  if (channel === 'link') {
+    try {
+      await navigator.clipboard.writeText(url)
+      showToast('链接已复制')
+    } catch (e) {
+      showToast('复制失败：' + url)
+    }
+    return
+  }
+  if (channel === 'more' && navigator.share) {
+    try {
+      await navigator.share({ title, text, url })
+      return
+    } catch (e) { /* 用户取消不降级 */ }
+  }
+  // wechat / moments / more(无 Web Share)：尽力走原生分享面板
   try {
     await bridge.openNative('share/feed?id=' + props.item.id)
   } catch (e) {
-    showToast('当前环境不支持分享')
+    showToast('当前环境不支持该分享方式')
   }
 }
 async function onFollow() {
