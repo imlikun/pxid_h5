@@ -2509,17 +2509,29 @@ function userBrief(deviceId) {
   }
 }
 // 关注列表：返回对象数组（头像/昵称/车型），便于 H5 直接渲染
+// ⚠️ 身份用「非空条件才参与 OR」：传 device 只按 device、传 member 只按 member、都传则双身份；
+// 绝不把空字符串当有效值，否则 `OR follower_member_user_id=''` 会误匹配全表空 member 行（返回别人的关注）。
 app.get('/follow/list', (req, res) => {
-  const { device, member } = req.query
+  const device = String(req.query.device || '')
+  const member = String(req.query.member || '')
   if (!device && !member) return res.json(err(1, '缺少 device / member'))
-  const rows = db.prepare('SELECT followee_device FROM follows WHERE (follower_device=? OR follower_member_user_id=?) ORDER BY created_at DESC').all(String(device || ''), String(member || ''))
+  const conds = []
+  const args = []
+  if (device) { conds.push('follower_device=?'); args.push(device) }
+  if (member) { conds.push('follower_member_user_id=?'); args.push(member) }
+  const rows = db.prepare(`SELECT followee_device FROM follows WHERE (${conds.join(' OR ')}) ORDER BY created_at DESC`).all(...args)
   res.json(ok({ list: rows.map((r) => userBrief(r.followee_device)) }))
 })
 // 粉丝列表：关注我的人（同结构）
 app.get('/follow/followers', (req, res) => {
-  const { device, member } = req.query
+  const device = String(req.query.device || '')
+  const member = String(req.query.member || '')
   if (!device && !member) return res.json(err(1, '缺少 device / member'))
-  const rows = db.prepare('SELECT follower_device FROM follows WHERE (followee_device=? OR followee_member_user_id=?) ORDER BY created_at DESC').all(String(device || ''), String(member || ''))
+  const conds = []
+  const args = []
+  if (device) { conds.push('followee_device=?'); args.push(device) }
+  if (member) { conds.push('followee_member_user_id=?'); args.push(member) }
+  const rows = db.prepare(`SELECT follower_device FROM follows WHERE (${conds.join(' OR ')}) ORDER BY created_at DESC`).all(...args)
   res.json(ok({ list: rows.map((r) => userBrief(r.follower_device)) }))
 })
 app.get('/follow/check', (req, res) => {
