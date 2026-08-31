@@ -1,5 +1,8 @@
 <template>
-  <div class="discover">
+  <div
+    class="discover"
+    :class="{ 'locale-zh': locale === 'zh', 'locale-en': locale === 'en', 'locale-pt': locale === 'pt' }"
+  >
     <!-- 顶部：三 tab + 操作 -->
     <TopBar sticky :show-back="false">
       <template #left>
@@ -89,7 +92,7 @@
         v-for="(q, i) in discoverQuick"
         :key="q.key"
         class="quick__item fade-up press"
-        :class="'stagger-' + ((i % 10) + 1)"
+        :class="['stagger-' + ((i % 10) + 1), { 'quick__item--ai': q.key === 'ai' }]"
         @click="onQuick(q)"
       >
           <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
@@ -210,7 +213,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onActivated, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onActivated, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
@@ -287,10 +290,15 @@ const activeFilter = ref('全部')
 const myCarModel = ref('')
 
 // 4 宫格标签：仅当文字宽度超出容器时才启用滚动动画（避免短标签「看起来没滚 / 长标签才滚」的不一致）
+// AI 助手（en/pt 较长）滚动统一由 CSS 子选择器驱动，这里跳过不干预
 const quickLabelEls = ref([])
 const quickOverflow = ref([])
 function measureQuick() {
-  quickOverflow.value = quickLabelEls.value.map((el) => !!el && el.scrollWidth > el.clientWidth + 1)
+  quickOverflow.value = quickLabelEls.value.map((el, i) => {
+    const q = discoverQuick[i]
+    if (q && q.key === 'ai') return false
+    return !!el && el.scrollWidth > el.clientWidth + 1
+  })
 }
 
 // ---- 地区由语言映射（2026-08-31 定）：语言同时决定界面和内容 ----
@@ -474,8 +482,8 @@ async function onRegionChanged() {
 watch(currentRegion, (newRegion, oldRegion) => {
   if (oldRegion && newRegion !== oldRegion) onRegionChanged()
 })
-// 语言切换后宫格文案长度变化，重新检测哪些需要滚动
-watch(locale, () => measureQuick())
+// 语言切换后宫格文案长度变化，重新检测哪些需要滚动（nextTick 等 DOM 文案更新完再量，避免量到旧宽度）
+watch(locale, () => nextTick(measureQuick))
 
 // 发现页 banner：拉运营后台配置的 banner（status=on），点击跳 banner.url
 async function fetchBanners() {
@@ -873,6 +881,7 @@ function showToast(msg) {
 .quick__item {
   position: relative;
   height: 72px;
+  min-width: 0; /* 葡语等长文案不会把该列撑宽，保证 4 宫格各语言等宽 */
   background: #ffffff;
   border: none;
   border-radius: var(--radius-xl);
@@ -897,13 +906,19 @@ function showToast(msg) {
   font-size: 14px;
   line-height: 1;
   color: var(--text);
+  text-align: center; /* 各语言标签统一居中（修 EN/PT 通知/积分偏左不齐） */
 }
 .quick__label__text {
   display: inline-block;
   white-space: nowrap;
 }
-/* 仅当文字溢出容器才滚动，短标签保持静止——保证 4 宫格表现一致 */
+/* 仅当文字溢出容器才滚动，短标签（如中文）保持静止——保证 4 宫格表现一致 */
 .quick__label__text.overflow {
+  animation: q-marquee 4.5s linear infinite;
+}
+/* 英文/葡萄牙语：智能助手标签较长，用子选择器定位并滚动（纯 CSS 驱动，不依赖 JS 测宽） */
+.discover.locale-en .quick__item--ai .quick__label__text,
+.discover.locale-pt .quick__item--ai .quick__label__text {
   animation: q-marquee 4.5s linear infinite;
 }
 @keyframes q-marquee {

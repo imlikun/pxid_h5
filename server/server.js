@@ -1488,18 +1488,15 @@ function addPoints(device, delta, reason) {
   })
   tx()
 }
-function effectiveDevice(deviceId) {
-  const has = db.prepare('SELECT 1 FROM growth_points WHERE device_id=?').get(deviceId)
-    || db.prepare('SELECT 1 FROM growth_signins WHERE device_id=?').get(deviceId)
-    || db.prepare('SELECT 1 FROM growth_user_medals WHERE device_id=?').get(deviceId)
-  return has ? deviceId : '__demo__'
-}
+// 成长主页始终用「真实设备」聚合，绝不回落 __demo__：
+// 旧逻辑 effectiveDevice() 在设备无成长数据时返回 __demo__，会把假签到历史(19/20/21)伪装成用户真实日历，
+// 用户首次真实签到后真实设备有了数据，假历史消失 → 表现为「签完重进 19/20/21 变未签到 / 前几天签到不显示」。
+// 改为：无数据就返回干净的「新用户空态」，真实签到按 memberUserId 持久显示。
 function buildProfile(deviceId) {
-  const eff = effectiveDevice(deviceId)
-  const isDemo = eff === '__demo__'
-  const pts = db.prepare('SELECT balance FROM growth_points WHERE device_id=?').get(eff)
-  const last = db.prepare('SELECT * FROM growth_signins WHERE device_id=? ORDER BY sign_date DESC LIMIT 1').get(eff)
-  const owned = db.prepare('SELECT medal_code FROM growth_user_medals WHERE device_id=?').all(eff).map((r) => r.medal_code)
+  const device = deviceId || ''
+  const pts = db.prepare('SELECT balance FROM growth_points WHERE device_id=?').get(device)
+  const last = db.prepare('SELECT * FROM growth_signins WHERE device_id=? ORDER BY sign_date DESC LIMIT 1').get(device)
+  const owned = db.prepare('SELECT medal_code FROM growth_user_medals WHERE device_id=?').all(device).map((r) => r.medal_code)
   const balance = pts ? pts.balance : 0
   const today = ymd()
   const continuousDays = last ? last.continuous_days : 0
@@ -1507,9 +1504,9 @@ function buildProfile(deviceId) {
   const signedToday = lastSignDate === today
   const g = levelOf(balance)
   const [yy, mm] = today.split('-')
-  const monthSigns = db.prepare('SELECT sign_date FROM growth_signins WHERE device_id=? AND sign_date LIKE ?').all(eff, `${yy}-${mm}-%`).map((r) => r.sign_date.slice(8))
+  const monthSigns = db.prepare('SELECT sign_date FROM growth_signins WHERE device_id=? AND sign_date LIKE ?').all(device, `${yy}-${mm}-%`).map((r) => r.sign_date.slice(8))
   return {
-    isDemo,
+    isDemo: false,
     balance,
     continuousDays,
     lastSignDate,
@@ -1549,14 +1546,14 @@ app.post('/growth/signin', requireAuth, (req, res) => {
 app.get('/growth/medals', requireAuth, (req, res) => {
   const device = (req.user && (req.user.memberUserId || req.user.deviceId)) || ''
   if (!device) return res.json(err(401, '未授权'))
-  const eff = effectiveDevice(device)
-  const owned = new Set(db.prepare('SELECT medal_code FROM growth_user_medals WHERE device_id=?').all(eff).map((r) => r.medal_code))
+  // 始终用真实设备（不再回落 __demo__），新用户即空态，已获得勋章按真实数据展示
+  const owned = new Set(db.prepare('SELECT medal_code FROM growth_user_medals WHERE device_id=?').all(device).map((r) => r.medal_code))
   const list = MEDAL_DEFS.map((m) => ({
     code: m.code, icon: m.icon, sort: m.sort, owned: owned.has(m.code),
     name: { zh: m.name_zh, en: m.name_en, pt: m.name_pt },
     desc: { zh: m.desc_zh, en: m.desc_en, pt: m.desc_pt },
   }))
-  res.json(ok({ isDemo: eff === '__demo__', list }))
+  res.json(ok({ isDemo: false, list }))
 })
 
 // ============================================================
@@ -1569,7 +1566,7 @@ app.get('/growth/medals', requireAuth, (req, res) => {
 app.get('/growth/points-products', requireAuth, (req, res) => {
   const device = (req.user && (req.user.memberUserId || req.user.deviceId)) || ''
   if (!device) return res.json(err(401, '未授权'))
-  const eff = effectiveDevice(device)
+  const eff = device
   const rows = db.prepare("SELECT id,name,cover,tags,price,points,stock,description FROM points_products WHERE status='on' ORDER BY sort,id").all()
   const parseTags = (raw) => {
     if (!raw) return []
@@ -1587,7 +1584,7 @@ app.post('/growth/points-exchange', requireAuth, (req, res) => {
   const { productId, shippingName, shippingPhone, shippingAddress, note } = req.body || {}
   if (!productId) return res.json(err(400, '缺少商品'))
   if (!shippingName || !shippingPhone || !shippingAddress) return res.json(err(400, '请填写完整收货信息'))
-  const eff = effectiveDevice(device)
+  const eff = device
   const product = db.prepare("SELECT * FROM points_products WHERE id=? AND status='on'").get(productId)
   if (!product) return res.json(err(404, '商品不存在或已下架'))
   if (product.stock <= 0) return res.json(err(400, '库存不足'))
@@ -1623,7 +1620,7 @@ app.post('/growth/points-exchange', requireAuth, (req, res) => {
 app.get('/growth/points-exchanges', requireAuth, (req, res) => {
   const device = (req.user && (req.user.memberUserId || req.user.deviceId)) || ''
   if (!device) return res.json(err(401, '未授权'))
-  const eff = effectiveDevice(device)
+  const eff = device
   const list = db.prepare('SELECT id,product_id,product_name,cover,points_cost,status,tracking_no,created_at FROM points_exchanges WHERE device_id=? ORDER BY id DESC LIMIT 50').all(eff)
   res.json(ok({ list }))
 })
