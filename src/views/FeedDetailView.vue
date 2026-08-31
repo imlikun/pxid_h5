@@ -216,6 +216,9 @@
   <transition name="fade">
     <div v-if="toast" class="toast">{{ toast }}</div>
   </transition>
+
+  <!-- 分享面板：统一走本地 Sheet，不再直接调未实现的原生 share/feed 路由 -->
+  <ShareSheet v-if="item" v-model="showShare" :title="item.title || item.value?.title" @share="onShareChannel" />
 </template>
 
 <script setup>
@@ -228,6 +231,7 @@ import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, 
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
+import ShareSheet from '../components/ShareSheet.vue'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 
 const route = useRoute()
@@ -253,6 +257,7 @@ const comments = ref([])
 const commentText = ref('')
 const toast = ref('')
 let toastTimer = null
+const showShare = ref(false)
 const commentsBox = ref(null)
 const commentInput = ref(null)
 // 评论输入栏：聚焦时变固定底部栏，贴紧键盘顶边
@@ -662,18 +667,25 @@ async function onFollow() {
   }
 }
 async function onShare() {
-  // 分享是纯客户端动作（原生分享面板 / Web Share / 复制链接），不写后端数据，无需登录态（2026-08-25 修复：原挂 requireLogin 导致未登录点分享跳登录窗）
-  // 原生环境：拉起原生分享面板（契约 openNative('share/feed?id=')）
-  if (bridge.isNative()) {
-    bridge.openNative('share/feed?id=' + id.value)
-    showToast(t('feed.toast.shareLaunched'))
-    return
-  }
-  // H5 预览：Web Share API / 复制链接，保证可真实分享
+  // 唤起本地分享面板（复制链接 / 更多 / 微信 / 朋友圈）；不再直接依赖原生未实现的 share/feed 路由，
+  // 避免 Flutter 弹出「分享面板即将上线」的占位提示。面板内各渠道仍尽力桥接到原生能力。
+  showShare.value = true
+}
+
+async function onShareChannel({ channel }) {
   const url = location.origin + location.pathname + '#/feed/' + id.value
   const title = (item.value && item.value.title) || t('feed.shareTitle')
   const text = (item.value && item.value.content ? item.value.content : '').slice(0, 60)
-  if (navigator.share) {
+  if (channel === 'link') {
+    try {
+      await navigator.clipboard.writeText(url)
+      showToast(t('feed.toast.linkCopied'))
+    } catch (e) {
+      showToast(t('feed.toast.shareLink') + url)
+    }
+    return
+  }
+  if (channel === 'more' && navigator.share) {
     try {
       await navigator.share({ title, text, url })
       return
@@ -681,11 +693,11 @@ async function onShare() {
       if (e && e.name === 'AbortError') return // 用户取消，不降级
     }
   }
+  // 微信 / 朋友圈 / 更多（无 Web Share）：尽力走原生分享面板兜底
   try {
-    await navigator.clipboard.writeText(url)
-    showToast(t('feed.toast.linkCopied'))
+    await bridge.openNative('share/feed?id=' + id.value)
   } catch (e) {
-    showToast(t('feed.toast.shareLink') + url)
+    showToast(t('feed.toast.shareChannelFail'))
   }
 }
 function onActivitySignup() {
