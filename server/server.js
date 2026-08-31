@@ -929,8 +929,13 @@ app.get('/users/me', requireAuth, (req, res) => {
   const d = String(u.deviceId || u.device_id || '')
   const m = String(u.memberUserId || u.member_user_id || '')
   const profile = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
-  const feed = !profile.nickname || profile.nickname === '骑友'
-    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(d, m)
+  // 兜底：无 profile 时取该用户最新一条 feed 的昵称/头像/车型；
+  // 必须排除 device_id='' 的脏记录，否则空设备 token 会串到「PXID 官方」等默认内容。
+  const feed = (!profile.nickname || profile.nickname === '骑友') && (d || m)
+    ? db.prepare(d
+        ? "SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(device_id)>0 AND length(nickname)>0 ORDER BY id DESC LIMIT 1"
+        : "SELECT nickname, avatar, car_model FROM feeds WHERE member_user_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1"
+      ).get(...(d ? [d, m] : [m]))
     : null
   const im = userIdentityMatch('f.device_id', 'f.member_user_id', u)
   const feedCount = db.prepare(`SELECT COUNT(*) c FROM feeds f WHERE ${im.clause} AND f.status='published'`).get(...im.args).c
