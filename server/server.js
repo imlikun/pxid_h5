@@ -918,6 +918,7 @@ app.get('/users/me', requireAuth, (req, res) => {
   const u = req.user || {}
   const d = u.deviceId || u.device_id || ''
   const m = u.memberUserId || u.member_user_id || ''
+  console.log('[diag-pxid] /users/me hit auth=' + String(req.headers.authorization || '').slice(0, 60) + ' u=' + JSON.stringify(u))
   const profile = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
   const feed = !profile.nickname || profile.nickname === '骑友'
     ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(d, m)
@@ -928,6 +929,7 @@ app.get('/users/me', requireAuth, (req, res) => {
   const favoriteCount = db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${favIm.clause} AND f.status='published'`).get(...favIm.args).c
   const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (follower_device=? OR follower_member_user_id=?)').get(d, m).c
   const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (followee_device=? OR followee_member_user_id=?)').get(d, m).c
+  console.log('[diag-pxid] /users/me result d=' + d + ' m=' + m + ' stats=' + feedCount + '/' + favoriteCount + '/' + followeeCount + '/' + followerCount + ' nickname=' + (profile.nickname || (feed && feed.nickname) || '骑友'))
   res.json(ok({
     deviceId: d,
     memberUserId: m,
@@ -966,6 +968,7 @@ app.put('/users/profile', requireAuth, (req, res) => {
 // 资料与计数一律按「device_id OR member_user_id」双身份命中，避免 ToC 态只存 member_user_id 时查不到。
 app.get('/users/:deviceId', (req, res) => {
   const raw = String(req.params.deviceId || '')
+  console.log('[diag-pxid] /users/' + raw + ' hit auth=' + String(req.headers.authorization || '').slice(0, 60))
   if (!raw) return res.json(err(400, '缺少 deviceId'))
   // 可选身份：带有效 Bearer token 则解析（未登录也能看公开资料，只是 isFollowing/isSelf=false）
   let myDevice = ''
@@ -1001,6 +1004,7 @@ app.get('/users/:deviceId', (req, res) => {
   // 四宫格计数：发布数（公开动态数）/ 收藏数（仅自己可见，他人返回 0 不泄露私密）
   const feedCount = db.prepare("SELECT COUNT(*) c FROM feeds WHERE (device_id=? OR member_user_id=?) AND status='published'").get(raw, raw).c
   const favoriteCount = isSelf ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=? OR member_user_id=?').get(raw, raw).c : 0
+  console.log('[diag-pxid] /users/' + raw + ' result myDevice=' + myDevice + ' myMid=' + myMid + ' tDevice=' + tDevice + ' tMid=' + tMid + ' isSelf=' + isSelf + ' stats=' + feedCount + '/' + favoriteCount + '/' + followeeCount + '/' + followerCount + ' nickname=' + nickname)
   res.json(ok({
     deviceId: tDevice,
     memberUserId: tMid,
