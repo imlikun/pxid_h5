@@ -928,8 +928,14 @@ app.get('/users/me', requireAuth, (req, res) => {
   const feedCount = db.prepare(`SELECT COUNT(*) c FROM feeds f WHERE ${im.clause} AND f.status='published'`).get(...im.args).c
   const favIm = userIdentityMatch('v.device_id', 'v.member_user_id', u)
   const favoriteCount = db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${favIm.clause} AND f.status='published'`).get(...favIm.args).c
-  const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (follower_device=? OR follower_member_user_id=?)').get(d, m).c
-  const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (followee_device=? OR followee_member_user_id=?)').get(d, m).c
+  const followeeCount = (() => {
+    const im = userIdentityMatch('follower_device', 'follower_member_user_id', u)
+    return db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${im.clause}`).get(...im.args).c
+  })()
+  const followerCount = (() => {
+    const im = userIdentityMatch('followee_device', 'followee_member_user_id', u)
+    return db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${im.clause}`).get(...im.args).c
+  })()
   res.json(ok({
     deviceId: d,
     memberUserId: m,
