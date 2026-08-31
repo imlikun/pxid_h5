@@ -95,7 +95,9 @@
           <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
           <img v-if="QUICK_ICON_SVG[q.icon]" class="quick__icon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
           <IconSvg v-else class="quick__icon" :name="q.icon" :size="22" />
-          <div class="quick__label">{{ t('discover.quick.' + q.key) }}</div>
+          <div class="quick__label">
+            <span class="quick__label__text">{{ t('discover.quick.' + q.key) }}</span>
+          </div>
         </div>
       </div>
     </template>
@@ -875,9 +877,20 @@ function showToast(msg) {
   color: var(--text);
 }
 .quick__label {
+  width: 100%;
+  overflow: hidden;
   font-size: 14px;
   line-height: 1;
   color: var(--text);
+}
+.quick__label__text {
+  display: inline-block;
+  white-space: nowrap;
+  animation: q-marquee 4.5s linear infinite;
+}
+@keyframes q-marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
 }
 .q-badge {
   position: absolute;

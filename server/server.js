@@ -1042,6 +1042,29 @@ app.post('/feed', requireAuth, (req, res) => {
   moderation.reviewFeed(row, db)
   // 视频异步转码（增强，可选）：有 ffmpeg 才转，失败静默，不影响发布
   if (video) transcodeVideoIfAvailable(row.id, video)
+  // @提到：给被@用户发一条通知（容错，不影响发布）
+  try {
+    const mentionList = Array.isArray(mentions) ? mentions : []
+    const targetMidStmt = db.prepare("SELECT member_user_id FROM user_profiles WHERE device_id=? AND length(member_user_id)>0")
+    for (const m of mentionList) {
+      const targetDevice = typeof m === 'object' && m ? String(m.deviceId || '') : String(m || '')
+      if (!targetDevice || targetDevice === deviceId) continue
+      const midRow = targetMidStmt.get(targetDevice)
+      emitNotification({
+        deviceId: targetDevice,
+        memberUserId: (midRow && midRow.member_user_id) || '',
+        type: 'mention',
+        actorDevice: deviceId,
+        actorName: nickname,
+        actorAvatar: avatar,
+        targetType: 'feed',
+        targetId: String(row.id),
+        content: `${nickname} 在动态中提到了你`,
+      })
+    }
+  } catch (e) {
+    console.error('[pxid-feed] mention notify failed:', e.message || e)
+  }
   res.json(ok(rowToFeed(row)))
 })
 

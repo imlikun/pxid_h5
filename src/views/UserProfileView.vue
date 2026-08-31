@@ -15,22 +15,19 @@
         </div>
         <div v-if="user && user.carModel" class="u-car">#{{ user.carModel }}</div>
       </div>
-      <!-- 自己：编辑资料；他人：关注 + 发消息 + 更多菜单 -->
-      <div class="u-actions">
-        <button v-if="false" class="u-btn u-edit" @click="onEdit">编辑资料</button>
-        <template v-else>
-          <button class="u-btn u-follow" :class="{ on: user && user.isFollowing }" @click="onToggleFollow">
-            {{ user && user.isFollowing ? '已关注' : '+ 关注' }}
-          </button>
-          <button class="u-btn u-msg" @click="onMessage">发消息</button>
-          <button class="u-more-btn" @click="menuOpen = !menuOpen">⋯</button>
-          <transition name="fade">
-            <div v-if="menuOpen" class="u-menu" @click.stop>
-              <div class="u-menu__item" @click="onReport">举报</div>
-              <div class="u-menu__item" @click="onBlock">拉黑</div>
-            </div>
-          </transition>
-        </template>
+      <!-- 他人主页：关注 + 发消息 + 更多菜单；自己主页：不显示操作区 -->
+      <div v-if="!isSelf" class="u-actions">
+        <button class="u-btn u-follow" :class="{ on: user && user.isFollowing }" @click="onToggleFollow">
+          {{ user && user.isFollowing ? '已关注' : '+ 关注' }}
+        </button>
+        <button class="u-btn u-msg" @click="onMessage">发消息</button>
+        <button class="u-more-btn" @click="menuOpen = !menuOpen">⋯</button>
+        <transition name="fade">
+          <div v-if="menuOpen" class="u-menu" @click.stop>
+            <div class="u-menu__item" @click="onReport">举报</div>
+            <div class="u-menu__item" @click="onBlock">拉黑</div>
+          </div>
+        </transition>
       </div>
     </div>
 
@@ -142,8 +139,6 @@ const menuOpen = ref(false)
 // 「我的」入口（App「我的」四宫格）进 /user/me：身份走原生桥真实设备 ID，
 // 与发帖/收藏/关注的落地身份一致（2026-08-29 修复两套 ID 割裂）。
 const myDeviceId = ref('')
-const followCache = ref(null) // 自己+原生：Flutter 桥返回的关注/粉丝缓存，避免重复请求
-const fansCache = ref(null)
 const targetDevice = computed(() =>
   route.params.id === 'me' ? myDeviceId.value : String(route.params.id || '')
 )
@@ -191,17 +186,7 @@ async function loadProfile() {
   // 自己：优先 /users/me（token 身份最可靠）；他人：/users/:deviceId
   user.value = isSelf.value ? await fetchMyProfile(d) : await fetchUserProfile(d)
   if (!user.value) { showToast('用户信息加载失败'); return }
-  // 自己 + 原生：关注/粉丝来自 Flutter 桥（App 账号关系，H5 不自管），预拉取并校正四宫格计数
-  if (isSelf.value && bridge.isNative()) {
-    try {
-      followCache.value = await bridge.getFollowList()
-      fansCache.value = await bridge.getFansList()
-      user.value.followeeCount = (followCache.value || []).length
-      user.value.followerCount = (fansCache.value || []).length
-    } catch (e) {
-      // 桥未实现时回退 H5 本地，计数保持 /users 返回（预览态也走这里）
-    }
-  }
+  // 关注/粉丝/收藏统一走后端 H5 关系表，避免 Flutter 桥返回空导致计数清零
 }
 
 async function loadContent(reset = true) {
@@ -226,20 +211,8 @@ async function loadContent(reset = true) {
     }
   } else {
     const d = targetDevice.value
-    let list = []
-    // 自己 + 原生：关注/粉丝走 Flutter 桥（真实账号关系）；否则回退 H5 本地（预览/他人主页）
-    if (isSelf.value && bridge.isNative()) {
-      try {
-        list =
-          grid === 'follow'
-            ? followCache.value || (followCache.value = await bridge.getFollowList())
-            : fansCache.value || (fansCache.value = await bridge.getFansList())
-      } catch (e) {
-        list = []
-      }
-    } else {
-      list = grid === 'follow' ? await fetchFollowList(d) : await fetchFollowers(d)
-    }
+    // 关注/粉丝列表统一走后端 H5 follows 表
+    const list = grid === 'follow' ? await fetchFollowList(d) : await fetchFollowers(d)
     userList.value = list || []
     feedLoading.value = false
   }
