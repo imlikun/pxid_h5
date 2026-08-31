@@ -1875,12 +1875,6 @@ const upload = multer({
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024, files: 9 },
-  fileFilter: (req, file, cb) => {
-    // 双重白名单：mimetype + 原始扩展名，均须为 jpg/png/webp（去掉 gif，与增补方案 §9.1#4 一致）
-    const mimeOk = /^image\/(jpeg|png|webp)$/.test(file.mimetype)
-    const extOk = /\.(jpe?g|png|webp)$/i.test(file.originalname)
-    cb(mimeOk && extOk ? null : new Error('仅允许 jpg/png/webp 图片'))
-  },
 })
 // 静态服务上传文件（无需鉴权，URL 本身不可猜；文件经 magic bytes 校验后才落到 /uploads）
 app.use('/uploads', express.static(UPLOAD_DIR))
@@ -1935,10 +1929,6 @@ const mediaUpload = multer({
     filename: (req, file, cb) => cb(null, Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.tmp'),
   }),
   limits: { fileSize: 200 * 1024 * 1024, files: 1 },
-  fileFilter: (req, file, cb) => {
-    const ok = /^image\/(jpeg|png|webp)$/.test(file.mimetype) || /^video\/(mp4|webm|quicktime)$/.test(file.mimetype)
-    cb(ok ? null : new Error('仅支持 jpg/png/webp 图片与 mp4/webm 视频'))
-  },
 })
 app.post('/media/upload', requireAuth, mediaUpload.single('file'), (req, res) => {
   if (!req.file) return res.json(err(1, '未收到文件'))
