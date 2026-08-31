@@ -366,20 +366,27 @@ export async function fetchFootprints(params = {}) {
   }
 }
 // 关注列表：GET /follow/list（公开，返回对象数组）
-export async function fetchFollowList(deviceId) {
-  if (!FEED_API || !deviceId) return []
+// 双身份：device 与 member 任一命中即可，与四宫格计数口径一致（根治 deviceId 漂移导致列表≠数字）
+export async function fetchFollowList(deviceId, memberUserId) {
+  if (!FEED_API || (!deviceId && !memberUserId)) return []
   try {
-    const data = await request('/follow/list?device=' + encodeURIComponent(deviceId))
+    const qs = new URLSearchParams()
+    if (deviceId) qs.set('device', String(deviceId))
+    if (memberUserId) qs.set('member', String(memberUserId))
+    const data = await request('/follow/list?' + qs.toString())
     return data.list || []
   } catch (e) {
     return []
   }
 }
 // 粉丝列表：GET /follow/followers（公开，返回对象数组）
-export async function fetchFollowers(deviceId) {
-  if (!FEED_API || !deviceId) return []
+export async function fetchFollowers(deviceId, memberUserId) {
+  if (!FEED_API || (!deviceId && !memberUserId)) return []
   try {
-    const data = await request('/follow/followers?device=' + encodeURIComponent(deviceId))
+    const qs = new URLSearchParams()
+    if (deviceId) qs.set('device', String(deviceId))
+    if (memberUserId) qs.set('member', String(memberUserId))
+    const data = await request('/follow/followers?' + qs.toString())
     return data.list || []
   } catch (e) {
     return []

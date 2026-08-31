@@ -213,8 +213,9 @@ async function loadContent(reset = true) {
     }
   } else {
     const d = targetDevice.value
-    // 关注/粉丝列表统一走后端 H5 follows 表
-    const list = grid === 'follow' ? await fetchFollowList(d) : await fetchFollowers(d)
+    // 关注/粉丝列表统一走后端 H5 follows 表；双身份 (device + member) 与四宫格计数口径一致
+    const m = (user.value && user.value.memberUserId) || ''
+    const list = grid === 'follow' ? await fetchFollowList(d, m) : await fetchFollowers(d, m)
     userList.value = list || []
     feedLoading.value = false
   }
