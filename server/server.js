@@ -544,8 +544,10 @@ function userIdentityMatch(idCol, midCol, user) {
   const m = u.memberUserId || u.member_user_id || (u.raw && (u.raw.memberUserId || u.raw.member_user_id)) || ''
   const parts = []
   const args = []
-  if (d) { parts.push(`${idCol} = ?`); args.push(d) }
-  if (m) { parts.push(`${midCol} = ?`); args.push(m) }
+  // 注意：必须 String() 化！TOC userinfo 返回的 memberUserId 是数字（如 17），
+  // better-sqlite3 绑定 JS number 会变成 REAL(17.0)，与 TEXT 列 '17' 比较时转成 '17.0' 永不相等 → 查不到。
+  if (d) { parts.push(`${idCol} = ?`); args.push(String(d)) }
+  if (m) { parts.push(`${midCol} = ?`); args.push(String(m)) }
   return { clause: parts.length ? `(${parts.join(' OR ')})` : '(1=0)', args }
 }
 
@@ -916,9 +918,8 @@ app.get('/feed/users', (req, res) => {
 // ⚠️ 必须定义在 /users/:deviceId 之前，否则会被参数路由抢匹配成 deviceId='me'。
 app.get('/users/me', requireAuth, (req, res) => {
   const u = req.user || {}
-  const d = u.deviceId || u.device_id || ''
-  const m = u.memberUserId || u.member_user_id || ''
-  console.log('[diag-pxid] /users/me hit auth=' + String(req.headers.authorization || '').slice(0, 60) + ' u=' + JSON.stringify(u))
+  const d = String(u.deviceId || u.device_id || '')
+  const m = String(u.memberUserId || u.member_user_id || '')
   const profile = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
   const feed = !profile.nickname || profile.nickname === '骑友'
     ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(d, m)
@@ -929,7 +930,6 @@ app.get('/users/me', requireAuth, (req, res) => {
   const favoriteCount = db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${favIm.clause} AND f.status='published'`).get(...favIm.args).c
   const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (follower_device=? OR follower_member_user_id=?)').get(d, m).c
   const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE (followee_device=? OR followee_member_user_id=?)').get(d, m).c
-  console.log('[diag-pxid] /users/me result d=' + d + ' m=' + m + ' stats=' + feedCount + '/' + favoriteCount + '/' + followeeCount + '/' + followerCount + ' nickname=' + (profile.nickname || (feed && feed.nickname) || '骑友'))
   res.json(ok({
     deviceId: d,
     memberUserId: m,
@@ -949,8 +949,8 @@ app.get('/users/me', requireAuth, (req, res) => {
 // PUT /users/profile { nickname?, avatar?, carModel? } → 按 token 身份 upsert
 app.put('/users/profile', requireAuth, (req, res) => {
   const u = req.user || {}
-  const d = u.deviceId || u.device_id || ''
-  const m = u.memberUserId || u.member_user_id || ''
+  const d = String(u.deviceId || u.device_id || '')
+  const m = String(u.memberUserId || u.member_user_id || '')
   if (!d && !m) return res.status(401).json(err(401, '未授权：无法识别用户'))
   const { nickname, avatar, carModel } = req.body || {}
   const patch = {}
@@ -968,7 +968,6 @@ app.put('/users/profile', requireAuth, (req, res) => {
 // 资料与计数一律按「device_id OR member_user_id」双身份命中，避免 ToC 态只存 member_user_id 时查不到。
 app.get('/users/:deviceId', (req, res) => {
   const raw = String(req.params.deviceId || '')
-  console.log('[diag-pxid] /users/' + raw + ' hit auth=' + String(req.headers.authorization || '').slice(0, 60))
   if (!raw) return res.json(err(400, '缺少 deviceId'))
   // 可选身份：带有效 Bearer token 则解析（未登录也能看公开资料，只是 isFollowing/isSelf=false）
   let myDevice = ''
@@ -978,7 +977,7 @@ app.get('/users/:deviceId', (req, res) => {
     const t = h.startsWith('Bearer ') ? h.slice(7) : ''
     if (t && USER_TOKEN_SECRET) {
       const payload = verifyUserToken(t)
-      if (payload) { myDevice = payload.deviceId || ''; myMid = payload.memberUserId || '' }
+      if (payload) { myDevice = String(payload.deviceId || ''); myMid = String(payload.memberUserId || '') }
     }
   } catch (e) { /* 忽略，按未登录处理 */ }
   // 解析目标真实身份（device_id + member_user_id 双身份），用于回填返回字段，供前端 /feed 双身份过滤
@@ -1004,7 +1003,6 @@ app.get('/users/:deviceId', (req, res) => {
   // 四宫格计数：发布数（公开动态数）/ 收藏数（仅自己可见，他人返回 0 不泄露私密）
   const feedCount = db.prepare("SELECT COUNT(*) c FROM feeds WHERE (device_id=? OR member_user_id=?) AND status='published'").get(raw, raw).c
   const favoriteCount = isSelf ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=? OR member_user_id=?').get(raw, raw).c : 0
-  console.log('[diag-pxid] /users/' + raw + ' result myDevice=' + myDevice + ' myMid=' + myMid + ' tDevice=' + tDevice + ' tMid=' + tMid + ' isSelf=' + isSelf + ' stats=' + feedCount + '/' + favoriteCount + '/' + followeeCount + '/' + followerCount + ' nickname=' + nickname)
   res.json(ok({
     deviceId: tDevice,
     memberUserId: tMid,
@@ -1305,8 +1303,8 @@ function emitNotification({ deviceId = '', memberUserId = '', type, actorDevice 
 function visibleNotifClause(memberUserId, device) {
   const parts = []
   const args = []
-  if (memberUserId) { parts.push('member_user_id = ?'); args.push(memberUserId) }
-  if (device) { parts.push('device_id = ?'); args.push(device) }
+  if (memberUserId) { parts.push('member_user_id = ?'); args.push(String(memberUserId)) }
+  if (device) { parts.push('device_id = ?'); args.push(String(device)) }
   parts.push("device_id = '__demo__'")
   return { clause: parts.join(' OR '), args }
 }
@@ -1778,7 +1776,9 @@ async function requireAuth(req, res, next) {
       // ToC 校验通过但无 memberUserId（如匿名 token 调 ToC）→ 置 null 走下方 HMAC 兜底，
       // 保留 deviceId 身份（否则 deviceId 恒空 → 积分/成长等按 device 维度的接口全 401）
       if (u.memberUserId) {
-        user = { memberUserId: u.memberUserId, deviceId: '', toc: true, banned: !!u.banned, raw: u }
+        // ⚠️ memberUserId 必须 String() 化：ToC userinfo 返回数字（如 17），
+        // 数字绑定进 SQLite 与 TEXT 列比较会变成 '17.0' vs '17' 永不相等 → 计数全 0。
+        user = { memberUserId: String(u.memberUserId), deviceId: '', toc: true, banned: !!u.banned, raw: u }
       } else {
         user = null
       }
@@ -1791,7 +1791,7 @@ async function requireAuth(req, res, next) {
   // 2) 演示态兜底：自签 HMAC（Flutter 用同一 secret 签发的 token）
   if (!user && USER_TOKEN_SECRET) {
     const payload = verifyUserToken(t)
-    if (payload) user = { memberUserId: payload.memberUserId || '', deviceId: payload.deviceId || '', raw: payload }
+    if (payload) user = { memberUserId: String(payload.memberUserId || ''), deviceId: String(payload.deviceId || ''), raw: payload }
   }
 
   // 3) 最松兜底：两者都未配时，仅检查 token 非空（保持现状，不破演示态）
