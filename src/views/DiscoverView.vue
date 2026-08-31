@@ -473,8 +473,8 @@ function fmtDate(a) {
 // 真机 Flutter getLocale 注入后，onMounted 的 initLocale 优先，手动切地区时联动覆盖
 const REGION_LOCALE = { US: 'en', CN: 'zh', BR: 'pt' }
 async function switchRegion(code) {
-  // 始终先按地区对齐语言（纠正“直接点已选项不切语言”的错位）
-  setLocale(REGION_LOCALE[code] || 'en')
+  // URL 用 ?lang= 锁定语言时不联动（便于实测「内容与语言解耦」），否则按地区对齐语言
+  if (!urlParam('lang')) setLocale(REGION_LOCALE[code] || 'en')
   if (currentRegion.value === code) return // 已选中则不重拉数据
   currentRegion.value = code
   regionHint.value = ''
@@ -522,17 +522,30 @@ function onBanner() {
   }
 }
 
+// 读取 URL 查询参数（实测/联调用：?region=CN|BR|US、?lang=zh|en|pt）
+function urlParam(key) {
+  try {
+    return (new URLSearchParams(location.search).get(key) || '').trim()
+  } catch (e) {
+    return ''
+  }
+}
+
 // 发布后自动切到「动态」tab 展示新内容
 onMounted(async () => {
-  await initLocale() // 先按系统语言初始化
-  try {
-    const reg = await bridge.getRegion()
-    if (reg && ['CN', 'BR', 'US'].includes(String(reg).toUpperCase())) {
-      currentRegion.value = String(reg).toUpperCase()
-    }
-  } catch (e) { /* getRegion 失败则用兜底默认地区 */ }
-  // 强制按当前地区对齐语言：无论 getRegion 是否成功，语言都与当前 region 一致（兜底默认 CN=中文）
-  setLocale(REGION_LOCALE[currentRegion.value] || 'en')
+  await initLocale() // 先按系统语言初始化（URL ?lang= 优先级最高，见 i18n/initLocale）
+  // 地区来源优先级：URL ?region= > bridge.getRegion() > 兜底默认 CN
+  let region = urlParam('region').toUpperCase()
+  if (!['CN', 'BR', 'US'].includes(region)) {
+    try {
+      const reg = await bridge.getRegion()
+      const r = String(reg || '').toUpperCase()
+      if (['CN', 'BR', 'US'].includes(r)) region = r
+    } catch (e) { /* getRegion 失败则用兜底默认地区 */ }
+  }
+  if (['CN', 'BR', 'US'].includes(region)) currentRegion.value = region
+  // 未用 URL 锁定语言时，按当前地区对齐语言（兜底默认 CN=中文）
+  if (!urlParam('lang')) setLocale(REGION_LOCALE[currentRegion.value] || 'en')
   // 取登录用户绑定车型（用于「我的车」快捷筛选 chip）
   // 第一方案：Flutter getUserInfo().carModel；回退方案：H5 localStorage 记忆（Flutter 未返回时使用）
   try {

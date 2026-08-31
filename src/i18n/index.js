@@ -642,6 +642,16 @@ export function setLocale(loc) {
 
 // 启动时从原生桥取语言（Flutter 注入后自动生效；mock/未注入保持中文）
 export async function initLocale() {
+  // 优先级：URL ?lang=zh|en|pt（实测/联调用；Flutter 也可直接拼在 H5 地址上）> bridge.getLocale() > 默认 zh
+  try {
+    const q = (new URLSearchParams(location.search).get('lang') || '').trim()
+    if (q && messages[q]) {
+      locale.value = q
+      return
+    }
+  } catch (e) {
+    /* location 不可用（如 SSR/沙箱）时忽略，走下面的桥 */
+  }
   try {
     const loc = await bridge.getLocale()
     if (loc && messages[loc]) locale.value = loc
