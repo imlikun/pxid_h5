@@ -145,6 +145,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchProducts, fetchProductDetail, getProductByHandle, getStore, sym, API_BASE, initRegion, getRegion } from '../api/shop'
+import { initLocale } from '../i18n'
 import { addToCart, cartCount } from '../store/cart'
 import { bridge } from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
@@ -174,6 +175,7 @@ const displayPrice = computed(() => {
 
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同商品时组件被复用 → 必须监听路由重载，否则“永远同一片”
 async function load() {
+  await initLocale() // 语言决定内容地区，见 regionFromLocale
   const handle = route.params.id
   product.value = null
   loading.value = true

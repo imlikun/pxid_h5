@@ -42,7 +42,7 @@ useSwipeBack(rootRef, {
 function onVisibilityChange() {
   if (document.visibilityState !== 'visible') return
   // 切回前台时刷新界面语言：用户在系统设置里改了语言，切回 App 即生效，无需重启 App
-  // （语言只跟手机系统语言走，与地区无关，见 docs/语言与地区规则_Flutter对接.md）
+  // 语言同时驱动界面语言与内容地区，见 docs/语言与地区规则_Flutter对接.md
   initLocale()
   const el = rootRef.value
   if (el) {

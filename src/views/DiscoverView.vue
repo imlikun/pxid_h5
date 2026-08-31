@@ -27,19 +27,6 @@
       </template>
     </TopBar>
 
-    <!-- 地区切换：CN/BR/US，切换后推荐/动态/广场活动全部按地区重拉；US 为全球公共池，三区均可见 -->
-    <div class="regionbar">
-      <span
-        v-for="r in regionOptions"
-        :key="r.code"
-        class="region-pill"
-        :class="{ on: currentRegion === r.code }"
-        @click="switchRegion(r.code)"
-        >{{ r.label }}</span
-      >
-      <span class="region-hint">{{ regionHint }}</span>
-    </div>
-
     <!-- 搜索：推荐/广场显示 -->
     <div v-if="activeTab !== '动态'" class="search" @click="onSearch">
       <span class="sicon">
@@ -236,7 +223,7 @@ import { CAR_MODEL_LABELS } from '../data/carModels'
 import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
 import bridge from '../bridge'
-import { t, initLocale } from '../i18n'
+import { t, locale, initLocale, regionFromLocale } from '../i18n'
 import { fetchUnreadCount } from '../api/notifications'
 // 官方公告未读数（驱动发现页快捷区红点）：必须走响应式 store
 // 直接读 mock.notices 的 isRead 不会触发更新 —— mock 是普通数组，属性变化不会被 computed 追踪
@@ -293,14 +280,9 @@ const activeFilter = ref('全部')
 // 当前登录用户绑定的车型（来自 getUserInfo().carModel）；仅当其属于在售 12 车型时才在筛选条前置「我的车」
 const myCarModel = ref('')
 
-// ---- 地区（PRD 硬限定：CN / BR / US，3 国互不交叉）----
-const regionOptions = [
-  { code: 'US', label: t('discover.region.global') },
-  { code: 'CN', label: t('discover.region.cn') },
-  { code: 'BR', label: t('discover.region.br') },
-]
-const currentRegion = ref('CN')
-const regionHint = ref('')
+// ---- 地区由语言映射（2026-08-31 定）：语言同时决定界面和内容 ----
+// zh → CN 中国内容，pt → BR 巴西内容，en → US 全球内容
+const currentRegion = computed(() => regionFromLocale(locale.value))
 
 // tab 中文逻辑值 → i18n 展示
 const TAB_KEY = { 推荐: 'recommend', 动态: 'dynamic', 广场: 'plaza' }
@@ -468,20 +450,17 @@ function fmtDate(a) {
   return m ? m[1] + '-' + m[2] : (a.date || '')
 }
 
-// 切地区：重拉推荐/动态/活动（广场车型 showcase 待 ToC 车型 API 按 region 返回）
-// ⚠️ 地区只决定「内容池」，不决定语言（2026-08-31 定）：切地区不切换界面语言。
-//    语言由手机系统语言决定，见 i18n/initLocale；两者完全解耦。
-async function switchRegion(code) {
-  if (currentRegion.value === code) return // 已选中则不重拉数据
-  currentRegion.value = code
-  regionHint.value = ''
+// 当语言（从而地区）变化时，重拉当前列表并清理「附近」子栏旧数据
+async function onRegionChanged() {
   await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities()])
-  // 切地区后「附近」子栏数据失效，重置回关注流避免显示旧区坐标流
   if (dynamicSubtab.value === 'near') {
     dynamicSubtab.value = 'follow'
     nearList.value = []
   }
 }
+watch(currentRegion, (newRegion, oldRegion) => {
+  if (oldRegion && newRegion !== oldRegion) onRegionChanged()
+})
 
 // 发现页 banner：拉运营后台配置的 banner（status=on），点击跳 banner.url
 async function fetchBanners() {
@@ -519,29 +498,10 @@ function onBanner() {
   }
 }
 
-// 读取 URL 查询参数（实测/联调用：?region=CN|BR|US、?lang=zh|en|pt）
-function urlParam(key) {
-  try {
-    return (new URLSearchParams(location.search).get(key) || '').trim()
-  } catch (e) {
-    return ''
-  }
-}
-
 // 发布后自动切到「动态」tab 展示新内容
 onMounted(async () => {
   await initLocale() // 先按系统语言初始化（URL ?lang= 优先级最高，见 i18n/initLocale）
-  // 地区来源优先级：URL ?region= > bridge.getRegion() > 兜底默认 CN
-  let region = urlParam('region').toUpperCase()
-  if (!['CN', 'BR', 'US'].includes(region)) {
-    try {
-      const reg = await bridge.getRegion()
-      const r = String(reg || '').toUpperCase()
-      if (['CN', 'BR', 'US'].includes(r)) region = r
-    } catch (e) { /* getRegion 失败则用兜底默认地区 */ }
-  }
-  if (['CN', 'BR', 'US'].includes(region)) currentRegion.value = region
-  // 语言不在这里设置：已由 initLocale 按「手机系统语言」确定，地区只影响内容池、不影响语言
+  // 地区由当前语言自动映射：zh→CN、pt→BR、en→US，见 regionFromLocale
   // 取登录用户绑定车型（用于「我的车」快捷筛选 chip）
   // 第一方案：Flutter getUserInfo().carModel；回退方案：H5 localStorage 记忆（Flutter 未返回时使用）
   try {
@@ -788,38 +748,6 @@ function showToast(msg) {
   z-index: 2;
 }
 .act--add { transform-origin: center; }
-.regionbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  margin-top: 4px;
-}
-.region-pill {
-  font-size: 13px;
-  color: var(--text-sub);
-  background: var(--surface-2);
-  border-radius: var(--radius-pill);
-  padding: 6px 14px;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-.region-pill.on {
-  color: #fff;
-  background: var(--brand);
-  font-weight: 600;
-  font-size: 13px;
-  padding: 6px 14px;
-  line-height: 1;
-}
-.region-hint {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--text-hint);
-}
 .search {
   margin: 10px 16px 0;
   height: 40px;

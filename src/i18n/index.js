@@ -1,10 +1,12 @@
 // ============================================================
 // 轻量 i18n（PRD 限定三语：zh / en / pt）
 // ------------------------------------------------------------
-// 语言来源：bridge.getLocale()（Flutter 注入手机系统语言）> navigator.language（系统语言兜底）> zh
-// ⚠️ 语言与地区解耦（2026-08-31 坤哥拍板）：语言只跟「用户是谁」，不跟「用户在哪」。
-//    地区（CN/BR/US）只决定内容池，绝不反推语言。详见 docs/语言与地区规则_Flutter对接.md
-// 用法：import { t, locale, initLocale, setLocale } from '../i18n'
+// 语言来源：bridge.getLocale()（Flutter 注入手机系统语言 / App 内语言设置）> navigator.language（系统语言兜底）> zh
+// ⚠️ 语言与地区规则（2026-08-31 坤哥拍板）：语言同时决定「界面语言」和「内容地区」。
+//    中文 → 中国内容(CN)，葡萄牙语 → 巴西内容(BR)，英文 → 全球内容(US)。
+//    地区不是独立可切换的维度，而是由当前语言映射出来的结果。
+//    详见 docs/语言与地区规则_Flutter对接.md
+// 用法：import { t, locale, initLocale, setLocale, regionFromLocale } from '../i18n'
 //       {{ t('discover.searchPlaceholder') }}
 //       {{ t('feed.commentsCount', { n: commentCount }) }}   // 支持 {var} 占位符
 // 实测/联调：H5 地址带 ?lang=zh|en|pt 强制指定语言（优先级最高）。
@@ -13,6 +15,18 @@ import { ref } from 'vue'
 import bridge from '../bridge'
 
 export const locale = ref('zh')
+
+// 语言 → 内容地区映射（产品定版 2026-08-31）
+// 语言决定内容池：中文看中国内容，葡语看巴西内容，英文看全球内容
+export const LOCALE_REGION = {
+  zh: 'CN',
+  pt: 'BR',
+  en: 'US',
+}
+
+export function regionFromLocale(loc) {
+  return LOCALE_REGION[loc] || LOCALE_REGION[locale.value] || 'US'
+}
 
 const messages = {
   zh: {
@@ -657,10 +671,13 @@ function fromSystemLanguage() {
 // 初始化界面语言。
 //
 // 产品规则（2026-08-31 定，坤哥拍板）：
-//   **语言 = 用户是谁（手机系统语言），地区 = 用户看哪国的内容，两者互不影响。**
-//   中国人去美国，界面仍然显示中文 —— 语言绝不随地区变化。
+//   **语言同时决定「界面语言」和「内容地区」：**
+//   中文 → 界面中文 + 中国内容(CN)
+//   葡萄牙语 → 界面葡语 + 巴西内容(BR)
+//   英文 → 界面英文 + 全球内容(US)
+//   地区不再独立切换，见 regionFromLocale()。
 //
-// 优先级：URL ?lang=（实测/联调）> bridge.getLocale()（Flutter 注入的手机系统语言）
+// 优先级：URL ?lang=（实测/联调）> bridge.getLocale()（Flutter 注入的手机/App 语言）
 //        > navigator.language（系统语言兜底，原生未实现 getLocale 时生效）> zh
 export async function initLocale() {
   try {
@@ -685,4 +702,4 @@ export async function initLocale() {
   locale.value = sys && messages[sys] ? sys : 'zh'
 }
 
-export default { t, locale, setLocale, initLocale }
+export default { t, locale, setLocale, initLocale, regionFromLocale }

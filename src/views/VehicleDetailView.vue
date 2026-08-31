@@ -166,6 +166,7 @@
 import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { fetchProducts, fetchProductDetail, getProductByHandle, sym, initRegion } from '../api/shop'
+import { initLocale } from '../i18n'
 import { plazaShowcase, VEHICLE_HANDLES, carModelToHandle } from '../data/mock'
 import { handleAvatarError } from '../utils/avatar'
 
@@ -179,6 +180,7 @@ const loading = ref(true)
 const handle = computed(() => carModelToHandle[route.params.id] || route.params.id)
 
 async function load() {
+  await initLocale() // 语言决定内容地区，见 regionFromLocale
   const h = handle.value
   loading.value = true
   product.value = null

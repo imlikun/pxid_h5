@@ -133,7 +133,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { carModels } from '../data/mock'
 import bridge from '../bridge'
 import { getDeviceId } from '../utils/device'
-import { t } from '../i18n'
+import { t, locale, regionFromLocale } from '../i18n'
 import { fetchFeedUsers } from '../api/feed'
 import { uploadMedia } from '../storage'
 import TopBar from '../components/TopBar.vue'
@@ -180,12 +180,9 @@ const showMention = ref(false)
 const mentionUsers = ref([])
 const mentions = ref([]) // [{ deviceId, nickname }]
 
-async function getRegion() {
-  try {
-    const reg = await bridge.getRegion()
-    if (['CN', 'BR', 'US'].includes(String(reg).toUpperCase())) return String(reg).toUpperCase()
-  } catch (e) {}
-  return 'US'
+// 发布内容所属地区由当前语言映射：zh→CN，pt→BR，en→US
+function getRegion() {
+  return regionFromLocale(locale.value)
 }
 
 async function getLocation() {

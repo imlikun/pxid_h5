@@ -1,23 +1,7 @@
 <template>
   <div class="activity-center">
-    <!-- 顶部：返回 + 标题 + 当前地区 -->
-    <TopBar sticky :title="t('activity.title')" :back="goBack">
-      <template #right>
-        <span class="top-region">{{ regionLabel }}</span>
-      </template>
-    </TopBar>
-
-    <!-- 地区切换（与发现页一致：US/CN/BR） -->
-    <div class="regionbar">
-      <span
-        v-for="r in regionOptions"
-        :key="r.code"
-        class="region-pill"
-        :class="{ on: currentRegion === r.code }"
-        @click="switchRegion(r.code)"
-        >{{ t(r.label) }}</span
-      >
-    </div>
+    <!-- 顶部：返回 + 标题 -->
+    <TopBar sticky :title="t('activity.title')" :back="goBack" />
 
     <div class="body">
       <div v-if="loading" class="empty">{{ t('common.loading') }}</div>
@@ -48,10 +32,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import bridge from '../bridge'
-import { t, initLocale } from '../i18n'
+import { t, locale, initLocale, regionFromLocale } from '../i18n'
 import TopBar from '../components/TopBar.vue'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
@@ -60,17 +43,8 @@ const router = useRouter()
 const list = ref([])
 const loading = ref(false)
 
-// 地区（与发现页同一套语义：US/CN/BR）：只决定内容池，不决定语言（语言由手机系统语言决定）
-const regionOptions = [
-  { code: 'US', label: 'discover.region.global' },
-  { code: 'CN', label: 'discover.region.cn' },
-  { code: 'BR', label: 'discover.region.br' },
-]
-const currentRegion = ref('CN')
-const regionLabel = computed(() => {
-  const o = regionOptions.find((r) => r.code === currentRegion.value)
-  return o ? t(o.label) : currentRegion.value
-})
+// 地区由语言映射（2026-08-31 定）：语言同时决定界面语言与内容地区
+const currentRegion = computed(() => regionFromLocale(locale.value))
 
 async function load() {
   loading.value = true
@@ -85,12 +59,10 @@ async function load() {
   loading.value = false
 }
 
-async function switchRegion(code) {
-  // 切地区只换内容池，不换语言（2026-08-31 定：语言跟手机系统语言）
-  if (currentRegion.value === code) return // 已选中则不重拉数据
-  currentRegion.value = code
-  await load()
-}
+// 语言变化导致地区变化时，自动重拉活动列表
+watch(currentRegion, (newRegion, oldRegion) => {
+  if (oldRegion && newRegion !== oldRegion) load()
+})
 
 // 日期展示：MM-DD ~ MM-DD（跨年带年份）
 function dateRange(a) {
@@ -123,14 +95,7 @@ function goBack() {
 const toast = ref('')
 
 onMounted(async () => {
-  await initLocale()
-  try {
-    const reg = await bridge.getRegion()
-    if (reg && ['CN', 'BR', 'US'].includes(String(reg).toUpperCase())) {
-      currentRegion.value = String(reg).toUpperCase()
-    }
-  } catch (e) { /* getRegion 失败则用兜底默认地区 */ }
-  // 语言不在这里设置：已由 initLocale 按「手机系统语言」确定，地区只影响内容池、不影响语言
+  await initLocale() // 语言决定内容地区，见 regionFromLocale
   await load()
 })
 </script>
@@ -142,30 +107,6 @@ onMounted(async () => {
   /* 顶部安全区由 Flutter WebView 处理，H5 不额外 padding-top（与发现页/互动消息页一致） */
   padding-bottom: env(safe-area-inset-bottom);
   overflow-x: hidden;
-}
-.top-region {
-  font-size: 13px;
-  color: var(--text-sub);
-}
-.regionbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 16px 8px;
-}
-.region-pill {
-  font-size: 12px;
-  color: var(--text-sub);
-  background: #F0F1F3;
-  border-radius: 12px;
-  padding: 4px 12px;
-  line-height: 1.4;
-  transition: all 0.15s ease;
-}
-.region-pill.on {
-  color: #fff;
-  background: var(--brand);
-  font-weight: 600;
 }
 .body {
   padding: 8px 16px 24px;

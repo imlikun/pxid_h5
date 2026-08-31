@@ -1,28 +1,11 @@
 // 精选商品数据层：对接后端 /mall-api/products（Shopify 代理）
-// 多店路由：region 由 Flutter 原生桥注入（window.PXIDBridge.getRegion），后端 REGION_STORES 已就绪
-//   半自动接线：默认 US 兜底；原生注入 getRegion() 后自动生效，无需改此处（见 initRegion/setRegion）
-const DEFAULT_REGION = 'US'
-let currentRegion = DEFAULT_REGION
+// 多店路由：region 不再由 Flutter 单独注入，而是由当前界面语言映射（2026-08-31 定）
+//   zh→CN，pt→BR，en→US。见 src/i18n/index.js 的 regionFromLocale。
+import { locale, regionFromLocale } from '../i18n'
 
-// 预留 Flutter 接线位：原生注入 window.PXIDBridge.getRegion() 后自动生效；未注入（H5 预览/mock）保持默认 US
+// 地区随语言自动映射：中文看中国店，葡语看巴西店，英文看全球店
 export async function initRegion() {
-  try {
-    const native = (typeof window !== 'undefined' && window.PXIDBridge) || null
-    if (native && typeof native.getRegion === 'function') {
-      const r = await native.getRegion()
-      if (r) currentRegion = String(r).toUpperCase()
-    }
-  } catch (e) {
-    // bridge 未注入，保持默认
-    console.error('[shop] initRegion failed:', e.message || e)
-  }
-  return currentRegion
-}
-
-// 供 Flutter 切地区时调用（§7.1 region 变化通知），触发 H5 重拉对应店商品
-export function setRegion(r) {
-  if (r) currentRegion = r
-  return currentRegion
+  return regionFromLocale(locale.value)
 }
 
 export const API_BASE =
@@ -33,10 +16,10 @@ let _loading = null
 let _lastError = ''
 
 export function getRegion() {
-  return currentRegion
+  return regionFromLocale(locale.value)
 }
 
-export async function fetchProducts(region = currentRegion) {
+export async function fetchProducts(region = getRegion()) {
   if (_loading) return _loading
   _loading = (async () => {
     try {
@@ -89,7 +72,7 @@ export function getProductByHandle(handle) {
 // 单品详情：按 Shopify 对应链接真拉（/mall-api/products/:handle 服务端代拉 Shopify 商品 JSON）
 //   返回完整字段：含 description(body_html 富文本) / vendor / options / images / variants
 //   ECS→Shopify 偶发 fetch failed，最多重试 2 次（间隔 600ms）提升稳定性
-export async function fetchProductDetail(handle, region = currentRegion) {
+export async function fetchProductDetail(handle, region = getRegion()) {
   const url = `${API_BASE}/mall-api/products/${encodeURIComponent(handle)}?region=${region}`
   let lastErr = null
   for (let attempt = 0; attempt < 3; attempt++) {

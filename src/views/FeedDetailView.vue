@@ -223,7 +223,7 @@ import { computed, ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
-import { t } from '../i18n'
+import { t, locale, regionFromLocale } from '../i18n'
 import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite } from '../api/feed'
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
@@ -492,7 +492,8 @@ const gridCols = computed(() => {
 })
 
 // 相关推荐：从推荐流取同车型/同标签帖子（排除自身）
-const currentRegion = ref('CN')
+// 地区由当前语言映射（2026-08-31 定）：zh→CN、pt→BR、en→US
+const currentRegion = computed(() => regionFromLocale(locale.value))
 const related = ref([])
 async function loadRelated() {
   if (!item.value) return

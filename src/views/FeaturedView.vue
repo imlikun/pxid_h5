@@ -133,7 +133,7 @@ import TopBar from '../components/TopBar.vue'
 import { featuredQuick } from '../data/mock'
 import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym, API_BASE } from '../api/shop'
 import { bridge } from '../bridge'
-import { t } from '../i18n'
+import { t, initLocale } from '../i18n'
 
 const router = useRouter()
 const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
@@ -165,6 +165,7 @@ async function fetchFeaturedConfig() {
 
 onMounted(async () => {
   try {
+    await initLocale() // 语言决定内容地区，见 regionFromLocale
     await initRegion()
     await Promise.all([fetchProducts(), fetchFeaturedConfig()])
     store.value = getStore()
