@@ -52,6 +52,7 @@
           </div>
           <div v-if="picked.length < 9" class="gitem add" @click="onPickImageClick">
             <input
+              v-if="!isFlutterEnv()"
               ref="fileInput"
               type="file"
               accept="image/jpeg,image/png,image/webp"
@@ -69,8 +70,9 @@
       <!-- 视频上传（统一 /media/upload，封面自动取首帧，≤60s / ≤200MB） -->
       <div class="card section">
         <div class="label">{{ t('publish.video') }}</div>
-        <div v-if="!videoFile" class="vadd" style="position:relative;" @click="onPickVideoClick">
+          <div v-if="!videoFile" class="vadd" style="position:relative;" @click="onPickVideoClick">
             <input
+              v-if="!isFlutterEnv()"
               ref="fileInputVideo"
               type="file"
               accept="video/mp4,video/webm,video/quicktime"
