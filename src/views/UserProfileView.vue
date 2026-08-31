@@ -91,6 +91,7 @@ import {
   fetchUserProfile,
   fetchMyProfile,
   fetchUserFeeds,
+  fetchMyFeeds,
   followUser,
   unfollowUser,
   fetchFavorites,
@@ -200,7 +201,8 @@ async function loadContent(reset = true) {
       const d = targetDevice.value
       let r = { list: [], total: 0 }
       if (grid === 'favorites') r = await fetchFavorites({ page: page.value, pageSize: PAGE_SIZE })
-      else r = await fetchUserFeeds(d, { page: page.value, pageSize: PAGE_SIZE })
+      else if (isSelf.value) r = await fetchMyFeeds({ page: page.value, pageSize: PAGE_SIZE })
+      else r = await fetchUserFeeds(user.value, { page: page.value, pageSize: PAGE_SIZE })
       const list = r.list || []
       feedList.value = reset ? list : feedList.value.concat(list)
       hasMore.value = list.length >= PAGE_SIZE && feedList.value.length < (r.total || Infinity)

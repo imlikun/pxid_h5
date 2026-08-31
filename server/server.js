@@ -811,7 +811,7 @@ app.post('/auth/token', (req, res) => {
 
 // ---- 动态流 ----
 app.get('/feed', (req, res) => {
-  const { tab = 'dynamic', carModel, page = 1, pageSize = 20, offset, followerDevice, region, near, radius = 50, deviceId } = req.query
+  const { tab = 'dynamic', carModel, page = 1, pageSize = 20, offset, followerDevice, region, near, radius = 50, deviceId, memberUserId } = req.query
   const cm = carModel && carModel !== '全部' && carModel !== '最新' ? carModel : ''
   // 地区过滤：CN/BR/US，US 为全球公共池；请求某区时显示该区 + US 帖（三区均可见全球内容）
   const reg = String(region || '').toUpperCase()
@@ -829,8 +829,13 @@ app.get('/feed', (req, res) => {
     if (cm) { w += ' AND car_model = ?'; args.push(cm) }
   }
   if (regFiltered) { w += " AND region_code IN (?, 'US')"; args.push(regFiltered) }
-  // 个人主页动态流：按作者 device 过滤（deviceId 参数）
-  if (deviceId) { w += ' AND device_id = ?'; args.push(String(deviceId)) }
+  // 个人主页动态流：按作者身份过滤（deviceId 或 memberUserId 任一命中即可，解决 ToC 双 ID 漂移导致"帖子不是自己的"）
+  if (deviceId || memberUserId) {
+    const idv = []
+    if (deviceId) { idv.push('device_id = ?'); args.push(String(deviceId)) }
+    if (memberUserId) { idv.push('member_user_id = ?'); args.push(String(memberUserId)) }
+    w += ' AND (' + idv.join(' OR ') + ')'
+  }
   // 附近 LBS：near=lat,lng（半径 radius km，默认 50）。SQLite 无三角函数，JS 算距离，数据量小内存筛
   let nearLat = null, nearLng = null
   const nearRad = Math.max(0.1, Number(radius) || 50)
@@ -867,6 +872,20 @@ app.get('/feed', (req, res) => {
     .prepare(`SELECT * FROM feeds ${w} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
     .all(...args, ps, off)
   res.json(ok({ total, list: rows.map(rowToFeed), tab }))
+})
+
+// ---- 我的发布（token 双身份，/user/me 专用；不依赖 getDeviceId()，彻底解决 App「我的」页数量与列表不一致）----
+// ⚠️ 必须定义在 app.get('/feed/:id') 之前，否则会被 /feed/:id 参数路由抢匹配返回 404
+app.get('/feed/me', requireAuth, (req, res) => {
+  const u = req.user || {}
+  const { page = 1, pageSize = 20, offset } = req.query
+  const im = userIdentityMatch('f.device_id', 'f.member_user_id', u)
+  const w = `WHERE ${im.clause} AND f.status='published'`
+  const total = db.prepare(`SELECT COUNT(*) c FROM feeds f ${w}`).get(...im.args).c
+  const ps = Math.min(50, Math.max(1, parseInt(pageSize) || 20))
+  const off = offset !== undefined ? Math.max(0, parseInt(offset) || 0) : (Math.max(1, parseInt(page) || 1) - 1) * ps
+  const rows = db.prepare(`SELECT f.* FROM feeds f ${w} ORDER BY f.id DESC LIMIT ? OFFSET ?`).all(...im.args, ps, off)
+  res.json(ok({ total, list: rows.map(rowToFeed) }))
 })
 
 // ---- 活跃用户（@话题选人用；返回最近发帖去重的 deviceId/nickname/avatar）----
@@ -956,30 +975,35 @@ app.get('/users/:deviceId', (req, res) => {
       if (payload) { myDevice = payload.deviceId || ''; myMid = payload.memberUserId || '' }
     }
   } catch (e) { /* 忽略，按未登录处理 */ }
-  // 解析资料：优先按 device_id；若参数本身是数字（member_user_id）则再按 member_user_id 补一次
-  let profile = resolveProfile({ deviceId: raw, memberUserId: '', storedNickname: '', storedAvatar: '' })
-  if ((!profile.nickname || profile.nickname === '骑友') && /^\d+$/.test(raw)) {
-    const byMid = resolveProfile({ deviceId: '', memberUserId: raw, storedNickname: '', storedAvatar: '' })
-    if (byMid.nickname) profile = byMid
-  }
-  const feed = !profile.nickname || profile.nickname === '骑友'
-    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
-    : null
+  // 解析目标真实身份（device_id + member_user_id 双身份），用于回填返回字段，供前端 /feed 双身份过滤
+  let tDevice = raw, tMid = ''
+  const idRow = db.prepare('SELECT device_id, member_user_id FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(member_user_id)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
+    || db.prepare('SELECT device_id, member_user_id FROM user_profiles WHERE (device_id=? OR member_user_id=?) AND length(member_user_id)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
+  if (idRow) { tDevice = idRow.device_id || raw; tMid = idRow.member_user_id || '' }
+  // 解析资料：双身份命中 user_profiles；昵称若为默认"骑友"视为无效，回退 feeds 真实昵称（修复昵称兜底写反）
+  const profile = resolveProfile({ deviceId: raw, memberUserId: raw, storedNickname: '', storedAvatar: '' })
+  const useFeedName = !profile.nickname || profile.nickname === '骑友'
+  const feed = db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
+  const nickname = useFeedName ? (feed && feed.nickname ? feed.nickname : (profile.nickname || '骑友')) : profile.nickname
+  const avatar = profile.avatar || (feed && feed.avatar) || ''
+  const carModel = profile.carModel || (feed && feed.car_model) || ''
   // 关注/粉丝数：H5 follows 表按 设备/会员 双身份
   const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE follower_device=? OR follower_member_user_id=?').get(raw, raw).c
   const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE followee_device=? OR followee_member_user_id=?').get(raw, raw).c
   const isFollowing = (myDevice || myMid)
     ? !!db.prepare('SELECT 1 FROM follows WHERE (follower_device=? OR follower_member_user_id=?) AND (followee_device=? OR followee_member_user_id=?)').get(myDevice, myMid, raw, raw)
     : false
-  const isSelf = (myDevice && myDevice === raw) || (myMid && myMid === raw)
+  // isSelf 同时比对解析后的双身份，避免 App 用 member_user_id、token 用 device_id 时误判为他人
+  const isSelf = (myDevice && (myDevice === raw || myDevice === tDevice || (tMid && myDevice === tMid))) || (myMid && (myMid === raw || myMid === tMid))
   // 四宫格计数：发布数（公开动态数）/ 收藏数（仅自己可见，他人返回 0 不泄露私密）
   const feedCount = db.prepare("SELECT COUNT(*) c FROM feeds WHERE (device_id=? OR member_user_id=?) AND status='published'").get(raw, raw).c
   const favoriteCount = isSelf ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=? OR member_user_id=?').get(raw, raw).c : 0
   res.json(ok({
-    deviceId: raw,
-    nickname: profile.nickname || (feed && feed.nickname) || '骑友',
-    avatar: profile.avatar || (feed && feed.avatar) || '',
-    carModel: profile.carModel || (feed && feed.car_model) || '',
+    deviceId: tDevice,
+    memberUserId: tMid,
+    nickname,
+    avatar,
+    carModel,
     followeeCount,
     followerCount,
     feedCount,

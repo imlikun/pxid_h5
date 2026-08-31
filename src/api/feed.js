@@ -300,12 +300,31 @@ export async function uploadMedia(file) {
   return json.data.url
 }
 
-// ---- 某人发布的动态（个人主页动态流，按 device 过滤）----
-export async function fetchUserFeeds(deviceId, params = {}) {
-  if (!FEED_API || !deviceId) return { list: [], total: 0 }
+// ---- 某人发布的动态（个人主页动态流，按 device_id / member_user_id 双身份过滤，解决 ToC 双 ID 漂移）----
+// target: { deviceId, memberUserId } 或 旧式字符串 deviceId；两者都传时后端任一命中即可
+export async function fetchUserFeeds(target, params = {}) {
+  if (!FEED_API || !target) return { list: [], total: 0 }
   try {
-    const qs = new URLSearchParams({ tab: 'dynamic', deviceId, ...params }).toString()
-    const data = await request('/feed?' + qs)
+    const qs = new URLSearchParams({ tab: 'dynamic', ...params })
+    if (typeof target === 'string') {
+      if (target) qs.set('deviceId', target)
+    } else {
+      if (target.deviceId) qs.set('deviceId', target.deviceId)
+      if (target.memberUserId) qs.set('memberUserId', target.memberUserId)
+    }
+    const data = await request('/feed?' + qs.toString())
+    return { list: (data.list || []).map(normalize), total: data.total || 0 }
+  } catch (e) {
+    return { list: [], total: 0 }
+  }
+}
+
+// ---- 我的发布（按 token 双身份，本人 /user/me 专用；不依赖 getDeviceId()，根治数量/列表不一致）----
+export async function fetchMyFeeds(params = {}) {
+  if (!FEED_API) return { list: [], total: 0 }
+  try {
+    const qs = new URLSearchParams(params).toString()
+    const data = await request('/feed/me' + (qs ? '?' + qs : ''))
     return { list: (data.list || []).map(normalize), total: data.total || 0 }
   } catch (e) {
     return { list: [], total: 0 }
