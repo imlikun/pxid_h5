@@ -195,7 +195,9 @@ CREATE TABLE IF NOT EXISTS activities (
 CREATE TABLE IF NOT EXISTS follows (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   follower_device TEXT NOT NULL,
+  follower_member_user_id TEXT,
   followee_device TEXT NOT NULL,
+  followee_member_user_id TEXT,
   created_at TEXT NOT NULL,
   UNIQUE(follower_device, followee_device)
 );
@@ -211,6 +213,7 @@ CREATE TABLE IF NOT EXISTS feed_likes (
 CREATE TABLE IF NOT EXISTS favorites (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   device_id TEXT NOT NULL,
+  member_user_id TEXT,
   feed_id INTEGER NOT NULL,
   created_at TEXT NOT NULL,
   UNIQUE(device_id, feed_id)
