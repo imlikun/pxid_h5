@@ -236,7 +236,7 @@ import { CAR_MODEL_LABELS } from '../data/carModels'
 import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
 import bridge from '../bridge'
-import { t, initLocale, setLocale } from '../i18n'
+import { t, initLocale } from '../i18n'
 import { fetchUnreadCount } from '../api/notifications'
 // 官方公告未读数（驱动发现页快捷区红点）：必须走响应式 store
 // 直接读 mock.notices 的 isRead 不会触发更新 —— mock 是普通数组，属性变化不会被 computed 追踪
@@ -469,12 +469,9 @@ function fmtDate(a) {
 }
 
 // 切地区：重拉推荐/动态/活动（广场车型 showcase 待 ToC 车型 API 按 region 返回）
-// 地区 → 语言联动：CN=中文、BR=葡语、US=英文（US 为全球公共池，三区均可见；CN/BR 仅本区内容）
-// 真机 Flutter getLocale 注入后，onMounted 的 initLocale 优先，手动切地区时联动覆盖
-const REGION_LOCALE = { US: 'en', CN: 'zh', BR: 'pt' }
+// ⚠️ 地区只决定「内容池」，不决定语言（2026-08-31 定）：切地区不切换界面语言。
+//    语言由手机系统语言决定，见 i18n/initLocale；两者完全解耦。
 async function switchRegion(code) {
-  // URL 用 ?lang= 锁定语言时不联动（便于实测「内容与语言解耦」），否则按地区对齐语言
-  if (!urlParam('lang')) setLocale(REGION_LOCALE[code] || 'en')
   if (currentRegion.value === code) return // 已选中则不重拉数据
   currentRegion.value = code
   regionHint.value = ''
@@ -544,8 +541,7 @@ onMounted(async () => {
     } catch (e) { /* getRegion 失败则用兜底默认地区 */ }
   }
   if (['CN', 'BR', 'US'].includes(region)) currentRegion.value = region
-  // 未用 URL 锁定语言时，按当前地区对齐语言（兜底默认 CN=中文）
-  if (!urlParam('lang')) setLocale(REGION_LOCALE[currentRegion.value] || 'en')
+  // 语言不在这里设置：已由 initLocale 按「手机系统语言」确定，地区只影响内容池、不影响语言
   // 取登录用户绑定车型（用于「我的车」快捷筛选 chip）
   // 第一方案：Flutter getUserInfo().carModel；回退方案：H5 localStorage 记忆（Flutter 未返回时使用）
   try {

@@ -51,7 +51,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import bridge from '../bridge'
-import { t, initLocale, setLocale } from '../i18n'
+import { t, initLocale } from '../i18n'
 import TopBar from '../components/TopBar.vue'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
@@ -60,8 +60,7 @@ const router = useRouter()
 const list = ref([])
 const loading = ref(false)
 
-// 地区（与发现页同一套语义：US/CN/BR）→ 语言映射
-const REGION_LOCALE = { US: 'en', CN: 'zh', BR: 'pt' }
+// 地区（与发现页同一套语义：US/CN/BR）：只决定内容池，不决定语言（语言由手机系统语言决定）
 const regionOptions = [
   { code: 'US', label: 'discover.region.global' },
   { code: 'CN', label: 'discover.region.cn' },
@@ -87,7 +86,7 @@ async function load() {
 }
 
 async function switchRegion(code) {
-  setLocale(REGION_LOCALE[code] || 'en') // 始终先对齐语言（切地区即换语言）
+  // 切地区只换内容池，不换语言（2026-08-31 定：语言跟手机系统语言）
   if (currentRegion.value === code) return // 已选中则不重拉数据
   currentRegion.value = code
   await load()
@@ -131,8 +130,7 @@ onMounted(async () => {
       currentRegion.value = String(reg).toUpperCase()
     }
   } catch (e) { /* getRegion 失败则用兜底默认地区 */ }
-  // 强制按当前地区对齐语言：无论 getRegion 是否成功，语言都与当前 region 一致（兜底默认 CN=中文）
-  setLocale(REGION_LOCALE[currentRegion.value] || 'en')
+  // 语言不在这里设置：已由 initLocale 按「手机系统语言」确定，地区只影响内容池、不影响语言
   await load()
 })
 </script>

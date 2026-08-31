@@ -1,12 +1,13 @@
 // ============================================================
 // 轻量 i18n（PRD 限定三语：zh / en / pt）
 // ------------------------------------------------------------
-// 语言来源：bridge.getLocale()（Flutter 注入）；H5 预览默认 zh。
-// 地区→语言映射在 DiscoverView.REGION_LOCALE：US→en / CN→zh / BR→pt
+// 语言来源：bridge.getLocale()（Flutter 注入手机系统语言）> navigator.language（系统语言兜底）> zh
+// ⚠️ 语言与地区解耦（2026-08-31 坤哥拍板）：语言只跟「用户是谁」，不跟「用户在哪」。
+//    地区（CN/BR/US）只决定内容池，绝不反推语言。详见 docs/语言与地区规则_Flutter对接.md
 // 用法：import { t, locale, initLocale, setLocale } from '../i18n'
 //       {{ t('discover.searchPlaceholder') }}
 //       {{ t('feed.commentsCount', { n: commentCount }) }}   // 支持 {var} 占位符
-// 真机 Flutter 注入 getLocale 后，initLocale() 自动切换；H5 也可手动 setLocale 预览。
+// 实测/联调：H5 地址带 ?lang=zh|en|pt 强制指定语言（优先级最高）。
 // ============================================================
 import { ref } from 'vue'
 import bridge from '../bridge'
@@ -640,9 +641,28 @@ export function setLocale(loc) {
   if (messages[loc]) locale.value = loc
 }
 
-// 启动时从原生桥取语言（Flutter 注入后自动生效；mock/未注入保持中文）
+// 手机/浏览器系统语言 → H5 三语之一（匹配不到返回 ''）
+function fromSystemLanguage() {
+  try {
+    const raw = String((navigator && (navigator.language || navigator.userLanguage)) || '').toLowerCase()
+    if (raw.startsWith('zh')) return 'zh'
+    if (raw.startsWith('pt')) return 'pt'
+    if (raw.startsWith('en')) return 'en'
+  } catch (e) {
+    /* 忽略 */
+  }
+  return ''
+}
+
+// 初始化界面语言。
+//
+// 产品规则（2026-08-31 定，坤哥拍板）：
+//   **语言 = 用户是谁（手机系统语言），地区 = 用户看哪国的内容，两者互不影响。**
+//   中国人去美国，界面仍然显示中文 —— 语言绝不随地区变化。
+//
+// 优先级：URL ?lang=（实测/联调）> bridge.getLocale()（Flutter 注入的手机系统语言）
+//        > navigator.language（系统语言兜底，原生未实现 getLocale 时生效）> zh
 export async function initLocale() {
-  // 优先级：URL ?lang=zh|en|pt（实测/联调用；Flutter 也可直接拼在 H5 地址上）> bridge.getLocale() > 默认 zh
   try {
     const q = (new URLSearchParams(location.search).get('lang') || '').trim()
     if (q && messages[q]) {
@@ -654,10 +674,15 @@ export async function initLocale() {
   }
   try {
     const loc = await bridge.getLocale()
-    if (loc && messages[loc]) locale.value = loc
+    if (loc && messages[loc]) {
+      locale.value = loc
+      return
+    }
   } catch (e) {
-    /* 默认中文 */
+    /* 原生未实现 getLocale：继续用系统语言兜底 */
   }
+  const sys = fromSystemLanguage()
+  locale.value = sys && messages[sys] ? sys : 'zh'
 }
 
 export default { t, locale, setLocale, initLocale }
