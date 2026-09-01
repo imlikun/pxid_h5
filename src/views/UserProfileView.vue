@@ -248,6 +248,21 @@ async function loadContent(reset = true) {
       else if (isSelf.value) r = await fetchMyFeeds({ page: page.value, pageSize: PAGE_SIZE })
       else r = await fetchUserFeeds(user.value, { page: page.value, pageSize: PAGE_SIZE })
       const list = r.list || []
+      // 自己主页：顶部头像可能被 mergeNativeProfile 用 Flutter 实时值覆盖，
+      // 而列表头像来自 H5 后端 user_profiles，两套资料源不同步时会出现
+      //「顶部新头像、列表旧头像」的不一致。这里把列表里自己的帖子头像
+      // 强制与顶部统一，保证当前用户看自己主页时视觉一致。
+      if (isSelf.value && user.value && user.value.avatar) {
+        const myMid = String(user.value.memberUserId || '')
+        const myDid = String(user.value.deviceId || '')
+        list.forEach((it) => {
+          const itMid = String(it.memberUserId || '')
+          const itDid = String(it.deviceId || '')
+          if ((myMid && itMid === myMid) || (!myMid && myDid && itDid === myDid)) {
+            it.avatar = user.value.avatar
+          }
+        })
+      }
       feedList.value = reset ? list : feedList.value.concat(list)
       hasMore.value = list.length >= PAGE_SIZE && feedList.value.length < (r.total || Infinity)
       page.value += 1
