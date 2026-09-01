@@ -1,7 +1,7 @@
 <template>
   <div
     class="discover"
-    :class="{ 'locale-zh': locale === 'zh', 'locale-en': locale === 'en', 'locale-pt': locale === 'pt' }"
+    :class="{ 'locale-zh': locale === 'zh', 'locale-en': locale === 'en', 'locale-pt': locale === 'pt', 'marquee-paused': docHidden }"
   >
     <!-- 顶部：三 tab + 操作 -->
     <TopBar sticky :show-back="false">
@@ -251,6 +251,7 @@ const bannerSlides = computed(() => {
 const bannerIdx = ref(0)
 let bannerTimer = null
 let bannerTouchX = 0
+const docHidden = ref(false) // 页面隐藏（切 Tab / 手机后台）：暂停 marquee 持续动画，避免制造常驻合成层
 const heroVideoRef = ref(null)
 let videoPlayTimer = null
 
@@ -292,6 +293,7 @@ function stopBannerLoop() {
   }
 }
 function onDocVisibility() {
+  docHidden.value = document.hidden
   if (document.hidden) stopBannerLoop()
   else startBannerLoop()
 }
@@ -941,6 +943,10 @@ function showToast(msg) {
 @keyframes q-marquee {
   0% { transform: translateX(100%); }
   100% { transform: translateX(-100%); }
+}
+/* 页面隐藏（切 Tab / App 后台）时暂停滚动动画，避免持续 transform 合成层在 WebView 久驻后干扰整页点击命中 */
+.discover.marquee-paused .quick__label__text {
+  animation-play-state: paused;
 }
 .q-badge {
   position: absolute;

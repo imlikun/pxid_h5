@@ -153,7 +153,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
@@ -203,8 +203,14 @@ onMounted(async () => {
     loading.value = false
   }
   startBanner()
+  document.addEventListener('visibilitychange', onVis)
 })
-onUnmounted(stopBanner)
+onUnmounted(() => {
+  stopBanner()
+  document.removeEventListener('visibilitychange', onVis)
+})
+onDeactivated(stopBanner) // 切到别的 Tab（IndexedStack 隐藏本 WebView）时停掉，避免隐藏期间持续制造合成层
+onActivated(startBanner) // 回到本 Tab 恢复轮播
 
 function enterStore() {
   if (store.value) bridge.openShopify('https://' + store.value)
@@ -221,11 +227,16 @@ const bannerList = computed(() =>
 
 function startBanner() {
   stopBanner()
+  if (document.hidden) return // 后台/WebView Offstage 时不跑，避免持续制造合成层
   if (bannerList.value.length > 1) {
     _bannerTimer = setInterval(() => {
       current.value = (current.value + 1) % bannerList.value.length
     }, 4000)
   }
+}
+function onVis() {
+  if (document.hidden) stopBanner()
+  else startBanner()
 }
 function stopBanner() {
   if (_bannerTimer) {

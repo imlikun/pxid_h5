@@ -3,6 +3,9 @@
 // - 跟手 translateX，松手过阈值弹走返回、不足回弹
 // - 可返回（history.state.back 非空）→ 正常返回上一页
 // - 嵌入 Flutter（isNative=true）→ 根页面不退出 App，只 popPage，退出交给 Flutter MainPage
+// - ⚠️ 2026-09-01（Flutter 已做全局返回手势）：嵌入模式下 H5 不再往根容器写 transform/willChange，
+//   返回手势的跟手动画完全交给 Flutter 全局手势；H5 只做手势判定 + 路由返回/ popPage。
+//   独立浏览器模式保留原跟手动画。
 //
 // ⚠️ 核心约束（2026-09-01 整改，对应《发现精选_长时间停留后全页无法点击_H5整改清单》）：
 // 只要往根元素写过 transform / willChange，`.app-root` 就会变成 containing block 并新建合成层。
@@ -62,9 +65,10 @@ export function useSwipeBack(elRef, opts = {}) {
   // 现改为「写 → 读布局强制同步 reflow → 立即还原」：全程在同一个同步任务内完成，
   // 不依赖 rAF，后台/Offstage 也不可能中断，因此不可能残留。
   function resetEl() {
-    // 防御：清掉历史版本/其它代码可能在 <html> 上留下的 transform（老包残留自愈）
+    // 防御：清掉历史版本/其它代码可能在 <html> 上留下的 transform/willChange（老包残留自愈）
     const doc = document.documentElement
     if (doc.style.transform) doc.style.transform = ''
+    if (doc.style.willChange) doc.style.willChange = ''
 
     const el = elRef && elRef.value
     if (!el) return
@@ -127,13 +131,16 @@ export function useSwipeBack(elRef, opts = {}) {
       if (startEdge === 'left' && dx <= 0) { startEdge = null; return } // 方向不符
       if (startEdge === 'right' && dx >= 0) { startEdge = null; return }
       active = true
-      if (elRef && elRef.value) elRef.value.style.willChange = 'transform'
+      // 嵌入 Flutter 时返回手势的视觉滑动由 Flutter 全局手势负责，H5 不再写根容器 transform
+      // （避免与 Flutter 全局返回手势抢同一个手势，并消除根容器 transform 导致的点击命中错位）
+      if (elRef && elRef.value && !bridge.isEmbed) elRef.value.style.willChange = 'transform'
     }
-    if (elRef && elRef.value) {
+    // 仅独立浏览器模式做跟手动画；嵌入模式只做手势判定 + 路由返回，视觉交给 Flutter
+    if (elRef && elRef.value && !bridge.isEmbed) {
       elRef.value.style.transition = 'none'
       elRef.value.style.transform = `translateX(${dx}px)`
     }
-    scheduleSafetyReset() // 写入 transform 的同时立刻挂兜底，不等 touchend
+    scheduleSafetyReset() // 手势进行中立刻挂兜底，不等 touchend
   }
 
   function clearSafetyReset() {
@@ -149,16 +156,19 @@ export function useSwipeBack(elRef, opts = {}) {
     const el = elRef && elRef.value
     const move = dx
     const pass = startEdge === 'left' ? move > threshold : -move > threshold
-    if (el) el.style.transition = 'transform 0.28s ease'
+    const embed = bridge.isEmbed
 
     if (!pass) {
-      if (el) {
+      // 回弹：独立浏览器做动画并彻底清 transform；嵌入模式无需动画（Flutter 负责视觉）
+      if (el && !embed) {
+        el.style.transition = 'transform 0.28s ease'
         el.style.transform = 'translateX(0)'
-        // 回弹动画结束彻底清除 transform（translateX(0) 仍是 transform，会创建包含块使 fixed 弹层错位）
         let cleared = false
         const clear = () => { if (cleared) return; cleared = true; resetEl() }
         el.addEventListener('transitionend', clear, { once: true })
         setTimeout(clear, 400) // 兜底：transitionend 不触发时也能清
+      } else {
+        resetGestureAndElement()
       }
       startEdge = null
       active = false
@@ -166,13 +176,14 @@ export function useSwipeBack(elRef, opts = {}) {
     }
 
     if (canGoBack()) {
-      // 可返回：弹走返回
-      if (el) el.style.transform = `translateX(${startEdge === 'left' ? window.innerWidth * 0.45 : -window.innerWidth * 0.45}px)`
-      const t = setTimeout(() => {
+      // 可返回：H5 内部路由返回。嵌入模式视觉由 Flutter 全局手势负责，H5 直接返回不写 transform
+      if (el && !embed) {
+        el.style.transition = 'transform 0.28s ease'
+        el.style.transform = `translateX(${startEdge === 'left' ? window.innerWidth * 0.45 : -window.innerWidth * 0.45}px)`
+        const t = setTimeout(() => { router.back(); resetEl(); clearTimeout(t) }, 200)
+      } else {
         router.back()
-        resetEl()
-        clearTimeout(t)
-      }, 200)
+      }
     } else {
       // 不可返回（H5 根页面）：交给原生 pop，H5 自己绝不退出 App
       resetEl()
@@ -185,7 +196,7 @@ export function useSwipeBack(elRef, opts = {}) {
       }
       // 嵌入 Flutter App 内（真实桥 isNative=true）：根页退出与「再按一次退出」完全由 Flutter MainPage 控制，
       // H5 不调 bridge.exit()、不弹退出提示，避免与 Flutter PopScope 并发消费同一个返回意图（清单 4.3）
-      if (bridge.isEmbed) {
+      if (embed) {
         startEdge = null
         active = false
         return
