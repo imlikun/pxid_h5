@@ -510,8 +510,12 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '', avatar
     const insAvatar = hasAvatar ? rawAvatar.slice(0, 500) : (String(fe.avatar || '').slice(0, 500))
     const insCar = (carModel !== undefined && carModel !== null) ? String(carModel || '').slice(0, 30) : (String(fe.car_model || '').slice(0, 30))
     try {
+      // mid 非空时写空 device_id，避免同设备另一账号的 idx_profile_device 行被复用（T040 根治 member 维度串号）。
+      // 例：设备 0a30a20d 绑 member17 和 member24，member24 首次写 profile 时 device_id='' 可独立成行，
+      //     否则会与 member17 的行共用 device_id 唯一索引，B 改头像会把 A 的行 UPDATE 掉。
+      const profileDev = mid ? '' : id
       db.prepare('INSERT INTO user_profiles (device_id, member_user_id, nickname, avatar, car_model, updated_at) VALUES (?,?,?,?,?,?)')
-        .run(id, mid, insNick, insAvatar, insCar, now())
+        .run(profileDev, mid, insNick, insAvatar, insCar, now())
     } catch (e) {
       if (String(e.message || '').includes('UNIQUE')) {
         // 极端并发冲突：重建为更新，避免 500（同样只对非空字段覆盖）
@@ -546,12 +550,14 @@ function resolveFeedsIdentity(deviceId = '', memberUserId = '') {
 
 // ⚠️ 2026-09-01：不再兜底返回占位「骑友」。查不到就返回空串，让上层走空态或原生资料补齐，
 //    避免「接口异常/资料缺失」被伪装成一个看起来正常的用户名（北帆整改清单 问题D）。
-function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '', storedAvatar = '' }) {
+// allowDeviceFallback=false：只认 memberUserId，不靠 device_id 回退到同设备另一账号的资料。
+// 用于本人身份场景（/users/me、PATCH /users/profile），防止 A 切到 B 后仍展示 A 的昵称/头像。
+function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '', storedAvatar = '', allowDeviceFallback = true }) {
   const id = String(deviceId || '')
   const mid = String(memberUserId || '')
   let p = null
   if (mid) p = db.prepare("SELECT * FROM user_profiles WHERE member_user_id=? AND length(member_user_id)>0").get(mid)
-  if (!p && id) p = db.prepare("SELECT * FROM user_profiles WHERE device_id=? AND length(device_id)>0").get(id)
+  if (!p && allowDeviceFallback && id) p = db.prepare("SELECT * FROM user_profiles WHERE device_id=? AND length(device_id)>0").get(id)
   if (!p) return { nickname: storedNickname || '', avatar: storedAvatar || '', carModel: '' }
   return {
     nickname: p.nickname || storedNickname || '',
@@ -998,7 +1004,7 @@ app.get('/users/me', requireAuth, (req, res) => {
   const u = req.user || {}
   const d = String(u.deviceId || u.device_id || '')
   const m = String(u.memberUserId || u.member_user_id || '')
-  const profile = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
+  const profile = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '', allowDeviceFallback: false })
   // 兜底：无 profile 时取该用户最新一条 feed 的昵称/头像/车型；
   // 必须排除 device_id='' 的脏记录，否则空设备 token 会串到「PXID 官方」等默认内容。
   // 额外排除 nickname='骑友' 的历史脏记录：占位昵称不该被当成真实资料回显（2026-09-01）
@@ -1049,7 +1055,8 @@ app.put('/users/profile', requireAuth, (req, res) => {
   if (avatar !== undefined) patch.avatar = String(avatar || '').slice(0, 500)
   if (carModel !== undefined) patch.carModel = String(carModel || '').slice(0, 30)
   upsertProfile({ deviceId: d, memberUserId: m, nickname: patch.nickname !== undefined ? patch.nickname : undefined, avatar: patch.avatar !== undefined ? patch.avatar : undefined, carModel: patch.carModel !== undefined ? patch.carModel : undefined })
-  const p = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
+  // 本人场景只认 memberUserId，不靠 device_id 回退（T040 根治 member 维度串号）
+  const p = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '', allowDeviceFallback: false })
   res.json(ok({ nickname: p.nickname, avatar: p.avatar, carModel: p.carModel }))
 })
 
