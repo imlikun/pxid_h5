@@ -2,15 +2,27 @@
   <div class="interaction">
     <TopBar sticky :title="t('interaction.title')" :back="goBack" />
 
-    <!-- 分类切换：全部 / 评论 / 赞 / 关注 / 系统（对应通知 type） -->
+    <!-- 分类切换：4 个圆形 icon 卡片（评论 / 关注 / 点赞 / 收藏，对齐截图"天阳"样式） -->
     <div class="cats">
-      <span
+      <div
         v-for="c in cats"
         :key="c.key"
         class="cat"
         :class="{ active: activeCat === c.key }"
         @click="activeCat = c.key"
-      >{{ t('interaction.tab.' + c.key) }}</span>
+      >
+        <span class="cat__icon" :style="{ '--bg': c.bg, '--fg': c.fg }">
+          <!-- 评论：对话气泡 -->
+          <svg v-if="c.key === 'comment'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <!-- 关注：人 + 加号 -->
+          <svg v-else-if="c.key === 'follow'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          <!-- 点赞：心形 -->
+          <svg v-else-if="c.key === 'like'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <!-- 收藏：星形 -->
+          <svg v-else-if="c.key === 'favorite'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </span>
+        <span class="cat__label">{{ t('interaction.tab.' + c.key) }}</span>
+      </div>
     </div>
 
     <!-- 时间线消息列表（对齐车辆消息样式：时间居中 + 左侧系统头像 + 右侧气泡卡片） -->
@@ -62,13 +74,13 @@ const router = useRouter()
 const list = ref([])
 const loading = ref(true)
 const activeCat = ref('comment')
-// 分类 tab：评论 / 关注 / 点赞 / 收藏（与截图一致，去掉「全部/系统」）
+// 分类：评论 / 关注 / 点赞 / 收藏，每个带软色背景 + 主题色（对齐截图"天阳"圆形 icon 样式）
 // comment 同时包含 comment + reply（回复评论也归类到评论通知）
 const cats = [
-  { key: 'comment' },
-  { key: 'follow' },
-  { key: 'like' },
-  { key: 'favorite' },
+  { key: 'comment', bg: '#E0ECFF', fg: '#4A6CF7' },
+  { key: 'follow', bg: '#EBE0FF', fg: '#7C4DFF' },
+  { key: 'like', bg: '#FFE0E5', fg: '#E53E5E' },
+  { key: 'favorite', bg: '#FFEED4', fg: '#FF9500' },
 ]
 const PAGE_SIZE = 20
 const page = ref(1)
@@ -204,35 +216,54 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   background: var(--bg, #f7f8fa);
   min-height: calc(100vh - 100px);
 }
-/* ---- 分类切换 tab ---- */
+/* ---- 分类切换：4 个圆形 icon 卡片 ---- */
 .cats {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 16px 12px 14px;
   background: var(--card, #fff);
   border-bottom: 1px solid var(--line, #eee);
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.cats::-webkit-scrollbar { display: none; }
 .cat {
-  flex: none;
-  font-size: 14px;
-  color: var(--text-sub);
-  background: var(--surface-2, #f0f1f3);
-  border-radius: 16px;
-  padding: 6px 16px;
-  font-weight: 500;
-  line-height: 1;
-  transition: all 0.15s ease;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  transition: transform 0.15s;
+  cursor: pointer;
 }
-.cat.active {
+.cat:active { transform: scale(0.94); }
+.cat__icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+/* 激活态：浅色背景反转为实心主题色 + 白色 icon */
+.cat.active .cat__icon {
+  background: var(--fg);
   color: #fff;
-  background: var(--brand, #4A6CF7);
-  font-weight: 600;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
-.cat:active { transform: scale(0.96); }
+.cat__label {
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.2;
+  transition: color 0.2s, font-weight 0.2s;
+}
+.cat.active .cat__label {
+  color: var(--fg);
+  font-weight: 700;
+}
 .msg-group {
   margin-bottom: 18px;
 }
