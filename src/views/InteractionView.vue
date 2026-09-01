@@ -1,58 +1,97 @@
 <template>
   <div class="interaction">
-    <TopBar sticky :title="t('interaction.title')" :back="goBack" />
-
-    <!-- 分类切换：4 个圆形 icon 卡片（评论 / 关注 / 点赞 / 收藏，对齐截图"天阳"样式） -->
-    <div class="cats">
-      <div
-        v-for="c in cats"
-        :key="c.key"
-        class="cat"
-        :class="{ active: activeCat === c.key }"
-        @click="activeCat = c.key"
-      >
-        <span class="cat__icon" :style="{ '--bg': c.bg, '--fg': c.fg }">
-          <!-- 评论：对话气泡 -->
-          <svg v-if="c.key === 'comment'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <!-- 关注：人 + 加号 -->
-          <svg v-else-if="c.key === 'follow'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-          <!-- 点赞：心形 -->
-          <svg v-else-if="c.key === 'like'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          <!-- 收藏：星形 -->
-          <svg v-else-if="c.key === 'favorite'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <TopBar sticky :title="t('interaction.title')" :back="goBack">
+      <template #right>
+        <!-- 轻量筛选入口：互动消息是「时间驱动」的，默认全部混合流；按类型筛选属低频需求，收进浮层不常驻 tab -->
+        <span class="filter-btn press" @click="showFilter = !showFilter">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <i v-if="activeCat !== 'all'" class="filter-dot"></i>
         </span>
-        <span class="cat__label">{{ t('interaction.tab.' + c.key) }}</span>
-      </div>
-    </div>
+      </template>
+    </TopBar>
 
-    <!-- 时间线消息列表（对齐车辆消息样式：时间居中 + 左侧系统头像 + 右侧气泡卡片） -->
+    <!-- 筛选浮层 -->
+    <transition name="fd">
+      <div v-if="showFilter" class="fmask" @click="showFilter = false">
+        <div class="fmenu" @click.stop>
+          <button
+            v-for="o in filterOpts"
+            :key="o.key"
+            class="fitem"
+            :class="{ on: activeCat === o.key }"
+            @click="pickFilter(o.key)"
+          >
+            <i class="fdot" :style="{ background: o.color }"></i>
+            <span class="ftext">{{ t('interaction.filter.' + o.key) }}</span>
+            <svg v-if="activeCat === o.key" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </button>
+        </div>
+      </div>
+    </transition>
+
+    <!-- 混合时间线：评论/赞/关注/收藏/提到 按时间倒序混合，右侧标签标明类型 -->
     <div class="list">
       <div
-        v-for="n in filtered"
-        :key="n.id"
-        class="msg-group"
-        :class="{ unread: !n.read }"
-        @click="onTap(n)"
+        v-for="g in grouped"
+        :key="g.key"
+        class="msg"
+        :class="{ unread: g.unread, open: expanded === g.key }"
       >
-        <div class="time">{{ formatDateTime(n.createdAt) }}</div>
-        <div class="msg-row">
-          <div class="avatar">
-            <img v-if="n.actorAvatar" :src="n.actorAvatar" alt="" @error="(e) => handleAvatarError(e, n.actorName)" />
-            <span v-else class="avatar__ph">{{ avatarText(n) }}</span>
-            <span v-if="!n.read" class="dot"></span>
+        <div class="time">{{ formatDateTime(g.createdAt) }}</div>
+        <div class="row">
+          <!-- 头像：聚合时最多堆叠 3 个 -->
+          <div class="avatars">
+            <span
+              v-for="(a, i) in g.actors"
+              :key="i"
+              class="ava"
+              :class="{ stacked: g.count > 1 }"
+              :style="{ zIndex: 10 - i, marginLeft: g.count > 1 && i > 0 ? '-12px' : '0' }"
+            >
+              <img v-if="a.avatar" :src="a.avatar" alt="" @error="(e) => handleAvatarError(e, a.name)" />
+              <span v-else class="ava__ph">{{ (a.name || '?').slice(0, 1).toUpperCase() }}</span>
+            </span>
+            <span v-if="g.unread" class="dot"></span>
           </div>
-          <div class="bubble">
-            <div class="actor">{{ n.actorName || t('interaction.tab.system') }}</div>
-            <div class="content">{{ n.content }}</div>
+
+          <div class="bubble" @click="toggle(g)">
+            <div class="head">
+              <span class="actor">{{ g.title }}</span>
+              <!-- 右侧类型标签：同色系小圆点 + 文字，避免 4 色块炸屏 -->
+              <span class="pill" :style="{ '--c': metaOf(g.type).color, '--bg': metaOf(g.type).bg }">
+                <i class="pdot"></i>{{ t(metaOf(g.type).labelKey) }}
+              </span>
+            </div>
+            <div class="content">{{ g.summary }}</div>
+
+            <!-- inline 展开：评论正文 + 关联原动态预览。砍掉「消息详情页」这一跳，5 层压到 4 层 -->
+            <div v-if="expanded === g.key" class="more">
+              <div v-if="g.body" class="quote">{{ g.body }}</div>
+
+              <div v-if="g.target" class="post" @click.stop="goPost(g)">
+                <img v-if="g.target.cover" class="post__cover" :src="g.target.cover" alt="" />
+                <div class="post__body">
+                  <div class="post__title">{{ g.target.title }}</div>
+                  <div class="post__author">{{ g.target.author }}</div>
+                </div>
+              </div>
+              <div v-else-if="g.targetType === 'feed'" class="post post--missing">{{ t('interaction.postMissing') }}</div>
+
+              <div v-if="g.type === 'comment' || g.type === 'reply' || g.type === 'mention' || g.type === 'follow'" class="acts">
+                <button v-if="g.type !== 'follow'" class="act" @click.stop="goPost(g)">{{ t('interaction.reply') }}</button>
+                <button v-else class="act" @click.stop="goProfile(g)">{{ t('interaction.goProfile') }}</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <div v-if="!filtered.length && !loading" class="empty">
-        <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--text-hint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M34 42H14a4 4 0 01-4-4V18l14-10 14 10v20a4 4 0 01-4 4z"/><path d="M10 18l14-10 14 10"/><path d="M20 42v-12h8v12"/></svg>
-        <p>{{ t('interaction.empty') }}</p>
+
+      <div v-if="!grouped.length && !loading" class="empty">
+        <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--text-hint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M34 42H14a4 4 0 0 1-4-4V18l14-10 14 10v20a4 4 0 0 1-4 4z"/><path d="M10 18l14-10 14 10"/><path d="M20 42v-12h8v12"/></svg>
+        <p>{{ activeCat === 'all' ? t('interaction.empty') : t('interaction.emptyFiltered') }}</p>
       </div>
-      <div v-if="loadingMore" class="loadmore">加载中…</div>
-      <div v-else-if="!hasMore && list.length" class="loadmore">没有更多了</div>
+      <div v-if="loadingMore" class="loadmore">{{ t('interaction.loading') }}</div>
+      <div v-else-if="!hasMore && grouped.length" class="loadmore">{{ t('interaction.noMore') }}</div>
     </div>
 
     <transition name="toast-fade">
@@ -73,15 +112,32 @@ import { handleAvatarError } from '../utils/avatar'
 const router = useRouter()
 const list = ref([])
 const loading = ref(true)
-const activeCat = ref('comment')
-// 分类：评论 / 关注 / 点赞 / 收藏，每个带软色背景 + 主题色（对齐截图"天阳"圆形 icon 样式）
-// comment 同时包含 comment + reply（回复评论也归类到评论通知）
-const cats = [
-  { key: 'comment', bg: '#E0ECFF', fg: '#4A6CF7' },
-  { key: 'follow', bg: '#EBE0FF', fg: '#7C4DFF' },
-  { key: 'like', bg: '#FFE0E5', fg: '#E53E5E' },
-  { key: 'favorite', bg: '#FFEED4', fg: '#FF9500' },
+const activeCat = ref('all')
+const showFilter = ref(false)
+const expanded = ref('')
+
+// 类型元数据：统一驱动「右侧标签配色 + 文案 + 筛选浮层」
+const TYPES = {
+  comment: { color: '#4A6CF7', bg: '#E0ECFF', labelKey: 'interaction.tab.comment' },
+  reply: { color: '#4A6CF7', bg: '#E0ECFF', labelKey: 'interaction.tab.comment' },
+  like: { color: '#E53E5E', bg: '#FFE0E5', labelKey: 'interaction.tab.like' },
+  favorite: { color: '#FF9500', bg: '#FFEED4', labelKey: 'interaction.tab.favorite' },
+  follow: { color: '#7C4DFF', bg: '#EBE0FF', labelKey: 'interaction.tab.follow' },
+  mention: { color: '#00B8A9', bg: '#D6F7F3', labelKey: 'interaction.tab.mention' },
+  system: { color: '#8A94A6', bg: '#EDEFF3', labelKey: 'interaction.tab.system' },
+}
+function metaOf(type) {
+  return TYPES[type] || TYPES.system
+}
+// 筛选浮层选项（「全部」+ 4 类）
+const filterOpts = [
+  { key: 'all', color: '#8A94A6' },
+  { key: 'comment', color: '#4A6CF7' },
+  { key: 'like', color: '#E53E5E' },
+  { key: 'follow', color: '#7C4DFF' },
+  { key: 'favorite', color: '#FF9500' },
 ]
+
 const PAGE_SIZE = 20
 const page = ref(1)
 const total = ref(0)
@@ -89,14 +145,100 @@ const loadingMore = ref(false)
 const hasMore = computed(() => list.value.length < total.value)
 
 const filtered = computed(() => {
-  const type = activeCat.value
-  if (type === 'comment') return list.value.filter((n) => n.type === 'comment' || n.type === 'reply')
-  return list.value.filter((n) => n.type === type)
+  const c = activeCat.value
+  if (c === 'all') return list.value
+  // 评论类同时收 comment + reply（回复评论也归到「评论」）
+  if (c === 'comment') return list.value.filter((n) => n.type === 'comment' || n.type === 'reply')
+  return list.value.filter((n) => n.type === c)
 })
 
-function avatarText(n) {
-  if (n.actorName) return n.actorName.slice(0, 1).toUpperCase()
-  return { like: '♥', comment: '💬', follow: '＋', favorite: '★', reply: '↩' }[n.type] || '!'
+// 动作摘要：按 type 走 i18n，而不是直接显示后端存的中文 content（否则切语言文案不变）
+function actionText(n) {
+  if (n.type === 'like') return t('interaction.action.like')
+  if (n.type === 'comment') return t('interaction.action.comment')
+  if (n.type === 'reply') return t('interaction.action.reply')
+  if (n.type === 'follow') return t('interaction.action.follow')
+  if (n.type === 'favorite') return t('interaction.action.favorite')
+  if (n.type === 'mention') return t('interaction.action.mention')
+  return t('interaction.action.system')
+}
+
+// 正文：后端 content 形如「评论了你的动态：正文」，剥掉动作前缀只留正文
+function bodyOf(n) {
+  const c = String(n.content || '')
+  const i = c.search(/[：:]/)
+  return i < 0 ? '' : c.slice(i + 1).trim()
+}
+
+// 聚合：同一帖子上的连续点赞/收藏合并成一条，避免点赞把评论冲下去
+const grouped = computed(() => {
+  const out = []
+  for (const n of filtered.value) {
+    const mergeable = n.type === 'like' || n.type === 'favorite'
+    const prev = out[out.length - 1]
+    if (mergeable && prev && prev.type === n.type && prev.targetId && String(prev.targetId) === String(n.targetId)) {
+      prev.items.push(n)
+      if (!n.read) prev.unread = true
+      continue
+    }
+    out.push({
+      key: n.id,
+      type: n.type,
+      targetType: n.targetType,
+      targetId: n.targetId,
+      target: n.target || null,
+      createdAt: n.createdAt,
+      unread: !n.read,
+      items: [n],
+    })
+  }
+  out.forEach((g) => {
+    const first = g.items[0]
+    g.count = g.items.length
+    g.actors = g.items.slice(0, 3).map((i) => ({ name: i.actorName, avatar: i.actorAvatar }))
+    g.summary = actionText(first)
+    g.body = g.count > 1 ? '' : bodyOf(first)
+    if (g.count > 1) {
+      g.title = g.type === 'like'
+        ? `${first.actorName || ''} ${t('interaction.group.like', { n: g.count })}`
+        : `${first.actorName || ''} ${t('interaction.group.favorite', { n: g.count })}`
+    } else {
+      g.title = first.actorName || t('interaction.tab.system')
+    }
+  })
+  return out
+})
+
+function pickFilter(key) {
+  activeCat.value = key
+  showFilter.value = false
+  expanded.value = ''
+}
+
+// 点击气泡 inline 展开（不再跳转消息详情页），同时把组内所有通知标已读
+async function toggle(g) {
+  if (expanded.value === g.key) {
+    expanded.value = ''
+    return
+  }
+  expanded.value = g.key
+  if (g.unread) {
+    g.unread = false
+    g.items.forEach((n) => {
+      n.read = true
+      markNotificationRead(n.id)
+    })
+  }
+}
+
+function goPost(g) {
+  if (!g.target || !g.target.id) return
+  router.push('/feed/' + g.target.id)
+}
+
+function goProfile(g) {
+  const d = g.items[0] && g.items[0].actorDevice
+  if (d) router.push('/user/' + d)
 }
 
 // 返回上一级：对齐积分页 PointsView.handlePointsBack。
@@ -109,22 +251,6 @@ function goBack() {
   } else {
     router.back()
   }
-}
-
-// 时间人性化：刚刚 / x 分钟前 / x 小时前 / 昨天 / M-d / yyyy-MM-dd
-function formatTime(s) {
-  if (!s) return ''
-  const d = new Date(String(s).replace(' ', 'T'))
-  if (isNaN(d.getTime())) return String(s).slice(0, 16)
-  const diff = (Date.now() - d.getTime()) / 1000
-  if (diff < 60) return '刚刚'
-  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前'
-  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前'
-  if (diff < 172800) return '昨天'
-  const pad = (x) => String(x).padStart(2, '0')
-  const now = new Date()
-  if (d.getFullYear() === now.getFullYear()) return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 // 时间线样式：08/27 17:12
@@ -176,19 +302,10 @@ function showToast(m) {
   toastTimer = setTimeout(() => (toastMsg.value = ''), 1600)
 }
 
-async function onTap(n) {
-  if (!n.read) {
-    n.read = true
-    await markNotificationRead(n.id)
-  }
-  // 统一进入消息详情页：展示对方发来的内容（评论正文/系统消息）+ 关联原动态预览，
-  // 详情页内再提供"查看原动态 / 去TA主页"等后续动作。
-  router.push('/interaction/' + n.id)
-}
-
 async function onMarkAll() {
   list.value.forEach((n) => (n.read = true))
   await markAllRead()
+  showToast(t('interaction.markAllDone'))
 }
 
 onMounted(() => {
@@ -210,80 +327,119 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 :deep(.tb-bar) {
   background: var(--card, #ffffff);
 }
+
+/* ---- 顶栏右侧筛选按钮 ---- */
+.filter-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--text, #1a1a1a);
+}
+.filter-btn:active {
+  background: rgba(0, 0, 0, 0.05);
+}
+.filter-dot {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand, #4A6CF7);
+}
+
+/* ---- 筛选浮层 ---- */
+.fmask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 60;
+}
+.fmenu {
+  position: absolute;
+  top: 52px;
+  right: 10px;
+  min-width: 156px;
+  background: var(--card, #fff);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+.fitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text, #1a1a1a);
+  cursor: pointer;
+}
+.fitem:active {
+  background: var(--surface-2, #f0f1f3);
+}
+.fitem.on {
+  color: var(--brand, #4A6CF7);
+  font-weight: 600;
+}
+.fdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.ftext {
+  flex: 1;
+  text-align: left;
+}
+.fd-enter-active,
+.fd-leave-active {
+  transition: opacity 0.18s ease;
+}
+.fd-enter-from,
+.fd-leave-to {
+  opacity: 0;
+}
+
 /* ---- 时间线消息列表 ---- */
 .list {
   padding: 8px 16px calc(20px + env(safe-area-inset-bottom));
   background: var(--bg, #f7f8fa);
   min-height: calc(100vh - 100px);
 }
-/* ---- 分类切换：4 个圆形 icon 卡片 ---- */
-.cats {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  padding: 16px 12px 14px;
-  background: var(--card, #fff);
-  border-bottom: 1px solid var(--line, #eee);
-}
-.cat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0;
-  transition: transform 0.15s;
-  cursor: pointer;
-}
-.cat:active { transform: scale(0.94); }
-.cat__icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: var(--bg);
-  color: var(--fg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s, color 0.2s, transform 0.2s;
-}
-/* 激活态：浅色背景反转为实心主题色 + 白色 icon */
-.cat.active .cat__icon {
-  background: var(--fg);
-  color: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-}
-.cat__label {
-  font-size: 12px;
-  color: var(--text-sub);
-  line-height: 1.2;
-  transition: color 0.2s, font-weight 0.2s;
-}
-.cat.active .cat__label {
-  color: var(--fg);
-  font-weight: 700;
-}
-.msg-group {
+.msg {
   margin-bottom: 18px;
 }
-.msg-group:last-child {
+.msg:last-child {
   margin-bottom: 0;
 }
-.msg-group .time {
+.msg .time {
   text-align: center;
   font-size: 12px;
   color: var(--text-hint);
   margin-bottom: 10px;
 }
-.msg-row {
+.row {
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
 
-/* ---- 头像（车辆消息：浅灰圆底 + 白色铃铛） ---- */
-.avatar {
+/* ---- 头像（可堆叠） ---- */
+.avatars {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.ava {
   position: relative;
   width: 40px;
   height: 40px;
@@ -292,21 +448,19 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: none;
   overflow: hidden;
   border: 2px solid #fff;
 }
-.avatar img {
+.ava.stacked {
+  width: 32px;
+  height: 32px;
+}
+.ava img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.avatar .bell {
-  width: 20px;
-  height: 20px;
-  color: #9ca3af;
-}
-.avatar__ph {
+.ava__ph {
   font-size: 15px;
   font-weight: 700;
   color: var(--brand, #4A6CF7);
@@ -323,20 +477,48 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   transition: background 0.15s;
 }
-.msg-group:active .bubble {
+.msg:active .bubble {
   background: #f9f9fb;
 }
-.msg-group.unread .bubble {
-  background: #fff;
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 .actor {
+  flex: 1;
+  min-width: 0;
   font-size: 14px;
   font-weight: 700;
   color: var(--text);
-  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.msg-group.unread .actor {
+.msg.unread .actor {
   color: var(--brand, #4A6CF7);
+}
+
+/* 右侧类型标签：浅色底 + 类型色小圆点，安静不抢主内容 */
+.pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--c);
+  font-weight: 600;
+}
+.pdot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--c);
 }
 .content {
   font-size: 14px;
@@ -345,20 +527,95 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   word-break: break-word;
 }
 
+/* ---- inline 展开区 ---- */
+.more {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, #eee);
+}
+.quote {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text, #1a1a1a);
+  background: var(--surface-2, #f4f5f7);
+  border-left: 3px solid var(--brand, #4A6CF7);
+  border-radius: 6px;
+  padding: 8px 10px;
+  word-break: break-word;
+}
+.post {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface-2, #f4f5f7);
+}
+.post:active {
+  background: #eceef2;
+}
+.post__cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex: none;
+  background: #e3e5ea;
+}
+.post__body {
+  flex: 1;
+  min-width: 0;
+}
+.post__title {
+  font-size: 13px;
+  color: var(--text, #1a1a1a);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.post__author {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-hint);
+}
+.post--missing {
+  color: var(--text-hint);
+  font-size: 13px;
+  justify-content: center;
+}
+.acts {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.act {
+  border: 1px solid var(--line, #e3e5ea);
+  background: var(--card, #fff);
+  color: var(--text-sub);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+}
+.act:active {
+  background: var(--surface-2, #f0f1f3);
+}
+
 /* ---- 未读红点 ---- */
 .dot {
   position: absolute;
   top: -2px;
-  right: -2px;
+  right: -4px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: var(--price, #E53E3E);
   border: 2px solid var(--bg, #f7f8fa);
   box-shadow: 0 1px 3px rgba(229, 62, 62, 0.35);
+  z-index: 20;
 }
-
-/* ---- 空状态 ---- */
 
 /* ---- 空状态 ---- */
 .empty {

@@ -1366,6 +1366,36 @@ app.get('/notifications', requireAuth, (req, res) => {
   const rows = db
     .prepare(`SELECT * FROM notifications WHERE ${vc.clause} ORDER BY id DESC LIMIT ? OFFSET ?`)
     .all(...vc.args, pageSize, (page - 1) * pageSize)
+
+  // 关联原动态快照（供互动消息页 inline 展开用，避免再跳一层详情页）
+  // 批量查询：一次 SELECT 取回本页所有 targetType=feed 的原帖，杜绝 N+1
+  const feedIds = [...new Set(
+    rows.filter((r) => r.target_type === 'feed' && r.target_id)
+      .map((r) => Number(r.target_id))
+      .filter((x) => x > 0)
+  )]
+  const feedMap = new Map()
+  if (feedIds.length) {
+    const ph = feedIds.map(() => '?').join(',')
+    db.prepare(`SELECT id, content, images, nickname FROM feeds WHERE id IN (${ph})`)
+      .all(...feedIds)
+      .forEach((f) => {
+        let cover = ''
+        try {
+          const arr = JSON.parse(f.images || '[]')
+          if (Array.isArray(arr) && arr.length) cover = String(arr[0] || '')
+        } catch (e) {
+          cover = ''
+        }
+        feedMap.set(String(f.id), {
+          id: f.id,
+          title: String(f.content || '').slice(0, 60),
+          cover,
+          author: String(f.nickname || ''),
+        })
+      })
+  }
+
   res.json(ok({
     total: totalRow.c,
     list: rows.map((r) => ({
@@ -1379,6 +1409,8 @@ app.get('/notifications', requireAuth, (req, res) => {
       content: r.content,
       read: !!r.read,
       createdAt: r.created_at,
+      // 关联原动态快照：targetType='feed' 时可能为 null（原帖已删除 → 前端展示「原帖已删除」不再跳转）
+      target: r.target_type === 'feed' ? (feedMap.get(String(r.target_id)) || null) : null,
       demo: r.device_id === '__demo__',
     })),
   }))
