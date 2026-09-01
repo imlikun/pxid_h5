@@ -1275,13 +1275,17 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
   const memberUserId = (req.user && req.user.memberUserId) || ''
   if (!deviceId && !memberUserId) return res.status(401).json(err(401, '未授权：无法识别用户身份'))
   const { liked = true, nickname = '', avatar = '' } = req.body || {}
-  const already = !!db.prepare('SELECT 1 FROM feed_likes WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, row.id)
+  // ⚠️ T040：member 非空只按 member 单条件。原 OR 逻辑下同设备两个 member（17/24）共享 device_id：
+  //   「我是否赞过」会误判成另一账号的点赞；取消点赞更会把另一账号的点赞记录一起删掉（数据破坏）。
+  const likeMatch = userIdentityMatch('device_id', 'member_user_id', req.user, true)
+  const already = !!db.prepare(`SELECT 1 FROM feed_likes WHERE ${likeMatch.clause} AND feed_id=?`).get(...likeMatch.args, row.id)
   let isLiked = already
   if (liked && !already) {
+    // 写入仍保留双身份（兼容历史数据/游客态），但读取与删除严格按 member 单条件
     db.prepare('INSERT OR IGNORE INTO feed_likes (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, row.id, now())
     isLiked = true
   } else if (!liked && already) {
-    db.prepare('DELETE FROM feed_likes WHERE (device_id=? OR member_user_id=?) AND feed_id=?').run(deviceId, memberUserId, row.id)
+    db.prepare(`DELETE FROM feed_likes WHERE ${likeMatch.clause} AND feed_id=?`).run(...likeMatch.args, row.id)
     isLiked = false
   }
   const likes = db.prepare('SELECT COUNT(*) c FROM feed_likes WHERE feed_id=?').get(row.id).c
@@ -1315,7 +1319,10 @@ app.post('/feed/:id/favorite', requireAuth, (req, res) => {
   const memberUserId = (req.user && req.user.memberUserId) || ''
   if (!deviceId && !memberUserId) return res.status(401).json(err(401, '未授权：无法识别用户身份'))
   const { favorited = true } = req.body || {}
-  const already = !!db.prepare('SELECT 1 FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, req.params.id)
+  // ⚠️ T040 memberOnly：同设备两 member（17/24）共享 device_id，OR 会误判另一账号的收藏，
+  //   取消收藏的 DELETE 更会误删另一账号的记录（数据破坏）。一律按 member 单条件。
+  const favMatch = userIdentityMatch('device_id', 'member_user_id', req.user, true)
+  const already = !!db.prepare(`SELECT 1 FROM favorites WHERE ${favMatch.clause} AND feed_id=?`).get(...favMatch.args, req.params.id)
   if (favorited && !already) {
     db.prepare('INSERT OR IGNORE INTO favorites (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, req.params.id, now())
     // 给动态作者发「收藏了你的动态」通知（非自己收藏自己）
@@ -1324,7 +1331,7 @@ app.post('/feed/:id/favorite', requireAuth, (req, res) => {
       (author && author.device_id && author.device_id === deviceId) ||
       (author && author.member_user_id && String(author.member_user_id) === String(memberUserId))
     if (author && !isSelf && (author.device_id || author.member_user_id)) {
-      const actor = db.prepare('SELECT nickname, avatar FROM feeds WHERE (device_id=? OR member_user_id=?) ORDER BY id DESC LIMIT 1').get(deviceId, memberUserId)
+      const actor = db.prepare(`SELECT nickname, avatar FROM feeds WHERE ${favMatch.clause} ORDER BY id DESC LIMIT 1`).get(...favMatch.args)
       emitNotification({
         deviceId: author.device_id,
         memberUserId: author.member_user_id,
@@ -1338,9 +1345,9 @@ app.post('/feed/:id/favorite', requireAuth, (req, res) => {
       })
     }
   } else if (!favorited && already) {
-    db.prepare('DELETE FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').run(deviceId, memberUserId, req.params.id)
+    db.prepare(`DELETE FROM favorites WHERE ${favMatch.clause} AND feed_id=?`).run(...favMatch.args, req.params.id)
   }
-  const isFav = db.prepare('SELECT 1 FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, req.params.id)
+  const isFav = db.prepare(`SELECT 1 FROM favorites WHERE ${favMatch.clause} AND feed_id=?`).get(...favMatch.args, req.params.id)
   const favorites = db.prepare('SELECT COUNT(*) c FROM favorites WHERE feed_id=?').get(req.params.id).c
   res.json(ok({ favorited: !!isFav, favorites }))
 })
@@ -1352,8 +1359,10 @@ app.post('/footprints', requireAuth, (req, res) => {
   if (!row) return res.json(err(404, '动态不存在'))
   const deviceId = (req.user && req.user.deviceId) || ''
   const memberUserId = (req.user && req.user.memberUserId) || ''
-  if (!deviceId && !memberUserId) return res.status(401).json(err(401, '未授权：无法识别用户身份'))
-  db.prepare('DELETE FROM footprints WHERE (device_id=? OR member_user_id=?) AND feed_id=?').run(deviceId, memberUserId, feedId)
+  if (!deviceId && !memberUserId) return res.status(401).json(err(401, '未识别用户身份'))
+  // ⚠️ T040 memberOnly：同设备两 member 共享 device_id，OR 会误删另一账号的足迹
+  const fpMatch = userIdentityMatch('device_id', 'member_user_id', req.user, true)
+  db.prepare(`DELETE FROM footprints WHERE ${fpMatch.clause} AND feed_id=?`).run(...fpMatch.args, feedId)
   db.prepare('INSERT INTO footprints (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, feedId, now())
   res.json(ok({ ok: true }))
 })
