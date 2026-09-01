@@ -1076,6 +1076,19 @@ app.put('/users/profile', requireAuth, (req, res) => {
   upsertProfile({ deviceId: d, memberUserId: m, nickname: patch.nickname !== undefined ? patch.nickname : undefined, avatar: patch.avatar !== undefined ? patch.avatar : undefined, carModel: patch.carModel !== undefined ? patch.carModel : undefined })
   // 本人场景只认 memberUserId，不靠 device_id 回退（T040 根治 member 维度串号）
   const p = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '', allowDeviceFallback: false })
+  // 本人改资料后，回刷历史动态/评论的作者头像昵称快照（按双身份单条件，绝不 OR 跨账号），
+  // 让「个人主页动态列表头像」跟随最新资料（否则 rowToFeed 回退 feeds.avatar 快照仍显示旧头像）。
+  const newNick = p.nickname || ''
+  const newAvatar = p.avatar || ''
+  if (newNick || newAvatar) {
+    if (m) {
+      db.prepare('UPDATE feeds SET avatar=?, nickname=? WHERE member_user_id=? AND length(member_user_id)>0').run(newAvatar, newNick, m)
+      db.prepare('UPDATE comments SET avatar=?, nickname=? WHERE member_user_id=? AND length(member_user_id)>0').run(newAvatar, newNick, m)
+    } else if (d) {
+      db.prepare('UPDATE feeds SET avatar=?, nickname=? WHERE device_id=? AND length(device_id)>0').run(newAvatar, newNick, d)
+      db.prepare('UPDATE comments SET avatar=?, nickname=? WHERE device_id=? AND length(device_id)>0').run(newAvatar, newNick, d)
+    }
+  }
   res.json(ok({ nickname: p.nickname, avatar: p.avatar, carModel: p.carModel }))
 })
 

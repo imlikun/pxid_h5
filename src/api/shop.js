@@ -11,7 +11,11 @@ export async function initRegion() {
 export const API_BASE =
   (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
-let _cache = { region: null, list: [], store: '', currency: 'USD' }
+// ⚠️ 必须用 reactive：FeaturedView 里 `const all = computed(() => getProducts())` 依赖本模块的导出数据。
+// 旧实现是 `let _cache = {...}` 重新赋值整个对象，Vue 无法追踪非响应式的闭包变量读取，
+// 导致 computed 只在 setup 时求值一次（拿到初始空数组），fetchProducts 异步回填后视图永不刷新 → 精选商城整片空白。
+import { reactive } from 'vue'
+const _cache = reactive({ region: null, list: [], store: '', currency: 'USD' })
 let _loading = null
 let _lastError = ''
 
@@ -30,13 +34,12 @@ export async function fetchProducts(region = getRegion()) {
       const json = await r.json()
       const payload = json.data || json
       const list = Array.isArray(payload.list) ? payload.list : []
-      _cache = {
-        region,
-        list,
-        store:
-          payload.store || (json.data && json.data.store) || _cache.store || '',
-        currency: payload.currency || _cache.currency,
-      }
+      // 原地修改 reactive 字段（不要整体重赋值 _cache，否则 computed 不会刷新）
+      _cache.region = region
+      _cache.list = list
+      _cache.store =
+        payload.store || (json.data && json.data.store) || _cache.store || ''
+      _cache.currency = payload.currency || _cache.currency
       _lastError = ''
       console.log('[shop] got', list.length, 'products, store=', _cache.store)
     } catch (e) {

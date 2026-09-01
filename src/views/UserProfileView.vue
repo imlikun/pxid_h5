@@ -201,9 +201,23 @@ async function mergeNativeProfile(u) {
     }
     const p = await bridge.getUserInfo()
     if (!p) return
-    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim())) u.nickname = String(p.nickname)
-    if (p.avatar) u.avatar = String(p.avatar)
-    if (p.carModel) u.carModel = String(p.carModel)
+    // 用 Flutter 主端最新资料覆盖（仅当值真的不同才记 patch，避免无意义写）
+    const patch = {}
+    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim()) && p.nickname !== u.nickname) {
+      u.nickname = String(p.nickname); patch.nickname = u.nickname
+    }
+    if (p.avatar && p.avatar !== u.avatar) {
+      u.avatar = String(p.avatar); patch.avatar = u.avatar
+    }
+    if (p.carModel && p.carModel !== u.carModel) {
+      u.carModel = String(p.carModel); patch.carModel = u.carModel
+    }
+    // 把 Flutter 最新资料持久化回 H5 user_profiles：否则「App 改头像」后，
+    // 个人主页动态列表（rowToFeed 读 user_profiles）仍显示旧头像。
+    if (Object.keys(patch).length) {
+      try { await updateMyProfile(patch) }
+      catch (e) { console.warn('[mergeNativeProfile] persist failed:', e.message || e) }
+    }
   } catch (e) { /* 原生桥未实现：保持后端数据 */ }
 }
 
