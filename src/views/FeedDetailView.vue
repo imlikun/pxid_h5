@@ -217,8 +217,6 @@
     <div v-if="toast" class="toast">{{ toast }}</div>
   </transition>
 
-  <!-- 分享面板：统一走本地 Sheet，不再直接调未实现的原生 share/feed 路由 -->
-  <ShareSheet v-if="item" v-model="showShare" :title="item.title || item.value?.title" @share="onShareChannel" />
 </template>
 
 <script setup>
@@ -231,7 +229,6 @@ import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, 
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
-import ShareSheet from '../components/ShareSheet.vue'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 
 const route = useRoute()
@@ -257,7 +254,6 @@ const comments = ref([])
 const commentText = ref('')
 const toast = ref('')
 let toastTimer = null
-const showShare = ref(false)
 const commentsBox = ref(null)
 const commentInput = ref(null)
 // 评论输入栏：聚焦时变固定底部栏，贴紧键盘顶边
@@ -666,10 +662,10 @@ async function onFollow() {
     showToast(t('feed.toast.followFail'))
   }
 }
+// 海外用户无微信：点击分享直接复制链接，不再弹分享面板
 async function onShare() {
-  // 唤起本地分享面板（复制链接 / 更多 / 微信 / 朋友圈）；不再直接依赖原生未实现的 share/feed 路由，
-  // 避免 Flutter 弹出「分享面板即将上线」的占位提示。面板内各渠道仍尽力桥接到原生能力。
-  showShare.value = true
+  const url = location.origin + location.pathname + '#/feed/' + id.value
+  await copyShareLink(url)
 }
 
 async function copyShareLink(url) {
@@ -679,43 +675,6 @@ async function copyShareLink(url) {
   } catch (e) {
     showToast(t('feed.toast.shareLink') + url)
   }
-}
-
-async function onShareChannel({ channel }) {
-  const url = location.origin + location.pathname + '#/feed/' + id.value
-  const title = (item.value && item.value.title) || t('feed.shareTitle')
-  const text = (item.value && item.value.content ? item.value.content : '').slice(0, 60)
-
-  // 复制链接：永远可用
-  if (channel === 'link') {
-    await copyShareLink(url)
-    return
-  }
-
-  // 更多：优先系统级 Web Share；不支持则降级复制链接
-  if (channel === 'more') {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, text, url })
-        return
-      } catch (e) {
-        if (e && e.name === 'AbortError') return // 用户取消
-      }
-    }
-    await copyShareLink(url)
-    return
-  }
-
-  // 微信 / 朋友圈：H5/WebView 无法直接调起微信，统一复制链接并提示用户手动打开微信分享。
-  // 不再调用 bridge.openNative('share/feed...')，因为 Flutter 未实现该路由会弹「分享面板即将上线」。
-  if (channel === 'wechat' || channel === 'moments') {
-    await copyShareLink(url)
-    showToast(t('feed.toast.wechatCopied'))
-    return
-  }
-
-  // 未知渠道兜底
-  await copyShareLink(url)
 }
 function onActivitySignup() {
   bridge.requestPurchase({ type: 'activity', id: id.value })

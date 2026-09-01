@@ -60,8 +60,6 @@
   <transition name="fade">
     <div v-if="toast" class="m-toast">{{ toast }}</div>
   </transition>
-
-  <ShareSheet v-model="showShare" :title="item.title" @share="onShareChannel" />
 </template>
 
 <script setup>
@@ -74,7 +72,6 @@ import { formatTime } from '../utils/time'
 import { mediaUrl } from '../storage'
 import { requireLogin } from '../utils/auth'
 import { likeFeed, toggleFavorite } from '../api/feed'
-import ShareSheet from './ShareSheet.vue'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -85,7 +82,6 @@ const liked = ref(!!props.item.isLiked)
 const likeCount = ref(props.item.likes || 0)
 const favorited = ref(!!props.item.isFavorited)
 const toast = ref('')
-const showShare = ref(false)
 let toastTimer = null
 function showToast(m) {
   toast.value = m
@@ -160,10 +156,10 @@ async function onFavorite() {
     showToast(favorited.value ? '已收藏' : '已取消收藏')
   }
 }
+// 海外用户无微信：点击分享直接复制链接，不再弹分享面板
 async function onShare() {
-  // 唤起本地分享面板（微信/朋友圈/复制链接/更多）；不再直接依赖原生未实现的 share/feed 路由，
-  // 原生环境下面板里的「微信/朋友圈」仍走 openNative 兜底，保证功能可用。
-  showShare.value = true
+  const url = location.origin + location.pathname + '#/feed/' + props.item.id
+  await copyShareLink(url)
 }
 
 async function copyShareLink(url) {
@@ -173,37 +169,6 @@ async function copyShareLink(url) {
   } catch (e) {
     showToast(t('feed.toast.shareLink') + url)
   }
-}
-
-async function onShareChannel({ channel }) {
-  const url = location.origin + location.pathname + '#/feed/' + props.item.id
-  const title = props.item.title || 'PXID'
-  const text = (props.item.content || '').slice(0, 60)
-
-  if (channel === 'link') {
-    await copyShareLink(url)
-    return
-  }
-
-  if (channel === 'more') {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, text, url })
-        return
-      } catch (e) { /* 用户取消不降级 */ }
-    }
-    await copyShareLink(url)
-    return
-  }
-
-  // 微信 / 朋友圈：H5/WebView 无法直接调起微信；不再调未实现的 share/feed 原生路由。
-  if (channel === 'wechat' || channel === 'moments') {
-    await copyShareLink(url)
-    showToast(t('feed.toast.wechatCopied'))
-    return
-  }
-
-  await copyShareLink(url)
 }
 async function onFollow() {
   const ok = await requireLogin()
