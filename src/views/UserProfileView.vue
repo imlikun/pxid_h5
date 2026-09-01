@@ -226,10 +226,13 @@ async function loadContent(reset = true) {
       feedLoading.value = false
     }
   } else {
+    // 关注/粉丝列表：自己只看 memberUserId，避免同设备另一账号的行串进本账号列表（device_id OR 命中 bug）。
+    // 他人 profile 仍传双身份，向后兼容历史数据。
     const d = targetDevice.value
-    // 关注/粉丝列表统一走后端 H5 follows 表；双身份 (device + member) 与四宫格计数口径一致
     const m = (user.value && user.value.memberUserId) || ''
-    const list = grid === 'follow' ? await fetchFollowList(d, m) : await fetchFollowers(d, m)
+    const list = grid === 'follow'
+      ? await fetchFollowList(isSelf.value ? '' : d, isSelf.value ? m : '')
+      : await fetchFollowers(isSelf.value ? '' : d, isSelf.value ? m : '')
     userList.value = list || []
     feedLoading.value = false
   }
