@@ -467,10 +467,18 @@ function upsertProfileAlias({ deviceId = '', memberUserId = '', nickname = '', a
 }
 
 // ---- 用户资料解析：发帖/评论时 upsert，读取时按身份解析为最新昵称/头像 ----
-function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', avatar, carModel }) {
+function upsertProfile({ deviceId = '', memberUserId = '', nickname = '', avatar, carModel }) {
   const id = String(deviceId || '')
   const mid = String(memberUserId || '')
   if (!id && !mid) return
+  // ⚠️ 空值/占位值绝不覆盖真实资料（2026-09-01 与北帆《账号切换后H5头像昵称不一致》整改清单对齐）：
+  //   「骑友」是历史占位昵称。此前前端未取到昵称时传空串，空串 !== undefined 照样进 UPDATE，
+  //   把用户真实昵称冲成空，再经 resolveProfile 的 || '骑友' 兜底渲染成「骑友」——昵称莫名变「骑友」的真凶。
+  const NICK_PLACEHOLDER = '骑友'
+  const rawNick = String(nickname === undefined || nickname === null ? '' : nickname).trim()
+  const rawAvatar = String(avatar === undefined || avatar === null ? '' : avatar).trim()
+  const hasNick = rawNick !== '' && rawNick !== NICK_PLACEHOLDER
+  const hasAvatar = rawAvatar !== ''
   // 任一身份键命中即视为同一人（兼容 device_id 与 member_user_id 任一变化/缺失），避免重复 INSERT 触发 UNIQUE 约束 500
   const existing = db.prepare(
     `SELECT * FROM user_profiles WHERE (length(device_id)>0 AND device_id=?) OR (length(member_user_id)>0 AND member_user_id=?)`,
@@ -479,16 +487,17 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', 
     // 昵称/头像变更前，先把旧资料快照存为 alias，保证历史评论能按旧昵称+头像找到当前身份
     const oldNick = String(existing.nickname || '')
     const oldAvatar = String(existing.avatar || '')
-    const newNick = nickname !== undefined ? String(nickname).slice(0, 20) : oldNick
-    const newAvatar = avatar !== undefined ? String(avatar || '').slice(0, 500) : oldAvatar
+    const newNick = hasNick ? rawNick.slice(0, 20) : oldNick
+    const newAvatar = hasAvatar ? rawAvatar.slice(0, 500) : oldAvatar
     if ((newNick && newNick !== oldNick) || (newAvatar && newAvatar !== oldAvatar)) {
       upsertProfileAlias({ deviceId, memberUserId, nickname: oldNick, avatar: oldAvatar })
     }
     const sets = []
     const args = []
-    if (nickname !== undefined) { sets.push('nickname=?'); args.push(newNick) }
-    if (avatar !== undefined) { sets.push('avatar=?'); args.push(newAvatar) }
+    if (hasNick) { sets.push('nickname=?'); args.push(newNick) }
+    if (hasAvatar) { sets.push('avatar=?'); args.push(newAvatar) }
     if (carModel !== undefined) { sets.push('car_model=?'); args.push(String(carModel || '').slice(0, 30)) }
+    if (!sets.length) return   // 全空 patch：直接返回，避免只刷 updated_at 造成无意义写入
     sets.push('updated_at=?')
     args.push(now())
     args.push(id)
@@ -497,29 +506,34 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '骑友', 
   } else {
     // 首次写：未提供的字段回退到 feeds 真实身份，避免「只改昵称」把头像/车型清空
     const fe = resolveFeedsIdentity(id, mid) || {}
-    const insNick = (nickname && nickname !== '骑友') ? String(nickname).slice(0, 20) : (String(fe.nickname || '').slice(0, 20) || '骑友')
-    const insAvatar = (avatar !== undefined && avatar !== null) ? String(avatar || '').slice(0, 500) : (String(fe.avatar || '').slice(0, 500))
+    const insNick = hasNick ? rawNick.slice(0, 20) : (String(fe.nickname || '').slice(0, 20) || '')
+    const insAvatar = hasAvatar ? rawAvatar.slice(0, 500) : (String(fe.avatar || '').slice(0, 500))
     const insCar = (carModel !== undefined && carModel !== null) ? String(carModel || '').slice(0, 30) : (String(fe.car_model || '').slice(0, 30))
     try {
       db.prepare('INSERT INTO user_profiles (device_id, member_user_id, nickname, avatar, car_model, updated_at) VALUES (?,?,?,?,?,?)')
         .run(id, mid, insNick, insAvatar, insCar, now())
     } catch (e) {
       if (String(e.message || '').includes('UNIQUE')) {
-        // 极端并发冲突：重建为更新，避免 500
-        const newNick = String(nickname || '骑友').slice(0, 20)
-        const newAvatar = String(avatar || '').slice(0, 500)
-        const newCar = String(carModel || '').slice(0, 30)
+        // 极端并发冲突：重建为更新，避免 500（同样只对非空字段覆盖）
+        const sets = []
+        const args = []
+        if (hasNick) { sets.push('nickname=?'); args.push(rawNick.slice(0, 20)) }
+        if (hasAvatar) { sets.push('avatar=?'); args.push(rawAvatar.slice(0, 500)) }
+        if (carModel !== undefined) { sets.push('car_model=?'); args.push(String(carModel || '').slice(0, 30)) }
+        if (!sets.length) return
+        sets.push('updated_at=?')
+        args.push(now())
         if (mid) {
-          db.prepare(`UPDATE user_profiles SET nickname=?, avatar=?, car_model=?, updated_at=? WHERE member_user_id=? AND length(member_user_id)>0`).run(newNick, newAvatar, newCar, now(), mid)
+          db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE member_user_id=? AND length(member_user_id)>0`).run(...args, mid)
         } else if (id) {
-          db.prepare(`UPDATE user_profiles SET nickname=?, avatar=?, car_model=?, updated_at=? WHERE device_id=? AND length(device_id)>0`).run(newNick, newAvatar, newCar, now(), id)
+          db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE device_id=? AND length(device_id)>0`).run(...args, id)
         }
       } else {
         throw e
       }
     }
   }
-  upsertProfileAlias({ deviceId, memberUserId, nickname, avatar })
+  if (hasNick || hasAvatar) upsertProfileAlias({ deviceId, memberUserId, nickname: hasNick ? rawNick : '', avatar: hasAvatar ? rawAvatar : '' })
 }
 
 // 从动态表回退取作者最新身份（昵称/头像/车型），用于「首次写 profile 缺字段」时补全，避免清空真实头像。
@@ -530,15 +544,17 @@ function resolveFeedsIdentity(deviceId = '', memberUserId = '') {
   return db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(id, mid) || null
 }
 
-function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '骑友', storedAvatar = '' }) {
+// ⚠️ 2026-09-01：不再兜底返回占位「骑友」。查不到就返回空串，让上层走空态或原生资料补齐，
+//    避免「接口异常/资料缺失」被伪装成一个看起来正常的用户名（北帆整改清单 问题D）。
+function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '', storedAvatar = '' }) {
   const id = String(deviceId || '')
   const mid = String(memberUserId || '')
   let p = null
   if (mid) p = db.prepare("SELECT * FROM user_profiles WHERE member_user_id=? AND length(member_user_id)>0").get(mid)
   if (!p && id) p = db.prepare("SELECT * FROM user_profiles WHERE device_id=? AND length(device_id)>0").get(id)
-  if (!p) return { nickname: storedNickname || '骑友', avatar: storedAvatar || '', carModel: '' }
+  if (!p) return { nickname: storedNickname || '', avatar: storedAvatar || '', carModel: '' }
   return {
-    nickname: p.nickname || storedNickname || '骑友',
+    nickname: p.nickname || storedNickname || '',
     avatar: p.avatar || storedAvatar || '',
     carModel: p.car_model || '',
   }
@@ -914,7 +930,7 @@ app.get('/feed/users', (req, res) => {
   for (const r of rows) {
     if (!r.device_id || seen.has(r.device_id)) continue
     seen.add(r.device_id)
-    list.push({ deviceId: r.device_id, nickname: String(r.nickname || '骑友'), avatar: r.avatar || '' })
+    list.push({ deviceId: r.device_id, nickname: String(r.nickname || ''), avatar: r.avatar || '' })
     if (list.length >= 30) break
   }
   res.json(ok({ list }))
@@ -931,10 +947,11 @@ app.get('/users/me', requireAuth, (req, res) => {
   const profile = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '' })
   // 兜底：无 profile 时取该用户最新一条 feed 的昵称/头像/车型；
   // 必须排除 device_id='' 的脏记录，否则空设备 token 会串到「PXID 官方」等默认内容。
+  // 额外排除 nickname='骑友' 的历史脏记录：占位昵称不该被当成真实资料回显（2026-09-01）
   const feed = (!profile.nickname || profile.nickname === '骑友') && (d || m)
     ? db.prepare(d
-        ? "SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(device_id)>0 AND length(nickname)>0 ORDER BY id DESC LIMIT 1"
-        : "SELECT nickname, avatar, car_model FROM feeds WHERE member_user_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1"
+        ? "SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(device_id)>0 AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1"
+        : "SELECT nickname, avatar, car_model FROM feeds WHERE member_user_id=? AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1"
       ).get(...(d ? [d, m] : [m]))
     : null
   const im = userIdentityMatch('f.device_id', 'f.member_user_id', u)
@@ -949,11 +966,11 @@ app.get('/users/me', requireAuth, (req, res) => {
     const im = userIdentityMatch('followee_device', 'followee_member_user_id', u)
     return db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${im.clause}`).get(...im.args).c
   })()
-  console.log(`[user-me] d=${d} m=${m} nick=${profile.nickname || (feed && feed.nickname) || '骑友'} car=${profile.carModel || (feed && feed.car_model) || ''} stats=${feedCount}/${favoriteCount}/${followeeCount}/${followerCount}`)
+  console.log(`[user-me] d=${d} m=${m} nick=${profile.nickname || (feed && feed.nickname) || ''} car=${profile.carModel || (feed && feed.car_model) || ''} stats=${feedCount}/${favoriteCount}/${followeeCount}/${followerCount}`)
   res.json(ok({
     deviceId: d,
     memberUserId: m,
-    nickname: profile.nickname || (feed && feed.nickname) || '骑友',
+    nickname: profile.nickname || (feed && feed.nickname) || '',
     avatar: profile.avatar || (feed && feed.avatar) || '',
     carModel: profile.carModel || (feed && feed.car_model) || '',
     followeeCount,
@@ -1008,8 +1025,8 @@ app.get('/users/:deviceId', (req, res) => {
   // 解析资料：双身份命中 user_profiles；昵称若为默认"骑友"视为无效，回退 feeds 真实昵称（修复昵称兜底写反）
   const profile = resolveProfile({ deviceId: raw, memberUserId: raw, storedNickname: '', storedAvatar: '' })
   const useFeedName = !profile.nickname || profile.nickname === '骑友'
-  const feed = db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
-  const nickname = useFeedName ? (feed && feed.nickname ? feed.nickname : (profile.nickname || '骑友')) : profile.nickname
+  const feed = db.prepare("SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1").get(raw, raw)
+  const nickname = useFeedName ? (feed && feed.nickname ? feed.nickname : (profile.nickname || '')) : profile.nickname
   const avatar = profile.avatar || (feed && feed.avatar) || ''
   const carModel = profile.carModel || (feed && feed.car_model) || ''
   // 关注/粉丝数：H5 follows 表按 设备/会员 双身份
@@ -1049,10 +1066,20 @@ app.get('/users/:deviceId', (req, res) => {
 
 // ---- 发帖（用户侧，kind=user）----
 app.post('/feed', requireAuth, (req, res) => {
-  const { content, images = [], carModel = '', tags = [], nickname = '骑友', avatar = '', region = 'US', lat, lng, mentions = [], video = '', cover = '' } = req.body || {}
+  const { content, images = [], carModel = '', tags = [], nickname = '', avatar = '', region = 'US', lat, lng, mentions = [], video = '', cover = '' } = req.body || {}
   // 安全：deviceId 以 token 内可信值为准（P0-1/P1-4），未配 USER_TOKEN_SECRET 时降级用 body 传值
   const deviceId = (USER_TOKEN_SECRET && req.user && req.user.deviceId) || String(req.body.deviceId || '')
   const memberUserId = (req.user && req.user.memberUserId) || ''
+  // 昵称/头像以 token 身份解析为唯一真相源（2026-09-01，北帆整改清单 问题D）：
+  //   body 未传或传空时按 device/member 查 user_profiles；查不到就落空串，
+  //   ⚠️ 绝不写占位「骑友」——它会被 /users/me 的兜底查询选中，成为跨账号可见的脏数据源。
+  let finalNickname = String(nickname || '').trim()
+  let finalAvatar = String(avatar || '').trim()
+  if (!finalNickname || !finalAvatar) {
+    const rp = resolveProfile({ deviceId, memberUserId, storedNickname: '', storedAvatar: '' })
+    if (!finalNickname) finalNickname = String(rp.nickname || '').slice(0, 20)
+    if (!finalAvatar) finalAvatar = String(rp.avatar || '').slice(0, 500)
+  }
   const text = String(content || '').trim()
   if (!text) return res.json(err(1, '内容不能为空'))
   if (text.length > 1000) return res.json(err(1, '内容不能超过 1000 字'))
@@ -1069,10 +1096,10 @@ app.post('/feed', requireAuth, (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'published', '')`
     )
     .run(
-      String(nickname).slice(0, 20),
+      String(finalNickname).slice(0, 20),
       String(deviceId || ''),
       String(memberUserId || ''),
-      String(avatar || ''),
+      String(finalAvatar || ''),
       text,
       JSON.stringify((images || []).slice(0, 9)),
       JSON.stringify((tags || []).slice(0, 5)),
@@ -1087,7 +1114,8 @@ app.post('/feed', requireAuth, (req, res) => {
     )
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(info.lastInsertRowid)
   // 同步/更新用户资料 truth source（昵称/头像/车型以最新一次发帖为准）
-  upsertProfile({ deviceId, memberUserId, nickname, avatar, carModel })
+  // 用 finalNickname/finalAvatar（已按 token 身份补全），空值不会覆盖真实资料
+  upsertProfile({ deviceId, memberUserId, nickname: finalNickname, avatar: finalAvatar, carModel })
   // 内容安全②：阿里云异步复核（配置 AK 后生效；命中高危自动下架）
   moderation.reviewFeed(row, db)
   // 视频异步转码（增强，可选）：有 ffmpeg 才转，失败静默，不影响发布
@@ -1105,8 +1133,8 @@ app.post('/feed', requireAuth, (req, res) => {
         memberUserId: (midRow && midRow.member_user_id) || '',
         type: 'mention',
         actorDevice: deviceId,
-        actorName: nickname,
-        actorAvatar: avatar,
+        actorName: finalNickname,
+        actorAvatar: finalAvatar,
         targetType: 'feed',
         targetId: String(row.id),
         content: `${nickname} 在动态中提到了你`,
@@ -1254,11 +1282,20 @@ app.get('/footprints', requireAuth, (req, res) => {
 app.post('/feed/:id/comment', requireAuth, (req, res) => {
   const row = db.prepare('SELECT * FROM feeds WHERE id=?').get(req.params.id)
   if (!row) return res.json(err(404, '动态不存在'))
-  const { content, nickname = '骑友', avatar = '', parentId = 0 } = req.body || {}
+  const { content, nickname = '', avatar = '', parentId = 0 } = req.body || {}
   const text = String(content || '').trim()
   if (!text) return res.json(err(1, '评论内容不能为空'))
   const deviceId = (req.user && req.user.deviceId) || ''
   const memberUserId = (req.user && req.user.memberUserId) || ''
+  // 昵称/头像以 token 身份补全（2026-09-01）：body 未传时按身份查 user_profiles，
+  // 查不到留空串而不是「骑友」——评论落库后的昵称会成为 /users/me 兜底查询的数据源。
+  let finalNickname = String(nickname || '').trim()
+  let finalAvatar = String(avatar || '').trim()
+  if (!finalNickname || !finalAvatar) {
+    const rp = resolveProfile({ deviceId, memberUserId, storedNickname: '', storedAvatar: '' })
+    if (!finalNickname) finalNickname = String(rp.nickname || '').slice(0, 20)
+    if (!finalAvatar) finalAvatar = String(rp.avatar || '').slice(0, 500)
+  }
   // 内容安全①：本地词库同步拦截（评论同样「有违禁词发不出」）
   const mc = moderation.checkText(text + ' ' + String(nickname || ''))
   if (!mc.pass) {
@@ -1266,7 +1303,7 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
     return res.json(err(1, '评论包含违禁词「' + mc.words.slice(0, 5).join('、') + '」，请修改后发送'))
   }
   // 评论时同步更新资料 truth source（以后改昵称/头像，历史评论会跟着刷新）
-  upsertProfile({ deviceId, memberUserId, nickname, avatar })
+  upsertProfile({ deviceId, memberUserId, nickname: finalNickname, avatar: finalAvatar })
 
   // parentId：楼中楼可回复任意层级（自引用）；校验父评论存在且同属本动态，否则降级为一级评论
   let parentIdNum = Number(parentId) || 0
@@ -1276,7 +1313,7 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
   }
   const info = db
     .prepare(`INSERT INTO comments (feed_id, parent_id, device_id, member_user_id, nickname, avatar, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(row.id, parentIdNum, String(deviceId || ''), String(memberUserId || ''), String(nickname).slice(0, 20), String(avatar || ''), text.slice(0, 500), now())
+    .run(row.id, parentIdNum, String(deviceId || ''), String(memberUserId || ''), String(finalNickname).slice(0, 20), String(finalAvatar || ''), text.slice(0, 500), now())
   const c = db.prepare('SELECT * FROM comments WHERE id=?').get(info.lastInsertRowid)
   // 互动消息：楼中楼回复通知父评论作者；一级评论通知动态作者（均不通知自己，双维度自检）
   if (parentIdNum) {
@@ -1284,13 +1321,13 @@ app.post('/feed/:id/comment', requireAuth, (req, res) => {
     if (parent) {
       const isSelf = (parent.device_id && deviceId && parent.device_id === deviceId) || (parent.member_user_id && memberUserId && parent.member_user_id === memberUserId)
       if (!isSelf && (parent.device_id || parent.member_user_id)) {
-        emitNotification({ deviceId: parent.device_id, memberUserId: parent.member_user_id, type: 'reply', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'comment', targetId: parentIdNum, content: '回复了你的评论：' + text.slice(0, 40) })
+        emitNotification({ deviceId: parent.device_id, memberUserId: parent.member_user_id, type: 'reply', actorDevice: deviceId, actorName: String(finalNickname || ''), actorAvatar: String(finalAvatar || ''), targetType: 'comment', targetId: parentIdNum, content: '回复了你的评论：' + text.slice(0, 40) })
       }
     }
   } else {
     const isSelf = (row.device_id && deviceId && row.device_id === deviceId) || (row.member_user_id && memberUserId && row.member_user_id === memberUserId)
     if (!isSelf && (row.device_id || row.member_user_id)) {
-      emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'comment', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '评论了你的动态：' + text.slice(0, 40) })
+      emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'comment', actorDevice: deviceId, actorName: String(finalNickname || ''), actorAvatar: String(finalAvatar || ''), targetType: 'feed', targetId: row.id, content: '评论了你的动态：' + text.slice(0, 40) })
     }
   }
   const p = resolveProfile({ deviceId: c.device_id, memberUserId: c.member_user_id, storedNickname: c.nickname, storedAvatar: c.avatar })
@@ -2578,11 +2615,11 @@ app.delete('/follow', requireAuth, (req, res) => {
 function userBrief(deviceId) {
   const profile = resolveProfile({ deviceId, memberUserId: '', storedNickname: '', storedAvatar: '' })
   const feed = !profile.nickname || profile.nickname === '骑友'
-    ? db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(deviceId)
+    ? db.prepare("SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1").get(deviceId)
     : null
   return {
     deviceId,
-    nickname: profile.nickname || (feed && feed.nickname) || '骑友',
+    nickname: profile.nickname || (feed && feed.nickname) || '',
     avatar: profile.avatar || (feed && feed.avatar) || '',
     carModel: profile.carModel || (feed && feed.car_model) || '',
   }

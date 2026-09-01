@@ -181,12 +181,26 @@ function selectGrid(key) {
 }
 
 // ---- 加载 ----
+// 自己：后端 /users/me 是唯一真相源，但当后端缺昵称/头像时（用户只在 App 原生侧改过名、
+// 或资料还没同步过来），用 Flutter 桥返回的真实资料补齐——这是北帆整改清单「问题A 资料来源不统一」的补齐方向。
+// ⚠️ 只在后端缺值时补，绝不覆盖后端已有值（方向搞反会变成「后端资料被设备级资料污染」）。
+const EMPTY_NICK = new Set(['', '骑友'])
+async function mergeNativeProfile(u) {
+  try {
+    const p = await bridge.getUserInfo()
+    if (!p) return
+    if (EMPTY_NICK.has(String(u.nickname || '').trim()) && p.nickname) u.nickname = p.nickname
+    if (!String(u.avatar || '').trim() && p.avatar) u.avatar = p.avatar
+  } catch (e) { /* 原生桥未实现：保持后端数据 */ }
+}
+
 async function loadProfile() {
   const d = targetDevice.value
   if (!d) { showToast('无法识别用户'); return }
-  // 自己：优先 /users/me（token 身份最可靠）；他人：/users/:deviceId
-  user.value = isSelf.value ? await fetchMyProfile(d) : await fetchUserProfile(d)
+  // 自己：只走 /users/me（token 身份最可靠，且不回退 deviceId 避免跨账号串号）；他人：/users/:deviceId
+  user.value = isSelf.value ? await fetchMyProfile() : await fetchUserProfile(d)
   if (!user.value) { showToast('用户信息加载失败'); return }
+  if (isSelf.value) await mergeNativeProfile(user.value)
   // 关注/粉丝/收藏统一走后端 H5 关系表，避免 Flutter 桥返回空导致计数清零
 }
 

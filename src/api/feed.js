@@ -11,7 +11,7 @@
 // 后端就绪后：在下方 FEED_API 填真实 Base URL 即自动切换（保留 mock 兜底）。
 // ============================================================
 
-import { publishState, addMoment } from '../store/publish'
+import { publishState, addMoment, ensurePublishScope } from '../store/publish'
 import { moments, feedItems, defaultAvatar } from '../data/mock'
 import { getDeviceId } from '../utils/device'
 import bridge from '../bridge'
@@ -66,6 +66,8 @@ export async function fetchFeeds(tab = 'dynamic', params = {}) {
     }
   }
   // 兜底：我的发布（localStorage 持久化）+ 官方 mock moments，最新在前
+  // 先按账号分区重载，避免切号后读到上一个账号的本地发布（2026-09-01）
+  await ensurePublishScope()
   const mine = publishState.list.map((m) => ({ ...m, itemType: 'moment' }))
   const official = moments.map((m) => ({ ...m }))
   return { list: [...mine, ...official], total: mine.length + official.length }
@@ -76,6 +78,7 @@ export async function publishFeed(payload) {
   if (FEED_API) {
     try {
       const data = await request('/feed', { method: 'POST', body: payload })
+      await ensurePublishScope()
       addMoment(normalize(data), '动态')
       return { ok: true, id: data.id }
     } catch (e) {
@@ -102,6 +105,7 @@ export async function publishFeed(payload) {
     followed: false,
     focusCar: cm,
   }
+  await ensurePublishScope()
   addMoment(newMoment, '动态')
   return { ok: true, id: newMoment.id }
 }
@@ -119,6 +123,7 @@ export async function fetchFeedDetail(id) {
       /* 回落 */
     }
   }
+  await ensurePublishScope()
   const all = [...publishState.list, ...moments, ...feedItems]
   return all.find((i) => String(i.id) === String(id)) || null
 }
@@ -264,15 +269,16 @@ export async function fetchUserProfile(deviceId) {
   }
 }
 
-// 自己的主页资料：优先 /users/me（用 token 身份，最可靠），失败回退 /users/:deviceId
-export async function fetchMyProfile(deviceId) {
+// 自己的主页资料：只走 /users/me（token 身份 = 当前登录账号）。
+// ⚠️ 严禁回退 /users/:deviceId（2026-09-01 与北帆整改清单对齐，问题B）：
+//    deviceId 是设备稳定 ID，**不随账号切换**。一旦 /users/me 失败就回退它，
+//    会出现「已切到乙账号、却显示甲的资料」的跨账号串号。拿不到就返回 null，让上层走错误/空态。
+export async function fetchMyProfile() {
   if (!FEED_API) return null
   try {
     return await request('/users/me')
   } catch (e) {
-    if (deviceId) {
-      try { return await request('/users/' + encodeURIComponent(deviceId)) } catch (_) {}
-    }
+    console.warn('[fetchMyProfile] /users/me failed:', e.message || e)
     return null
   }
 }

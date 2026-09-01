@@ -422,7 +422,10 @@ async function onPublish() {
         carModel: cm,
         tags: cm ? [cm] : [],
         region,
-        nickname: profile.nickname || '骑友',
+        // ⚠️ 不再兜底「骑友」（2026-09-01 北帆整改清单 问题D）：取不到就传空，
+        //    由后端按 token 身份从 user_profiles 解析真实昵称；传「骑友」会被写进 feeds 表
+        //    并在后续 /users/me 兜底查询里被当成真实昵称回显。
+        nickname: profile.nickname || '',
         avatar: profile.avatar || '',
         deviceId: await getDeviceId(),
         lat: lat.value,
