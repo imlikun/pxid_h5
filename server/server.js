@@ -479,10 +479,13 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '', avatar
   const rawAvatar = String(avatar === undefined || avatar === null ? '' : avatar).trim()
   const hasNick = rawNick !== '' && rawNick !== NICK_PLACEHOLDER
   const hasAvatar = rawAvatar !== ''
-  // 任一身份键命中即视为同一人（兼容 device_id 与 member_user_id 任一变化/缺失），避免重复 INSERT 触发 UNIQUE 约束 500
-  const existing = db.prepare(
-    `SELECT * FROM user_profiles WHERE (length(device_id)>0 AND device_id=?) OR (length(member_user_id)>0 AND member_user_id=?)`,
-  ).get(id, mid)
+  // ⚠️ T040：绝不用 OR 双条件。同设备两个 member（17/24）时 OR 会同时命中两行，
+  //   .get() 只返回第一条但 UPDATE 的 OR 条件会【同时改掉两行】→ A 改昵称 B 跟着变（跨账号双向污染）。
+  //   member 非空时只按 member 匹配（账号级唯一身份），member 为空（游客/未登录）才按 device。
+  const match = mid
+    ? { clause: 'member_user_id=? AND length(member_user_id)>0', arg: mid }
+    : { clause: 'device_id=? AND length(device_id)>0', arg: id }
+  const existing = db.prepare(`SELECT * FROM user_profiles WHERE ${match.clause}`).get(match.arg)
   if (existing) {
     // 昵称/头像变更前，先把旧资料快照存为 alias，保证历史评论能按旧昵称+头像找到当前身份
     const oldNick = String(existing.nickname || '')
@@ -500,9 +503,8 @@ function upsertProfile({ deviceId = '', memberUserId = '', nickname = '', avatar
     if (!sets.length) return   // 全空 patch：直接返回，避免只刷 updated_at 造成无意义写入
     sets.push('updated_at=?')
     args.push(now())
-    args.push(id)
-    args.push(mid)
-    db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE (length(device_id)>0 AND device_id=?) OR (length(member_user_id)>0 AND member_user_id=?)`).run(...args)
+    args.push(match.arg)
+    db.prepare(`UPDATE user_profiles SET ${sets.join(', ')} WHERE ${match.clause}`).run(...args)
   } else {
     // 首次写：未提供的字段回退到 feeds 真实身份，避免「只改昵称」把头像/车型清空
     const fe = resolveFeedsIdentity(id, mid) || {}
@@ -545,7 +547,11 @@ function resolveFeedsIdentity(deviceId = '', memberUserId = '') {
   const id = String(deviceId || '')
   const mid = String(memberUserId || '')
   if (!id && !mid) return null
-  return db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(id, mid) || null
+  // T040：member 非空时只按 member 查，避免同设备另一账号发的帖把自己的初始资料填成对方的
+  if (mid) {
+    return db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE member_user_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(mid) || null
+  }
+  return db.prepare('SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 ORDER BY id DESC LIMIT 1').get(id) || null
 }
 
 // ⚠️ 2026-09-01：不再兜底返回占位「骑友」。查不到就返回空串，让上层走空态或原生资料补齐，
@@ -568,7 +574,10 @@ function resolveProfile({ deviceId = '', memberUserId = '', storedNickname = '',
 
 // 按 token 双身份(设备/会员)构造 OR 匹配子句：避免 ToC 态 device_id 为空导致活动数据查不到。
 // 仅对非空身份生成条件；若两者皆空则匹配恒假(1=0)，不误返回他人数据。
-function userIdentityMatch(idCol, midCol, user) {
+// memberOnly=true（T040）：member 非空时【只按 member 匹配，不 OR device】。
+//   同设备绑两个 member（如 17/24）时，OR 会把另一账号的行一起命中/更新——
+//   这正是「数字对不上」「A 改昵称 B 也变」的根因。口径必须与前端列表一致（前端只传 member）。
+function userIdentityMatch(idCol, midCol, user, memberOnly = false) {
   const u = user || {}
   const d = u.deviceId || u.device_id || (u.raw && (u.raw.deviceId || u.raw.device_id)) || ''
   const m = u.memberUserId || u.member_user_id || (u.raw && (u.raw.memberUserId || u.raw.member_user_id)) || ''
@@ -576,6 +585,9 @@ function userIdentityMatch(idCol, midCol, user) {
   const args = []
   // 注意：必须 String() 化！TOC userinfo 返回的 memberUserId 是数字（如 17），
   // better-sqlite3 绑定 JS number 会变成 REAL(17.0)，与 TEXT 列 '17' 比较时转成 '17.0' 永不相等 → 查不到。
+  if (memberOnly && m) {
+    return { clause: `(${midCol} = ?)`, args: [String(m)] }
+  }
   if (d) { parts.push(`${idCol} = ?`); args.push(String(d)) }
   if (m) { parts.push(`${midCol} = ?`); args.push(String(m)) }
   return { clause: parts.length ? `(${parts.join(' OR ')})` : '(1=0)', args }
@@ -1008,22 +1020,26 @@ app.get('/users/me', requireAuth, (req, res) => {
   // 兜底：无 profile 时取该用户最新一条 feed 的昵称/头像/车型；
   // 必须排除 device_id='' 的脏记录，否则空设备 token 会串到「PXID 官方」等默认内容。
   // 额外排除 nickname='骑友' 的历史脏记录：占位昵称不该被当成真实资料回显（2026-09-01）
+  // T040：m 非空时【只按 member 查】。d 非空时若用 OR，同设备另一账号（member24）发的帖
+  //   会被 member17 的兜底查询捞到 → 新账号显示成老账号的昵称。
   const feed = (!profile.nickname || profile.nickname === '骑友') && (d || m)
-    ? db.prepare(d
-        ? "SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(device_id)>0 AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1"
-        : "SELECT nickname, avatar, car_model FROM feeds WHERE member_user_id=? AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1"
-      ).get(...(d ? [d, m] : [m]))
+    ? db.prepare(m
+        ? "SELECT nickname, avatar, car_model FROM feeds WHERE member_user_id=? AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1"
+        : "SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(device_id)>0 AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1"
+      ).get(m || d)
     : null
-  const im = userIdentityMatch('f.device_id', 'f.member_user_id', u)
+  // 四格计数 memberOnly：与前端列表口径一致（前端 /follow/list 只传 member，后端单条件查）。
+  //   此前四格用 OR 双身份算（含另一账号的行），列表用单条件算 → 数字必然对不上。
+  const im = userIdentityMatch('f.device_id', 'f.member_user_id', u, true)
   const feedCount = db.prepare(`SELECT COUNT(*) c FROM feeds f WHERE ${im.clause} AND f.status='published'`).get(...im.args).c
-  const favIm = userIdentityMatch('v.device_id', 'v.member_user_id', u)
+  const favIm = userIdentityMatch('v.device_id', 'v.member_user_id', u, true)
   const favoriteCount = db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${favIm.clause} AND f.status='published'`).get(...favIm.args).c
   const followeeCount = (() => {
-    const im = userIdentityMatch('follower_device', 'follower_member_user_id', u)
+    const im = userIdentityMatch('follower_device', 'follower_member_user_id', u, true)
     return db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${im.clause}`).get(...im.args).c
   })()
   const followerCount = (() => {
-    const im = userIdentityMatch('followee_device', 'followee_member_user_id', u)
+    const im = userIdentityMatch('followee_device', 'followee_member_user_id', u, true)
     return db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${im.clause}`).get(...im.args).c
   })()
   console.log(`[user-me] d=${d} m=${m} nick=${profile.nickname || (feed && feed.nickname) || ''} car=${profile.carModel || (feed && feed.car_model) || ''} stats=${feedCount}/${favoriteCount}/${followeeCount}/${followerCount}`)
