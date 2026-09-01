@@ -209,7 +209,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onActivated, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onActivated, onDeactivated, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import MomentCard from '../components/MomentCard.vue'
@@ -267,9 +267,33 @@ function lazyPlayHeroVideo() {
     if (p && p.catch) p.catch(() => { /* iOS 等自动播被拦：停留在 poster，用户滑动后仍可播 */ })
   }, 1200)
 }
-// 视频加载/播放失败：直接切下一张，不卡住轮播
+  // 视频加载/播放失败：直接切下一张，不卡住轮播
 function onVideoError() {
   nextBanner()
+}
+// Banner 自动轮播：只在页面「真正可见」时跑。
+// 2026-09-01 复核：App.vue 用 <keep-alive> 缓存本页，Flutter 侧又是 IndexedStack，
+// 切到别的 Tab 后本页组件依然挂载、onUnmounted 不触发，此前的 setInterval 会一直跑。
+// 每 4s 改一次 .banner__track 的 inline transform 并触发 0.45s transition = 每 4 秒一次
+// 合成层动画；停留 30 分钟就是 450 次，且隐藏期间同样在跑（纯浪费 + 持续制造合成层）。
+// 改为随 activated/deactivated/visibilitychange 起停。
+function startBannerLoop() {
+  stopBannerLoop()
+  if (document.hidden) return
+  if (bannerSlides.value.length < 2) return
+  bannerTimer = setInterval(() => {
+    if (bannerSlides.value.length > 1 && !document.hidden) nextBanner()
+  }, 4000)
+}
+function stopBannerLoop() {
+  if (bannerTimer) {
+    clearInterval(bannerTimer)
+    bannerTimer = null
+  }
+}
+function onDocVisibility() {
+  if (document.hidden) stopBannerLoop()
+  else startBannerLoop()
 }
 function onBannerTouchStart(e) {
   bannerTouchX = e.changedTouches[0].clientX
@@ -543,16 +567,20 @@ onMounted(async () => {
   // 4 宫格标签溢出检测（渲染完成后量一次；语言切换后文案长度变化需重测）
   measureQuick()
   // Banner 轮播自动播放：统一 4s/张，视频 slide 也定时切走（不再等 @ended，避免视频 loop 卡在第一张）
-  bannerTimer = setInterval(() => {
-    if (bannerSlides.value.length > 1) nextBanner()
-  }, 4000)
+  startBannerLoop()
+  document.addEventListener('visibilitychange', onDocVisibility)
   // 视频懒加载：首屏图片先渲染，视频延迟播放
   lazyPlayHeroVideo()
   // 触底分页：滚动加载更多（推荐/动态）
   window.addEventListener('scroll', onScroll, { passive: true })
 })
+onDeactivated(() => {
+  // 切到别的 Tab（Flutter IndexedStack 隐藏本 WebView）时停掉，避免隐藏期间持续制造合成层
+  stopBannerLoop()
+})
 onUnmounted(() => {
-  if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null }
+  stopBannerLoop()
+  document.removeEventListener('visibilitychange', onDocVisibility)
   window.removeEventListener('scroll', onScroll)
   if (videoPlayTimer) { clearTimeout(videoPlayTimer); videoPlayTimer = null }
 })
@@ -560,6 +588,7 @@ onUnmounted(() => {
 // App.vue 用 <keep-alive> 缓存全部页面：从互动消息页返回时 onMounted 不会重跑，
 // keep-alive 返回时刷新当前 tab 列表（防陈旧数据：补头像/新帖等），30s 内不重复拉
 onActivated(async () => {
+  startBannerLoop() // 回到本 Tab 恢复轮播
   const now = Date.now()
   if (now - lastListLoadTs > 30000) {
     lastListLoadTs = now

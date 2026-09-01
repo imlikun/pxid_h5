@@ -181,16 +181,21 @@ function selectGrid(key) {
 }
 
 // ---- 加载 ----
-// 自己：后端 /users/me 是唯一真相源，但当后端缺昵称/头像时（用户只在 App 原生侧改过名、
-// 或资料还没同步过来），用 Flutter 桥返回的真实资料补齐——这是北帆整改清单「问题A 资料来源不统一」的补齐方向。
-// ⚠️ 只在后端缺值时补，绝不覆盖后端已有值（方向搞反会变成「后端资料被设备级资料污染」）。
+// 自己：Flutter/ToC 是主端，H5 是嵌入从端，**H5 资料永远以 Flutter 为准**。
+// 历史教训（2026-09-01 排查「头像串号」）：
+//   原逻辑 `!avatar && p.avatar` 只在 H5 为空时补，结果 H5 端的污染值（同 device 另一账号串过来的）
+//   永远不会被 Flutter 的最新值覆盖 → 用户「改完 App 头像，H5 还显示别人头像」。
+//   现在改成：Flutter 有值就直接覆盖，根治 H5 脏数据问题。
+//   边界：用户在 H5 ProfileEditView 改的资料没回写 Flutter（架构问题，不在本次范围）；
+//        H5 改的本来就是「孤儿」数据，以 Flutter 覆盖反而正确。
 const EMPTY_NICK = new Set(['', '骑友'])
 async function mergeNativeProfile(u) {
   try {
     const p = await bridge.getUserInfo()
     if (!p) return
-    if (EMPTY_NICK.has(String(u.nickname || '').trim()) && p.nickname) u.nickname = p.nickname
-    if (!String(u.avatar || '').trim() && p.avatar) u.avatar = p.avatar
+    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim())) u.nickname = String(p.nickname)
+    if (p.avatar) u.avatar = String(p.avatar)
+    if (p.carModel) u.carModel = String(p.carModel)
   } catch (e) { /* 原生桥未实现：保持后端数据 */ }
 }
 

@@ -113,8 +113,16 @@ input {
   }
 }
 
+/* 2026-09-01 复核：填充模式必须是 backwards，不能用 both/forwards。
+   forwards/both 会让动画结束后把最后一帧的 `transform: translateY(0)` 永久留在计算样式里
+   —— 注意 translateY(0) 仍然是 transform（计算值是 matrix(1,0,0,1,0,0)，不是 none），
+   于是每一张 FeedCard / ProductCard / MomentCard 都永久成为 containing block + 独立合成层。
+   发现/精选是无限分页列表，卡片数随停留时长线性增长，层数量随之失控，最终触发
+   Android WebView 合成层上限、主线程命中测试与合成层错位（能滚动、点不动）。
+   backwards 只保留 delay 期间的起始帧（stagger 错开需要），动画结束后 transform 归 none、
+   层自动回收，视觉效果与 both 完全一致。 */
 .fade-up {
-  animation: fadeUp 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: fadeUp 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 /* stagger 错开，每档 55ms */
@@ -172,7 +180,8 @@ input {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .float-in {
-  animation: floatIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  /* 同 .fade-up：用 backwards 而非 both，避免动画结束后 transform 永久残留（详见 .fade-up 注释） */
+  animation: floatIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
   animation-delay: 0.18s;
 }
 

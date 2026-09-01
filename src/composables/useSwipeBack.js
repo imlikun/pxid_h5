@@ -48,20 +48,36 @@ export function useSwipeBack(elRef, opts = {}) {
 
   // 彻底复位根元素。
   // 必须清空字符串，不能改写成 translateX(0)——那依然是 transform，照样创建 containing block。
-  // 若此前确实残留了 transform，额外重建一次合成层修复已经发生的点击命中错位。
+  //
+  // ⚠️ 2026-09-01 二次复核修正：此前这里会通过 `documentElement.style.transform = 'translateZ(0)'`
+  // 再靠「两次 requestAnimationFrame」还原来重建合成层。这是本次久停留后全页点不动的**头号放大器**：
+  //   1) 它把毒从 .app-root 搬到了 <html>——整页变成一个 containing block + 一个全屏合成层，
+  //      影响面比原来大得多（所有 position:fixed 弹层全部改为相对 <html> 定位）；
+  //   2) 清除只依赖 requestAnimationFrame，而 WebView 进后台、或被 Flutter IndexedStack /
+  //      Offstage 隐藏时 **rAF 完全停摆**——translateZ(0) 就此长期残留，正好对应
+  //      「切 Tab 回来」「App 前后台切换」两个触发路径；
+  //   3) 更致命的是：本文件所有兜底（450ms timer / blur / pagehide / pageshow / resize /
+  //      visibilitychange / resetInteractionLayer）清的都是 elRef，**没有任何一条会去清
+  //      documentElement** —— 残留一旦发生就再也没有人能救回来。
+  // 现改为「写 → 读布局强制同步 reflow → 立即还原」：全程在同一个同步任务内完成，
+  // 不依赖 rAF，后台/Offstage 也不可能中断，因此不可能残留。
   function resetEl() {
-    if (!elRef || !elRef.value) return
-    const el = elRef.value
-    const hadTransform = !!el.style.transform
+    // 防御：清掉历史版本/其它代码可能在 <html> 上留下的 transform（老包残留自愈）
+    const doc = document.documentElement
+    if (doc.style.transform) doc.style.transform = ''
+
+    const el = elRef && elRef.value
+    if (!el) return
+    if (!el.style.transform && !el.style.willChange) return // 干净状态，不做任何写入
+
     el.style.transition = ''
     el.style.transform = ''
     el.style.willChange = ''
-    if (!hadTransform) return // 干净状态无需重建合成层，避免每次触摸都触发 rAF
-    const doc = document.documentElement
-    doc.style.transform = 'translateZ(0)'
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => { doc.style.transform = '' })
-    })
+    // 强制同步重建一次合成层，修复已经发生的点击命中错位；同一任务内立即还原，零残留
+    el.style.transform = 'translateZ(0)'
+    void el.offsetHeight // 读取布局属性 → 强制同步 reflow，立刻生效
+    el.style.transform = ''
+    void el.offsetHeight
   }
 
   // 兜底复位：清 timer + 手势状态归位 + 元素复位（清单 4.1）
