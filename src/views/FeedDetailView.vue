@@ -672,33 +672,50 @@ async function onShare() {
   showShare.value = true
 }
 
+async function copyShareLink(url) {
+  try {
+    await navigator.clipboard.writeText(url)
+    showToast(t('feed.toast.linkCopied'))
+  } catch (e) {
+    showToast(t('feed.toast.shareLink') + url)
+  }
+}
+
 async function onShareChannel({ channel }) {
   const url = location.origin + location.pathname + '#/feed/' + id.value
   const title = (item.value && item.value.title) || t('feed.shareTitle')
   const text = (item.value && item.value.content ? item.value.content : '').slice(0, 60)
+
+  // 复制链接：永远可用
   if (channel === 'link') {
-    try {
-      await navigator.clipboard.writeText(url)
-      showToast(t('feed.toast.linkCopied'))
-    } catch (e) {
-      showToast(t('feed.toast.shareLink') + url)
-    }
+    await copyShareLink(url)
     return
   }
-  if (channel === 'more' && navigator.share) {
-    try {
-      await navigator.share({ title, text, url })
-      return
-    } catch (e) {
-      if (e && e.name === 'AbortError') return // 用户取消，不降级
+
+  // 更多：优先系统级 Web Share；不支持则降级复制链接
+  if (channel === 'more') {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url })
+        return
+      } catch (e) {
+        if (e && e.name === 'AbortError') return // 用户取消
+      }
     }
+    await copyShareLink(url)
+    return
   }
-  // 微信 / 朋友圈 / 更多（无 Web Share）：尽力走原生分享面板兜底
-  try {
-    await bridge.openNative('share/feed?id=' + id.value)
-  } catch (e) {
-    showToast(t('feed.toast.shareChannelFail'))
+
+  // 微信 / 朋友圈：H5/WebView 无法直接调起微信，统一复制链接并提示用户手动打开微信分享。
+  // 不再调用 bridge.openNative('share/feed...')，因为 Flutter 未实现该路由会弹「分享面板即将上线」。
+  if (channel === 'wechat' || channel === 'moments') {
+    await copyShareLink(url)
+    showToast(t('feed.toast.wechatCopied'))
+    return
   }
+
+  // 未知渠道兜底
+  await copyShareLink(url)
 }
 function onActivitySignup() {
   bridge.requestPurchase({ type: 'activity', id: id.value })

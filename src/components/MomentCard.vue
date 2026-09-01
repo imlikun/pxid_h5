@@ -166,31 +166,44 @@ async function onShare() {
   showShare.value = true
 }
 
+async function copyShareLink(url) {
+  try {
+    await navigator.clipboard.writeText(url)
+    showToast(t('feed.toast.linkCopied'))
+  } catch (e) {
+    showToast(t('feed.toast.shareLink') + url)
+  }
+}
+
 async function onShareChannel({ channel }) {
   const url = location.origin + location.pathname + '#/feed/' + props.item.id
   const title = props.item.title || 'PXID'
   const text = (props.item.content || '').slice(0, 60)
+
   if (channel === 'link') {
-    try {
-      await navigator.clipboard.writeText(url)
-      showToast('链接已复制')
-    } catch (e) {
-      showToast('复制失败：' + url)
-    }
+    await copyShareLink(url)
     return
   }
-  if (channel === 'more' && navigator.share) {
-    try {
-      await navigator.share({ title, text, url })
-      return
-    } catch (e) { /* 用户取消不降级 */ }
+
+  if (channel === 'more') {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url })
+        return
+      } catch (e) { /* 用户取消不降级 */ }
+    }
+    await copyShareLink(url)
+    return
   }
-  // wechat / moments / more(无 Web Share)：尽力走原生分享面板
-  try {
-    await bridge.openNative('share/feed?id=' + props.item.id)
-  } catch (e) {
-    showToast('当前环境不支持该分享方式')
+
+  // 微信 / 朋友圈：H5/WebView 无法直接调起微信；不再调未实现的 share/feed 原生路由。
+  if (channel === 'wechat' || channel === 'moments') {
+    await copyShareLink(url)
+    showToast(t('feed.toast.wechatCopied'))
+    return
   }
+
+  await copyShareLink(url)
 }
 async function onFollow() {
   const ok = await requireLogin()
