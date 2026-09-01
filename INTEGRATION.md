@@ -334,6 +334,34 @@ window.PXIDApp = {
 3. H5 页内返回按钮：所有二级页顶部保留返回箭头，点击调 `history.back()`；原生应保证状态栏/刘海区域不遮挡该按钮。
 4. 切后台点击失效 bug 已修（见 🔴.5），Flutter 正常嵌 WebView 即可，无需额外处理。
 
+### 4.12 全页点击失效的根治（2026-09-01 整改 · Flutter 需配合两条）
+
+**背景**：发现/精选长时间停留、切前后台、切 Tab 后偶发「页面看着正常、能滚动、但所有点击无效，刷新才恢复」。根因是 H5 根容器 `.app-root` 的侧滑 transform 在原生手势接管后残留，Android WebView 合成层点击命中区域因此错位（详见 🔴.5）。
+
+**已修（H5 侧，2026-09-01 `6702a8a` 已上线）**：
+
+1. 复位不再依赖 `touchend`/`touchcancel` 必然到达 —— 一旦开始写 transform 就挂 450ms 兜底复位，手指移动时续期，**事件流被原生接管而断掉也能自愈**。
+2. `blur` / `pagehide` / `pageshow` / `resize` / `visibilitychange`（隐藏与恢复都算）全部无条件复位。
+3. **嵌入 Flutter（`isNative=true`）时，H5 根页侧滑不再执行 `bridge.exit()`、不再弹「再按一次退出程序」**，只走 `router.back()` 或 `popPage()`，退出 App 完全交给 Flutter MainPage，避免与 `PopScope` 并发消费同一个返回意图。
+
+**Flutter 需要配合的两条**：
+
+1. **（必做）Tab 恢复可见 / App 回前台时调用一次恢复函数** —— H5 已全局暴露：
+
+   ```js
+   window.PXIDBridgeHints.resetInteractionLayer()   // 无副作用，可重复调用
+   ```
+
+   在发现/精选 Tab 从 `IndexedStack` 隐藏恢复可见、`AppLifecycleState.resumed` 时各调一次（双保险，不替代 H5 自修复）。用 `runJavascript`/`evaluateJavascript` 执行即可，注意判空：
+
+   ```dart
+   controller.evaluateJavascript(
+     'window.PXIDBridgeHints && window.PXIDBridgeHints.resetInteractionLayer && window.PXIDBridgeHints.resetInteractionLayer()'
+   );
+   ```
+
+2. **（确认）根页退出统一由 Flutter MainPage 控制** —— H5 已不再主动退出 App，Flutter 无需再防 H5 抢返回意图；若此前为规避该问题加过特殊处理，可移除。
+
 ### 4.11 个人主页（H5 已上线四宫格，Flutter 需配合透传）
 
 1. H5 已完整实现 `UserProfileView`（`/user/:id` 他人、`/user/me` 自己），含资料卡 + **四宫格（发布/收藏/关注/粉丝）+ 发布子Tab（动态/赞过/足迹）**；他人主页无「收藏」入口、发布子Tab 无「足迹」。
