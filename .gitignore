@@ -2,6 +2,8 @@ node_modules/
 server/node_modules/
 dist.old.*/
 dist.rebuild.del.*/
+# 部署脚本原子替换用的临时构建目录（ECS deploy-pxid-h5.sh 第 3/4 步），绝不入库
+dist.tmp/
 .DS_Store
 *.log
 *.bak.*
