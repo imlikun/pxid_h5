@@ -36,24 +36,15 @@ useSwipeBack(rootRef, {
   onExit: () => bridge.exit(),
 })
 
-// 修复：WebView 切后台冻结、回前台时根容器合成层点击命中区域错位
-// （表现为「能滚动不能点击」，刷新才恢复）。回前台时强制清除手势残留
-// transform，并重建合成层（临时 translateZ(0) + 双 rAF 移除）修复命中错位
+// 切回前台时刷新界面语言：用户在系统设置里改了语言，切回 App 即生效，无需重启 App
+// 语言同时驱动界面语言与内容地区，见 docs/语言与地区规则_Flutter对接.md
+//
+// 注：这里只管语言。根容器合成层/transform 的复位已统一收敛到 useSwipeBack 的
+// resetGestureAndElement()（blur / pagehide / pageshow / resize / visibilitychange / 450ms 兜底全覆盖），
+// 两处各清一套会互相打架，故此处不再重复处理。
 function onVisibilityChange() {
   if (document.visibilityState !== 'visible') return
-  // 切回前台时刷新界面语言：用户在系统设置里改了语言，切回 App 即生效，无需重启 App
-  // 语言同时驱动界面语言与内容地区，见 docs/语言与地区规则_Flutter对接.md
   initLocale()
-  const el = rootRef.value
-  if (el) {
-    el.style.transition = ''
-    el.style.transform = ''
-  }
-  const doc = document.documentElement
-  doc.style.transform = 'translateZ(0)'
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => { doc.style.transform = '' })
-  })
 }
 onMounted(() => {
   // 首屏立即按系统语言初始化（修复：从 Flutter「我的」等全新 WebView 入口进来时，
