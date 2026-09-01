@@ -77,19 +77,21 @@ const loading = ref(!item.value)
 const rel = ref({})
 const relCover = ref('')
 
-const TYPE_LABEL = { like: '赞', comment: '评论', follow: '关注', system: '系统' }
+const TYPE_LABEL = { like: '赞', comment: '评论', follow: '关注', favorite: '收藏', reply: '评论' }
 function typeLabel(type) {
-  return TYPE_LABEL[type] || t('interaction.action.system')
+  return TYPE_LABEL[type] || type
 }
 function actionText(n) {
   if (n.type === 'like') return t('interaction.action.like')
   if (n.type === 'comment') return t('interaction.action.comment')
+  if (n.type === 'reply') return t('interaction.action.reply')
   if (n.type === 'follow') return t('interaction.action.follow')
+  if (n.type === 'favorite') return t('interaction.action.favorite')
   return t('interaction.action.system')
 }
 function avatarText(n) {
   if (n.actorName) return n.actorName.slice(0, 1).toUpperCase()
-  return { like: '♥', comment: '💬', follow: '＋', system: '!' }[n.type] || '!'
+  return { like: '♥', comment: '💬', follow: '＋', favorite: '★', reply: '↩' }[n.type] || '!'
 }
 // 时间线样式：08/27 17:12
 function formatDateTime(s) {

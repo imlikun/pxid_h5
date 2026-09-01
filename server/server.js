@@ -317,7 +317,7 @@ db.exec(`
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   device_id TEXT NOT NULL DEFAULT '',     -- 接收人（被点赞/评论/关注者）
-  type TEXT NOT NULL DEFAULT 'system',    -- like | comment | follow | system
+  type TEXT NOT NULL DEFAULT 'system',    -- like | comment | reply | follow | favorite | system
   actor_device TEXT NOT NULL DEFAULT '',  -- 触发人 deviceId（系统消息可为空）
   actor_name TEXT NOT NULL DEFAULT '',
   actor_avatar TEXT NOT NULL DEFAULT '',
@@ -391,7 +391,7 @@ addCommentCol('parent_id', "INTEGER NOT NULL DEFAULT 0")
       { type: 'like', actorDevice: 'd_lily', actorName: 'Lily', actorAvatar: 'unsplash/photo-1494790108377-be9c29b29330_w_80_q_80.jpg', targetType: 'feed', targetId: '12', content: '赞了你的动态', extra: '刚刚骑了一段超棒的路线！' },
       { type: 'comment', actorDevice: 'd_max', actorName: 'Max', actorAvatar: 'unsplash/photo-1507003211169-0a1dd7228f2d_w_80_q_80.jpg', targetType: 'feed', targetId: '12', content: '评论了你的动态', extra: '这车看着真帅，求链接~' },
       { type: 'follow', actorDevice: 'd_nora', actorName: 'Nora', actorAvatar: 'unsplash/photo-1438761681033-6461ffad8d80_w_80_q_80.jpg', targetType: 'user', targetId: '', content: '关注了你', extra: '' },
-      { type: 'system', actorDevice: '', actorName: 'PXID 官方', actorAvatar: 'unsplash/photo-1544723795-3fb6469f5b39_w_80_q_80.jpg', targetType: 'system', targetId: '', content: '欢迎加入 PXID 社区', extra: '完成签到可领取新人积分礼包' },
+      { type: 'favorite', actorDevice: 'd_max', actorName: 'Max', actorAvatar: 'unsplash/photo-1507003211169-0a1dd7228f2d_w_80_q_80.jpg', targetType: 'feed', targetId: '12', content: '收藏了你的动态', extra: '这车看着真帅，求链接~' },
     ]
     const ins = db.prepare('INSERT INTO notifications (device_id, type, actor_device, actor_name, actor_avatar, target_type, target_id, content, read, created_at) VALUES (?,?,?,?,?,?,?,?,0,?)')
     rows.forEach((r, i) => ins.run('__demo__', r.type, r.actorDevice, r.actorName, r.actorAvatar, r.targetType, r.targetId, r.content + (r.extra ? '：' + r.extra : ''), fmtAgo(i)))
@@ -1197,8 +1197,30 @@ app.post('/feed/:id/favorite', requireAuth, (req, res) => {
   if (!deviceId && !memberUserId) return res.status(401).json(err(401, '未授权：无法识别用户身份'))
   const { favorited = true } = req.body || {}
   const already = !!db.prepare('SELECT 1 FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, req.params.id)
-  if (favorited && !already) db.prepare('INSERT OR IGNORE INTO favorites (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, req.params.id, now())
-  else if (!favorited && already) db.prepare('DELETE FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').run(deviceId, memberUserId, req.params.id)
+  if (favorited && !already) {
+    db.prepare('INSERT OR IGNORE INTO favorites (device_id, member_user_id, feed_id, created_at) VALUES (?,?,?,?)').run(deviceId, memberUserId, req.params.id, now())
+    // 给动态作者发「收藏了你的动态」通知（非自己收藏自己）
+    const author = db.prepare('SELECT device_id, member_user_id FROM feeds WHERE id=?').get(req.params.id)
+    const isSelf =
+      (author && author.device_id && author.device_id === deviceId) ||
+      (author && author.member_user_id && String(author.member_user_id) === String(memberUserId))
+    if (author && !isSelf && (author.device_id || author.member_user_id)) {
+      const actor = db.prepare('SELECT nickname, avatar FROM feeds WHERE (device_id=? OR member_user_id=?) ORDER BY id DESC LIMIT 1').get(deviceId, memberUserId)
+      emitNotification({
+        deviceId: author.device_id,
+        memberUserId: author.member_user_id,
+        type: 'favorite',
+        actorDevice: deviceId,
+        actorName: String((actor && actor.nickname) || ''),
+        actorAvatar: String((actor && actor.avatar) || ''),
+        targetType: 'feed',
+        targetId: req.params.id,
+        content: '收藏了你的动态',
+      })
+    }
+  } else if (!favorited && already) {
+    db.prepare('DELETE FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').run(deviceId, memberUserId, req.params.id)
+  }
   const isFav = db.prepare('SELECT 1 FROM favorites WHERE (device_id=? OR member_user_id=?) AND feed_id=?').get(deviceId, memberUserId, req.params.id)
   const favorites = db.prepare('SELECT COUNT(*) c FROM favorites WHERE feed_id=?').get(req.params.id).c
   res.json(ok({ favorited: !!isFav, favorites }))

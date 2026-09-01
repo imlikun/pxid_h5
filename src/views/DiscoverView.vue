@@ -22,10 +22,6 @@
           <span class="act act--add float-in press" @click="onAdd">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </span>
-          <span class="act act--bell press" @click="onNotice">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-            <span v-if="interactionUnread > 0" class="bell-badge badge-pulse"></span>
-          </span>
         </div>
       </template>
     </TopBar>
@@ -233,7 +229,6 @@ import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
 import bridge from '../bridge'
 import { t, locale, initLocale, regionFromLocale } from '../i18n'
-import { fetchUnreadCount } from '../api/notifications'
 // 官方公告未读数（驱动发现页快捷区红点）：必须走响应式 store
 // 直接读 mock.notices 的 isRead 不会触发更新 —— mock 是普通数组，属性变化不会被 computed 追踪
 import { noticeUnread } from '../store/noticeStore'
@@ -388,9 +383,6 @@ const dynamicList = computed(() => {
 const currentFeedKey = computed(() =>
   activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
 )
-
-// 互动消息未读（真实后端计数，驱动铃铛红点）
-const interactionUnread = ref(0)
 
 function setTab(t) {
   activeTab.value = t
@@ -550,8 +542,6 @@ onMounted(async () => {
   }
   // 4 宫格标签溢出检测（渲染完成后量一次；语言切换后文案长度变化需重测）
   measureQuick()
-  // 拉取互动消息未读数（铃铛红点）
-  interactionUnread.value = await fetchUnreadCount()
   // Banner 轮播自动播放：统一 4s/张，视频 slide 也定时切走（不再等 @ended，避免视频 loop 卡在第一张）
   bannerTimer = setInterval(() => {
     if (bannerSlides.value.length > 1) nextBanner()
@@ -568,10 +558,8 @@ onUnmounted(() => {
 })
 
 // App.vue 用 <keep-alive> 缓存全部页面：从互动消息页返回时 onMounted 不会重跑，
-// 必须 onActivated 重新拉未读数，否则「点过已读红点不消失」
+// keep-alive 返回时刷新当前 tab 列表（防陈旧数据：补头像/新帖等），30s 内不重复拉
 onActivated(async () => {
-  interactionUnread.value = await fetchUnreadCount()
-  // keep-alive 返回时刷新当前 tab 列表（防陈旧数据：补头像/新帖等），30s 内不重复拉
   const now = Date.now()
   if (now - lastListLoadTs > 30000) {
     lastListLoadTs = now

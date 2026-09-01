@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PXID H5 前端产品框架 · 按页面功能拆解</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --panel:#ffffff; --ink:#1f2330; --muted:#6b7280;
+    --line:#d8dce8; --brand:#6c4dff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:1240px;margin:0 auto;padding:26px 20px 60px;}
+  header.top{text-align:center;margin-bottom:4px;}
+  header.top .kicker{font-size:12px;letter-spacing:3px;color:var(--brand);font-weight:700;text-transform:uppercase;}
+  header.top h1{margin:6px 0 4px;font-size:24px;font-weight:800;letter-spacing:.5px;}
+  header.top p{margin:0;color:var(--muted);font-size:13px;}
+
+  .root{display:flex;justify-content:center;margin:16px 0 24px;}
+  .root .chip{background:linear-gradient(135deg,#6c4dff,#8b6bff);color:#fff;
+    padding:11px 24px;border-radius:14px;font-size:16px;font-weight:800;
+    box-shadow:0 10px 24px rgba(108,77,255,.28);text-align:center;line-height:1.35;}
+  .root .chip small{display:block;font-weight:500;font-size:12px;opacity:.85;margin-top:2px;}
+
+  .branches{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;align-items:flex-start;}
+  .branch{flex:1 1 360px;max-width:390px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:0 0 14px;overflow:hidden;box-shadow:0 6px 18px rgba(31,35,48,.05);}
+  .branch .bhead{padding:11px 15px;font-weight:800;font-size:14.5px;color:#fff;background:var(--c);}
+  .branch .bhead small{display:block;font-weight:500;font-size:11px;opacity:.85;margin-top:1px;}
+
+  /* 竖树连线 */
+  ul.tree,ul.tree ul{list-style:none;margin:0;padding:0;}
+  ul.tree{margin:10px 8px 0 14px;}
+  ul.tree ul{margin-left:15px;}
+  ul.tree li{position:relative;padding-left:15px;margin:2px 0;}
+  ul.tree li::before,ul.tree li::after{content:"";position:absolute;left:0;}
+  ul.tree li::before{top:13px;width:12px;border-top:2px solid var(--line);}
+  ul.tree li::after{top:0;bottom:0;border-left:2px solid var(--line);}
+  ul.tree li:last-child::after{height:13px;bottom:auto;}
+  ul.tree > li:only-child::after,ul.tree > li:only-child::before{display:none;}
+  .node{display:inline-block;padding:5px 10px;border-radius:9px;background:#f1f2f8;
+    color:var(--ink);font-size:12.5px;line-height:1.45;cursor:default;border:1px solid transparent;transition:.15s;max-width:330px;}
+  .node.page{background:#fff;border-color:var(--line);font-weight:700;color:var(--c);}
+  .node.fn{background:#f7f8fc;}
+  .node.design{background:#fff7ec;border-color:#f3d8a8;color:#9a6a13;font-size:12px;}
+  .node.has-children{cursor:pointer;}
+  .node.has-children:hover{border-color:var(--brand);color:var(--brand);}
+  .node.has-children::before{content:"▾";display:inline-block;margin-right:5px;font-size:10px;transform:translateY(-1px);color:var(--muted);}
+  li.collapsed > .node.has-children::before{content:"▸";}
+  li.collapsed > ul{display:none;}
+  .legend{margin-top:24px;display:flex;flex-wrap:wrap;gap:14px;justify-content:center;font-size:12px;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  .legend i.p{background:#6c4dff;} .legend i.f{background:#f1f2f8;} .legend i.d{background:#f3d8a8;}
+  .tip{text-align:center;color:var(--muted);font-size:12px;margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="kicker">Product Framework · by Page</div>
+    <h1>PXID H5 前端产品框架</h1>
+    <p>按页面功能逐层拆解（主 Tab → 页面 → 功能点 / 设计取舍）</p>
+  </header>
+
+  <div class="root">
+    <div class="chip">PXID H5（C 端跨端 App 前端）
+      <small>Flutter 壳 + H5 内核 · 看车→买车→用车→玩车→成长</small>
+    </div>
+  </div>
+
+  <div class="branches" id="branches"></div>
+
+  <div class="legend">
+    <span><i class="p"></i>页面（路由）</span>
+    <span><i class="f"></i>功能点</span>
+    <span><i class="d"></i>设计 / 为什么 / 效果</span>
+  </div>
+  <div class="tip">点击带 ▾ 的节点可折叠 / 展开子项</div>
+</div>
+
+<script>
+const colors = ['#6c4dff','#2f80ed','#1faa8f','#e0833a','#e0533d','#7a5bd6'];
+const data = {
+  children: [
+    { text:'发现 Discover', sub:'主 Tab · /discover', children:[
+      { text:'动态流（关注 / 推荐 / 广场 三 tab）', page:true, children:[
+        { text:'动态卡片 MomentCard：点赞 / 评论 / 收藏 / 分享' },
+        { text:'分享走本地 ShareSheet（复制链接 / 系统分享 / 兜底原生），不依赖未实现路由' },
+        { text:'动态详情 /feed/:id（FeedDetailView）：评论区 + 回复 + 分享面板' },
+        { text:'活动详情 /activity/:id（复用详情页）+ 活动中心 /activity-center' },
+      ]},
+      { text:'4 宫格快捷入口（仅溢出才滚动，EN/PT 走 locale 子选择器）', page:true, children:[
+        { text:'AI 助手（长名滚动）' },
+        { text:'通知 /notices（官方公告列表）+ /notice/:id 详情' },
+        { text:'积分 /points（跳签到成长）' },
+        { text:'发布 /publish（发布动态）' },
+      ]},
+      { text:'车型筛选（12 在售车型 F1…P9，对齐 CAR_MODEL_LABELS）', page:true, children:[
+        { text:'广场按车型卡预选发动态' },
+      ]},
+      { text:'内联搜索 → 全局 /search', page:true, children:[] },
+      { text:'热门活动区（点击进入活动详情）', page:true, children:[] },
+    ]},
+    { text:'精选 Featured', sub:'主 Tab · /featured · 交易链路', children:[
+      { text:'商品列表（分类 tab）+ 内联搜索（商品名过滤）', page:true, children:[
+        { text:'商品详情 /product/:id' },
+        { text:'购物车 /cart → 结算 /checkout' },
+        { text:'支付成功 /order-success → 我的订单 /order-list' },
+      ]},
+      { text:'设计：Shopify 后端精选商城交易链路', design:true, children:[
+        { text:'为什么：承接线上购车、变现转化' },
+        { text:'效果：看车 → 买车闭环' },
+      ]},
+    ]},
+    { text:'服务 Service', sub:'主 Tab · /service · 用车保障', children:[
+      { text:'服务入口网格（ServiceView）', page:true, children:[
+        { text:'道路救援 /service/rescue' },
+        { text:'车辆体检 /service/check' },
+        { text:'我的工单 /service/workorders（+ /:id 详情）' },
+        { text:'附近门店 /service/stores' },
+        { text:'三包政策 /service/policy' },
+        { text:'使用指南 /service/guide（+ /video 视频 / /manual 资料）' },
+        { text:'意见反馈 /service/feedback' },
+        { text:'常见问题 /service/faq（+ /filter / /:id）' },
+      ]},
+      { text:'设计：用车保障闭环', design:true, children:[
+        { text:'为什么：售后留存、降低人工服务成本' },
+        { text:'效果：车主自助服务，提升满意度' },
+      ]},
+    ]},
+    { text:'消息 Message', sub:'主入口 · 触达召回', children:[
+      { text:'官方公告 /notices（+ /:id 详情）', page:true, children:[] },
+      { text:'互动消息 /interactions（全部 / 回复 / 点赞 / 关注 / 系统 分类 tab）', page:true, children:[
+        { text:'互动详情 /interaction/:id' },
+      ]},
+      { text:'设计：消息聚合触达', design:true, children:[
+        { text:'为什么：召回沉默用户、提升互动' },
+        { text:'效果：活跃与留存双提升' },
+      ]},
+    ]},
+    { text:'我的 / 成长 Profile + Points', sub:'个人中心 · 留存激励', children:[
+      { text:'个人主页 /user/:id', page:true, children:[
+        { text:'资料（头像 / 昵称 / 车型 / 统计：发布·收藏·关注·粉丝）' },
+        { text:'编辑资料 /profile/edit（H5 自管 user_profiles 唯一真相源）' },
+      ]},
+      { text:'签到成长 /points', page:true, children:[
+        { text:'签到日历（真实数据，无 __demo__ 兜底，避免假历史）' },
+        { text:'连续签到 / 积分 / 等级 / 勋章' },
+        { text:'积分玩法 /points/guide' },
+        { text:'积分商城 /points/mall（兑换）' },
+      ]},
+      { text:'购车转化', page:true, children:[
+        { text:'车型详情 /vehicle/:id' },
+        { text:'购车定制 /purchase/customize' },
+      ]},
+      { text:'设计：成长体系真实数据', design:true, children:[
+        { text:'为什么：激励留存、杜绝 demo 假象误导' },
+        { text:'效果：签到 / 积分 / 勋章驱动日活与复购' },
+      ]},
+    ]},
+    { text:'跨页通用能力', sub:'支撑所有页面', children:[
+      { text:'三语 i18n（zh 中国 / en 美国 / pt 巴西）+ regionFromLocale 语言→地区解耦', page:true, children:[] },
+      { text:'bridge 桥接：分享 / 发布 / 语言 / 登录 调 Flutter 原生', page:true, children:[] },
+      { text:'hash 路由 + 按路由懒加载 chunk（首屏瘦身）', page:true, children:[] },
+      { text:'keep-alive 缓存 + onActivated 返回刷新', page:true, children:[] },
+      { text:'全局搜索 /search（内容 / 活动 / 车型）', page:true, children:[] },
+    ]},
+  ]
+};
+
+function buildList(nodes){
+  const ul = document.createElement('ul');
+  ul.className = 'tree';
+  nodes.forEach(n=>{
+    const li = document.createElement('li');
+    const sp = document.createElement('span');
+    sp.className = 'node' + (n.page ? ' page' : n.design ? ' design' : ' fn');
+    if(n.sub) sp.textContent = n.text;
+    else sp.textContent = n.text;
+    li.appendChild(sp);
+    if(n.children && n.children.length){
+      sp.classList.add('has-children');
+      li.appendChild(buildList(n.children));
+      sp.addEventListener('click', ()=> li.classList.toggle('collapsed'));
+    }
+    ul.appendChild(li);
+  });
+  return ul;
+}
+
+const branchesEl = document.getElementById('branches');
+data.children.forEach((b,i)=>{
+  const d = document.createElement('div');
+  d.className = 'branch';
+  d.style.setProperty('--c', colors[i % colors.length]);
+  const h = document.createElement('div');
+  h.className = 'bhead';
+  h.textContent = b.text;
+  if(b.sub){ const s=document.createElement('small'); s.textContent=b.sub; h.appendChild(s); }
+  d.appendChild(h);
+  d.appendChild(buildList(b.children));
+  branchesEl.appendChild(d);
+});
+</script>
+</body>
+</html>

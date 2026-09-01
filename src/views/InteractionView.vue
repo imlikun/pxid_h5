@@ -26,9 +26,6 @@
         <div class="msg-row">
           <div class="avatar">
             <img v-if="n.actorAvatar" :src="n.actorAvatar" alt="" @error="(e) => handleAvatarError(e, n.actorName)" />
-            <template v-else-if="n.type === 'system'">
-              <svg class="bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            </template>
             <span v-else class="avatar__ph">{{ avatarText(n) }}</span>
             <span v-if="!n.read" class="dot"></span>
           </div>
@@ -64,14 +61,14 @@ import { handleAvatarError } from '../utils/avatar'
 const router = useRouter()
 const list = ref([])
 const loading = ref(true)
-const activeCat = ref('all')
-// 分类 tab：key 即通知 type（'all' 表示全部）；与 interaction.tab.* i18n 键对应
+const activeCat = ref('comment')
+// 分类 tab：评论 / 关注 / 点赞 / 收藏（与截图一致，去掉「全部/系统」）
+// comment 同时包含 comment + reply（回复评论也归类到评论通知）
 const cats = [
-  { key: 'all' },
   { key: 'comment' },
-  { key: 'like' },
   { key: 'follow' },
-  { key: 'system' },
+  { key: 'like' },
+  { key: 'favorite' },
 ]
 const PAGE_SIZE = 20
 const page = ref(1)
@@ -80,13 +77,14 @@ const loadingMore = ref(false)
 const hasMore = computed(() => list.value.length < total.value)
 
 const filtered = computed(() => {
-  if (activeCat.value === 'all') return list.value
-  return list.value.filter((n) => n.type === activeCat.value)
+  const type = activeCat.value
+  if (type === 'comment') return list.value.filter((n) => n.type === 'comment' || n.type === 'reply')
+  return list.value.filter((n) => n.type === type)
 })
 
 function avatarText(n) {
   if (n.actorName) return n.actorName.slice(0, 1).toUpperCase()
-  return { like: '♥', comment: '💬', follow: '＋', system: '!' }[n.type] || '!'
+  return { like: '♥', comment: '💬', follow: '＋', favorite: '★', reply: '↩' }[n.type] || '!'
 }
 
 // 返回上一级：对齐积分页 PointsView.handlePointsBack。
