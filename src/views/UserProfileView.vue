@@ -215,8 +215,11 @@ async function mergeNativeProfile(u) {
     // 把 Flutter 最新资料持久化回 H5 user_profiles：否则「App 改头像」后，
     // 个人主页动态列表（rowToFeed 读 user_profiles）仍显示旧头像。
     if (Object.keys(patch).length) {
-      try { await updateMyProfile(patch) }
-      catch (e) { console.warn('[mergeNativeProfile] persist failed:', e.message || e) }
+      try {
+        await updateMyProfile(patch)
+        // 后端已更新资料 + 回刷快照；重新加载列表，确保 rowToFeed 读到最新 user_profiles
+        await loadContent(true)
+      } catch (e) { console.warn('[mergeNativeProfile] persist failed:', e.message || e) }
     }
   } catch (e) { /* 原生桥未实现：保持后端数据 */ }
 }

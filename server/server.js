@@ -1074,6 +1074,22 @@ app.put('/users/profile', requireAuth, (req, res) => {
   if (avatar !== undefined) patch.avatar = String(avatar || '').slice(0, 500)
   if (carModel !== undefined) patch.carModel = String(carModel || '').slice(0, 30)
   upsertProfile({ deviceId: d, memberUserId: m, nickname: patch.nickname !== undefined ? patch.nickname : undefined, avatar: patch.avatar !== undefined ? patch.avatar : undefined, carModel: patch.carModel !== undefined ? patch.carModel : undefined })
+  // 同步同设备的游客态资料行：历史 member_user_id 为空的动态/评论会按 device_id 回退取头像，
+  // 若 device 行仍是旧头像，就会出现「大头像新、列表头像旧」的截图现象。
+  // T040 防串号仅禁止 OR 双条件更新，此处是主动按 device_id 写当前用户资料，明确且安全。
+  if (d && m) {
+    const devSets = []
+    const devArgs = []
+    if (patch.nickname !== undefined) { devSets.push('nickname=?'); devArgs.push(patch.nickname) }
+    if (patch.avatar !== undefined) { devSets.push('avatar=?'); devArgs.push(patch.avatar) }
+    if (patch.carModel !== undefined) { devSets.push('car_model=?'); devArgs.push(patch.carModel) }
+    if (devSets.length) {
+      devSets.push('updated_at=?')
+      devArgs.push(now())
+      devArgs.push(d)
+      db.prepare(`UPDATE user_profiles SET ${devSets.join(', ')} WHERE device_id=? AND length(device_id)>0 AND (member_user_id IS NULL OR length(member_user_id)=0)`).run(...devArgs)
+    }
+  }
   // 本人场景只认 memberUserId，不靠 device_id 回退（T040 根治 member 维度串号）
   const p = resolveProfile({ deviceId: d, memberUserId: m, storedNickname: '', storedAvatar: '', allowDeviceFallback: false })
   // 本人改资料后，回刷历史动态/评论的作者头像昵称快照（按双身份单条件，绝不 OR 跨账号），
@@ -1084,9 +1100,11 @@ app.put('/users/profile', requireAuth, (req, res) => {
     if (m) {
       db.prepare('UPDATE feeds SET avatar=?, nickname=? WHERE member_user_id=? AND length(member_user_id)>0').run(newAvatar, newNick, m)
       db.prepare('UPDATE comments SET avatar=?, nickname=? WHERE member_user_id=? AND length(member_user_id)>0').run(newAvatar, newNick, m)
-    } else if (d) {
-      db.prepare('UPDATE feeds SET avatar=?, nickname=? WHERE device_id=? AND length(device_id)>0').run(newAvatar, newNick, d)
-      db.prepare('UPDATE comments SET avatar=?, nickname=? WHERE device_id=? AND length(device_id)>0').run(newAvatar, newNick, d)
+    }
+    if (d) {
+      // 游客态历史数据（member_user_id 为空）按 device_id 同步，避免老帖子头像滞留
+      db.prepare("UPDATE feeds SET avatar=?, nickname=? WHERE device_id=? AND length(device_id)>0 AND (member_user_id IS NULL OR length(member_user_id)=0)").run(newAvatar, newNick, d)
+      db.prepare("UPDATE comments SET avatar=?, nickname=? WHERE device_id=? AND length(device_id)>0 AND (member_user_id IS NULL OR length(member_user_id)=0)").run(newAvatar, newNick, d)
     }
   }
   res.json(ok({ nickname: p.nickname, avatar: p.avatar, carModel: p.carModel }))
