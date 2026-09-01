@@ -327,6 +327,12 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 :deep(.tb-bar) {
   background: var(--card, #ffffff);
 }
+/* 本页标题放大（全局 TopBar 默认 16px/600），仅互动消息页生效 */
+:deep(.tb-title) {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
 
 /* ---- 顶栏右侧筛选按钮 ---- */
 .filter-btn {
