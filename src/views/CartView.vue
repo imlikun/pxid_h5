@@ -135,23 +135,17 @@ function showToast(msg) {
 .cart {
   min-height: 100vh;
   background: var(--bg);
-  padding-top: env(safe-area-inset-top);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: env(safe-area-inset-top) 12px 12px;
+/* 顶栏安全区：交给 TopBar 自己吸收 env(safe-area-inset-top)。
+   根容器不能再加 padding-top —— 否则与 TopBar 自带 48px 高叠加成 ~92px，
+   顶栏会被整体推到状态栏下方一大截（历史上踩过这个双重叠加的坑）。
+   全局 *{box-sizing:border-box}，故 height 已含 padding，内容区仍是 48px。
+   :deep 作用范围仅限本页 TopBar 实例，其他页面不受影响。 */
+:deep(.tb-bar) {
+  padding-top: env(safe-area-inset-top);
   height: calc(48px + env(safe-area-inset-top));
-  background: #ffffff;
-  position: sticky;
-  top: 0;
-  z-index: 10;
 }
-.back { font-size: 18px; width: 32px; display: flex; color: #333; }
-.sp { width: 32px; }
-.t { font-size: 15px; font-weight: 600; color: #333; }
 
 .list {
   padding: 12px;
