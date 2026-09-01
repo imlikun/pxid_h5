@@ -7,7 +7,7 @@
         <div class="m-time">{{ formatTime(item.time) }}</div>
       </div>
       <button
-        v-if="!item.followed"
+        v-if="canFollow && !item.followed"
         class="m-follow"
         @click.stop="onFollow"
       >+ 关注</button>
@@ -71,7 +71,7 @@ import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 import { formatTime } from '../utils/time'
 import { mediaUrl } from '../storage'
 import { requireLogin } from '../utils/auth'
-import { likeFeed, toggleFavorite } from '../api/feed'
+import { likeFeed, toggleFavorite, followUser } from '../api/feed'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -96,6 +96,9 @@ const videoCoverUrl = computed(() => {
   return c || FALLBACK
 })
 const avatarUrl = computed(() => resolveAvatar(props.item.author, props.item.avatar))
+// 关注按钮可见性：后端按 viewer 注入 canFollow（官方帖 / 自己的帖 = false）。
+// 老数据或兜底 mock 没有该字段时默认 true，保持既有行为，避免按钮大面积消失。
+const canFollow = computed(() => props.item.canFollow !== false)
 const displayImages = computed(() => {
   const imgs = props.item && props.item.images
   return Array.isArray(imgs) ? imgs : []
@@ -174,6 +177,14 @@ async function onFollow() {
   const ok = await requireLogin()
   if (!ok) return
   props.item.followed = true
+  // 关注关系必须落库，否则刷新/切页后又变回「+ 关注」（此前只改本地字段 + 通知原生，等于没关注）。
+  // 后端 INSERT OR IGNORE 幂等，与原生侧重复写入不冲突。
+  const r = await followUser(props.item.deviceId, props.item.memberUserId)
+  if (!r.ok) {
+    props.item.followed = false
+    showToast(r.message || '关注失败')
+    return
+  }
   bridge.openNative('feed/follow?id=' + props.item.id)
 }
 </script>

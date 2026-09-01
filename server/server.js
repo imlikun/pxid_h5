@@ -701,7 +701,54 @@ function seedAliasesFromExistingComments() {
   }
 }
 
-function rowToFeed(r) {
+// ---- 关注态上下文（viewer 视角）----
+// ctx = null 表示「未登录 / 拿不到身份」：followed 恒 false，关注按钮按旧行为显示（点击会走 requireLogin）。
+// ⚠️ 身份只用非空值参与比较：空字符串绝不当有效身份，否则「无 memberUserId 的帖」会被误判成自己的帖
+// （这是 2026-09-01 修 deviceId/空值 OR 误匹配时定下的铁律，此处同样适用）。
+function buildViewerContext(viewer) {
+  if (!viewer) return null
+  const deviceId = String(viewer.deviceId || '')
+  const memberUserId = String(viewer.memberUserId || '')
+  if (!deviceId && !memberUserId) return null
+  const conds = []
+  const args = []
+  if (deviceId) { conds.push('follower_device=?'); args.push(deviceId) }
+  if (memberUserId) { conds.push('follower_member_user_id=?'); args.push(memberUserId) }
+  // 一次查全量关注关系建 Set，避免列表 N 条查 N 次（N+1）
+  const set = new Set()
+  try {
+    const rows = db
+      .prepare(`SELECT followee_device, followee_member_user_id FROM follows WHERE ${conds.join(' OR ')}`)
+      .all(...args)
+    for (const x of rows) {
+      if (x.followee_device) set.add(String(x.followee_device))
+      if (x.followee_member_user_id) set.add(String(x.followee_member_user_id))
+    }
+  } catch (e) {
+    console.warn('[pxid-feed] buildViewerContext failed:', e.message || e)
+  }
+  return { deviceId, memberUserId, followSet: set }
+}
+function isViewerSelf(r, ctx) {
+  if (!ctx) return false
+  const d = String(r.device_id || '')
+  const m = String(r.member_user_id || '')
+  return (!!d && d === ctx.deviceId) || (!!m && m === ctx.memberUserId)
+}
+function followedFor(r, ctx) {
+  if (!ctx || !ctx.followSet) return false
+  const d = String(r.device_id || '')
+  const m = String(r.member_user_id || '')
+  return (!!d && ctx.followSet.has(d)) || (!!m && ctx.followSet.has(m))
+}
+// 关注按钮可见性：官方帖（无作者可关注）+ 自己的帖 → 隐藏
+function canFollowFor(r, ctx) {
+  if ((r.kind || 'user') === 'official') return false
+  if (isViewerSelf(r, ctx)) return false
+  return true
+}
+
+function rowToFeed(r, ctx) {
   const isUser = (r.kind || 'user') !== 'official'
   const profile = isUser && (r.device_id || r.member_user_id)
     ? resolveProfile({ deviceId: r.device_id, memberUserId: r.member_user_id, storedNickname: r.nickname, storedAvatar: r.avatar })
@@ -727,7 +774,8 @@ function rowToFeed(r) {
     comments: db.prepare('SELECT COUNT(*) c FROM comments WHERE feed_id=?').get(r.id).c,
     createdAt: r.created_at,
     time: r.created_at,
-    followed: false,
+    followed: followedFor(r, ctx),
+    canFollow: canFollowFor(r, ctx),
     focusCar: r.car_model,
     status: r.status,
     pinned: !!r.pinned,
@@ -839,8 +887,12 @@ app.post('/auth/token', (req, res) => {
 })
 
 // ---- 动态流 ----
-app.get('/feed', (req, res) => {
+app.get('/feed', async (req, res) => {
   const { tab = 'dynamic', carModel, page = 1, pageSize = 20, offset, followerDevice, region, near, radius = 50, deviceId, memberUserId } = req.query
+  // viewer 关注态：按 token 身份一次查全量 follows 注入每条 followed / canFollow
+  // （公开读接口，解析失败静默降级为匿名，不 401 —— 否则未登录浏览发现页会直接报错）
+  const v = await resolveViewer(req).catch(() => ({ user: null, errMsg: '' }))
+  const fctx = buildViewerContext(v && v.user)
   const cm = carModel && carModel !== '全部' && carModel !== '最新' ? carModel : ''
   // 地区过滤：CN/BR/US，US 为全球公共池；请求某区时显示该区 + US 帖（三区均可见全球内容）
   const reg = String(region || '').toUpperCase()
@@ -887,7 +939,7 @@ app.get('/feed', (req, res) => {
     const ps = Math.min(50, Math.max(1, parseInt(pageSize) || 20))
     const off = offset !== undefined ? Math.max(0, parseInt(offset) || 0) : (Math.max(1, parseInt(page) || 1) - 1) * ps
     const rows = withDist.slice(off, off + ps).map((x) => x.r)
-    return res.json(ok({ total: withDist.length, list: rows.map(rowToFeed), tab, near: true }))
+    return res.json(ok({ total: withDist.length, list: rows.map((r) => rowToFeed(r, fctx)), tab, near: true }))
   }
   const total = db.prepare(`SELECT COUNT(*) c FROM feeds ${w}`).get(...args).c
   const ps = Math.min(50, Math.max(1, parseInt(pageSize) || 20))
@@ -900,7 +952,7 @@ app.get('/feed', (req, res) => {
   const rows = db
     .prepare(`SELECT * FROM feeds ${w} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
     .all(...args, ps, off)
-  res.json(ok({ total, list: rows.map(rowToFeed), tab }))
+  res.json(ok({ total, list: rows.map((r) => rowToFeed(r, fctx)), tab }))
 })
 
 // ---- 我的发布（token 双身份，/user/me 专用；不依赖 getDeviceId()，彻底解决 App「我的」页数量与列表不一致）----
@@ -914,7 +966,9 @@ app.get('/feed/me', requireAuth, (req, res) => {
   const ps = Math.min(50, Math.max(1, parseInt(pageSize) || 20))
   const off = offset !== undefined ? Math.max(0, parseInt(offset) || 0) : (Math.max(1, parseInt(page) || 1) - 1) * ps
   const rows = db.prepare(`SELECT f.* FROM feeds f ${w} ORDER BY f.id DESC LIMIT ? OFFSET ?`).all(...im.args, ps, off)
-  res.json(ok({ total, list: rows.map(rowToFeed) }))
+  // 我的发布：按本人 viewer 注入关注态（自己的帖 → canFollow=false，不显示「+ 关注」按钮）
+  const mctx = buildViewerContext(u)
+  res.json(ok({ total, list: rows.map((r) => rowToFeed(r, mctx)) }))
 })
 
 // ---- 活跃用户（@话题选人用；返回最近发帖去重的 deviceId/nickname/avatar）----
@@ -1853,10 +1907,13 @@ function isBannedMember(memberUserId) {
 //     2) 演示态：未配 ToC 但配了 USER_TOKEN_SECRET 时，走自签 HMAC 校验
 //     3) 最松兜底：两者都未配时，仅检查 token 非空（保持现状，不破演示态）
 //   封禁维度：member_user_id 优先，回退 device_id
-async function requireAuth(req, res, next) {
+// 解析请求者身份（只解析、不拦截）：返回 { user, errMsg }；无 token / 校验失败时 user 为 null。
+// 供两处共用：① requireAuth（写接口，必须登录）；② 公开读接口（GET /feed）按 viewer 注入
+// 「是否已关注 / 是否该显示关注按钮」，避免两处各写一套 token 解析导致行为漂移。
+async function resolveViewer(req) {
   const h = req.headers.authorization || ''
   const t = h.startsWith('Bearer ') ? h.slice(7) : ''
-  if (!t) return res.status(401).json(err(401, '未授权：需要登录后操作'))
+  if (!t) return { user: null, errMsg: '未授权：需要登录后操作' }
 
   let user = null
 
@@ -1875,7 +1932,7 @@ async function requireAuth(req, res, next) {
           headers: { 'Content-Type': 'application/json', ...signHeaders },
           body: bodyStr
         })
-        if (r.status === 401) return res.status(401).json(err(401, '未授权：Token 无效或已过期'))
+        if (r.status === 401) return { user: null, errMsg: '未授权：Token 无效或已过期' }
         if (!r.ok) throw new Error('userinfo HTTP ' + r.status)
         const j = await r.json().catch(() => ({}))
         u = j.data || j   // 规范返回 { code, data:{ memberUserId, banned, ... } }
@@ -1912,7 +1969,14 @@ async function requireAuth(req, res, next) {
     }
   }
 
-  if (!user) return res.status(401).json(err(401, '未授权：Token 校验失败'))
+  if (!user) return { user: null, errMsg: '未授权：Token 校验失败' }
+  return { user, errMsg: '' }
+}
+
+// 写接口鉴权：resolveViewer 解析不出身份即 401（三种失败文案原样保留）
+async function requireAuth(req, res, next) {
+  const { user, errMsg } = await resolveViewer(req)
+  if (!user) return res.status(401).json(err(401, errMsg || '未授权：需要登录后操作'))
 
   req.user = user
 

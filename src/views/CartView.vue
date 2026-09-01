@@ -137,16 +137,11 @@ function showToast(msg) {
   background: var(--bg);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
-/* 顶栏安全区：交给 TopBar 自己吸收 env(safe-area-inset-top)。
-   根容器不能再加 padding-top —— 否则与 TopBar 自带 48px 高叠加成 ~92px，
-   顶栏会被整体推到状态栏下方一大截（历史上踩过这个双重叠加的坑）。
-   全局 *{box-sizing:border-box}，故 height 已含 padding，内容区仍是 48px。
-   :deep 作用范围仅限本页 TopBar 实例，其他页面不受影响。 */
-:deep(.tb-bar) {
-  padding-top: env(safe-area-inset-top);
-  height: calc(48px + env(safe-area-inset-top));
-}
-
+/* ⚠️ 顶栏安全区：本页不得吸收 env(safe-area-inset-top)（2026-09-01 二修）
+   HANDOFF.md 第 1 条：Flutter 已用 SafeArea 包住 WebView，H5 顶栏固定 48px 即可。
+   历史两次事故：① 根容器 padding-top:env() → 48+env≈92px；② 挪进 :deep(.tb-bar) 用
+   padding+height → 总高仍是 48+env，等于没改。正确做法是把这层 env 整段删掉，
+   与同在精选 tab 的 FeaturedView 保持一致（该页从未加过，显示正常）。 */
 .list {
   padding: 12px;
   display: flex;

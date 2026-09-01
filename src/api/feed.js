@@ -212,9 +212,13 @@ export async function fetchActivities(params = {}) {
 }
 
 // ---- 关注 / 取关 / 检查（动态关注流）----
-export async function followUser(followeeDevice) {
+// followeeMemberUserId：被关注者的会员 ID（有就传，便于「同人换设备」后关注关系仍命中）
+export async function followUser(followeeDevice, followeeMemberUserId = '') {
   try {
-    await request('/follow', { method: 'POST', body: { followerDevice: await getDeviceId(), followeeDevice } })
+    await request('/follow', {
+      method: 'POST',
+      body: { followerDevice: await getDeviceId(), followeeDevice, followeeMemberUserId: String(followeeMemberUserId || '') },
+    })
     return { ok: true }
   } catch (e) {
     return { ok: false, message: e.message || '关注失败' }
