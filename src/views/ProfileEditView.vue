@@ -102,6 +102,16 @@ function onAvatarError() {
   avatar.value = ''
 }
 
+// 标记「用户刚在 H5 改过资料」（按 memberUserId 分区，避免同设备多账号串号）。
+// UserProfileView.mergeNativeProfile 会据此在保护期内跳过 Flutter 覆盖，
+// 避免刚保存的昵称/头像被 Flutter 的旧值吃掉（Flutter 是主端，但 H5 改的没回写通道）。
+function markH5ProfileEdited(memberUserId) {
+  try {
+    if (!memberUserId) return
+    localStorage.setItem(`pxid_h5_profile_edited_at:${memberUserId}`, String(Date.now()))
+  } catch (e) { /* localStorage 不可用（无痕模式）时静默 */ }
+}
+
 async function onSave() {
   if (saving.value) return
   saving.value = true
@@ -117,6 +127,7 @@ async function onSave() {
     if (avatarUrl) payload.avatar = avatarUrl
     payload.carModel = carModel.value
     await updateMyProfile(payload)
+    markH5ProfileEdited(myMemberId.value)
     showToast('资料已更新')
     setTimeout(() => router.back(), 700)
   } catch (e) {
@@ -126,10 +137,12 @@ async function onSave() {
   }
 }
 
+const myMemberId = ref('')
 onMounted(async () => {
   try {
     const p = await fetchMyProfile()
     if (p) {
+      myMemberId.value = String(p.memberUserId || '')
       nickname.value = p.nickname && p.nickname !== '骑友' ? p.nickname : ''
       avatar.value = p.avatar || ''
       carModel.value = p.carModel || ''

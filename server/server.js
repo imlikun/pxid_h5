@@ -928,12 +928,13 @@ app.get('/feed', async (req, res) => {
     if (cm) { w += ' AND car_model = ?'; args.push(cm) }
   }
   if (regFiltered) { w += " AND region_code IN (?, 'US')"; args.push(regFiltered) }
-  // 个人主页动态流：按作者身份过滤（deviceId 或 memberUserId 任一命中即可，解决 ToC 双 ID 漂移导致"帖子不是自己的"）
+  // 个人主页动态流：按作者身份过滤。
+  // ⚠️ T040：member 非空时【只按 member 单条件】。此前用 OR，同设备两个 member（17/24）共享
+  //   同一个 device_id 时，看 24 的主页会把 17 的帖子全捞进来（实测 8 条 vs 正确的 2 条）。
+  //   仅传 deviceId（游客/历史数据场景）时才按 device 查，保持向后兼容。
   if (deviceId || memberUserId) {
-    const idv = []
-    if (deviceId) { idv.push('device_id = ?'); args.push(String(deviceId)) }
-    if (memberUserId) { idv.push('member_user_id = ?'); args.push(String(memberUserId)) }
-    w += ' AND (' + idv.join(' OR ') + ')'
+    if (memberUserId) { w += ' AND member_user_id = ?'; args.push(String(memberUserId)) }
+    else { w += ' AND device_id = ?'; args.push(String(deviceId)) }
   }
   // 附近 LBS：near=lat,lng（半径 radius km，默认 50）。SQLite 无三角函数，JS 算距离，数据量小内存筛
   let nearLat = null, nearLng = null
@@ -978,7 +979,9 @@ app.get('/feed', async (req, res) => {
 app.get('/feed/me', requireAuth, (req, res) => {
   const u = req.user || {}
   const { page = 1, pageSize = 20, offset } = req.query
-  const im = userIdentityMatch('f.device_id', 'f.member_user_id', u)
+  // T040 memberOnly：与 /users/me 的 feedCount 口径一致（四格也是 memberOnly）。
+  //   此前列表用 OR、四格后来改成 memberOnly，两个口径不一致 → 「数字≠列表条数」。
+  const im = userIdentityMatch('f.device_id', 'f.member_user_id', u, true)
   const w = `WHERE ${im.clause} AND f.status='published'`
   const total = db.prepare(`SELECT COUNT(*) c FROM feeds f ${w}`).get(...im.args).c
   const ps = Math.min(50, Math.max(1, parseInt(pageSize) || 20))
@@ -1099,24 +1102,32 @@ app.get('/users/:deviceId', (req, res) => {
   const idRow = db.prepare('SELECT device_id, member_user_id FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(member_user_id)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
     || db.prepare('SELECT device_id, member_user_id FROM user_profiles WHERE (device_id=? OR member_user_id=?) AND length(member_user_id)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
   if (idRow) { tDevice = idRow.device_id || raw; tMid = idRow.member_user_id || '' }
-  // 解析资料：双身份命中 user_profiles；昵称若为默认"骑友"视为无效，回退 feeds 真实昵称（修复昵称兜底写反）
-  const profile = resolveProfile({ deviceId: raw, memberUserId: raw, storedNickname: '', storedAvatar: '' })
+  // ⚠️ T040：以下所有查询一律用「解析后的真实身份 tDevice/tMid」，且【member 非空时只按 member 单条件】。
+  //   此前这里全部拿 raw（URL 里的 device 串）做 OR 双身份匹配，同设备绑两个 member（17/24）时
+  //   会把另一账号的行一起算进来 → 他人主页四格虚高（如 member24 关注 2 却显示 3）、昵称/头像串号。
+  const qMid = tMid
+  const idCol = (devCol, midCol) => (qMid ? `${midCol}=?` : `${devCol}=?`)
+  const idArg = () => (qMid || tDevice)
+  // 解析资料：用真实身份（member 优先）；昵称若为默认"骑友"视为无效，回退 feeds 真实昵称
+  const profile = resolveProfile({ deviceId: tDevice, memberUserId: tMid, storedNickname: '', storedAvatar: '' })
   const useFeedName = !profile.nickname || profile.nickname === '骑友'
-  const feed = db.prepare("SELECT nickname, avatar, car_model FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1").get(raw, raw)
+  const feed = db.prepare(`SELECT nickname, avatar, car_model FROM feeds WHERE ${idCol('device_id', 'member_user_id')} AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1`).get(idArg())
   const nickname = useFeedName ? (feed && feed.nickname ? feed.nickname : (profile.nickname || '')) : profile.nickname
   const avatar = profile.avatar || (feed && feed.avatar) || ''
   const carModel = profile.carModel || (feed && feed.car_model) || ''
-  // 关注/粉丝数：H5 follows 表按 设备/会员 双身份
-  const followeeCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE follower_device=? OR follower_member_user_id=?').get(raw, raw).c
-  const followerCount = db.prepare('SELECT COUNT(*) c FROM follows WHERE followee_device=? OR followee_member_user_id=?').get(raw, raw).c
+  // 关注/粉丝数：按真实身份单条件统计
+  const followeeCount = db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${idCol('follower_device', 'follower_member_user_id')}`).get(idArg()).c
+  const followerCount = db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${idCol('followee_device', 'followee_member_user_id')}`).get(idArg()).c
+  // isFollowing：自己一侧用 memberOnly（避免用自己 device 误命中同设备另一账号的关注关系）
+  const myMatch = userIdentityMatch('follower_device', 'follower_member_user_id', { deviceId: myDevice, memberUserId: myMid }, true)
   const isFollowing = (myDevice || myMid)
-    ? !!db.prepare('SELECT 1 FROM follows WHERE (follower_device=? OR follower_member_user_id=?) AND (followee_device=? OR followee_member_user_id=?)').get(myDevice, myMid, raw, raw)
+    ? !!db.prepare(`SELECT 1 FROM follows WHERE ${myMatch.clause} AND ${idCol('followee_device', 'followee_member_user_id')}`).get(...myMatch.args, idArg())
     : false
   // isSelf 同时比对解析后的双身份，避免 App 用 member_user_id、token 用 device_id 时误判为他人
   const isSelf = (myDevice && (myDevice === raw || myDevice === tDevice || (tMid && myDevice === tMid))) || (myMid && (myMid === raw || myMid === tMid))
   // 四宫格计数：发布数（公开动态数）/ 收藏数（仅自己可见，他人返回 0 不泄露私密）
-  const feedCount = db.prepare("SELECT COUNT(*) c FROM feeds WHERE (device_id=? OR member_user_id=?) AND status='published'").get(raw, raw).c
-  const favoriteCount = isSelf ? db.prepare('SELECT COUNT(*) c FROM favorites WHERE device_id=? OR member_user_id=?').get(raw, raw).c : 0
+  const feedCount = db.prepare(`SELECT COUNT(*) c FROM feeds WHERE ${idCol('device_id', 'member_user_id')} AND status='published'`).get(idArg()).c
+  const favoriteCount = isSelf ? db.prepare(`SELECT COUNT(*) c FROM favorites WHERE ${idCol('device_id', 'member_user_id')}`).get(idArg()).c : 0
   console.log(`[user-id] raw=${raw} myD=${myDevice} myM=${myMid} tD=${tDevice} tM=${tMid} nick=${nickname} car=${carModel} stats=${feedCount}/${favoriteCount}/${followeeCount}/${followerCount} isSelf=${isSelf}`)
   res.json(ok({
     deviceId: tDevice,
@@ -1227,7 +1238,8 @@ app.post('/feed', requireAuth, (req, res) => {
 // GET /feed/liked?page=&pageSize= → { total, list }（仅本人，requireAuth 从 token 取 deviceId；返回项 isLiked 恒 true）
 // ⚠️ 必须定义在 app.get('/feed/:id') 之前，否则会被 /feed/:id 参数路由抢匹配返回 404
 app.get('/feed/liked', requireAuth, (req, res) => {
-  const im = userIdentityMatch('l.device_id', 'l.member_user_id', req.user)
+  // T040 memberOnly：本人「赞过」列表只按 member，避免同设备另一账号的点赞记录串进来
+  const im = userIdentityMatch('l.device_id', 'l.member_user_id', req.user, true)
   if (!im.args.length) return res.json(err(1, '无法识别用户'))
   const page = Math.max(1, parseInt(req.query.page) || 1)
   const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
@@ -1240,7 +1252,8 @@ app.get('/feed/liked', requireAuth, (req, res) => {
 // ---- 查询当前登录用户是否收藏了某条动态（详情页初始化收藏态用）----
 // 必须前置注册，否则会被 /feed/:id 参数路由拦截。
 app.get('/feed/:id/favorite', requireAuth, (req, res) => {
-  const im = userIdentityMatch('device_id', 'member_user_id', req.user)
+  // T040 memberOnly：查询「我是否收藏过此帖」只按 member，避免同设备另一账号的收藏串成已收藏
+  const im = userIdentityMatch('device_id', 'member_user_id', req.user, true)
   const row = db.prepare(`SELECT 1 FROM favorites WHERE ${im.clause} AND feed_id=?`).get(...im.args, req.params.id)
   res.json(ok({ favorited: !!row }))
 })
@@ -1284,7 +1297,8 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
 // ---- 收藏 / 足迹（H5 自管关系表，个人主页 Tab）----
 // GET /favorites?page=&pageSize= → { total, list }（仅本人）
 app.get('/favorites', requireAuth, (req, res) => {
-  const im = userIdentityMatch('v.device_id', 'v.member_user_id', req.user)
+  // T040 memberOnly：与 /users/me 的 favoriteCount 口径一致（四格也是 memberOnly）
+  const im = userIdentityMatch('v.device_id', 'v.member_user_id', req.user, true)
   if (!im.args.length) return res.json(err(1, '无法识别用户'))
   const page = Math.max(1, parseInt(req.query.page) || 1)
   const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
@@ -1345,7 +1359,8 @@ app.post('/footprints', requireAuth, (req, res) => {
 })
 // GET /footprints?page=&pageSize= → { total, list }（最近浏览，去重，最新优先）
 app.get('/footprints', requireAuth, (req, res) => {
-  const im = userIdentityMatch('p.device_id', 'p.member_user_id', req.user)
+  // T040 memberOnly：浏览足迹只按 member，避免同设备另一账号的足迹串进来
+  const im = userIdentityMatch('p.device_id', 'p.member_user_id', req.user, true)
   if (!im.args.length) return res.json(err(1, '无法识别用户'))
   const page = Math.max(1, parseInt(req.query.page) || 1)
   const ps = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 20))
@@ -2695,7 +2710,14 @@ app.post('/follow', requireAuth, (req, res) => {
 app.delete('/follow', requireAuth, (req, res) => {
   const { followerDevice, followeeDevice } = req.query
   if (!followerDevice || !followeeDevice) return res.json(err(1, '缺少 followerDevice / followeeDevice'))
-  db.prepare('DELETE FROM follows WHERE (follower_device=? OR follower_member_user_id=?) AND (followee_device=? OR followee_member_user_id=?)').run(followerDevice, followerDevice, followeeDevice, followeeDevice)
+  // ⚠️ T040 数据破坏修复：原逻辑 `WHERE (follower_device=? OR follower_member_user_id=?)` 且两个参数
+  //   都传 followerDevice（同一个值），等于只按 device 删——同设备绑两个 member（17/24）时，
+  //   member24 取消关注会把 member17 的关注记录一起删掉。
+  //   现在「我」这一侧严格用 token 身份（member 非空只按 member），只删自己的关系。
+  //   对方一侧保持双条件：followeeDevice 可能是 device 也可能是 member ID，两者格式不同不会误命中。
+  const me = userIdentityMatch('follower_device', 'follower_member_user_id', req.user, true)
+  db.prepare(`DELETE FROM follows WHERE ${me.clause} AND (followee_device=? OR followee_member_user_id=?)`)
+    .run(...me.args, String(followeeDevice), String(followeeDevice))
   res.json(ok({ following: false }))
 })
 // 解析某 deviceId 的公开简介（昵称/头像/车型），优先 user_profiles，回退最新发帖
@@ -2741,7 +2763,20 @@ app.get('/follow/check', (req, res) => {
   const { follower, followee, followerMember, followeeMember } = req.query
   if (!follower && !followerMember) return res.json(err(1, '缺少 follower / followerMember'))
   if (!followee && !followeeMember) return res.json(err(1, '缺少 followee / followeeMember'))
-  const row = db.prepare('SELECT 1 FROM follows WHERE (follower_device=? OR follower_member_user_id=?) AND (followee_device=? OR followee_member_user_id=?)').get(String(follower || ''), String(followerMember || ''), String(followee || ''), String(followeeMember || ''))
+  // ⚠️ T040：空值绝不参与 OR。`follower_member_user_id=''` 会误命中所有 member 为空的历史行
+  //   → 明明没关注却返回「已关注」。只在传了非空值时才把该条件拼进去（与 /follow/list 同一保护）。
+  const build = (devVal, midVal, devCol, midCol) => {
+    const d = String(devVal || '')
+    const m = String(midVal || '')
+    const conds = []
+    const args = []
+    if (d) { conds.push(`${devCol}=?`); args.push(d) }
+    if (m) { conds.push(`${midCol}=?`); args.push(m) }
+    return { clause: conds.length ? `(${conds.join(' OR ')})` : '(1=0)', args }
+  }
+  const a = build(follower, followerMember, 'follower_device', 'follower_member_user_id')
+  const b = build(followee, followeeMember, 'followee_device', 'followee_member_user_id')
+  const row = db.prepare(`SELECT 1 FROM follows WHERE ${a.clause} AND ${b.clause}`).get(...a.args, ...b.args)
   res.json(ok({ following: !!row }))
 })
 

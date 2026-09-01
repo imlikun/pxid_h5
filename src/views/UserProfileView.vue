@@ -189,8 +189,16 @@ function selectGrid(key) {
 //   边界：用户在 H5 ProfileEditView 改的资料没回写 Flutter（架构问题，不在本次范围）；
 //        H5 改的本来就是「孤儿」数据，以 Flutter 覆盖反而正确。
 const EMPTY_NICK = new Set(['', '骑友'])
+// 用户在 H5 改过资料后的「保护期」：期间不用 Flutter 值覆盖，避免刚改的资料被 Flutter 旧值吃掉。
+// 过期后恢复 Flutter 优先，自动纠正 H5 端可能存在的历史污染值。
+const H5_EDIT_TTL = 7 * 24 * 3600 * 1000
 async function mergeNativeProfile(u) {
   try {
+    const mid = String(u.memberUserId || '')
+    if (mid) {
+      const editedAt = Number(localStorage.getItem(`pxid_h5_profile_edited_at:${mid}`) || 0)
+      if (editedAt && Date.now() - editedAt < H5_EDIT_TTL) return // 保护期内：尊重 H5 的值
+    }
     const p = await bridge.getUserInfo()
     if (!p) return
     if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim())) u.nickname = String(p.nickname)
