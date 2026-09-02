@@ -1,12 +1,7 @@
 <template>
   <div class="hima">
-    <!-- 顶栏 -->
-    <TopBar sticky :back="goBack">
-      <template #title>
-        <div class="title-marquee">
-          <span>{{ t('assistant.title') }}</span>
-        </div>
-      </template>
+    <!-- 顶栏：直接传 title，TopBar 自带居中+省略号，4 字不滚动 -->
+    <TopBar sticky :back="goBack" :title="t('assistant.title')">
       <template #right>
         <span class="more" @click="onMore">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
@@ -22,22 +17,22 @@
           <div class="hero__avatar">
             <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="5"/><path d="M12 8V4M9 4h6M9 13h.01M15 13h.01"/></svg>
           </div>
-          <div class="hero__hi">你好，我是 HIMA 智能助手</div>
-          <div class="hero__sub">你的 PXID 专属出行 AI，查车型、找门店、看公告、解疑问都能问。</div>
+          <div class="hero__hi">{{ tt('heroHi') }}</div>
+          <div class="hero__sub">{{ tt('heroSub') }}</div>
         </div>
 
         <!-- 紫色推荐卡 -->
         <div class="promo">
           <div class="promo__top">
-            <span class="promo__badge">PXID 智能出行</span>
+            <span class="promo__badge">{{ tt('promoBadge') }}</span>
             <span class="promo__arrow">&gt;</span>
           </div>
-          <div class="promo__title">把车交给更懂你的 AI</div>
-          <div class="promo__desc">购车定制、保养提醒、续航优化、道路救援——一句话搞定日常用车。</div>
+          <div class="promo__title">{{ tt('promoTitle') }}</div>
+          <div class="promo__desc">{{ tt('promoDesc') }}</div>
         </div>
 
         <!-- 快捷问题 -->
-        <div class="quick-title">你可以这样问我</div>
+        <div class="quick-title">{{ tt('quickTitle') }}</div>
         <div class="quick">
           <div
             v-for="(q, i) in quickQuestions"
@@ -49,7 +44,7 @@
             <span class="quick__text">{{ q.q }}</span>
           </div>
         </div>
-        <div class="demo-tip">演示版 · 正式版将接入 PXID 智能出行大模型</div>
+        <div class="demo-tip">{{ tt('demoTip') }}</div>
       </div>
 
       <!-- 对话气泡 -->
@@ -82,10 +77,10 @@
         v-model="input"
         class="inputbar__field"
         type="text"
-        placeholder="问问 HIMA 关于用车的一切…"
+        :placeholder="tt('inputPlaceholder')"
         @keyup.enter="send"
       />
-      <button class="inputbar__send" :class="{ on: input.trim() }" @click="send">发送</button>
+      <button class="inputbar__send" :class="{ on: input.trim() }" @click="send">{{ tt('send') }}</button>
     </div>
 
     <transition name="toast-fade">
@@ -99,7 +94,7 @@ import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import bridge from '../bridge'
-import { t } from '../i18n'
+import { t, locale } from '../i18n'
 
 const router = useRouter()
 
@@ -111,30 +106,147 @@ const started = computed(() => messages.value.length > 0)
 const toastMsg = ref('')
 let toastTimer = null
 
-const quickQuestions = [
-  { q: '如何预约车辆保养？', a: '可在「服务」页在线预约车辆体检与保养，或到附近门店登记。保养周期建议每 2000km 或 3 个月一次。', action: { type: 'native', path: 'service/check', label: '打开保养预约' } },
-  { q: '附近有哪些门店？', a: '进入「服务 → 附近门店」可按距离查看离你最近的 PXID 授权门店与营业时间，支持一键导航。', action: { type: 'native', path: 'service/stores', label: '查看附近门店' } },
-  { q: '查看最新官方公告', a: '发现页「官方公告」入口可查看召回、版本、活动与安全提醒，重要公告会带红点提示。', action: { type: 'route', to: '/notices', label: '查看官方公告' } },
-  { q: '踏春活动怎么参与？', a: '精选商城踏春装备专场已开启，满 199 减 30，积分可叠加抵扣，点击商品即可进入商城。', action: { type: 'route', to: '/featured', label: '进入踏春专场' } },
-  { q: '我的积分怎么用？', a: '积分可在积分商城兑换原厂好物，100 积分抵 1 元，签到、发动态都能赚积分。', action: { type: 'route', to: '/points', label: '进入积分商城' } },
-]
+// ============================================================
+// 智能助手多语内容（zh / en / pt），跟随系统语言切换
+// 顶栏标题仍走全局 i18n(t('assistant.title'))，此处只管本页内容
+// ============================================================
+const L = {
+  zh: {
+    heroHi: '你好，我是 HIMA 智能助手',
+    heroSub: '你的 PXID 专属出行 AI，查车型、找门店、看公告、解疑问都能问。',
+    promoBadge: 'PXID 智能出行',
+    promoTitle: '把车交给更懂你的 AI',
+    promoDesc: '购车定制、保养提醒、续航优化、道路救援——一句话搞定日常用车。',
+    quickTitle: '你可以这样问我',
+    demoTip: '演示版 · 正式版将接入 PXID 智能出行大模型',
+    inputPlaceholder: '问问 HIMA 关于用车的一切…',
+    send: '发送',
+    toastEmpty: '对话还是空的',
+    toastCleared: '对话已清空',
+    quick: [
+      { q: '如何预约车辆保养？', a: '可在「服务」页在线预约车辆体检与保养，或到附近门店登记。保养周期建议每 2000km 或 3 个月一次。', action: { type: 'native', path: 'service/check', label: '打开保养预约' } },
+      { q: '附近有哪些门店？', a: '进入「服务 → 附近门店」可按距离查看离你最近的 PXID 授权门店与营业时间，支持一键导航。', action: { type: 'native', path: 'service/stores', label: '查看附近门店' } },
+      { q: '查看最新官方公告', a: '发现页「官方公告」入口可查看召回、版本、活动与安全提醒，重要公告会带红点提示。', action: { type: 'route', to: '/notices', label: '查看官方公告' } },
+      { q: '踏春活动怎么参与？', a: '精选商城踏春装备专场已开启，满 199 减 30，积分可叠加抵扣，点击商品即可进入商城。', action: { type: 'route', to: '/featured', label: '进入踏春专场' } },
+      { q: '我的积分怎么用？', a: '积分可在积分商城兑换原厂好物，100 积分抵 1 元，签到、发动态都能赚积分。', action: { type: 'route', to: '/points', label: '进入积分商城' } },
+    ],
+    replies: {
+      store: { a: '附近门店可在「服务 → 附近门店」查看，支持按距离排序与一键导航。', action: { type: 'native', path: 'service/stores', label: '查看附近门店' } },
+      maintenance: { a: '车辆保养与体检可在「服务」页在线预约，建议每 2000km 或 3 个月一次。', action: { type: 'native', path: 'service/check', label: '打开保养预约' } },
+      rescue: { a: '道路救援可在「服务 → 道路救援」一键呼叫，附近门店接单后会主动联系你。', action: { type: 'native', path: 'service/rescue', label: '呼叫道路救援' } },
+      workorder: { a: '我的工单可在「服务 → 我的工单」查看进度，也可在线提交报修。', action: { type: 'native', path: 'service/workorders', label: '查看我的工单' } },
+      notice: { a: '官方公告含召回、版本、活动与安全提醒，重要通知带红点。', action: { type: 'route', to: '/notices', label: '查看官方公告' } },
+      activity: { a: '踏春出行季精选装备限时直降，满 199 减 30，积分可叠加抵扣。', action: { type: 'route', to: '/featured', label: '进入踏春专场' } },
+      points: { a: '积分可在积分商城兑换原厂好物，100 积分抵 1 元，签到与发动态都能赚。', action: { type: 'route', to: '/points', label: '进入积分商城' } },
+      publish: { a: '在「发现」页点右下角 + 即可发布动态，用 #车型# 标记更易被同好看到。', action: { type: 'route', to: '/publish', label: '去发布动态' } },
+      interaction: { a: '互动消息（赞/评论/关注/系统）可在「我的 → 消息中心」查看。', action: { type: 'route', to: '/interactions', label: '查看互动消息' } },
+      battery: { a: '电池保养建议：日常保持电量 20%-80%，避免亏电长期存放；冬季室内停放可缓解续航缩水。' },
+      warranty: { a: '整车保修 2 年（关键部件 3 年），电池 1-2 年（按车型）；非人为故障免费维修，详情见购车合同。' },
+      fallback: { a: '收到～这是 HIMA 的演示回复。当前为前端预览版，正式版将接入 PXID 智能出行大模型，可解答保养、续航、门店与活动等问题。' },
+    },
+  },
+  en: {
+    heroHi: "Hi, I'm HIMA, your AI assistant",
+    heroSub: 'Your PXID travel AI — ask about models, stores, notices, or anything.',
+    promoBadge: 'PXID Smart Mobility',
+    promoTitle: 'Let AI that knows you handle your ride',
+    promoDesc: 'Purchase customization, maintenance reminders, range optimization, roadside rescue — all in one sentence.',
+    quickTitle: 'Try asking me',
+    demoTip: 'Demo version · full version connects to the PXID mobility model',
+    inputPlaceholder: 'Ask HIMA anything about your ride…',
+    send: 'Send',
+    toastEmpty: 'Conversation is empty',
+    toastCleared: 'Conversation cleared',
+    quick: [
+      { q: 'How do I book vehicle maintenance?', a: "Book a vehicle check-up or maintenance in the 'Service' page online, or register at a nearby store. We recommend service every 2000km or 3 months.", action: { type: 'native', path: 'service/check', label: 'Open maintenance booking' } },
+      { q: 'Which stores are nearby?', a: "Go to 'Service → Nearby Stores' to see the closest authorized PXID stores with hours and one-tap navigation.", action: { type: 'native', path: 'service/stores', label: 'View nearby stores' } },
+      { q: 'View the latest official notices', a: "The 'Official Notices' entry on the Discover page shows recalls, versions, events and safety alerts, with a red dot for important ones.", action: { type: 'route', to: '/notices', label: 'View official notices' } },
+      { q: 'How do I join the spring event?', a: 'The spring gear sale is live in the Featured mall — ¥30 off orders over ¥199, stackable with points. Tap a product to enter.', action: { type: 'route', to: '/featured', label: 'Enter spring sale' } },
+      { q: 'How do I use my points?', a: 'Redeem original accessories in the points mall — 100 points = ¥1. Earn points by checking in and posting.', action: { type: 'route', to: '/points', label: 'Enter points mall' } },
+    ],
+    replies: {
+      store: { a: "Find nearby stores under 'Service → Nearby Stores', with distance sorting and one-tap navigation.", action: { type: 'native', path: 'service/stores', label: 'View nearby stores' } },
+      maintenance: { a: "Book a vehicle check-up or maintenance in the 'Service' page online — recommended every 2000km or 3 months.", action: { type: 'native', path: 'service/check', label: 'Open maintenance booking' } },
+      rescue: { a: "Call roadside rescue with one tap under 'Service → Roadside Rescue'; nearby stores will contact you after accepting.", action: { type: 'native', path: 'service/rescue', label: 'Call roadside rescue' } },
+      workorder: { a: "Track your work orders under 'Service → My Work Orders', or submit a repair request online.", action: { type: 'native', path: 'service/workorders', label: 'View my work orders' } },
+      notice: { a: 'Official notices include recalls, versions, events and safety alerts, with red dots for important ones.', action: { type: 'route', to: '/notices', label: 'View official notices' } },
+      activity: { a: 'The spring travel sale offers limited-time discounts in the Featured mall — ¥30 off over ¥199, stackable with points.', action: { type: 'route', to: '/featured', label: 'Enter spring sale' } },
+      points: { a: 'Redeem original accessories in the points mall — 100 points = ¥1. Earn points by checking in and posting.', action: { type: 'route', to: '/points', label: 'Enter points mall' } },
+      publish: { a: "Tap the '+' at the bottom-right of the Discover page to post; tag with #Model# to reach more riders.", action: { type: 'route', to: '/publish', label: 'Go post' } },
+      interaction: { a: "Interaction messages (likes/comments/follows/system) are under 'Me → Message Center'.", action: { type: 'route', to: '/interactions', label: 'View interactions' } },
+      battery: { a: 'Battery tips: keep charge between 20%-80% daily, avoid long-term depletion; indoor parking in winter helps range.' },
+      warranty: { a: 'Vehicle warranty 2 years (key parts 3 years), battery 1-2 years (by model); non-human faults repaired free — see purchase contract.' },
+      fallback: { a: 'Got it~ This is a demo reply from HIMA. The current build is a front-end preview; the full version will connect to the PXID mobility model and answer maintenance, range, store and event questions.' },
+    },
+  },
+  pt: {
+    heroHi: 'Olá, sou o HIMA, seu assistente IA',
+    heroSub: 'Sua IA de mobilidade PXID — pergunte sobre modelos, lojas, avisos ou qualquer coisa.',
+    promoBadge: 'Mobilidade Inteligente PXID',
+    promoTitle: 'Deixe a IA que te conhece cuidar do seu veículo',
+    promoDesc: 'Personalização de compra, lembretes de manutenção, otimização de autonomia, resgate na estrada — tudo numa frase.',
+    quickTitle: 'Experimente perguntar',
+    demoTip: 'Versão demo · a completa conecta ao modelo de mobilidade PXID',
+    inputPlaceholder: 'Pergunte à HIMA qualquer coisa sobre seu veículo…',
+    send: 'Enviar',
+    toastEmpty: 'A conversa está vazia',
+    toastCleared: 'Conversa limpa',
+    quick: [
+      { q: 'Como agendo a manutenção do veículo?', a: 'Agende revisão ou manutenção pela página "Serviços" online, ou registre numa loja próxima. Recomendamos a cada 2000km ou 3 meses.', action: { type: 'native', path: 'service/check', label: 'Abrir agendamento' } },
+      { q: 'Quais lojas estão por perto?', a: 'Vá em "Serviços → Lojas Próximas" para ver as lojas PXID autorizadas mais próximas, com horários e navegação em um toque.', action: { type: 'native', path: 'service/stores', label: 'Ver lojas próximas' } },
+      { q: 'Ver os avisos oficiais mais recentes', a: 'A entrada "Avisos Oficiais" na página Descobrir mostra recalls, versões, eventos e alertas de segurança, com ponto vermelho nos importantes.', action: { type: 'route', to: '/notices', label: 'Ver avisos oficiais' } },
+      { q: 'Como participo do evento de primavera?', a: 'A promoção de equipamentos de primavera está no mall Em destaque — R$30 de desconto acima de R$199, acumulável com pontos. Toque num produto para entrar.', action: { type: 'route', to: '/featured', label: 'Entrar na promoção' } },
+      { q: 'Como uso meus pontos?', a: 'Resgate acessórios originais no mall de pontos — 100 pontos = R$1. Ganhe pontos checkando e postando.', action: { type: 'route', to: '/points', label: 'Entrar no mall de pontos' } },
+    ],
+    replies: {
+      store: { a: 'Encontre lojas próximas em "Serviços → Lojas Próximas", com ordenação por distância e navegação em um toque.', action: { type: 'native', path: 'service/stores', label: 'Ver lojas próximas' } },
+      maintenance: { a: 'Agende revisão ou manutenção pela página "Serviços" online — recomendado a cada 2000km ou 3 meses.', action: { type: 'native', path: 'service/check', label: 'Abrir agendamento' } },
+      rescue: { a: 'Chame o resgate na estrada em um toque em "Serviços → Resgate"; lojas próximas entram em contato ao aceitar.', action: { type: 'native', path: 'service/rescue', label: 'Chamar resgate' } },
+      workorder: { a: 'Acompanhe suas ordens em "Serviços → Minhas Ordens", ou envie um reparo online.', action: { type: 'native', path: 'service/workorders', label: 'Ver minhas ordens' } },
+      notice: { a: 'Avisos oficiais incluem recalls, versões, eventos e alertas de segurança, com ponto vermelho nos importantes.', action: { type: 'route', to: '/notices', label: 'Ver avisos oficiais' } },
+      activity: { a: 'A promoção de viagem de primavera oferece descontos por tempo limitado no mall Em destaque — R$30 acima de R$199, acumulável com pontos.', action: { type: 'route', to: '/featured', label: 'Entrar na promoção' } },
+      points: { a: 'Resgate acessórios originais no mall de pontos — 100 pontos = R$1. Ganhe pontos checkando e postando.', action: { type: 'route', to: '/points', label: 'Entrar no mall de pontos' } },
+      publish: { a: 'Toque no "+" no canto inferior direito de Descobrir para postar; marque com #Modelo# para alcançar mais.', action: { type: 'route', to: '/publish', label: 'Ir postar' } },
+      interaction: { a: 'Mensagens de interação (curtidas/comentários/seguidos/sistema) ficam em "Eu → Central de Mensagens".', action: { type: 'route', to: '/interactions', label: 'Ver interações' } },
+      battery: { a: 'Dicas de bateria: mantenha carga entre 20%-80%, evite descarga prolongada; estacionar coberto no inverno ajuda a autonomia.' },
+      warranty: { a: 'Garantia do veículo 2 anos (peças-chave 3 anos), bateria 1-2 anos (por modelo); falhas não humanas consertadas grátis — veja o contrato.', },
+      fallback: { a: 'Entendi~ Esta é uma resposta demo da HIMA. A versão atual é prévia de front-end; a completa conectará ao modelo de mobilidade PXID e responderá sobre manutenção, autonomia, lojas e eventos.' },
+    },
+  },
+}
+
+// 跟随当前语言取文本；缺失回退 zh
+function tt(key) {
+  return L[locale.value]?.[key] ?? L.zh[key]
+}
+// 快捷问题随语言切换
+const quickQuestions = computed(() => L[locale.value]?.quick ?? L.zh.quick)
+
+// 意图关键词（多语），用于识别用户问题意图
+const INTENT_KEYWORDS = {
+  store:       { zh: ['门店', '附近', '体验店'],                       en: ['store', 'nearby', 'shop', 'location'],            pt: ['loja', 'perto', 'lojas'] },
+  maintenance: { zh: ['保养', '预约', '体检', '维护'],                 en: ['maintenance', 'service', 'checkup', 'servicing'],  pt: ['manuten', 'revis', 'manutenc'] },
+  rescue:      { zh: ['救援', '拖车', '抛锚'],                         en: ['rescue', 'tow', 'roadside'],                       pt: ['resgate', 'guincho', 'rebocar'] },
+  workorder:   { zh: ['工单', '报修', '维修'],                         en: ['work order', 'repair', 'ticket', 'workorder'],     pt: ['ordem', 'reparo', 'conserto'] },
+  notice:      { zh: ['公告', '召回'],                               en: ['notice', 'recall', 'announcement'],                pt: ['aviso', 'recall'] },
+  activity:    { zh: ['活动', '踏春', '优惠', '促销'],                 en: ['event', 'spring', 'promo', 'discount', 'offer', 'deal'], pt: ['evento', 'promo', 'desconto'] },
+  points:      { zh: ['积分', '兑换', '奖励'],                         en: ['points', 'redeem', 'reward'],                      pt: ['pontos', 'resgatar', 'prêmio', 'premio'] },
+  publish:     { zh: ['发布', '发动态'],                             en: ['post', 'publish'],                                  pt: ['postar', 'publicar'] },
+  interaction: { zh: ['关注', '粉丝', '消息', '互动'],                 en: ['follow', 'fan', 'message', 'interaction'],          pt: ['seguir', 'fã', 'mensagem', 'interação', 'interacao'] },
+  battery:     { zh: ['续航', '电池', '充电'],                         en: ['battery', 'range', 'charging'],                     pt: ['bateria', 'autonomia', 'carregamento'] },
+  warranty:    { zh: ['质保', '保修'],                               en: ['warranty', 'guarantee'],                           pt: ['garantia'] },
+}
 
 // 关键词语义分流：服务类交给原生 service 模块，App 内页直接路由跳转
 function smartReply(text) {
   const s = (text || '').toLowerCase().replace(/\s/g, '')
-  const has = (...kw) => kw.some((k) => s.includes(k))
-  if (has('门店', '附近', '体验店', 'store')) return { a: '附近门店可在「服务 → 附近门店」查看，支持按距离排序与一键导航。', action: { type: 'native', path: 'service/stores', label: '查看附近门店' } }
-  if (has('保养', '预约', '体检', '维护', 'maintenance')) return { a: '车辆保养与体检可在「服务」页在线预约，建议每 2000km 或 3 个月一次。', action: { type: 'native', path: 'service/check', label: '打开保养预约' } }
-  if (has('救援', '拖车', 'roadside', '抛锚')) return { a: '道路救援可在「服务 → 道路救援」一键呼叫，附近门店接单后会主动联系你。', action: { type: 'native', path: 'service/rescue', label: '呼叫道路救援' } }
-  if (has('工单', '报修', '维修', 'workorder')) return { a: '我的工单可在「服务 → 我的工单」查看进度，也可在线提交报修。', action: { type: 'native', path: 'service/workorders', label: '查看我的工单' } }
-  if (has('公告', '召回', 'notice')) return { a: '官方公告含召回、版本、活动与安全提醒，重要通知带红点。', action: { type: 'route', to: '/notices', label: '查看官方公告' } }
-  if (has('活动', '踏春', 'spring', '优惠')) return { a: '踏春出行季精选装备限时直降，满 199 减 30，积分可叠加抵扣。', action: { type: 'route', to: '/featured', label: '进入踏春专场' } }
-  if (has('积分', 'points', '兑换')) return { a: '积分可在积分商城兑换原厂好物，100 积分抵 1 元，签到与发动态都能赚。', action: { type: 'route', to: '/points', label: '进入积分商城' } }
-  if (has('发布', '发动态', 'publish')) return { a: '在「发现」页点右下角 + 即可发布动态，用 #车型# 标记更易被同好看到。', action: { type: 'route', to: '/publish', label: '去发布动态' } }
-  if (has('关注', '粉丝', '消息', '互动', 'interaction')) return { a: '互动消息（赞/评论/关注/系统）可在「我的 → 消息中心」查看。', action: { type: 'route', to: '/interactions', label: '查看互动消息' } }
-  if (has('续航', '电池', '充电', 'battery')) return { a: '电池保养建议：日常保持电量 20%-80%，避免亏电长期存放；冬季室内停放可缓解续航缩水。' }
-  if (has('质保', '保修', 'warranty')) return { a: '整车保修 2 年（关键部件 3 年），电池 1-2 年（按车型）；非人为故障免费维修，详情见购车合同。' }
-  return { a: '收到～这是 HIMA 的演示回复。当前为前端预览版，正式版将接入 PXID 智能出行大模型，可解答保养、续航、门店与活动等问题。' }
+  const hit = (kws) => Object.values(kws).some((arr) => arr.some((k) => s.includes(k.toLowerCase())))
+  for (const intent of Object.keys(INTENT_KEYWORDS)) {
+    if (hit(INTENT_KEYWORDS[intent])) {
+      return L[locale.value]?.replies?.[intent] ?? L.zh.replies[intent]
+    }
+  }
+  return L[locale.value]?.replies?.fallback ?? L.zh.replies.fallback
 }
 
 function showToast(m) {
@@ -179,7 +291,7 @@ function runAction(action) {
   } else if (action.type === 'native') {
     try {
       bridge.openNative(action.path)
-      showToast('正在打开：' + action.label)
+      showToast(action.label)
     } catch (e) {
       console.log('[hima] openNative', action.path)
     }
@@ -195,11 +307,11 @@ function scrollDown() {
 
 function onMore() {
   if (!messages.value.length) {
-    showToast('对话还是空的')
+    showToast(tt('toastEmpty'))
     return
   }
   messages.value = []
-  showToast('对话已清空')
+  showToast(tt('toastCleared'))
 }
 
 // 返回对齐积分页：原生 WebView 打开时关闭回「我的」；浏览器预览退回 router.back()
@@ -226,23 +338,6 @@ function goBack() {
   width: 28px;
   height: 28px;
   color: var(--text);
-}
-
-/* 顶栏标题滚动：英文/葡语较长时避免换行或省略 */
-.title-marquee {
-  width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.title-marquee span {
-  display: inline-block;
-  white-space: nowrap;
-  padding-left: 100%;
-  animation: marquee-title 8s linear infinite;
-}
-@keyframes marquee-title {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-100%); }
 }
 
 .chat {
