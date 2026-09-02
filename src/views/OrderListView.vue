@@ -142,7 +142,7 @@ function buyAgain(o) {
   router.push('/cart')
 }
 function detail(o) {
-  console.log('order detail:', o.id)
+  router.push('/order/' + o.id)
 }
 async function applyReturn(o) {
   if (!o.rawOrderId) return

@@ -83,6 +83,17 @@
       <!-- 三个快捷 -->
       <QuickActions :items="featuredQuickI18n" @tap="onQuick" />
 
+      <!-- 我的订单入口 -->
+      <div class="my-order" @click="router.push('/order/list')">
+        <span class="my-order__ico">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        </span>
+        <span class="my-order__txt">{{ t('featured.myOrder') }}</span>
+        <span class="my-order__arrow">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </span>
+      </div>
+
       <!-- 热购榜单 -->
       <SectionHeader :title="t('featured.hotTitle')" />
       <div class="grid2">
@@ -487,6 +498,32 @@ async function retry() {
   font-weight: 600;
   text-align: center;
   border: none;
+}
+.my-order {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 12px 0;
+  padding: 14px 16px;
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+.my-order__ico {
+  color: var(--brand, #4a6cf7);
+  display: flex;
+  align-items: center;
+}
+.my-order__txt {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.my-order__arrow {
+  color: var(--text-hint);
+  display: flex;
+  align-items: center;
 }
 .grid2 {
   display: grid;

@@ -11,6 +11,7 @@ const CartView = () => import('../views/CartView.vue')
 const CheckoutView = () => import('../views/CheckoutView.vue')
 const OrderSuccessView = () => import('../views/OrderSuccessView.vue')
 const OrderListView = () => import('../views/OrderListView.vue')
+const OrderDetailView = () => import('../views/OrderDetailView.vue')
 const MessageView = () => import('../views/MessageView.vue')
 const FeedDetailView = () => import('../views/FeedDetailView.vue')
 const NoticesView = () => import('../views/NoticesView.vue')
@@ -86,6 +87,7 @@ const routes = [
   { path: '/cart/checkout', name: 'checkout', component: CheckoutView, meta: { hideTabBar: true, title: '确认订单' } },
   { path: '/order/success', name: 'order-success', component: OrderSuccessView, meta: { hideTabBar: true, title: '支付成功' } },
   { path: '/order/list', name: 'order-list', component: OrderListView, meta: { hideTabBar: true, title: '我的订单' } },
+  { path: '/order/:id', name: 'order-detail', component: OrderDetailView, meta: { hideTabBar: true, title: '订单详情' } },
 
   // 发现
   { path: '/message', name: 'message', component: MessageView, meta: { hideTabBar: true } },
