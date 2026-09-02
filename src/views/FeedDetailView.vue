@@ -12,8 +12,10 @@
       </template>
     </TopBar>
 
+  <article class="article">
     <!-- 作者卡：点作者进个人主页（官方帖无 deviceId 不跳） -->
-    <div class="author fade-up stagger-1" @click="goAuthor">
+    <header class="article__header">
+      <div class="author fade-up stagger-1" @click="goAuthor">
       <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.value?.author)" />
       <div class="meta">
         <div class="name">
@@ -32,7 +34,9 @@
 
     <!-- 标题 -->
     <h1 class="title fade-up stagger-2">{{ item.title }}</h1>
+    </header>
 
+    <div class="article__body">
     <!-- 活动报名卡 -->
     <div v-if="isActivity" class="signup">
       <div class="signup__row">
@@ -59,7 +63,7 @@
     </div>
 
     <!-- 图片九宫格 -->
-    <div class="gallery fade-up stagger-3" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
+    <div v-if="images.length && images[0]" class="gallery fade-up stagger-3" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
       <img
         v-for="(img, i) in images"
         :key="i"
@@ -79,6 +83,7 @@
         :class="segClass(seg)"
         @click="segClick(seg)"
       >{{ seg.v }}</span>
+    </div>
     </div>
 
     <!-- 标签 / 车型 -->
@@ -101,6 +106,7 @@
       </div>
       <span class="prod__go">{{ t('feed.goView') }} &gt;</span>
     </div>
+  </article>
 
     <!-- 评论区 -->
     <div class="comments fade-up stagger-7" ref="commentsBox">
@@ -484,7 +490,48 @@ const images = computed(() => {
     : [item.value.cover]
 })
 const videoSrc = computed(() => mediaUrl(item.value && item.value.videoUrl))
-const videoPoster = computed(() => mediaUrl(item.value && item.value.videoCover) || '')
+const generatedPoster = ref('')
+const videoPoster = computed(() => mediaUrl(item.value && item.value.videoCover) || generatedPoster.value || '')
+
+// 视频封面兜底：后端没返 videoCover 时，用 canvas 截取首帧生成 poster
+function generateVideoPoster(url) {
+  if (!url || generatedPoster.value) return
+  const video = document.createElement('video')
+  video.crossOrigin = 'anonymous'
+  video.muted = true
+  video.playsInline = true
+  video.preload = 'metadata'
+  let seekDone = false
+  video.onloadedmetadata = () => {
+    if (seekDone) return
+    seekDone = true
+    // 取 0.5s 避免部分视频开头黑帧
+    video.currentTime = Math.min(0.5, video.duration || 0.5)
+  }
+  video.onseeked = () => {
+    const canvas = document.createElement('canvas')
+    const w = video.videoWidth || 1280
+    const h = video.videoHeight || 720
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0, w, h)
+    try {
+      generatedPoster.value = canvas.toDataURL('image/jpeg', 0.85)
+    } catch (e) {
+      // 跨域限制时无法生成，忽略
+    }
+  }
+  video.onerror = () => {}
+  video.src = url
+}
+watch(videoSrc, (url) => {
+  if (url && !item.value?.videoCover) {
+    nextTick(() => generateVideoPoster(url))
+  }
+}, { immediate: true })
+watch(id, () => { generatedPoster.value = '' })
+
 const gridCols = computed(() => {
   const n = images.value.length
   if (n <= 1) return 1
@@ -767,18 +814,26 @@ function showToast(msg) {
 <style scoped>
 .detail {
   min-height: 100vh;
-  background: var(--bg);
+  background: var(--card);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 .share { display: flex; color: var(--text); }
+
+/* 文章主容器：统一内边距，消除作者/标题/正文/媒体之间的断痕 */
+.article {
+  padding: 8px 16px 16px;
+  background: var(--card);
+}
+.article__header { margin-bottom: 16px; }
+.article__body { margin-bottom: 16px; }
+.article__body > *:last-child { margin-bottom: 0; }
 
 /* 作者卡 */
 .author {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px 6px;
-  background: var(--card);
+  padding-bottom: 12px;
 }
 .avatar {
   width: 40px;
@@ -813,17 +868,15 @@ function showToast(msg) {
 
 /* 标题 */
 .title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--text);
-  line-height: 1.45;
-  padding: 8px 16px 4px;
-  background: var(--card);
+  line-height: 1.4;
 }
 
 /* 活动报名卡 */
 .signup {
-  margin: 12px 16px 0;
+  margin-bottom: 16px;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -851,14 +904,13 @@ function showToast(msg) {
 
 /* 视频播放器 */
 .vd-video {
-  padding: 14px 16px 0;
-  background: var(--card);
+  margin-bottom: 16px;
 }
 .vd-video__el {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: #000;
   display: block;
 }
@@ -867,14 +919,13 @@ function showToast(msg) {
 .gallery {
   display: grid;
   gap: 6px;
-  padding: 14px 16px 0;
-  background: var(--card);
+  margin-bottom: 16px;
 }
 .gallery__img {
   width: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   display: block;
 }
 .gallery__img.single {
@@ -885,10 +936,8 @@ function showToast(msg) {
 
 /* 正文 */
 .content {
-  padding: 14px 16px 4px;
-  background: var(--card);
   font-size: 16px;
-  color: #333;
+  color: var(--text);
   line-height: 1.85;
 }
 .seg--car, .seg--at { color: var(--brand); }
@@ -898,8 +947,7 @@ function showToast(msg) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px 16px 14px;
-  background: var(--card);
+  padding-top: 4px;
 }
 .tag {
   font-size: 13px;
@@ -915,7 +963,7 @@ function showToast(msg) {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 4px 16px 0;
+  margin-top: 12px;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -934,7 +982,7 @@ function showToast(msg) {
 .prod__go { font-size: 13px; color: var(--brand); flex: none; }
 
 /* 评论 */
-.comments { background: var(--card); margin-top: 10px; padding: 14px 16px 0; }
+.comments { background: var(--card); border-top: 1px solid var(--line); padding: 16px; }
 .comments__head { font-size: 15px; font-weight: 600; color: var(--text); }
 .comments__empty { font-size: 13px; color: var(--text-hint); padding: 18px 0; text-align: center; }
 .cmt { display: flex; gap: 10px; padding: 14px 0; border-bottom: 1px solid #f2f3f5; }
@@ -991,7 +1039,7 @@ function showToast(msg) {
 }
 
 /* 相关推荐 */
-.related { background: var(--card); margin-top: 10px; padding: 14px 16px 16px; }
+.related { background: var(--card); border-top: 1px solid var(--line); padding: 16px; }
 .related__head { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
 .related__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .rcard { background: var(--bg); border-radius: var(--radius-lg); overflow: hidden; }
