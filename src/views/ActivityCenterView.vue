@@ -36,6 +36,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { t, locale, initLocale, regionFromLocale } from '../i18n'
 import TopBar from '../components/TopBar.vue'
+import { fetchActivities } from '../api/feed'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
@@ -48,14 +49,7 @@ const currentRegion = computed(() => regionFromLocale(locale.value))
 
 async function load() {
   loading.value = true
-  try {
-    const r = await fetch(`${API_BASE}/activities?region=${currentRegion.value}`)
-    const j = await r.json()
-    if (j.code === 0 && j.data) list.value = j.data.list || []
-    else list.value = []
-  } catch (e) {
-    list.value = []
-  }
+  list.value = await fetchActivities({ region: currentRegion.value })
   loading.value = false
 }
 

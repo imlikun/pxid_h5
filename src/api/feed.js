@@ -198,16 +198,18 @@ export async function fetchComments(id) {
   }
 }
 
-// ---- 广场热门活动（只读；运营后台可配基础活动）----
+// ---- 广场热门活动（只读；运营后台可配基础活动；接口空/异常时前端兜底 mock）----
+import { activities as MOCK_ACTIVITIES } from '../data/mock'
 export async function fetchActivities(params = {}) {
-  if (!FEED_API) return []
+  if (!FEED_API) return MOCK_ACTIVITIES
   try {
     const qs = new URLSearchParams(params).toString()
     const url = '/activities' + (qs ? '?' + qs : '')
     const data = await request(url)
-    return data.list || []
+    const list = data.list || []
+    return list.length ? list : MOCK_ACTIVITIES
   } catch (e) {
-    return []
+    return MOCK_ACTIVITIES
   }
 }
 

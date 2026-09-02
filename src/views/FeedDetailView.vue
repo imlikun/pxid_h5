@@ -41,11 +41,11 @@
     <div v-if="isActivity" class="signup">
       <div class="signup__row">
         <span class="signup__k">{{ t('feed.signup.time') }}</span>
-        <span class="signup__v">{{ item.date }}</span>
+        <span class="signup__v">{{ activityDateText() }}</span>
       </div>
       <div class="signup__row">
         <span class="signup__k">{{ t('feed.signup.place') }}</span>
-        <span class="signup__v">{{ t('feed.signup.placeVal') }}</span>
+        <span class="signup__v">{{ item.location || t('feed.signup.placeVal') }}</span>
       </div>
       <button class="signup__btn press" @click="onActivitySignup">{{ t('feed.signup.btn') }}</button>
     </div>
@@ -561,6 +561,18 @@ async function loadRelated() {
       likes: it.likes || 0,
     }))
   } catch (e) { /* 相关推荐失败不影响详情 */ }
+}
+
+// 活动详情日期：优先 startDate~endDate 区间，fallback date 字段
+function activityDateText() {
+  const it = item.value
+  if (!it) return ''
+  const s = it.startDate || it.start_date || ''
+  const e = it.endDate || it.end_date || ''
+  const f = (d) => { const m = String(d).match(/^\d{4}-(\d{2})-(\d{2})/); return m ? m[1] + '-' + m[2] : d }
+  if (s && e && s !== e) return f(s) + ' ~ ' + f(e)
+  if (s) return f(s)
+  return it.date || ''
 }
 
 // 富文本分段：#车型# / @用户 可点
