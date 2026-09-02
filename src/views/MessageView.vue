@@ -1,7 +1,7 @@
 <template>
   <div class="hima">
     <!-- 顶栏：直接传 title，TopBar 自带居中+省略号，4 字不滚动 -->
-    <TopBar sticky :back="goBack" :title="t('assistant.title')">
+    <TopBar :back="goBack" :title="t('assistant.title')">
       <template #right>
         <span class="more" @click="onMore">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
@@ -10,7 +10,12 @@
     </TopBar>
 
     <!-- 对话区 -->
-    <div class="chat" ref="chatEl">
+    <div
+      class="chat"
+      ref="chatEl"
+      @touchstart="onTouchStart"
+      @touchmove="onTouchMove"
+    >
       <!-- 欢迎态 -->
       <div v-if="!started" class="welcome">
         <div class="hero">
@@ -105,6 +110,7 @@ const typing = ref(false)
 const started = computed(() => messages.value.length > 0)
 const toastMsg = ref('')
 let toastTimer = null
+let touchStartY = 0
 
 // ============================================================
 // 智能助手多语内容（zh / en / pt），跟随系统语言切换
@@ -321,6 +327,19 @@ function goBack() {
   else if (window.history.length > 1) router.back()
   else router.push('/discover')
 }
+
+// 禁用下拉刷新：聊天区已置顶时继续下滑会冒泡到 WebView 触发全局下拉刷新
+function onTouchStart(e) {
+  touchStartY = e.touches[0].clientY
+}
+function onTouchMove(e) {
+  const el = chatEl.value
+  if (!el) return
+  // 仅在聊天区已滑到顶部且用户继续向下滑时阻止默认行为
+  if (el.scrollTop <= 0 && e.touches[0].clientY > touchStartY) {
+    e.preventDefault()
+  }
+}
 </script>
 
 <style scoped>
@@ -343,8 +362,9 @@ function goBack() {
 .chat {
   flex: 1;
   overflow-y: auto;
-  padding: 64px 14px 8px;
+  padding: 12px 14px 8px;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 /* 欢迎态 */
