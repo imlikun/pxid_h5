@@ -47,7 +47,7 @@
         <span class="signup__k">{{ t('feed.signup.place') }}</span>
         <span class="signup__v">{{ item.location || t('feed.signup.placeVal') }}</span>
       </div>
-      <button class="signup__btn press" @click="onActivitySignup">{{ t('feed.signup.btn') }}</button>
+      <button class="signup__btn press" :class="{ signed: signedUp }" :disabled="signedUp" @click="onActivitySignup">{{ signedUp ? t('feed.signup.joined') : t('feed.signup.btn') }}</button>
     </div>
 
     <!-- 视频播放器 -->
@@ -231,7 +231,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
 import { t, locale, regionFromLocale } from '../i18n'
-import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite } from '../api/feed'
+import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail } from '../api/feed'
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
@@ -244,6 +244,10 @@ const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://
 
 const isActivity = computed(() => route.path.startsWith('/activity'))
 const id = computed(() => Number(route.params.id))
+// 活动没有 deviceId → 视为官方，隐藏关注按钮、显示官方徽章
+const isOfficial = computed(() => !item.value || !item.value.deviceId || !!item.value.isOfficial)
+// 当前用户是否已报名该活动（控制报名按钮态）
+const signedUp = ref(false)
 const authorAvatar = computed(() => resolveAvatar(item.value?.author, item.value?.avatar))
 
 // 真实数据源（从接口拉取，activity 从 mock 取）
@@ -410,7 +414,8 @@ async function load() {
   item.value = null
   loading.value = true
   if (isActivity.value) {
-    item.value = activities.find((i) => i.id === id.value) || null
+    item.value = await fetchActivityDetail(id.value)
+    if (item.value) checkMySignup(id.value)
   } else {
     try {
       const data = await fetchFeedDetail(id.value)
@@ -735,9 +740,48 @@ async function copyShareLink(url) {
     showToast(t('feed.toast.shareLink') + url)
   }
 }
-function onActivitySignup() {
-  bridge.requestPurchase({ type: 'activity', id: id.value })
-  showToast(t('feed.toast.signupOpen'))
+async function onActivitySignup() {
+  if (signedUp.value) { showToast(t('feed.toast.signedUp')); return }
+  try {
+    const [profile, token] = await Promise.all([
+      bridge.getUserInfo().catch(() => ({ nickname: '' })),
+      bridge.getAuthToken(),
+    ])
+    if (!token) { showToast(t('feed.toast.needLogin')); return }
+    const r = await fetch(`${API_BASE}/activities/${id.value}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ name: profile.nickname || '', phone: '', bikeModel: '' }),
+    })
+    const j = await r.json()
+    if (j.code === 0) {
+      signedUp.value = true
+      showToast(t('feed.toast.signupOk'))
+      if (item.value && item.value.signupCount != null) item.value.signupCount = Number(item.value.signupCount) + 1
+    } else if (j.message && j.message.indexOf('名额') >= 0) {
+      showToast(t('feed.toast.signupFull'))
+    } else if (j.message && j.message.indexOf('已报名') >= 0) {
+      signedUp.value = true
+      showToast(t('feed.toast.signedUp'))
+    } else {
+      showToast(j.message || t('feed.toast.signupFail'))
+    }
+  } catch (e) {
+    showToast(t('feed.toast.signupFail'))
+  }
+}
+
+// 查当前用户是否已报名该活动（初始化报名按钮态）
+async function checkMySignup(aid) {
+  try {
+    const token = await bridge.getAuthToken()
+    if (!token) return
+    const r = await fetch(`${API_BASE}/activities/${aid}/signup/me`, {
+      headers: { Authorization: 'Bearer ' + token },
+    })
+    const j = await r.json()
+    if (j.code === 0 && j.data && j.data.signedUp) signedUp.value = true
+  } catch (e) { /* 未登录/失败不阻断 */ }
 }
 function onProductCard() {
   const p = item.value && item.value.productCard

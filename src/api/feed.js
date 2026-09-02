@@ -213,6 +213,17 @@ export async function fetchActivities(params = {}) {
   }
 }
 
+// ---- 活动详情：优先真实 /activities/:id，404/异常回退本地 mock ----
+export async function fetchActivityDetail(id) {
+  if (!FEED_API) return MOCK_ACTIVITIES.find((i) => i.id === Number(id)) || null
+  try {
+    const data = await request('/activities/' + id)
+    return data
+  } catch (e) {
+    return MOCK_ACTIVITIES.find((i) => i.id === Number(id)) || null
+  }
+}
+
 // ---- 关注 / 取关 / 检查（动态关注流）----
 // followeeMemberUserId：被关注者的会员 ID（有就传，便于「同人换设备」后关注关系仍命中）
 export async function followUser(followeeDevice, followeeMemberUserId = '') {
