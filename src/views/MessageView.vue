@@ -10,10 +10,9 @@
     </TopBar>
 
     <!-- 对话区 -->
-    <div
-      class="chat"
-      ref="chatEl"
-    >
+    <div class="chat">
+      <div class="chat-spacer"></div>
+      <div class="chat-body" ref="chatEl">
       <!-- 欢迎态 -->
       <div v-if="!started" class="welcome">
         <div class="hero">
@@ -72,6 +71,7 @@
           <div class="msg__bubble typing"><span></span><span></span><span></span></div>
         </div>
       </template>
+      </div>
     </div>
 
     <!-- 底部输入 -->
@@ -346,9 +346,22 @@ function goBack() {
 
 .chat {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* 64px 顶部安全区由 .chat-spacer 永久固定，永远不滚，
+     避免滚动后内容贴顶栏——之前 padding-top 随 scrollTop 滚出是遮挡真因 */
+}
+.chat-spacer {
+  flex: none;
+  height: 64px;
+}
+.chat-body {
+  flex: 1;
   overflow-y: auto;
-  padding: 64px 14px 8px;
+  padding: 12px 14px 8px;
   -webkit-overflow-scrolling: touch;
+  min-height: 0; /* flex 子项可滚必要 */
 }
 
 /* 欢迎态 */
