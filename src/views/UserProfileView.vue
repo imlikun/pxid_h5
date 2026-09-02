@@ -192,29 +192,21 @@ const EMPTY_NICK = new Set(['', '骑友'])
 // 用户在 H5 改过资料后的「保护期」：期间不用 Flutter 值覆盖，避免刚改的资料被 Flutter 旧值吃掉。
 // 过期后恢复 Flutter 优先，自动纠正 H5 端可能存在的历史污染值。
 const H5_EDIT_TTL = 7 * 24 * 3600 * 1000
-async function mergeNativeProfile(u) {
+async function mergeNativeProfile() {
   try {
     const p = await bridge.getUserInfo()
     if (!p) return
-    // Flutter 是主端真源：只要返回有效资料就无条件覆盖并写库（幂等）。
-    // 不再用「值是否变化」判断、不再设 7 天保护期——
-    // 旧逻辑下 App 改头像后 getUserInfo 返回新值却因「等于旧值」被跳过，库永远不更新；
-    // 若 Flutter 确实返回新头像，这里会第一时间 PUT 后端，让库/他人视角也同步。
+    // Flutter 只作「写库触发器」：把当前主端资料写回 H5 user_profiles（幂等）。
+    // 写完后重新从后端 /users/me 取最新资料作唯一真相源，绝不直接用 Flutter 瞬时值覆盖展示。
     const patch = {}
-    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim())) {
-      u.nickname = String(p.nickname); patch.nickname = u.nickname
-    }
-    if (p.avatar) {
-      u.avatar = String(p.avatar); patch.avatar = u.avatar
-    }
-    if (p.carModel) {
-      u.carModel = String(p.carModel); patch.carModel = u.carModel
-    }
-    // 把 Flutter 最新资料持久化回 H5 user_profiles，让列表/他人视角也同步新头像
+    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim())) patch.nickname = String(p.nickname)
+    if (p.avatar) patch.avatar = String(p.avatar)
+    if (p.carModel) patch.carModel = String(p.carModel)
     if (Object.keys(patch).length) {
       try {
         await updateMyProfile(patch)
-        // 后端已更新资料 + 回刷快照；重新加载列表，确保 rowToFeed 读到最新 user_profiles
+        // 重新加载后端资料（唯一真相源）：头部与列表此后都读同一个后端值，永远一致
+        user.value = await fetchMyProfile()
         await loadContent(true)
       } catch (e) { console.warn('[mergeNativeProfile] persist failed:', e.message || e) }
     }
@@ -227,7 +219,7 @@ async function loadProfile() {
   // 自己：只走 /users/me（token 身份最可靠，且不回退 deviceId 避免跨账号串号）；他人：/users/:deviceId
   user.value = isSelf.value ? await fetchMyProfile() : await fetchUserProfile(d)
   if (!user.value) { showToast('用户信息加载失败'); return }
-  if (isSelf.value) await mergeNativeProfile(user.value)
+  if (isSelf.value) await mergeNativeProfile()
   // 关注/粉丝/收藏统一走后端 H5 关系表，避免 Flutter 桥返回空导致计数清零
 }
 
