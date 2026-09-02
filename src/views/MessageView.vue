@@ -10,9 +10,7 @@
     </TopBar>
 
     <!-- 对话区 -->
-    <div class="chat">
-      <div class="chat-spacer"></div>
-      <div class="chat-body" ref="chatEl">
+    <div class="chat" ref="chatEl">
       <!-- 欢迎态 -->
       <div v-if="!started" class="welcome">
         <div class="hero">
@@ -71,7 +69,6 @@
           <div class="msg__bubble typing"><span></span><span></span><span></span></div>
         </div>
       </template>
-      </div>
     </div>
 
     <!-- 底部输入 -->
@@ -346,22 +343,17 @@ function goBack() {
 
 .chat {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  /* 64px 顶部安全区由 .chat-spacer 永久固定，永远不滚，
-     避免滚动后内容贴顶栏——之前 padding-top 随 scrollTop 滚出是遮挡真因 */
-}
-.chat-spacer {
-  flex: none;
-  height: 12px; /* 紧贴顶栏的小视觉间距；之前 64px 过度设计，把内容推得太远，整片灰夹在顶栏和内容之间像"遮罩"。滚动后消息在 48+12=60+，不透明顶栏 0~48 不重叠不挡 */
-}
-.chat-body {
-  flex: 1;
   overflow-y: auto;
-  padding: 12px 14px 8px;
+  padding: 5px 14px 8px; /* 坤哥指定 top 5px：对话框紧贴顶栏下，padding 5 让内容起 53。
+                            滚动后 padding-top 随 scrollTop 滚出，但消息在 48+ 不被顶栏切 */
   -webkit-overflow-scrolling: touch;
-  min-height: 0; /* flex 子项可滚必要 */
+}
+/* 真机 Flutter WebView 中 position:sticky + z-index:10 偶尔退化为 fixed 浮层（不占流），
+   导致 chat 从 y=0 起被顶栏盖住。此处强制顶栏 relative 占流 48，chat 始终在 48 之下 */
+:deep(.tb-bar.tb-sticky) {
+  position: relative !important;
+  z-index: auto !important;
+  top: auto !important;
 }
 
 /* 欢迎态 */
