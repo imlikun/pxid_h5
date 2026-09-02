@@ -194,26 +194,23 @@ const EMPTY_NICK = new Set(['', '骑友'])
 const H5_EDIT_TTL = 7 * 24 * 3600 * 1000
 async function mergeNativeProfile(u) {
   try {
-    const mid = String(u.memberUserId || '')
-    if (mid) {
-      const editedAt = Number(localStorage.getItem(`pxid_h5_profile_edited_at:${mid}`) || 0)
-      if (editedAt && Date.now() - editedAt < H5_EDIT_TTL) return // 保护期内：尊重 H5 的值
-    }
     const p = await bridge.getUserInfo()
     if (!p) return
-    // 用 Flutter 主端最新资料覆盖（仅当值真的不同才记 patch，避免无意义写）
+    // Flutter 是主端真源：只要返回有效资料就无条件覆盖并写库（幂等）。
+    // 不再用「值是否变化」判断、不再设 7 天保护期——
+    // 旧逻辑下 App 改头像后 getUserInfo 返回新值却因「等于旧值」被跳过，库永远不更新；
+    // 若 Flutter 确实返回新头像，这里会第一时间 PUT 后端，让库/他人视角也同步。
     const patch = {}
-    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim()) && p.nickname !== u.nickname) {
+    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim())) {
       u.nickname = String(p.nickname); patch.nickname = u.nickname
     }
-    if (p.avatar && p.avatar !== u.avatar) {
+    if (p.avatar) {
       u.avatar = String(p.avatar); patch.avatar = u.avatar
     }
-    if (p.carModel && p.carModel !== u.carModel) {
+    if (p.carModel) {
       u.carModel = String(p.carModel); patch.carModel = u.carModel
     }
-    // 把 Flutter 最新资料持久化回 H5 user_profiles：否则「App 改头像」后，
-    // 个人主页动态列表（rowToFeed 读 user_profiles）仍显示旧头像。
+    // 把 Flutter 最新资料持久化回 H5 user_profiles，让列表/他人视角也同步新头像
     if (Object.keys(patch).length) {
       try {
         await updateMyProfile(patch)
