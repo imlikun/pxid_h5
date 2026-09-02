@@ -276,7 +276,8 @@ CREATE TABLE IF NOT EXISTS banned (
 CREATE TABLE IF NOT EXISTS activity_signups (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   activity_id INTEGER NOT NULL,
-  device_id TEXT NOT NULL,
+  device_id TEXT NOT NULL DEFAULT '',
+  member_user_id TEXT NOT NULL DEFAULT '',
   name TEXT NOT NULL DEFAULT '',
   phone TEXT NOT NULL DEFAULT '',
   bike_model TEXT NOT NULL DEFAULT '',
@@ -288,7 +289,8 @@ CREATE TABLE IF NOT EXISTS activity_checkins (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   activity_id INTEGER NOT NULL,
   signup_id INTEGER NOT NULL,
-  device_id TEXT NOT NULL,
+  device_id TEXT NOT NULL DEFAULT '',
+  member_user_id TEXT NOT NULL DEFAULT '',
   operator_device TEXT NOT NULL DEFAULT '',
   code TEXT NOT NULL DEFAULT '',
   method TEXT NOT NULL DEFAULT 'scan',     -- scan / geo / manual
@@ -298,14 +300,16 @@ CREATE TABLE IF NOT EXISTS activity_checkins (
 CREATE TABLE IF NOT EXISTS activity_shares (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   activity_id INTEGER NOT NULL,
-  device_id TEXT NOT NULL,
+  device_id TEXT NOT NULL DEFAULT '',
+  member_user_id TEXT NOT NULL DEFAULT '',
   channel TEXT NOT NULL DEFAULT '',        -- wechat / moments / poster
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS activity_prizes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   activity_id INTEGER NOT NULL,
-  device_id TEXT NOT NULL,
+  device_id TEXT NOT NULL DEFAULT '',
+  member_user_id TEXT NOT NULL DEFAULT '',
   prize TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',  -- pending / sent
   created_at TEXT NOT NULL
@@ -341,6 +345,11 @@ try { db.exec("CREATE INDEX IF NOT EXISTS idx_notif_member ON notifications(memb
 })
 try { db.exec("ALTER TABLE follows ADD COLUMN follower_member_user_id TEXT NOT NULL DEFAULT ''") } catch (_) {}
 try { db.exec("ALTER TABLE follows ADD COLUMN followee_member_user_id TEXT NOT NULL DEFAULT ''") } catch (_) {}
+
+// 活动相关表补 member_user_id 维度（生产 ToC 态 device_id 为空，必须按 member_user_id 识别报名/核销/分享）
+;['activity_signups', 'activity_checkins', 'activity_shares', 'activity_prizes'].forEach((t) => {
+  try { db.exec(`ALTER TABLE ${t} ADD COLUMN member_user_id TEXT NOT NULL DEFAULT ''`) } catch (_) {}
+})
 
 // ---- 用户资料表：device / member_user_id 双维度，作为昵称/头像唯一真相源 ----
 db.exec(`
@@ -2549,6 +2558,18 @@ app.delete('/admin/activities/:id', requireAdmin, (req, res) => {
   res.json(ok({ id: req.params.id }))
 })
 
+// 活动身份：ToC token 可能只有 memberUserId、无 deviceId，故报名/核销/查询均按双身份命中
+function activityIdentity(req) {
+  return {
+    deviceId: String((req.user && req.user.deviceId) || ''),
+    memberUserId: String((req.user && req.user.memberUserId) || ''),
+  }
+}
+function identityMatchSql(prefix = '') {
+  const p = prefix ? prefix + '.' : ''
+  return `((length(${p}device_id)>0 AND ${p}device_id=?) OR (length(${p}member_user_id)>0 AND ${p}member_user_id=?))`
+}
+
 // ============================================================
 // 活动模块完整接口（厂商活动全流程）
 // ============================================================
@@ -2560,22 +2581,17 @@ function doCheckin(activityId, code, operator, method, lat, lng) {
   if (sup.status !== 'joined') return err(1, '该报名已取消')
   const done = db.prepare('SELECT 1 FROM activity_checkins WHERE signup_id=?').get(sup.id)
   if (done) return err(1, '已核销')
-  db.prepare(`INSERT INTO activity_checkins (activity_id, signup_id, device_id, operator_device, code, method, lat, lng, checked_at) VALUES (?,?,?,?,?,?,?,?,?)`).run(activityId, sup.id, sup.device_id, String(operator || ''), code, method || 'scan', lat || null, lng || null, now())
+  db.prepare(`INSERT INTO activity_checkins (activity_id, signup_id, device_id, member_user_id, operator_device, code, method, lat, lng, checked_at) VALUES (?,?,?,?,?,?,?,?,?,?)`).run(activityId, sup.id, sup.device_id || '', sup.member_user_id || '', String(operator || ''), code, method || 'scan', lat || null, lng || null, now())
   return ok({ ok: true, name: sup.name, bikeModel: sup.bike_model })
 }
 
-// 我的全部活动（user 侧：按 deviceId 列出所有报名 + 关联活动 + 核销状态）
+// 我的全部活动（user 侧：按 deviceId 或 memberUserId 列出所有报名 + 关联活动 + 核销状态）
 // 注意：必须声明在 /activities/:id 之前，否则 'me' 会被 :id 参数吞掉
-// R2：加 requireAuth；配 secret 时强制用 token 内 deviceId（防枚举他人报名/核销码），未配时降级 query + warning
 app.get('/activities/me', requireAuth, (req, res) => {
-  const deviceId = (USER_TOKEN_SECRET && req.user && req.user.deviceId) || String(req.query.deviceId || '')
-  if (!deviceId) {
-    if (USER_TOKEN_SECRET) return res.status(401).json(err(401, '未授权：Token 缺少设备信息'))
+  const { deviceId, memberUserId } = activityIdentity(req)
+  if (!deviceId && !memberUserId) {
+    if (USER_TOKEN_SECRET) return res.status(401).json(err(401, '未授权：Token 缺少身份信息'))
     return res.json(err(1, '缺少 deviceId'))
-  }
-  if (!USER_TOKEN_SECRET && !_tokenFallbackWarned) {
-    console.warn('[pxid-feed] USER_TOKEN_SECRET 未配置，/activities/me 使用 query.deviceId（过渡降级）')
-    _tokenFallbackWarned = true
   }
   const rows = db.prepare(`
     SELECT s.id AS sid, s.status AS sstatus, s.name AS sname, s.bike_model, s.checkin_code, s.created_at AS screated,
@@ -2584,7 +2600,7 @@ app.get('/activities/me', requireAuth, (req, res) => {
            (SELECT 1 FROM activity_checkins WHERE signup_id=s.id) AS checked,
            (SELECT checked_at FROM activity_checkins WHERE signup_id=s.id) AS checked_at
     FROM activity_signups s JOIN activities a ON a.id=s.activity_id
-    WHERE s.device_id=? ORDER BY s.id DESC`).all(String(deviceId))
+    WHERE ${identityMatchSql('s')} ORDER BY s.id DESC`).all(deviceId, memberUserId)
   const list = rows.map((r) => ({
     id: r.sid,
     status: r.sstatus,
@@ -2614,9 +2630,8 @@ app.get('/activities/:id', (req, res) => {
 // 报名
 app.post('/activities/:id/signup', requireAuth, (req, res) => {
   const { name = '', phone = '', bikeModel = '' } = req.body || {}
-  // 安全：报名 deviceId 强制用 token 内可信值（P0-4），未配 USER_TOKEN_SECRET 时降级用 body 传值
-  const deviceId = (USER_TOKEN_SECRET && req.user && req.user.deviceId) || String(req.body.deviceId || '')
-  if (!deviceId) return res.json(err(1, '缺少 deviceId'))
+  const { deviceId, memberUserId } = activityIdentity(req)
+  if (!deviceId && !memberUserId) return res.json(err(1, '缺少 deviceId'))
   const act = db.prepare('SELECT * FROM activities WHERE id=?').get(req.params.id)
   if (!act || act.status !== 'on') return res.json(err(404, '活动不存在或已下架'))
   const quota = act.quota || 0
@@ -2624,10 +2639,10 @@ app.post('/activities/:id/signup', requireAuth, (req, res) => {
     const c = db.prepare("SELECT COUNT(*) c FROM activity_signups WHERE activity_id=? AND status='joined'").get(act.id).c
     if (c >= quota) return res.json(err(1, '名额已满'))
   }
-  const dup = db.prepare('SELECT 1 FROM activity_signups WHERE activity_id=? AND device_id=? AND status=?').get(act.id, deviceId, 'joined')
+  const dup = db.prepare(`SELECT 1 FROM activity_signups WHERE activity_id=? AND status='joined' AND ${identityMatchSql()}`).get(act.id, deviceId, memberUserId)
   if (dup) return res.json(err(1, '已报名'))
   const code = 'ACT-' + act.id + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10)
-  const info = db.prepare(`INSERT INTO activity_signups (activity_id, device_id, name, phone, bike_model, checkin_code, status, created_at) VALUES (?,?,?,?,?,?,'joined',?)`).run(act.id, deviceId, String(name).slice(0,20), String(phone).slice(0,20), String(bikeModel||''), code, now())
+  const info = db.prepare(`INSERT INTO activity_signups (activity_id, device_id, member_user_id, name, phone, bike_model, checkin_code, status, created_at) VALUES (?,?,?,?,?,?,?,'joined',?)`).run(act.id, deviceId, memberUserId, String(name).slice(0,20), String(phone).slice(0,20), String(bikeModel||''), code, now())
   db.prepare("UPDATE activities SET signup_count = (SELECT COUNT(*) FROM activity_signups WHERE activity_id=? AND status='joined') WHERE id=?").run(act.id, act.id)
   const row = db.prepare('SELECT * FROM activity_signups WHERE id=?').get(info.lastInsertRowid)
   res.json(ok({ id: row.id, name: row.name, bikeModel: row.bike_model, checkinCode: row.checkin_code }))
@@ -2635,26 +2650,21 @@ app.post('/activities/:id/signup', requireAuth, (req, res) => {
 
 // 取消报名
 app.delete('/activities/:id/signup', requireAuth, (req, res) => {
-  // 安全：取消报名 deviceId 强制 token 内可信值（P0-3），未配 USER_TOKEN_SECRET 时降级用 query 传值
-  const deviceId = (USER_TOKEN_SECRET && req.user && req.user.deviceId) || String(req.query.deviceId || '')
-  if (!deviceId) return res.json(err(1, '缺少 deviceId'))
-  db.prepare("UPDATE activity_signups SET status='cancelled' WHERE activity_id=? AND device_id=? AND status='joined'").run(req.params.id, deviceId)
+  const { deviceId, memberUserId } = activityIdentity(req)
+  if (!deviceId && !memberUserId) return res.json(err(1, '缺少 deviceId'))
+  db.prepare(`UPDATE activity_signups SET status='cancelled' WHERE activity_id=? AND status='joined' AND ${identityMatchSql()}`).run(req.params.id, deviceId, memberUserId)
   db.prepare("UPDATE activities SET signup_count = (SELECT COUNT(*) FROM activity_signups WHERE activity_id=? AND status='joined') WHERE id=?").run(req.params.id, req.params.id)
   res.json(ok({ cancelled: true }))
 })
 
-// 我的报名（含核销码）——R2：加 requireAuth，配 secret 时强制用 token 内 deviceId
+// 我的报名（含核销码）
 app.get('/activities/:id/signup/me', requireAuth, (req, res) => {
-  const deviceId = (USER_TOKEN_SECRET && req.user && req.user.deviceId) || String(req.query.deviceId || '')
-  if (!deviceId) {
-    if (USER_TOKEN_SECRET) return res.status(401).json(err(401, '未授权：Token 缺少设备信息'))
+  const { deviceId, memberUserId } = activityIdentity(req)
+  if (!deviceId && !memberUserId) {
+    if (USER_TOKEN_SECRET) return res.status(401).json(err(401, '未授权：Token 缺少身份信息'))
     return res.json(err(1, '缺少 deviceId'))
   }
-  if (!USER_TOKEN_SECRET && !_tokenFallbackWarned) {
-    console.warn('[pxid-feed] USER_TOKEN_SECRET 未配置，/activities/:id/signup/me 使用 query.deviceId（过渡降级）')
-    _tokenFallbackWarned = true
-  }
-  const row = db.prepare("SELECT * FROM activity_signups WHERE activity_id=? AND device_id=? AND status='joined'").get(req.params.id, deviceId)
+  const row = db.prepare(`SELECT * FROM activity_signups WHERE activity_id=? AND status='joined' AND ${identityMatchSql()}`).get(req.params.id, deviceId, memberUserId)
   res.json(ok({ signedUp: !!row, signup: row ? { id: row.id, name: row.name, bikeModel: row.bike_model, checkinCode: row.checkin_code } : null }))
 })
 
@@ -2666,9 +2676,11 @@ app.post('/activities/:id/checkin', requireAuth, (req, res) => {
 
 // 分享
 app.post('/activities/:id/share', requireAuth, (req, res) => {
-  const { deviceId = '', channel = '' } = req.body || {}
-  if (!deviceId) return res.json(err(1, '缺少 deviceId'))
-  db.prepare('INSERT INTO activity_shares (activity_id, device_id, channel, created_at) VALUES (?,?,?,?)').run(req.params.id, deviceId, String(channel||''), now())
+  const { deviceId: bodyDeviceId = '', channel = '' } = req.body || {}
+  const { deviceId: tokenDeviceId, memberUserId } = activityIdentity(req)
+  const deviceId = tokenDeviceId || bodyDeviceId
+  if (!deviceId && !memberUserId) return res.json(err(1, '缺少 deviceId'))
+  db.prepare('INSERT INTO activity_shares (activity_id, device_id, member_user_id, channel, created_at) VALUES (?,?,?,?,?)').run(req.params.id, deviceId, memberUserId, String(channel||''), now())
   res.json(ok({ shared: true }))
 })
 
@@ -2705,9 +2717,9 @@ app.get('/admin/activities/:id/prizes', requireAdmin, (req, res) => {
   res.json(ok({ list: rows }))
 })
 app.post('/admin/activities/:id/prizes', requireAdmin, (req, res) => {
-  const { deviceId, prize } = req.body || {}
-  if (!deviceId) return res.json(err(1, '缺少 deviceId'))
-  const info = db.prepare("INSERT INTO activity_prizes (activity_id, device_id, prize, status, created_at) VALUES (?,?,?,'pending',?)").run(req.params.id, deviceId, String(prize||''), now())
+  const { deviceId = '', memberUserId = '', prize } = req.body || {}
+  if (!deviceId && !memberUserId) return res.json(err(1, '缺少 deviceId'))
+  const info = db.prepare("INSERT INTO activity_prizes (activity_id, device_id, member_user_id, prize, status, created_at) VALUES (?,?,?,?,'pending',?)").run(req.params.id, deviceId, memberUserId, String(prize||''), now())
   res.json(ok(db.prepare('SELECT * FROM activity_prizes WHERE id=?').get(info.lastInsertRowid)))
 })
 app.put('/admin/activities/:id/prizes/:pid', requireAdmin, (req, res) => {
