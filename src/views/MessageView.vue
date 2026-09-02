@@ -1,7 +1,7 @@
 <template>
   <div class="hima">
     <!-- 顶栏：直接传 title，TopBar 自带居中+省略号，4 字不滚动 -->
-    <TopBar :back="goBack" :title="t('assistant.title')">
+    <TopBar sticky :back="goBack" :title="t('assistant.title')">
       <template #right>
         <span class="more" @click="onMore">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
@@ -13,8 +13,6 @@
     <div
       class="chat"
       ref="chatEl"
-      @touchstart="onTouchStart"
-      @touchmove="onTouchMove"
     >
       <!-- 欢迎态 -->
       <div v-if="!started" class="welcome">
@@ -95,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onActivated, onDeactivated } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import bridge from '../bridge'
@@ -110,7 +108,6 @@ const typing = ref(false)
 const started = computed(() => messages.value.length > 0)
 const toastMsg = ref('')
 let toastTimer = null
-let touchStartY = 0
 
 // ============================================================
 // 智能助手多语内容（zh / en / pt），跟随系统语言切换
@@ -328,24 +325,6 @@ function goBack() {
   else router.push('/discover')
 }
 
-// 进入本页时关闭原生 WebView 下拉刷新（避免对话区下滑误触全局刷新）；
-// 离开时恢复。注意：最终是否生效取决于 Flutter 是否实现 PXIDBridge.setPullRefresh，
-// H5 侧已通过 bridge 发出请求（mock 环境为空实现，不影响预览）。
-onActivated(() => bridge.setPullRefresh(false))
-onDeactivated(() => bridge.setPullRefresh(true))
-
-// 禁用下拉刷新：聊天区已置顶时继续下滑会冒泡到 WebView 触发全局下拉刷新
-function onTouchStart(e) {
-  touchStartY = e.touches[0].clientY
-}
-function onTouchMove(e) {
-  const el = chatEl.value
-  if (!el) return
-  // 仅在聊天区已滑到顶部且用户继续向下滑时阻止默认行为
-  if (el.scrollTop <= 0 && e.touches[0].clientY > touchStartY) {
-    e.preventDefault()
-  }
-}
 </script>
 
 <style scoped>
@@ -353,8 +332,6 @@ function onTouchMove(e) {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  height: 100dvh; /* 精确贴合嵌入 WebView 可视高度，避免 100vh 溢出整页滚动 */
-  overflow: hidden; /* 内容只在 .chat 内滚动，杜绝文档级下拉刷新触发 */
   background: var(--bg, #f7f8fa);
 }
 :deep(.tb-bar) { background: var(--card, #fff); }
@@ -370,9 +347,8 @@ function onTouchMove(e) {
 .chat {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 14px 8px;
+  padding: 64px 14px 8px;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
 }
 
 /* 欢迎态 */
