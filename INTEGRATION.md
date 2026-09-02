@@ -387,7 +387,7 @@ window.PXIDApp = {
 
 - 用户资料（头像/昵称/车型）以 Flutter `getUserInfo()` 为准，H5 不自己存会过期的副本；头像改了就重拉覆盖。
 - `member_user_id` 是全站唯一身份标识，匹配时只按它，不要 `OR device_id` 兜底（游客才走 device）。
-- 过渡期 H5 自建 `user_profiles` 影子表兜底，根治等北帆补「按 ID 取资料」接口（见 `docs/按ID取用户资料_接口需求.md`）。
+- 过渡期 H5 自建 `user_profiles` 影子表**止血**（仅保证你自己主页/历史帖头像同步），全站一致的根治**待北帆补「按 ID 取资料」接口**（见 `docs/按ID取用户资料_接口需求.md`，目前悬空未排期）。
 
 ---
 
