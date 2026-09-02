@@ -354,7 +354,7 @@ function goBack() {
 }
 .chat-spacer {
   flex: none;
-  height: 64px;
+  height: 12px; /* 紧贴顶栏的小视觉间距；之前 64px 过度设计，把内容推得太远，整片灰夹在顶栏和内容之间像"遮罩"。滚动后消息在 48+12=60+，不透明顶栏 0~48 不重叠不挡 */
 }
 .chat-body {
   flex: 1;
