@@ -26,26 +26,41 @@ export function getRegion() {
 export async function fetchProducts(region = getRegion()) {
   if (_loading) return _loading
   _loading = (async () => {
+    let lastErr = null
     try {
-      const url = `${API_BASE}/mall-api/products?region=${region}`
-      console.log('[shop] fetching', url)
-      const r = await fetch(url)
-      if (!r.ok) throw new Error('HTTP ' + r.status)
-      const json = await r.json()
-      const payload = json.data || json
-      const list = Array.isArray(payload.list) ? payload.list : []
-      // 原地修改 reactive 字段（不要整体重赋值 _cache，否则 computed 不会刷新）
-      _cache.region = region
-      _cache.list = list
-      _cache.store =
-        payload.store || (json.data && json.data.store) || _cache.store || ''
-      _cache.currency = payload.currency || _cache.currency
-      _lastError = ''
-      console.log('[shop] got', list.length, 'products, store=', _cache.store)
-    } catch (e) {
-      _lastError = String(e.message || e)
-      console.error('[shop] fetch failed:', _lastError)
-      // 不覆盖旧缓存（如果有缓存数据就继续展示旧的）
+      // 重试 2 次（共 3 次）+ 单次 8s 超时兜底，消除偶发网络抖动导致的整页空白
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const ctrl = new AbortController()
+        const timer = setTimeout(() => ctrl.abort(), 8000)
+        try {
+          const url = `${API_BASE}/mall-api/products?region=${region}`
+          console.log('[shop] fetching', url, 'attempt', attempt + 1)
+          const r = await fetch(url, { signal: ctrl.signal })
+          if (!r.ok) throw new Error('HTTP ' + r.status)
+          const json = await r.json()
+          clearTimeout(timer)
+          const payload = json.data || json
+          const list = Array.isArray(payload.list) ? payload.list : []
+          // 原地修改 reactive 字段（不要整体重赋值 _cache，否则 computed 不会刷新）
+          _cache.region = region
+          _cache.list = list
+          _cache.store =
+            payload.store || (json.data && json.data.store) || _cache.store || ''
+          _cache.currency = payload.currency || _cache.currency
+          _lastError = ''
+          console.log('[shop] got', list.length, 'products, store=', _cache.store)
+          return _cache
+        } catch (e) {
+          clearTimeout(timer)
+          lastErr = e
+          _lastError = String(e.message || e)
+          console.error('[shop] fetch failed (attempt ' + (attempt + 1) + '):', _lastError)
+          // HTTP 错误/超时/网络抖动均重试；最后一次失败则跳出
+          if (attempt < 2) await new Promise((res) => setTimeout(res, 600))
+        }
+      }
+      console.error('[shop] products fetch finally failed:', String(lastErr && lastErr.message))
+      // 不覆盖旧缓存（若有），_lastError 已记录供 UI 展示
     } finally {
       _loading = null
     }

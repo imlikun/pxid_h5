@@ -200,12 +200,15 @@ onMounted(async () => {
   try {
     await initLocale() // 语言决定内容地区，见 regionFromLocale
     await initRegion()
-    await Promise.all([fetchProducts(), fetchFeaturedConfig()])
+    await fetchProducts() // 商品先出，不阻塞
     store.value = getStore()
     error.value = getLastError()
+  } catch (e) {
+    error.value = getLastError() || String(e.message || e)
   } finally {
     loading.value = false
   }
+  fetchFeaturedConfig() // 后台精选配置：异步补，不阻塞首屏商品渲染（配置回来后各 computed 自动重算）
   startBanner()
   document.addEventListener('visibilitychange', onVis)
 })
@@ -214,7 +217,22 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', onVis)
 })
 onDeactivated(stopBanner) // 切到别的 Tab（IndexedStack 隐藏本 WebView）时停掉，避免隐藏期间持续制造合成层
-onActivated(startBanner) // 回到本 Tab 恢复轮播
+onActivated(() => {
+  startBanner() // 回到本 Tab 恢复轮播
+  // 自愈：keep-alive 切回本页时，若首屏取数失败/为空，自动重拉商品（不再依赖整页刷新救回）
+  if (all.value.length === 0 || error.value) {
+    loading.value = true
+    error.value = ''
+    fetchProducts()
+      .then(() => {
+        store.value = getStore()
+        error.value = getLastError()
+      })
+      .finally(() => {
+        loading.value = false
+      })
+  }
+})
 
 function enterStore() {
   if (store.value) bridge.openShopify('https://' + store.value)

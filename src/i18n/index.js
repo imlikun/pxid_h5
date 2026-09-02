@@ -837,7 +837,11 @@ export async function initLocale() {
     /* location 不可用（如 SSR/沙箱）时忽略，走下面的桥 */
   }
   try {
-    const loc = await bridge.getLocale()
+    // 桥未就绪时 getLocale 可能挂死 → 1.5s 超时直接走系统语言兜底，避免阻塞整个首屏取数链
+    const loc = await Promise.race([
+      bridge.getLocale(),
+      new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
+    ])
     if (loc && messages[loc]) {
       locale.value = loc
       return
