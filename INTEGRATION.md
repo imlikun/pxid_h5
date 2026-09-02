@@ -1,6 +1,6 @@
 # PXID H5 × Flutter 原生对接总纲（Flutter 必读 · 唯一入口）
 
-> **最后更新**：2026-08-28 11:10 ｜ **基准代码**：`a7b0310`（Flutter 对接总纲，基于代码事实逐条核对版）
+> **最后更新**：2026-09-02 09:30 ｜ **基准代码**：`a7b0310`（Flutter 对接总纲，基于代码事实逐条核对版）
 > **读者**：Flutter 原生开发同学 ｜ **目的**：**一份文档说清所有 H5 ↔ Flutter 桥接契约与对接步骤**，不再分散到多个文档找来找去  
 > **配套（同仓库，按需深读）**：后端 API 见 `docs/PXID_ToC_后端接口规范.md`；视觉规范见 `docs/ToC_App_视觉开发规范.md`；Shopify 结账 Flutter 实现见 `docs/PXID_Shopify_结账桥接_Flutter版.md`  
 > **本文件按 🔴现状 / 🟠问题或卡点 / 🟡需要什么帮助 / 🟢怎么做 / 🔵最终效果 五步组织**
@@ -380,6 +380,26 @@ window.PXIDApp = {
 - 头像/封面当前为 Unsplash 占位，接入真实用户数据后由接口替换。
 
 ---
+
+---
+
+## 设计铁律（源头防呆 · SSOT · 2026-09-02 确立）
+
+> 本节是**契约级约束**。本次「App 改头像后瀑布流历史发帖/评论头像不同步」根因 = 资料无单一真源（Flutter 主端 `getUserInfo()` 与 H5 后端 `user_profiles` 影子表双源，且 H5 侧存在「7天保护期 + 旧值跳过」双拦截导致库不更新）。后续所有相关资料/身份的改动都必须遵守本节，避免重蹈。
+
+### 资料单一真源（SSOT）
+- **唯一真源**：Flutter 主端 `getUserInfo()` 是用户资料（头像/昵称/车型）的唯一真相源，H5 **不存会过期的资料副本**。
+- **变更传播**：头像/昵称一经修改，Flutter 必须让 `getUserInfo()` 返回新值，并触发 H5 重拉（`mergeNativeProfile` 无条件用 Flutter 值覆盖、幂等写库；个人主页回前台 / 路由进入时 `fetchMyProfile()` 只调 `/users/me`，**不回退 deviceId**）。
+- **展示层统一入口**：全站头像/昵称只经一个 `useProfile(mid)` 管道取数，头部、瀑布流、评论、通知、互动消息调用方不感知来源——杜绝「一处新一处旧」。
+
+### 身份维度外键化
+- **`member_user_id` 是全站唯一真身份**（来自 ToC/Flutter 登录态，经 JWT 注入后端）；feeds / comments / notifications / favorites / follows 一律以它为身份维度。
+- **禁止 `OR device_id` 兜底双源**：member 非空（已登录）只按 member 单条件匹配，绝不与 device `OR`；member 为空（游客）才走 device。
+- 路由/接口参数可继续用 `device_id` 作兼容标识，但**存储与匹配主体必须是 `member_user_id`**；昵称会改、会重名，不可作身份键。
+
+### 真源缺口期（过渡方案，非终点）
+- ToC 后端暂无「按 ID 取他人资料」公开接口、桥 `getUserInfo()` 无参只返当前用户 → H5 自建 `user_profiles` 影子表，仅作过渡。
+- **根治路线**：补 `GET /user/{memberUserId}` 真源接口 + 桥 `getUserInfoById(userId)`，废弃影子表（需求见 `docs/按ID取用户资料_接口需求.md`，交北帆）。
 
 ---
 
