@@ -271,6 +271,15 @@ const mockBridge = {
     logMock('popPage')
     return Promise.resolve()
   },
+
+  // 开关 WebView 原生下拉刷新（如 Flutter 的 RefreshIndicator / 原生下拉手势）
+  // 用途：智能助手等内部滚动页需在激活时关闭，避免对话区下滑误触全局刷新。
+  // 约定：enabled=true 启用（默认），false 关闭。Flutter 注入真实实现时按此签名处理；
+  //       未注入（H5 预览）为空实现，不影响预览。
+  setPullRefresh(enabled) {
+    logMock('setPullRefresh', enabled)
+    return Promise.resolve()
+  },
 }
 
 export function initBridge() {
@@ -356,6 +365,13 @@ export const bridge = {
       return window.PXIDBridge.popPage()
     }
     return Promise.reject(new Error('popPage 未实现'))
+  },
+  // 开关原生下拉刷新：转交 Flutter 实现，未注入则为空实现
+  setPullRefresh: (enabled) => {
+    if (window.PXIDBridge && typeof window.PXIDBridge.setPullRefresh === 'function') {
+      return window.PXIDBridge.setPullRefresh(enabled)
+    }
+    return Promise.resolve()
   },
 }
 

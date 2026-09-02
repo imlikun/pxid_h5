@@ -95,7 +95,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import bridge from '../bridge'
@@ -328,6 +328,12 @@ function goBack() {
   else router.push('/discover')
 }
 
+// 进入本页时关闭原生 WebView 下拉刷新（避免对话区下滑误触全局刷新）；
+// 离开时恢复。注意：最终是否生效取决于 Flutter 是否实现 PXIDBridge.setPullRefresh，
+// H5 侧已通过 bridge 发出请求（mock 环境为空实现，不影响预览）。
+onActivated(() => bridge.setPullRefresh(false))
+onDeactivated(() => bridge.setPullRefresh(true))
+
 // 禁用下拉刷新：聊天区已置顶时继续下滑会冒泡到 WebView 触发全局下拉刷新
 function onTouchStart(e) {
   touchStartY = e.touches[0].clientY
@@ -347,6 +353,8 @@ function onTouchMove(e) {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh; /* 精确贴合嵌入 WebView 可视高度，避免 100vh 溢出整页滚动 */
+  overflow: hidden; /* 内容只在 .chat 内滚动，杜绝文档级下拉刷新触发 */
   background: var(--bg, #f7f8fa);
 }
 :deep(.tb-bar) { background: var(--card, #fff); }
