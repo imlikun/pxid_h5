@@ -63,13 +63,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import bridge from '../bridge'
 import { t } from '../i18n'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 import { formatTime } from '../utils/time'
 import { mediaUrl } from '../storage'
+import { captureVideoPoster } from '../utils/videoPoster'
 import { requireLogin } from '../utils/auth'
 import { likeFeed, toggleFavorite, followUser } from '../api/feed'
 
@@ -91,10 +92,22 @@ function showToast(m) {
 
 // 图列表兜底：原 images 数组；空就放占位图（FALLBACK）防 m-imgs 区域空白
 const FALLBACK = import.meta.env.BASE_URL + 'feed_default.jpg'
-const videoCoverUrl = computed(() => {
-  const c = mediaUrl(props.item && props.item.videoCover)
-  return c || FALLBACK
-})
+// 视频封面：优先 videoCover；为空时 canvas 截首帧兜底，失败回 FALLBACK
+const videoCoverUrl = ref(FALLBACK)
+function updateVideoCover() {
+  const it = props.item || {}
+  const c = mediaUrl(it.videoCover)
+  if (c) { videoCoverUrl.value = c; return }
+  if (it.videoUrl) {
+    videoCoverUrl.value = FALLBACK
+    const src = mediaUrl(it.videoUrl)
+    if (src) nextTick(() => captureVideoPoster(src).then((d) => { if (d) videoCoverUrl.value = d }))
+    return
+  }
+  videoCoverUrl.value = FALLBACK
+}
+updateVideoCover()
+watch(() => props.item, updateVideoCover)
 const avatarUrl = computed(() => resolveAvatar(props.item.author, props.item.avatar))
 // 关注按钮可见性：后端按 viewer 注入 canFollow（官方帖 / 自己的帖 = false）。
 // 老数据或兜底 mock 没有该字段时默认 true，保持既有行为，避免按钮大面积消失。

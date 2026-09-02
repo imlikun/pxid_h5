@@ -20,11 +20,12 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { t } from '../i18n'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 import { mediaUrl } from '../storage'
+import { captureVideoPoster } from '../utils/videoPoster'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -32,14 +33,22 @@ const props = defineProps({
 const router = useRouter()
 // 封面兜底：cover → images[0] → 静态占位图（避免 src='' 出现 broken 图）
 const FALLBACK = import.meta.env.BASE_URL + 'feed_default.jpg'
-const coverUrl = computed(() => {
+// 视频封面：优先 videoCover；为空时 canvas 截首帧兜底，失败回 FALLBACK
+const coverUrl = ref(FALLBACK)
+function updateCover() {
   const it = props.item || {}
   if (it.videoUrl) {
     const c = mediaUrl(it.videoCover)
-    if (c) return c
+    if (c) { coverUrl.value = c; return }
+    coverUrl.value = FALLBACK
+    const src = mediaUrl(it.videoUrl)
+    if (src) nextTick(() => captureVideoPoster(src).then((d) => { if (d) coverUrl.value = d }))
+    return
   }
-  return it.cover || (Array.isArray(it.images) && it.images[0]) || FALLBACK
-})
+  coverUrl.value = it.cover || (Array.isArray(it.images) && it.images[0]) || FALLBACK
+}
+updateCover()
+watch(() => props.item, updateCover)
 const avatarUrl = computed(() => resolveAvatar(props.item.author, props.item.avatar))
 function onImgErr(e) {
   // 网络抖动/原图失效 → 换兜底（再失败也不再递归）
