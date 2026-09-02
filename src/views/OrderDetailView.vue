@@ -170,7 +170,7 @@ function showToast(msg) {
 </script>
 
 <style scoped>
-.od { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+.od { min-height: 100vh; background: var(--bg); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 .tip { text-align: center; color: #999; padding: 60px 20px; font-size: 14px; }
 .tip.empty { color: #bbb; }
 .status {

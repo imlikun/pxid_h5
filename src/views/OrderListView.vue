@@ -181,7 +181,7 @@ function showToast(msg) {
 </script>
 
 <style scoped>
-.orders { min-height: 100vh; background: var(--bg); padding-top: env(safe-area-inset-top); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+.orders { min-height: 100vh; background: var(--bg); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 .tabs {
   display: flex;
   background: #ffffff;

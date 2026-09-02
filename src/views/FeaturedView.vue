@@ -1,6 +1,6 @@
 <template>
   <div class="featured">
-    <!-- 顶部：三 tab + 搜索图标 -->
+    <!-- 顶部：三 tab + 我的订单入口（右上角） -->
     <TopBar sticky :show-back="false">
       <template #left>
         <div class="tabs">
@@ -15,24 +15,28 @@
         </div>
       </template>
       <template #right>
-        <span class="search-ico" @click="showSearch = !showSearch">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <span class="my-order-btn" @click="router.push('/order/list')">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <span class="my-order-btn__txt">{{ t('featured.myOrder') }}</span>
         </span>
       </template>
     </TopBar>
 
-    <!-- 精选搜索（点击右上角图标展开，按商品名本地过滤） -->
-    <div v-if="showSearch" class="fsearch">
-      <span class="fsearch__icon">
+    <!-- 精选搜索（常驻搜索条，按商品名本地过滤，与发现栏目一致） -->
+    <div class="search">
+      <span class="sicon">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </span>
       <input
-        class="fsearch__input"
+        class="sinput"
         v-model="kw"
         :placeholder="t('featured.searchPlaceholder')"
-        @keyup.enter="kw = kw.trim()"
+        @keyup.enter="onSearchEnter"
+        @compositionstart="isComposing = true"
+        @compositionend="onCompositionEnd"
+        @click.stop
       />
-      <span class="fsearch__close" @click="showSearch = false; kw = ''">✕</span>
+      <span v-if="showSearch" class="search__clear" @click="clearSearch">✕</span>
     </div>
 
     <!-- 推荐 -->
@@ -82,17 +86,6 @@
 
       <!-- 三个快捷 -->
       <QuickActions :items="featuredQuickI18n" @tap="onQuick" />
-
-      <!-- 我的订单入口 -->
-      <div class="my-order" @click="router.push('/order/list')">
-        <span class="my-order__ico">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-        </span>
-        <span class="my-order__txt">{{ t('featured.myOrder') }}</span>
-        <span class="my-order__arrow">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </span>
-      </div>
 
       <!-- 热购榜单 -->
       <SectionHeader :title="t('featured.hotTitle')" />
@@ -164,7 +157,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
@@ -283,15 +276,34 @@ const topTabs = computed(() => [
 ])
 const activeTab = ref('rec')
 
-// 精选搜索：点击右上角图标展开，按商品名本地过滤（仅对当前已加载商品生效）
+// 精选搜索：常驻搜索条，按商品名本地过滤（仅对当前已加载商品生效，与发现栏目一致）
 const showSearch = ref(false)
 const kw = ref('')
+const isComposing = ref(false)
 const searchResults = computed(() => {
   const k = (kw.value || '').trim().toLowerCase()
   if (!k) return []
   return all.value.filter(
     (p) => (p.name || '').toLowerCase().includes(k) || (p.title || '').toLowerCase().includes(k)
   )
+})
+// 搜索：回车触发；结果态随关键词清空自动退出（避免整页只剩「0 个结果」）
+function onSearchEnter() {
+  if (isComposing.value) return // IME 组合中不触发搜索
+  onSearch()
+}
+function onSearch() {
+  showSearch.value = !!String(kw.value || '').trim()
+}
+function onCompositionEnd() {
+  isComposing.value = false
+}
+function clearSearch() {
+  kw.value = ''
+  showSearch.value = false
+}
+watch(kw, (k) => {
+  if (!String(k || '').trim()) showSearch.value = false
 })
 
 // 精选快捷入口：label 走 i18n（key 不变，展示文案随语言切换）
@@ -375,31 +387,34 @@ async function retry() {
   border-radius: 2px;
   background: var(--brand, #4a6cf7);
 }
-.search-ico {
-  color: #000000;
-  width: 24px;
-  height: 24px;
+.my-order-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
-.fsearch {
+.my-order-btn svg { width: 18px; height: 18px; }
+.search {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 10px 12px 0;
+  margin: 10px 16px 0;
   height: 40px;
   background: var(--surface-2, #f0f1f3);
   border-radius: var(--radius-pill, 999px);
   padding: 0 14px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-.fsearch__icon {
+.sicon {
   color: var(--text-hint);
   display: flex;
   align-items: center;
 }
-.fsearch__input {
+.sinput {
   flex: 1;
   font-size: 14px;
   color: var(--text);
@@ -407,8 +422,8 @@ async function retry() {
   border: none;
   outline: none;
 }
-.fsearch__input::placeholder { color: var(--text-hint); }
-.fsearch__close {
+.sinput::placeholder { color: var(--text-hint); }
+.search__clear {
   color: var(--text-hint);
   font-size: 16px;
   padding: 4px;
@@ -498,32 +513,6 @@ async function retry() {
   font-weight: 600;
   text-align: center;
   border: none;
-}
-.my-order {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 12px 12px 0;
-  padding: 14px 16px;
-  background: var(--card);
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-}
-.my-order__ico {
-  color: var(--brand, #4a6cf7);
-  display: flex;
-  align-items: center;
-}
-.my-order__txt {
-  flex: 1;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-}
-.my-order__arrow {
-  color: var(--text-hint);
-  display: flex;
-  align-items: center;
 }
 .grid2 {
   display: grid;
