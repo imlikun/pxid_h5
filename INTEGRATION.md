@@ -383,23 +383,11 @@ window.PXIDApp = {
 
 ---
 
-## 设计铁律（源头防呆 · SSOT · 2026-09-02 确立）
+## 资料与身份约定（2026-09-02 补）
 
-> 本节是**契约级约束**。本次「App 改头像后瀑布流历史发帖/评论头像不同步」根因 = 资料无单一真源（Flutter 主端 `getUserInfo()` 与 H5 后端 `user_profiles` 影子表双源，且 H5 侧存在「7天保护期 + 旧值跳过」双拦截导致库不更新）。后续所有相关资料/身份的改动都必须遵守本节，避免重蹈。
-
-### 资料单一真源（SSOT）
-- **唯一真源**：Flutter 主端 `getUserInfo()` 是用户资料（头像/昵称/车型）的唯一真相源，H5 **不存会过期的资料副本**。
-- **变更传播**：头像/昵称一经修改，Flutter 必须让 `getUserInfo()` 返回新值，并触发 H5 重拉（`mergeNativeProfile` 无条件用 Flutter 值覆盖、幂等写库；个人主页回前台 / 路由进入时 `fetchMyProfile()` 只调 `/users/me`，**不回退 deviceId**）。
-- **展示层统一入口**：全站头像/昵称只经一个 `useProfile(mid)` 管道取数，头部、瀑布流、评论、通知、互动消息调用方不感知来源——杜绝「一处新一处旧」。
-
-### 身份维度外键化
-- **`member_user_id` 是全站唯一真身份**（来自 ToC/Flutter 登录态，经 JWT 注入后端）；feeds / comments / notifications / favorites / follows 一律以它为身份维度。
-- **禁止 `OR device_id` 兜底双源**：member 非空（已登录）只按 member 单条件匹配，绝不与 device `OR`；member 为空（游客）才走 device。
-- 路由/接口参数可继续用 `device_id` 作兼容标识，但**存储与匹配主体必须是 `member_user_id`**；昵称会改、会重名，不可作身份键。
-
-### 真源缺口期（过渡方案，非终点）
-- ToC 后端暂无「按 ID 取他人资料」公开接口、桥 `getUserInfo()` 无参只返当前用户 → H5 自建 `user_profiles` 影子表，仅作过渡。
-- **根治路线**：补 `GET /user/{memberUserId}` 真源接口 + 桥 `getUserInfoById(userId)`，废弃影子表（需求见 `docs/按ID取用户资料_接口需求.md`，交北帆）。
+- 用户资料（头像/昵称/车型）以 Flutter `getUserInfo()` 为准，H5 不自己存会过期的副本；头像改了就重拉覆盖。
+- `member_user_id` 是全站唯一身份标识，匹配时只按它，不要 `OR device_id` 兜底（游客才走 device）。
+- 过渡期 H5 自建 `user_profiles` 影子表兜底，根治等北帆补「按 ID 取资料」接口（见 `docs/按ID取用户资料_接口需求.md`）。
 
 ---
 
