@@ -196,18 +196,17 @@ async function mergeNativeProfile() {
   try {
     const p = await bridge.getUserInfo()
     if (!p) return
-    // Flutter 只作「写库触发器」：把当前主端资料写回 H5 user_profiles（幂等）。
-    // 写完后重新从后端 /users/me 取最新资料作唯一真相源，绝不直接用 Flutter 瞬时值覆盖展示。
+    // 头部展示直接采用 Flutter 主端实时值（与 App「我的」同源）——这才是唯一真源，
+    // H5 后端 user_profiles 只是它的缓存副本（给他人视角/评论用），不能反客为主覆盖展示。
     const patch = {}
-    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim())) patch.nickname = String(p.nickname)
-    if (p.avatar) patch.avatar = String(p.avatar)
-    if (p.carModel) patch.carModel = String(p.carModel)
+    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim())) { user.value.nickname = String(p.nickname); patch.nickname = user.value.nickname }
+    if (p.avatar) { user.value.avatar = String(p.avatar); patch.avatar = user.value.avatar }
+    if (p.carModel) { user.value.carModel = String(p.carModel); patch.carModel = user.value.carModel }
+    // 把 Flutter 当前资料写回 H5 user_profiles（幂等），让他人/评论/瀑布流看到你的新头像
     if (Object.keys(patch).length) {
       try {
         await updateMyProfile(patch)
-        // 重新加载后端资料（唯一真相源）：头部与列表此后都读同一个后端值，永远一致
-        user.value = await fetchMyProfile()
-        await loadContent(true)
+        await loadContent(true) // 刷新列表，使「列表自己帖头像=头部」(9c75448) 立即生效
       } catch (e) { console.warn('[mergeNativeProfile] persist failed:', e.message || e) }
     }
   } catch (e) { /* 原生桥未实现：保持后端数据 */ }
