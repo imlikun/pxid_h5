@@ -146,7 +146,13 @@ const targetDevice = computed(() =>
 async function resolveMyDevice() {
   myDeviceId.value = await getDeviceId()
 }
-const avatarText = computed(() => (user.value && user.value.nickname ? user.value.nickname.slice(0, 1).toUpperCase() : '?'))
+// 预填昵称：进入个人主页时 bridge.getUserInfo 异步返回前，先用它显示首字母，避免一直显示「?」
+const prefillNick = ref('')
+bridge.getUserInfo().then((p) => { if (p && p.nickname) prefillNick.value = String(p.nickname) }).catch(() => {})
+const avatarText = computed(() => {
+  const n = (user.value && user.value.nickname) || prefillNick.value
+  return n ? n.slice(0, 1).toUpperCase() : '?'
+})
 
 function showToast(m) {
   toast.value = m
@@ -334,6 +340,20 @@ watch(() => route.params.id, async () => {
 onMounted(async () => {
   applyQuery()
   await resolveMyDevice()
+  // 预填 Flutter 主端资料，消除「?」闪现（App「我的」入口 deviceId 即本人，getUserInfo 走本地桥远快于网络 fetchMyProfile）
+  if (isSelf.value) {
+    bridge.getUserInfo().then((p) => {
+      if (p && (p.nickname || p.avatar)) {
+        const base = user.value && typeof user.value === 'object'
+          ? user.value
+          : { isSelf: true, followeeCount: 0, followerCount: 0, feedCount: 0, favoriteCount: 0 }
+        if (p.nickname) base.nickname = String(p.nickname)
+        if (p.avatar) base.avatar = String(p.avatar)
+        if (p.carModel) base.carModel = String(p.carModel)
+        user.value = { ...base }
+      }
+    }).catch(() => {})
+  }
   await loadProfile()
   await loadContent(true)
   window.addEventListener('scroll', onScroll, { passive: true })

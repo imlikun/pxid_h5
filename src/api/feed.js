@@ -128,6 +128,17 @@ export async function fetchFeedDetail(id) {
   return all.find((i) => String(i.id) === String(id)) || null
 }
 
+// ---- 删除（仅作者，后端校验身份；软删 status='deleted'）----
+export async function deleteFeed(id) {
+  if (!FEED_API) return { ok: false, message: '删除服务未就绪' }
+  try {
+    await request('/feed/' + id, { method: 'DELETE' })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e.message || '删除失败' }
+  }
+}
+
 // ---- 评论 ----
 export async function commentFeed(id, text, { parentId = 0 } = {}) {
   if (!FEED_API) return { ok: false }

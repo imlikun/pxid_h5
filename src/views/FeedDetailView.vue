@@ -218,6 +218,19 @@
     </transition>
   </teleport>
 
+  <!-- 删除确认：自己发的帖才出现 -->
+  <teleport to="body">
+    <transition name="fade">
+      <div v-if="showDeleteConfirm" class="sheet-mask" @click="showDeleteConfirm = false">
+        <div class="sheet" @click.stop>
+          <div class="sheet__title">删除这条动态？</div>
+          <div class="sheet__item sheet__danger" @click="doDelete">删除</div>
+          <div class="sheet__cancel" @click="showDeleteConfirm = false">{{ t('feed.cancel') }}</div>
+        </div>
+      </div>
+    </transition>
+  </teleport>
+
   <!-- toast -->
   <transition name="fade">
     <div v-if="toast" class="toast">{{ toast }}</div>
@@ -231,7 +244,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
 import { t, locale, regionFromLocale } from '../i18n'
-import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail } from '../api/feed'
+import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail, deleteFeed, getDeviceId } from '../api/feed'
 import { mediaUrl } from '../storage'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
@@ -1237,6 +1250,8 @@ function showToast(msg) {
 .sheet__item { text-align: center; font-size: 16px; color: var(--text); padding: 14px 0; border-bottom: 1px solid #f0f1f3; }
 .sheet__item:active { background: #f5f5f7; }
 .sheet__cancel { text-align: center; font-size: 16px; color: var(--text-sub); font-weight: 600; padding: 14px 0; }
+.sheet__danger { text-align: center; font-size: 16px; color: #e64340; font-weight: 600; padding: 14px 0; border-bottom: 1px solid #f0f1f3; }
+.sheet__danger:active { background: #fdecec; }
 
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
