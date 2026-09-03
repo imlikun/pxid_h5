@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import bridge from '../bridge'
@@ -105,6 +105,10 @@ const typing = ref(false)
 const started = computed(() => messages.value.length > 0)
 const toastMsg = ref('')
 let toastTimer = null
+let scrollRafId = 0
+let scrollTimers = []
+let resizeObserver = null
+let vpHandler = null
 
 // ============================================================
 // 智能助手多语内容（zh / en / pt），跟随系统语言切换
@@ -257,12 +261,12 @@ function showToast(m) {
 
 function pushHima(text, action) {
   messages.value.push({ role: 'hima', text, action })
-  scrollDown()
+  scrollDown({ forceBottom: true })
 }
 
 function ask(item) {
   messages.value.push({ role: 'user', text: item.q })
-  scrollDown()
+  scrollDown({ forceBottom: true })
   typing.value = true
   setTimeout(() => {
     typing.value = false
@@ -275,12 +279,16 @@ function send() {
   if (!v) return
   messages.value.push({ role: 'user', text: v })
   input.value = ''
-  scrollDown()
+  scrollDown({ forceBottom: true })
   typing.value = true
+  scrollDown({ forceBottom: true })
   setTimeout(() => {
     typing.value = false
     const r = smartReply(v)
     pushHima(r.a, r.action)
+    // 回复气泡/action 回流后两级保底滚到底（字体/action 高度延迟稳定才会算对）
+    setTimeout(() => scrollDown({ forceBottom: true }), 150)
+    setTimeout(() => scrollDown({ forceBottom: true }), 400)
   }, 650)
 }
 
@@ -298,12 +306,56 @@ function runAction(action) {
   }
 }
 
-function scrollDown() {
-  nextTick(() => {
+// 多帧防抖滚动到底：nextTick(Vue DOM) + rAF×2(字体/图片回流) + 150/400ms 两级保底(输入法/action 高度延迟稳定)
+// 真机 WebView 单次 scrollTop=scrollHeight 常因回流未完成算少，导致新消息没滚到可视区(视觉=被遮挡/看不到)
+function scrollDown({ forceBottom = false } = {}) {
+  cancelAnimationFrame(scrollRafId)
+  scrollTimers.forEach((t) => clearTimeout(t))
+  scrollTimers = []
+  function doScroll() {
     const el = chatEl.value
-    if (el) el.scrollTop = el.scrollHeight
+    if (!el) return
+    const target = forceBottom
+      ? el.scrollHeight
+      : Math.max(el.scrollTop + el.clientHeight, el.scrollHeight)
+    el.scrollTop = target
+  }
+  nextTick(() => {
+    scrollRafId = requestAnimationFrame(() => {
+      doScroll()
+      scrollRafId = requestAnimationFrame(doScroll)
+      scrollTimers.push(setTimeout(doScroll, 150))
+      scrollTimers.push(setTimeout(doScroll, 400))
+    })
   })
 }
+
+// 尺寸变化(软键盘弹收/分屏/字体回流)自动补偿：仅当用户在底部附近(距底<24px)才补滚，不打断看历史
+function onChatSizeChanged() {
+  const el = chatEl.value
+  if (!el) return
+  const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+  if (dist < 24) scrollDown({ forceBottom: true })
+}
+
+onMounted(() => {
+  const el = chatEl.value
+  if (el && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(onChatSizeChanged)
+    resizeObserver.observe(el)
+  }
+  if (window.visualViewport) {
+    vpHandler = () => onChatSizeChanged()
+    window.visualViewport.addEventListener('resize', vpHandler)
+  }
+})
+onUnmounted(() => {
+  cancelAnimationFrame(scrollRafId)
+  scrollTimers.forEach((t) => clearTimeout(t))
+  scrollTimers = []
+  if (resizeObserver) resizeObserver.disconnect()
+  if (window.visualViewport && vpHandler) window.visualViewport.removeEventListener('resize', vpHandler)
+})
 
 function onMore() {
   if (!messages.value.length) {
@@ -471,6 +523,7 @@ function goBack() {
   gap: 8px;
   margin-bottom: 14px;
 }
+.msg:last-child { margin-bottom: 8px; } /* 最后一条收敛，与输入条更贴，避免"对话结束点下方空一块"观感 */
 .msg__avatar {
   width: 30px;
   height: 30px;
