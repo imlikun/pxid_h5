@@ -3,7 +3,7 @@
     <!-- 顶部 -->
     <TopBar sticky :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
       <template #right>
-        <span class="more press" @click="showReport = true">
+        <span class="more press" @click="onMoreClick">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
         </span>
         <span class="share press" @click="onShare">
@@ -400,7 +400,47 @@ onBeforeUnmount(() => {
   clearKbTimers()
 })
 const showReport = ref(false)
+const showDeleteConfirm = ref(false)
 const reportReasons = ['色情低俗', '广告诈骗', '辱骂攻击', '违法违规', '其他']
+// 自己/别人判定所需：当前登录用户的稳定身份（memberUserId 优先，回退 deviceId）
+const currentMemberUserId = ref('')
+const currentDeviceId = ref('')
+const isSelf = computed(() => {
+  if (!item.value) return false
+  const a = String(item.value.memberUserId || '')
+  const b = String(item.value.deviceId || '')
+  const m = String(currentMemberUserId.value || '')
+  const d = String(currentDeviceId.value || '')
+  return (!!a && a === m) || (!!b && b === d)
+})
+// 上次进入页面时已尝试预填（避免重复调用 bridge）
+async function initSelfIdentity() {
+  try {
+    const info = await bridge.getUserInfo().catch(() => ({}))
+    currentMemberUserId.value = String((info && info.memberUserId) || '')
+  } catch (e) {}
+  try {
+    currentDeviceId.value = String((await getDeviceId()) || '')
+  } catch (e) {}
+}
+function onMoreClick() {
+  if (isSelf.value) showDeleteConfirm.value = true
+  else showReport.value = true
+}
+async function doDelete() {
+  showDeleteConfirm.value = false
+  try {
+    const r = await deleteFeed(id.value)
+    if (r && r.ok !== false) {
+      showToast('已删除')
+      router.back()
+    } else {
+      showToast('删除失败')
+    }
+  } catch (e) {
+    showToast('删除失败')
+  }
+}
 const replyTo = ref(null) // { id, name }
 function onReplyNode(node) {
   replyTo.value = { id: node.id, name: node.author }
@@ -459,7 +499,10 @@ async function load() {
   loading.value = false
 }
 
-onMounted(load)
+onMounted(() => {
+  initSelfIdentity()
+  load()
+})
 // 同一个组件实例下，/feed/:id 或 /activity/:id 变化都重新拉详情
 watch(() => route.fullPath, load)
 
