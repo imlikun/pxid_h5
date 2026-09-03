@@ -3258,6 +3258,7 @@ app.post('/mall-api/checkout-v2', async (req, res) => {
     const vid = /^gid:\/\//.test(rawVid) ? rawVid : (digits ? 'gid://shopify/ProductVariant/' + digits : '')
     if (!vid) return res.status(400).json(err(400, 'variantId 格式无效'))
     const buyerIdentity = {}
+    const orderMemberUserId = body.memberUserId ? String(body.memberUserId).trim() : ''
     if (body.email) buyerIdentity.email = String(body.email).trim()
     const a = body.shippingAddress
     if (a && (a.address1 || a.city)) {
@@ -3282,7 +3283,9 @@ app.post('/mall-api/checkout-v2', async (req, res) => {
         userErrors { code field message }
       }
     }`
-    const variables = { input: { lines: [{ merchandiseId: vid, quantity: qty }], buyerIdentity } }
+    const cartAttributes = []
+    if (orderMemberUserId) cartAttributes.push({ key: 'member_user_id', value: orderMemberUserId })
+    const variables = { input: { lines: [{ merchandiseId: vid, quantity: qty }], buyerIdentity, attributes: cartAttributes.length ? cartAttributes : undefined } }
     const r = await fetch('https://' + cfg.store + '/api/2024-01/graphql.json', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Shopify-Storefront-Access-Token': token },
@@ -3301,6 +3304,10 @@ app.post('/mall-api/checkout-v2', async (req, res) => {
     res.status(500).json(err(500, String(e.message || e)))
   }
 })
+
+// 订单表补 member_user_id 维度（2026-09-03：订单直绑 ToC 账号，换任何登录方式都匹配）
+try { db.exec("ALTER TABLE d_mall_order_map ADD COLUMN member_user_id TEXT NOT NULL DEFAULT ''") } catch (_) {}
+try { db.exec("CREATE INDEX IF NOT EXISTS idx_order_member ON d_mall_order_map(member_user_id)") } catch (_) {}
 
 // 订单回流（Shopify Webhook：orders/create + fulfillment/update）
 //   多店：从 payload 的 shop_domain 反查 region，用对应店的 webhookSecret 校验 HMAC；
@@ -3334,8 +3341,11 @@ app.post('/mall-api/webhook/orders', (req, res) => {
     const _ex = db.prepare('SELECT 1 FROM d_mall_order_map WHERE order_id=?').get(oid)
     if (_ex) return res.json(ok({ duplicate: true, order_id: oid }))
     const items = (o.line_items || []).map((it) => ({ title: it.title, qty: it.quantity, price: Number(it.price) || 0 }))
-    db.prepare(`INSERT INTO d_mall_order_map (order_id, email, items_json, total, currency, fulfillment, raw_json, created_at)
-      VALUES (?,?,?,?,?,?,?,?)`).run(
+    const orderAttrs = (o.note_attributes && Array.isArray(o.note_attributes) ? o.note_attributes : (o.attributes && Array.isArray(o.attributes) ? o.attributes : []))
+    const midAttr = orderAttrs.find((a) => a && (a.name === 'member_user_id' || a.key === 'member_user_id'))
+    const orderMemberUserId = midAttr ? String(midAttr.value || '') : ''
+    db.prepare(`INSERT INTO d_mall_order_map (order_id, email, items_json, total, currency, fulfillment, raw_json, created_at, member_user_id)
+      VALUES (?,?,?,?,?,?,?,?,?)`).run(
       oid,
       String((o.customer && o.customer.email) || o.email || ''),
       JSON.stringify(items),
@@ -3343,7 +3353,8 @@ app.post('/mall-api/webhook/orders', (req, res) => {
       o.currency || cfg.currency,
       'pending',
       JSON.stringify(o).slice(0, 8000),
-      now()
+      now(),
+      orderMemberUserId
     )
     res.json(ok({ recorded: oid, region }))
   } catch (e) {
@@ -3351,29 +3362,22 @@ app.post('/mall-api/webhook/orders', (req, res) => {
   }
 })
 
-// 订单查询（按 email；M-MVP1 Multipass 归户后扩展为 deviceId/customer）
-// 安全：已配置 USER_TOKEN_SECRET 时 fail-closed（P0-2）—— email 只能来自验真后的 token，禁止 query 回退。
-// 匿名 token 无 email → 直接返回空列表，杜绝枚举他人订单。未配 secret 时保留 query email 过渡降级（仅告警一次）。
-let _ordersFallbackWarned = false
+// 订单查询（按 ToC 账号 memberUserId 直绑；历史 email 单走 claim 认领后同查）
+// 安全：requireAuth 验真身份，memberUserId 来自 token，杜绝枚举他人订单。
 app.get('/mall-api/orders', requireAuth, (req, res) => {
-  const emailFromToken = req.user && req.user.email ? req.user.email : ''
-  let email = emailFromToken
-
-  if (!email && !USER_TOKEN_SECRET) {
-    // 过渡降级：未配 USER_TOKEN_SECRET 时 req.user 为空，仍允许 query email，但打 warning（配了 secret 即走 fail-closed）
-    const emailFromQuery = String(req.query.email || '')
-    if (emailFromQuery) {
-      if (!_ordersFallbackWarned) {
-        console.warn('[pxid-feed] /mall-api/orders 使用 query email 回退（未配置 USER_TOKEN_SECRET 的过渡降级），存在 IDOR 风险，请配置 USER_TOKEN_SECRET')
-        _ordersFallbackWarned = true
-      }
-      email = emailFromQuery
-    }
-  }
-
-  if (!email) return res.json(ok({ list: [] }))
-  const rows = db.prepare('SELECT * FROM d_mall_order_map WHERE email=? ORDER BY id DESC').all(email)
+  const m = String((req.user && req.user.memberUserId) || '').trim()
+  if (!m) return res.json(ok({ list: [] }))
+  const rows = db.prepare('SELECT * FROM d_mall_order_map WHERE member_user_id=? ORDER BY id DESC').all(m)
   res.json(ok({ list: rows }))
+})
+
+// 历史订单认领：用当前登录 memberUserId 认领 email 匹配且未绑定的订单（幂等，仅补空 member_user_id 的行，不抢占已绑定他人的）
+app.post('/mall-api/orders/claim', requireAuth, (req, res) => {
+  const m = String((req.user && req.user.memberUserId) || '').trim()
+  const email = String((req.body && req.body.email) || '').trim().toLowerCase()
+  if (!m || !email) return res.json(ok({ claimed: 0 }))
+  const r = db.prepare("UPDATE d_mall_order_map SET member_user_id=? WHERE email=? AND (member_user_id IS NULL OR member_user_id='')").run(m, email)
+  res.json(ok({ claimed: r.changes }))
 })
 
 // ---- 健康检查 ----
