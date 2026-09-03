@@ -384,6 +384,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 .u-avatar {
+  position: relative;
   width: 68px;
   height: 68px;
   border-radius: 50%;
@@ -396,8 +397,28 @@ onUnmounted(() => {
   border: 2px solid #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
-.u-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.u-avatar__ph { font-size: 26px; font-weight: 700; color: var(--brand, #4a6cf7); }
+.u-avatar__ph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--brand, #4a6cf7);
+  z-index: 0;
+}
+.u-avatar__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 1;
+}
+.u-avatar__img.loaded { opacity: 1; }
 .u-meta { flex: 1; min-width: 0; }
 .u-name {
   font-size: 17px;
