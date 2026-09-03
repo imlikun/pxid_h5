@@ -110,14 +110,19 @@ async function loadRemote() {
   try {
     const [info, token] = await Promise.all([bridge.getUserInfo(), bridge.getToken().catch(() => '')])
     const email = info && info.email
-    if (email) {
-      const headers = { 'Content-Type': 'application/json' }
-      if (token) headers.Authorization = 'Bearer ' + token
-      const r = await fetch(`${API_BASE}/mall-api/orders?email=${encodeURIComponent(email)}`, { headers })
-      const j = await r.json()
-      const list = (j.data && j.data.list) || []
-      remoteOrders.value = list.map(mapRemote)
+    const headers = { 'Content-Type': 'application/json' }
+    if (token) headers.Authorization = 'Bearer ' + token
+    // 1) 绑定当前用户 email → memberUserId（幂等，换设备也能查到订单）
+    if (email && token) {
+      try {
+        await fetch(`${API_BASE}/mall-api/me/bind-email`, { method: 'POST', headers, body: JSON.stringify({ email }) })
+      } catch (e) { /* 绑定失败不阻断查单 */ }
     }
+    // 2) 按登录态 memberUserId 归户查订单（后端不再依赖 query email）
+    const r = await fetch(`${API_BASE}/mall-api/orders`, { headers })
+    const j = await r.json()
+    const list = (j.data && j.data.list) || []
+    remoteOrders.value = list.map(mapRemote)
   } catch (e) {
     console.error('[orders] load remote failed', e)
   } finally {
