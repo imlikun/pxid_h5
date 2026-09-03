@@ -1,6 +1,6 @@
 <template>
   <div class="orders">
-    <TopBar sticky title="我的订单" />
+    <TopBar sticky :back="goBack" title="我的订单" />
 
     <!-- 状态 tab -->
     <div class="tabs">
@@ -131,6 +131,14 @@ async function loadRemote() {
 }
 
 onMounted(loadRemote)
+
+// 返回：原生 WebView 打开时关闭回精选/原生页；浏览器预览退回 router.back()
+function goBack() {
+  const app = window.PXIDApp
+  if (app && typeof app.postMessage === 'function') app.postMessage('closeWebView')
+  else if (window.history.length > 1) router.back()
+  else router.push('/featured')
+}
 
 // 真实订单优先；无真实订单时回退 mock 演示数据
 const allOrders = computed(() => (remoteOrders.value.length ? remoteOrders.value : mockOrders))
