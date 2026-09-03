@@ -2741,7 +2741,9 @@ app.post('/follow', requireAuth, (req, res) => {
   if (followerDevice === followeeDevice) return res.json(err(1, '不能关注自己'))
   const followerMid = String(followerMemberUserId || (req.user && req.user.memberUserId) || '')
   const followeeMid = String(followeeMemberUserId || '')
-  db.prepare('INSERT OR IGNORE INTO follows (follower_device, followee_device, follower_member_user_id, followee_member_user_id, created_at) VALUES (?,?,?,?,?)').run(followerDevice, followeeDevice, followerMid, followeeMid, now())
+  const followInfo = db.prepare('INSERT OR IGNORE INTO follows (follower_device, followee_device, follower_member_user_id, followee_member_user_id, created_at) VALUES (?,?,?,?,?)').run(followerDevice, followeeDevice, followerMid, followeeMid, now())
+  // 社区成长：被关注 +10（给被关注者，按真实身份；INSERT OR IGNORE 的 changes() 防重复关注刷分）
+  if (followInfo.changes) addPoints(followeeMid || followeeDevice, 10, 'followed')
   // 互动消息：关注通知被关注者（真身份优先 memberUserId，演示态回退 device）
   emitNotification({
     deviceId: followeeDevice,
