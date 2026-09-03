@@ -67,7 +67,7 @@ const CONTENT = {
       title: '如何赚积分',
       desc: '日常互动都能赚积分，攒起来换好物',
       items: [
-        { icon: '📅', name: '每日签到', desc: '每天签到领取积分，连续签到奖励更高', pts: '+10~50' },
+        { icon: '📅', name: '每日签到', desc: '每天签到领取积分，连续签到奖励更高', pts: '+5' },
         { icon: '🛒', name: '购物返积分', desc: '商城下单按实付金额返积分', pts: '1元=1分' },
         { icon: '📝', name: '发布动态', desc: '在发现页发布骑行动态，审核通过即得积分', pts: '+20' },
         { icon: '👍', name: '互动有礼', desc: '内容获赞、被关注可获得积分', pts: '+5~15' },
@@ -106,7 +106,7 @@ const CONTENT = {
       title: 'How to Earn Points',
       desc: 'Earn points through daily interactions',
       items: [
-        { icon: '📅', name: 'Daily Check-in', desc: 'Check in daily for points; streaks earn more', pts: '+10~50' },
+        { icon: '📅', name: 'Daily Check-in', desc: 'Check in daily for points; streaks earn more', pts: '+5' },
         { icon: '🛒', name: 'Shop & Earn', desc: 'Earn points on every store order', pts: '¥1 = 1pt' },
         { icon: '📝', name: 'Post a Feed', desc: 'Share riding moments on Discover', pts: '+20' },
         { icon: '👍', name: 'Get Engaged', desc: 'Earn points from likes and follows', pts: '+5~15' },

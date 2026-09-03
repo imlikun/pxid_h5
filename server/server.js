@@ -1246,6 +1246,8 @@ app.post('/feed', requireAuth, (req, res) => {
   upsertProfile({ deviceId, memberUserId, nickname: finalNickname, avatar: finalAvatar, carModel })
   // 内容安全②：阿里云异步复核（配置 AK 后生效；命中高危自动下架）
   moderation.reviewFeed(row, db)
+  // 社区成长：发布动态 +20（按发布者真实身份 memberUserId 优先，deviceId 兜底）
+  if (memberUserId || deviceId) addPoints(memberUserId || deviceId, 20, 'publish')
   // 视频异步转码（增强，可选）：有 ffmpeg 才转，失败静默，不影响发布
   if (video) transcodeVideoIfAvailable(row.id, video)
   // @提到：给被@用户发一条通知（容错，不影响发布）
@@ -1334,6 +1336,8 @@ app.post('/feed/:id/like', requireAuth, (req, res) => {
   const isSelf = (row.device_id && deviceId && row.device_id === deviceId) || (row.member_user_id && memberUserId && row.member_user_id === memberUserId)
   if (liked && !already && !isSelf && (row.device_id || row.member_user_id)) {
     emitNotification({ deviceId: row.device_id, memberUserId: row.member_user_id, type: 'like', actorDevice: deviceId, actorName: String(nickname || ''), actorAvatar: String(avatar || ''), targetType: 'feed', targetId: row.id, content: '赞了你的动态' })
+    // 社区成长：获赞 +5（给动态作者，按真实身份；isSelf 已排除自己赞自己，already 防重复刷分）
+    addPoints(row.member_user_id || row.device_id, 5, 'liked')
   }
   res.json(ok({ isLiked, likes }))
 })
