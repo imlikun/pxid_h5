@@ -1,5 +1,5 @@
 <template>
-  <div class="hima">
+  <div class="hima-page">
     <!-- 顶栏：直接传 title，TopBar 自带居中+省略号，4 字不滚动 -->
     <TopBar sticky :back="goBack" :title="t('assistant.title')">
       <template #right>
@@ -377,12 +377,12 @@ function goBack() {
 </script>
 
 <style scoped>
-.hima {
+.hima-page {
   display: flex;
   flex-direction: column;
   height: 100vh;
   overflow: hidden; /* 兜底：任何子元素溢出都不产生文档滚动，内容只准在 .chat 内滚。
-                       缺它时 .chat 内容高会把 .hima 撑破 100vh → 文档滚动 → 内容滚过 sticky 顶栏被遮(真机遮挡真根因) */
+                       缺它时 .chat 内容高会把 .hima-page 撑破 100vh → 文档滚动 → 内容滚过 sticky 顶栏被遮(真机遮挡真根因) */
   background: var(--bg, #f7f8fa);
 }
 :deep(.tb-bar) { background: var(--card, #fff); }
@@ -398,7 +398,7 @@ function goBack() {
 .chat {
   flex: 1;
   overflow-y: auto;
-  min-height: 0; /* flex 子项可滚必要(默认 min-height:auto 会被内容撑大，撑破 .hima 100vh 导致文档滚动+遮挡) */
+  min-height: 0; /* flex 子项可滚必要(默认 min-height:auto 会被内容撑大，撑破 .hima-page 100vh 导致文档滚动+遮挡) */
   padding: 5px 14px 8px; /* 坤哥指定 top 5px：对话框紧贴顶栏下，padding 5 让内容起 53。
                             滚动后 padding-top 随 scrollTop 滚出，但消息在 48+ 不被顶栏切 */
   -webkit-overflow-scrolling: touch;
