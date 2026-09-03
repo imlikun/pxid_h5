@@ -112,13 +112,13 @@ async function loadRemote() {
     const email = info && info.email
     const headers = { 'Content-Type': 'application/json' }
     if (token) headers.Authorization = 'Bearer ' + token
-    // 1) 绑定当前用户 email → memberUserId（幂等，换设备也能查到订单）
+    // 1) 认领历史单：用当前登录 memberUserId 认领 email 匹配且未绑定的订单（幂等；后端从 token 取 memberUserId）
     if (email && token) {
       try {
-        await fetch(`${API_BASE}/mall-api/me/bind-email`, { method: 'POST', headers, body: JSON.stringify({ email }) })
-      } catch (e) { /* 绑定失败不阻断查单 */ }
+        await fetch(`${API_BASE}/mall-api/orders/claim`, { method: 'POST', headers, body: JSON.stringify({ email }) })
+      } catch (e) { /* 认领失败不阻断查单 */ }
     }
-    // 2) 按登录态 memberUserId 归户查订单（后端不再依赖 query email）
+    // 2) 按登录态 memberUserId 查订单（后端直绑 ToC 账号；已认领的历史单 + 新单同查）
     const r = await fetch(`${API_BASE}/mall-api/orders`, { headers })
     const j = await r.json()
     const list = (j.data && j.data.list) || []

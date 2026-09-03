@@ -103,6 +103,7 @@ async function goCheckout() {
         items,
         region: getRegion(),
         email: profile.email || '',
+        memberUserId: profile.memberUserId || '',
         shippingAddress: profile.shippingAddress || null,
       }),
     })
