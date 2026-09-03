@@ -1211,8 +1211,8 @@ app.post('/feed', requireAuth, (req, res) => {
   const text = String(content || '').trim()
   if (!text) return res.json(err(1, '内容不能为空'))
   if (text.length > 1000) return res.json(err(1, '内容不能超过 1000 字'))
-  // 内容安全①：本地词库同步拦截（内容+标签+昵称联合检测，命中即拒绝发布）
-  const mc = moderation.checkText(text + ' ' + (tags || []).join(' ') + ' ' + String(nickname || ''))
+  // 内容安全①：本地词库同步拦截（仅检测正文+话题标签，昵称为身份字段不当内容处理，避免昵称含 sm 等子串误拦）
+  const mc = moderation.checkText(text + ' ' + (tags || []).join(' '))
   if (!mc.pass) {
     moderation.logLocalBlock(db, 0, text, mc.words)
     return res.json(err(1, '内容包含违禁词「' + mc.words.slice(0, 5).join('、') + '」，请修改后发布'))
