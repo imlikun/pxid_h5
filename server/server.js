@@ -602,6 +602,17 @@ function userIdentityMatch(idCol, midCol, user, memberOnly = false) {
   return { clause: parts.length ? `(${parts.join(' OR ')})` : '(1=0)', args }
 }
 
+// 关注关系匹配：member 优先；member 为空的历史行用 device 兜底补回（memberOnly 会漏算 device-only 历史关注）。
+// 与裸 `device OR member` 双维度不同：member 非空时不查 device，避免同设备多 member 串号（如 17/24 共享设备）。
+// 计数与列表统一用此，保证「粉丝数 == 粉丝列表长度」。
+function followRelMatch(midCol, devCol, member, device) {
+  const m = String(member || '')
+  const d = String(device || '')
+  if (m) return { clause: `(${midCol} = ? OR (${midCol} = '' AND ${devCol} = ?))`, args: [m, d] }
+  if (d) return { clause: `(${devCol} = ?)`, args: [d] }
+  return { clause: '(1=0)', args: [] }
+}
+
 function resolveIdentityByAlias(nickname = '', avatar = '') {
   const row = db
     .prepare('SELECT device_id, member_user_id FROM profile_aliases WHERE nickname=? AND avatar=? ORDER BY last_seen_at DESC LIMIT 1')
@@ -1047,11 +1058,11 @@ app.get('/users/me', requireAuth, (req, res) => {
   const favIm = userIdentityMatch('v.device_id', 'v.member_user_id', u, true)
   const favoriteCount = db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${favIm.clause} AND f.status='published'`).get(...favIm.args).c
   const followeeCount = (() => {
-    const im = userIdentityMatch('follower_device', 'follower_member_user_id', u, true)
+    const im = followRelMatch('follower_member_user_id', 'follower_device', m, d)
     return db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${im.clause}`).get(...im.args).c
   })()
   const followerCount = (() => {
-    const im = userIdentityMatch('followee_device', 'followee_member_user_id', u, true)
+    const im = followRelMatch('followee_member_user_id', 'followee_device', m, d)
     return db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${im.clause}`).get(...im.args).c
   })()
   console.log(`[user-me] d=${d} m=${m} nick=${profile.nickname || (feed && feed.nickname) || ''} car=${profile.carModel || (feed && feed.car_model) || ''} stats=${feedCount}/${favoriteCount}/${followeeCount}/${followerCount}`)
@@ -1155,9 +1166,11 @@ app.get('/users/:deviceId', (req, res) => {
   const nickname = useFeedName ? (feed && feed.nickname ? feed.nickname : (profile.nickname || '')) : profile.nickname
   const avatar = profile.avatar || (feed && feed.avatar) || ''
   const carModel = profile.carModel || (feed && feed.car_model) || ''
-  // 关注/粉丝数：按真实身份单条件统计
-  const followeeCount = db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${idCol('follower_device', 'follower_member_user_id')}`).get(idArg()).c
-  const followerCount = db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${idCol('followee_device', 'followee_member_user_id')}`).get(idArg()).c
+  // 关注/粉丝数：member 优先 + device 兜底（与列表口径一致，补回 device-only 历史关注且不串号）
+  const feRel = followRelMatch('follower_member_user_id', 'follower_device', tMid, tDevice)
+  const foRel = followRelMatch('followee_member_user_id', 'followee_device', tMid, tDevice)
+  const followeeCount = db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${feRel.clause}`).get(...feRel.args).c
+  const followerCount = db.prepare(`SELECT COUNT(*) c FROM follows WHERE ${foRel.clause}`).get(...foRel.args).c
   // isFollowing：自己一侧用 memberOnly（避免用自己 device 误命中同设备另一账号的关注关系）
   const myMatch = userIdentityMatch('follower_device', 'follower_member_user_id', { deviceId: myDevice, memberUserId: myMid }, true)
   const isFollowing = (myDevice || myMid)
@@ -2790,11 +2803,8 @@ app.get('/follow/list', (req, res) => {
   const device = String(req.query.device || '')
   const member = String(req.query.member || '')
   if (!device && !member) return res.json(err(1, '缺少 device / member'))
-  const conds = []
-  const args = []
-  if (device) { conds.push('follower_device=?'); args.push(device) }
-  if (member) { conds.push('follower_member_user_id=?'); args.push(member) }
-  const rows = db.prepare(`SELECT followee_device FROM follows WHERE (${conds.join(' OR ')}) ORDER BY created_at DESC`).all(...args)
+  const rel = followRelMatch('follower_member_user_id', 'follower_device', member, device)
+  const rows = db.prepare(`SELECT followee_device FROM follows WHERE ${rel.clause} ORDER BY created_at DESC`).all(...rel.args)
   res.json(ok({ list: rows.map((r) => userBrief(r.followee_device)) }))
 })
 // 粉丝列表：关注我的人（同结构）
@@ -2802,11 +2812,8 @@ app.get('/follow/followers', (req, res) => {
   const device = String(req.query.device || '')
   const member = String(req.query.member || '')
   if (!device && !member) return res.json(err(1, '缺少 device / member'))
-  const conds = []
-  const args = []
-  if (device) { conds.push('followee_device=?'); args.push(device) }
-  if (member) { conds.push('followee_member_user_id=?'); args.push(member) }
-  const rows = db.prepare(`SELECT follower_device FROM follows WHERE (${conds.join(' OR ')}) ORDER BY created_at DESC`).all(...args)
+  const rel = followRelMatch('followee_member_user_id', 'followee_device', member, device)
+  const rows = db.prepare(`SELECT follower_device FROM follows WHERE ${rel.clause} ORDER BY created_at DESC`).all(...rel.args)
   res.json(ok({ list: rows.map((r) => userBrief(r.follower_device)) }))
 })
 app.get('/follow/check', (req, res) => {
