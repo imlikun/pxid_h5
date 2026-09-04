@@ -74,18 +74,21 @@
       </div>
     </div>
 
-    <!-- 规格（变体） -->
-    <div class="card" v-if="product.variants && product.variants.length">
+    <!-- 规格（仅展示颜色之外的维度；颜色已由上方颜色卡选择） -->
+    <div class="card spec-card" v-if="specDims.length">
       <div class="block__title">选择规格</div>
-      <div class="opts">
-        <span
-          v-for="(v, i) in product.variants"
-          :key="v.id"
-          class="opt"
-          :class="{ active: activeVariant === i, soldout: !v.available }"
-          @click="activeVariant = i"
-          >{{ v.title }}<em v-if="v.price && v.price !== product.price"> +{{ sym(product.currency) }}{{ v.price }}</em><i v-if="!v.available">缺货</i></span
-      >
+      <div class="spec-dim" v-for="dim in specDims" :key="dim.name">
+        <div class="spec-dim__label">{{ specLabel(dim.name) }}</div>
+        <div class="opts">
+          <span
+            v-for="val in dim.values"
+            :key="val"
+            class="opt"
+            :class="{ active: (specPick[dim.name] || '') === val, soldout: !specComboAvailable(dim.name, val) }"
+            @click="pickSpec(dim.name, val)"
+            >{{ val }}<i v-if="!specComboAvailable(dim.name, val)">缺货</i></span
+          >
+        </div>
       </div>
     </div>
 
@@ -174,7 +177,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchProducts, fetchProductDetail, getProductByHandle, getStore, sym, API_BASE, initRegion, getRegion } from '../api/shop'
 import { initLocale } from '../i18n'
@@ -261,15 +264,85 @@ const extraImages = computed(() => {
   return imageList.value.map((i) => i.src).filter((s) => s && !g.has(s))
 })
 const activeColor = ref('')
+const specPick = reactive({}) // 颜色之外各规格维度的当前选中值 { Battery: '10 Ah' }
+
+// 颜色之外的规格维度（如 Battery）；Title/单一默认维度视为无规格
+const specDims = computed(() => {
+  const opts = (product.value && product.value.options) || []
+  const vs = variantList.value
+  return opts
+    .filter((o) => o.name && !isColorOpt(o.name) && !/^title$/i.test(o.name))
+    .map((d) => {
+      const seen = []
+      vs.forEach((v) => {
+        const so = (v.selectedOptions || []).find((s) => s.name === d.name)
+        if (so && so.value && !seen.includes(so.value)) seen.push(so.value)
+      })
+      return { name: d.name, values: seen.length ? seen : (d.values || []).filter(Boolean) }
+    })
+    .filter((d) => d.values.length)
+})
+
+// 维度名汉化（英文店铺选项名 → 中文界面展示）
+const SPEC_LABEL = { Battery: '电池容量', Size: '尺寸', Voltage: '电压', Capacity: '容量', Model: '型号', Color: '颜色' }
+function specLabel(name) {
+  return SPEC_LABEL[name] || name
+}
+
+// 某 variant 是否满足「当前颜色 + 各规格已选 + 覆盖项」组合
+function matchVariant(v, overrides = {}) {
+  const so = v.selectedOptions || []
+  // 颜色条件：有颜色商品需匹配 activeColor
+  if (hasColor.value && activeColor.value) {
+    const hit = so.find((o) => isColorOpt(o.name))
+    if (!hit || hit.value !== activeColor.value) return false
+  }
+  // 其它规格维度：已选值需匹配（overrides 优先）
+  for (const d of specDims.value) {
+    const want = overrides[d.name] !== undefined ? overrides[d.name] : specPick[d.name]
+    if (!want) continue
+    const hit = so.find((o) => o.name === d.name)
+    if (!hit || hit.value !== want) return false
+  }
+  return true
+}
+
+// 颜色卡点击：更新色 → 轮播跳该色主图 → 重建选中变体
 function selectColor(cv) {
   activeColor.value = cv
   const idx = galleryImages.value.indexOf(colorImageMap.value[cv])
   if (idx >= 0) jumpTo(idx)
-  // 联动规格：选中该色对应的 variant（影响价格/库存）
-  const vi = variantList.value.findIndex((v) =>
-    (v.selectedOptions || []).some((o) => isColorOpt(o.name) && o.value === cv)
+  resolveVariant()
+}
+// 规格维度点击：更新该维值 → 重建选中变体
+function pickSpec(dimName, val) {
+  const exists = variantList.value.some((v) => matchVariant(v, { [dimName]: val }))
+  if (!exists) return // 该颜色下无此组合，忽略点击
+  specPick[dimName] = val
+  resolveVariant()
+}
+// 某维度值在「当前颜色 + 其它已选维度」下是否存在可用变体（决定缺货标）
+function specComboAvailable(dimName, val) {
+  return variantList.value.some(
+    (v) => v.available !== false && matchVariant(v, { [dimName]: val })
   )
-  if (vi >= 0) activeVariant.value = vi
+}
+// 依当前 activeColor + specPick 重建选中变体（找不到则保持原索引）
+function resolveVariant() {
+  const vs = variantList.value
+  if (!vs.length) return
+  const idx = vs.findIndex((v) => matchVariant(v))
+  if (idx >= 0) activeVariant.value = idx
+}
+// 从当前选中变体回填各规格维度的默认选中值（首次进入/换商品时）
+function syncSpecFromVariant() {
+  const v = variantList.value[activeVariant.value] || variantList.value[0]
+  if (!v) return
+  const so = v.selectedOptions || []
+  specDims.value.forEach((d) => {
+    const hit = so.find((s) => s.name === d.name)
+    specPick[d.name] = hit && hit.value ? hit.value : d.values[0]
+  })
 }
 
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同商品时组件被复用 → 必须监听路由重载，否则“永远同一片”
@@ -282,6 +355,8 @@ async function load() {
   activeIdx.value = 0
   activeVariant.value = 0
   activeColor.value = ''
+  // 清空规格维度选中值（换商品时防残留上一商品的维度）
+  Object.keys(specPick).forEach((k) => delete specPick[k])
   qty.value = 1
   await initRegion()
   // 1️⃣ 先用列表缓存快速首屏（含图/价/卖点/规格/描述）
@@ -309,6 +384,8 @@ async function load() {
       activeColor.value = hasColor.value
         ? (colorValues.value.find((cv) => colorImageMap.value[cv]) || colorValues.value[0] || '')
         : ''
+      syncSpecFromVariant() // 回填规格维度选中值（如 Battery）
+      resolveVariant() // 依颜色+规格重建选中变体（影响价格/库存）
       error.value = '' // 清除之前的错误
     } else if (!product.value) {
       error.value = '未找到该商品'
@@ -592,6 +669,21 @@ async function onBuy() {
 .opt.soldout {
   opacity: 0.5;
   text-decoration: line-through;
+}
+/* 规格多维度：每维度独立一行 */
+.spec-dim {
+  margin-bottom: 14px;
+}
+.spec-dim:last-child {
+  margin-bottom: 0;
+}
+.spec-dim__label {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-bottom: 8px;
+}
+.spec-card .opts {
+  gap: 8px;
 }
 /* 数量（决策区内联） */
 .card--inline {
