@@ -20,7 +20,7 @@ const PERSONAS = {
   kai:   { name: '露营车友阿凯', avatar: 'unsplash/photo-1544005313-94ddf0286df2_w_80_q_80.jpg' },
   mo:    { name: '电摩老炮', avatar: 'unsplash/photo-1544723795-3fb6469f5b39_w_80_q_80.jpg' },
 };
-const OFFICIAL = { name: 'PXID 品向智造', avatar: 'news/pxid-logo.png' };
+const OFFICIAL = { name: 'PXID 品向智造', avatar: 'news/pxid-official-avatar.png' };
 
 // 帖子：author=人设key或'official'；imgs=public下相对路径数组；ageDays=距今天数（越大越旧，先插旧的后插新的）
 const POSTS = [
