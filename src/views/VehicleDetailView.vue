@@ -208,7 +208,7 @@ watch(() => route.params.id, load)
 const v = computed(() => {
   const p = product.value
   if (!p) return null
-  const imgs = p.images || []
+  const imgs = (p.images || []).map((im) => (typeof im === 'string' ? im : (im && im.src) || ''))
   const basePrice = Number(p.price) || 0
   const variants = p.variants || []
   const configGroups = []

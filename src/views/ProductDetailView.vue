@@ -10,21 +10,21 @@
       </template>
     </TopBar>
 
-    <!-- 图廊：横向滑动 + 圆点 -->
+    <!-- 图廊：横向滑动 + 圆点（轮播=颜色主图，无颜色则全部图） -->
     <div class="gallery" ref="gallery" @scroll="onGalleryScroll">
       <img
-        v-for="(img, i) in product.images"
+        v-for="(src, i) in galleryImages"
         :key="i"
         class="slide"
-        :src="img"
+        :src="src"
         :alt="product.name"
         loading="lazy"
       />
-      <div v-if="!product.images || !product.images.length" class="slide empty-slide">无图</div>
+      <div v-if="!galleryImages.length" class="slide empty-slide">无图</div>
     </div>
-    <div class="dots" v-if="(product.images || []).length > 1">
+    <div class="dots" v-if="galleryImages.length > 1">
       <span
-        v-for="(img, i) in product.images"
+        v-for="(src, i) in galleryImages"
         :key="i"
         class="dot"
         :class="{ active: i === activeIdx }"
@@ -32,13 +32,13 @@
     </div>
 
     <!-- 缩略图 -->
-    <div class="thumbs" v-if="(product.images || []).length > 1">
+    <div class="thumbs" v-if="galleryImages.length > 1">
       <img
-        v-for="(img, i) in product.images"
+        v-for="(src, i) in galleryImages"
         :key="i"
         class="thumb"
         :class="{ active: i === activeIdx }"
-        :src="img"
+        :src="src"
         @click="jumpTo(i)"
       />
     </div>
@@ -54,6 +54,23 @@
       <div class="price-row">
         <span class="price">{{ sym(product.currency) }}{{ displayPrice }}</span>
         <span v-if="product.origin" class="origin">{{ sym(product.currency) }}{{ product.origin }}</span>
+      </div>
+    </div>
+
+    <!-- 颜色选择（有颜色选项时显示，联动轮播图与规格） -->
+    <div class="card color-card" v-if="hasColor">
+      <div class="block__title">选择颜色</div>
+      <div class="colors">
+        <button
+          v-for="cv in colorValues"
+          :key="cv"
+          class="color-btn"
+          :class="{ active: activeColor === cv }"
+          @click="selectColor(cv)"
+        >
+          <img :src="colorImageMap[cv]" :alt="cv" class="color-swatch" />
+          <span>{{ cv }}</span>
+        </button>
       </div>
     </div>
 
@@ -116,6 +133,21 @@
       </div>
     </div>
 
+    <!-- 商品图册：轮播之外的其余图（场景/细节/参数图） -->
+    <div class="card gallery-extra" v-if="extraImages.length">
+      <div class="block__title">商品图册</div>
+      <div class="extra-imgs">
+        <img
+          v-for="(src, i) in extraImages"
+          :key="i"
+          class="extra-img"
+          :src="src"
+          :alt="product.name"
+          loading="lazy"
+        />
+      </div>
+    </div>
+
     <div class="gap"></div>
 
     <!-- 底部吸底操作 -->
@@ -173,6 +205,73 @@ const displayPrice = computed(() => {
   return product.value ? product.value.price : 0
 })
 
+// —— 颜色主图联动（精选商品详情）——
+// images 统一成对象（兼容列表缓存的字符串数组）；variants 取 selectedOptions 匹配颜色
+const imageList = computed(() =>
+  (product.value?.images || []).map((im) =>
+    typeof im === 'string' ? { src: im, alt: '', id: '', variantIds: [] } : im
+  )
+)
+const variantList = computed(() => product.value?.variants || [])
+const colorOption = computed(() =>
+  (product.value?.options || []).find((o) => /color|colour|颜色/i.test(o.name)) || null
+)
+const colorValues = computed(() => (colorOption.value ? colorOption.value.values || [] : []))
+const isColorOpt = (name) => /color|colour|颜色/i.test(name || '')
+// 颜色值 -> 主图 src（优先级：variant.imageId 回查 > image.variantIds 命中 > alt 含色名）
+function pickColorImage(cv) {
+  const v = variantList.value.find((x) =>
+    (x.selectedOptions || []).some((o) => isColorOpt(o.name) && o.value === cv)
+  )
+  if (v && v.imageId) {
+    const im = imageList.value.find((i) => String(i.id) === String(v.imageId))
+    if (im) return im.src
+  }
+  if (v) {
+    const im = imageList.value.find((i) => (i.variantIds || []).map(String).includes(String(v.id)))
+    if (im) return im.src
+  }
+  const byAlt = imageList.value.find((i) => (i.alt || '').toLowerCase().includes(cv.toLowerCase()))
+  if (byAlt) return byAlt.src
+  return null
+}
+const colorImageMap = computed(() => {
+  const m = {}
+  colorValues.value.forEach((cv) => { m[cv] = pickColorImage(cv) })
+  return m
+})
+const hasColor = computed(() =>
+  colorValues.value.length > 0 && colorValues.value.some((cv) => colorImageMap.value[cv])
+)
+// 轮播图：有颜色=各色主图（每色一张）；无颜色=全部图（维持原状）
+const galleryImages = computed(() => {
+  if (!hasColor.value) return imageList.value.map((i) => i.src)
+  const arr = []
+  colorValues.value.forEach((cv) => {
+    const s = colorImageMap.value[cv]
+    if (s && !arr.includes(s)) arr.push(s)
+  })
+  if (!arr.length && imageList.value[0]) arr.push(imageList.value[0].src)
+  return arr
+})
+// 其余图（非轮播）：放进商品图册
+const extraImages = computed(() => {
+  if (!hasColor.value) return []
+  const g = new Set(galleryImages.value)
+  return imageList.value.map((i) => i.src).filter((s) => s && !g.has(s))
+})
+const activeColor = ref('')
+function selectColor(cv) {
+  activeColor.value = cv
+  const idx = galleryImages.value.indexOf(colorImageMap.value[cv])
+  if (idx >= 0) jumpTo(idx)
+  // 联动规格：选中该色对应的 variant（影响价格/库存）
+  const vi = variantList.value.findIndex((v) =>
+    (v.selectedOptions || []).some((o) => isColorOpt(o.name) && o.value === cv)
+  )
+  if (vi >= 0) activeVariant.value = vi
+}
+
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同商品时组件被复用 → 必须监听路由重载，否则“永远同一片”
 async function load() {
   await initLocale() // 语言决定内容地区，见 regionFromLocale
@@ -182,6 +281,7 @@ async function load() {
   error.value = ''
   activeIdx.value = 0
   activeVariant.value = 0
+  activeColor.value = ''
   qty.value = 1
   await initRegion()
   // 1️⃣ 先用列表缓存快速首屏（含图/价/卖点/规格/描述）
@@ -205,6 +305,10 @@ async function load() {
     if (detail) {
       product.value = detail
       if (activeVariant.value >= (detail.variants || []).length) activeVariant.value = 0
+      // 初始化颜色选择（精选多色商品）：默认首个能匹配到主图的颜色
+      activeColor.value = hasColor.value
+        ? (colorValues.value.find((cv) => colorImageMap.value[cv]) || colorValues.value[0] || '')
+        : ''
       error.value = '' // 清除之前的错误
     } else if (!product.value) {
       error.value = '未找到该商品'
@@ -739,6 +843,52 @@ async function onBuy() {
   color: var(--text);
 }
 .btn--retry:active {
+  background: var(--bg);
+}
+/* 颜色选择（联动轮播图） */
+.color-card .colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.color-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 76px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.color-btn.active {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+.color-swatch {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #fff;
+}
+.color-btn span {
+  font-size: 12px;
+  color: var(--text);
+}
+/* 商品图册（轮播之外的其余图） */
+.gallery-extra .extra-imgs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.extra-img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 10px;
   background: var(--bg);
 }
 </style>

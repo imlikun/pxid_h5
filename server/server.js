@@ -3147,7 +3147,15 @@ function extractSpecs(p) {
 }
 function normalizeProductDetail(p, store, currency) {
   const v0 = (p.variants && p.variants[0]) || {}
-  const imgs = (p.images || []).map((i) => i.src).filter(Boolean)
+  // 透传图对象（含 alt / id / variantIds），供前端按颜色匹配主图；列表接口 normalizeProduct 仍用字符串数组，保持商品卡兼容
+  const imgs = (p.images || [])
+    .map((i) => ({
+      src: i.src,
+      alt: i.alt || '',
+      id: String(i.id || ''),
+      variantIds: Array.isArray(i.variant_ids) ? i.variant_ids.map(String) : [],
+    }))
+    .filter((i) => i.src)
   const type = (p.product_type || '').toLowerCase()
   const tagsArr = toTags(p)
   const tags = tagsArr.join(' ').toLowerCase()
@@ -3161,20 +3169,29 @@ function normalizeProductDetail(p, store, currency) {
     price: Number(v0.price) || 0,
     origin: v0.compare_at_price ? Number(v0.compare_at_price) : null,
     currency,
-    cover: imgs[0] || (p.featured_image && p.featured_image.src) || '',
+    cover: (imgs[0] && imgs[0].src) || (p.featured_image && p.featured_image.src) || '',
     images: imgs,
     tag: tagsArr[0] || p.product_type || '',
     tags: tagsArr,
     collection,
     shopUrl: `https://${store}/products/${p.handle}`,
     options: (p.options || []).map((o) => ({ name: o.name, values: o.values || [] })),
-    variants: (p.variants || []).map((v) => ({
-      id: String(v.id),
-      title: v.title,
-      price: Number(v.price) || 0,
-      available: v.available !== false,
-      sku: v.sku || '',
-    })),
+    variants: (p.variants || []).map((v) => {
+      // 把 option1/2/3 按 options 顺序映射成 [{name,value}]，前端无需关心 option 顺序即可取颜色
+      const selectedOptions = (p.options || [])
+        .map((o, idx) => ({ name: o.name, value: [v.option1, v.option2, v.option3][idx] || '' }))
+        .filter((o) => o.name && o.name !== 'Title' && o.value)
+      return {
+        id: String(v.id),
+        title: v.title,
+        price: Number(v.price) || 0,
+        available: v.available !== false,
+        sku: v.sku || '',
+        selectedOptions,
+        // variant 自带 featured_image（公开 REST 有），即该色主图；存其 id 供前端回查 images
+        imageId: v.featured_image && v.featured_image.id ? String(v.featured_image.id) : null,
+      }
+    }),
     tagline: (() => {
       const txt = (p.body_html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
       return txt ? txt.slice(0, 60) : ''
