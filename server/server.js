@@ -3018,13 +3018,21 @@ function normalizeProduct(p, store, currency) {
     sellingPoints: extractSellingPoints(p),
     specs: extractSpecs(p),
     options: (p.options || []).map((o) => ({ name: o.name, values: o.values || [] })),
-    variants: (p.variants || []).map((v) => ({
-      id: String(v.id),
-      title: v.title,
-      price: Number(v.price) || 0,
-      available: v.available !== false,
-      sku: v.sku || '',
-    })),
+    variants: (p.variants || []).map((v) => {
+      // selectedOptions 供前端详情/规格卡按维度匹配变体（列表接口增量透传，不破坏商品卡）
+      const selectedOptions = (p.options || [])
+        .map((o, idx) => ({ name: o.name, value: [v.option1, v.option2, v.option3][idx] || '' }))
+        .filter((o) => o.name && o.name !== 'Title' && o.value)
+      return {
+        id: String(v.id),
+        title: v.title,
+        price: Number(v.price) || 0,
+        available: v.available !== false,
+        sku: v.sku || '',
+        selectedOptions,
+        imageId: v.featured_image && v.featured_image.id ? String(v.featured_image.id) : null,
+      }
+    }),
   }
 }
 

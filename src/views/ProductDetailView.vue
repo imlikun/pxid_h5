@@ -68,7 +68,8 @@
           :class="{ active: activeColor === cv }"
           @click="selectColor(cv)"
         >
-          <img :src="colorImageMap[cv]" :alt="cv" class="color-swatch" />
+          <img v-if="colorImageMap[cv]" :src="colorImageMap[cv]" :alt="cv" class="color-swatch" />
+          <span v-else class="color-swatch color-swatch--dot" :style="{ background: swatchDot(cv) }"></span>
           <span>{{ cv }}</span>
         </button>
       </div>
@@ -243,10 +244,16 @@ const colorImageMap = computed(() => {
   colorValues.value.forEach((cv) => { m[cv] = pickColorImage(cv) })
   return m
 })
-const hasColor = computed(() =>
-  colorValues.value.length > 0 && colorValues.value.some((cv) => colorImageMap.value[cv])
-)
-// 轮播图：有颜色=各色主图（每色一张）；无颜色=全部图（维持原状）
+// 有 Color 维度变体即认为可选手色（不再强依赖「图能否匹配到色」——图未绑色的商品也能选色，
+// 只是轮播退化为全图）；防 1 色 1 图重复卡与 Title-only 商品
+const hasColor = computed(() => {
+  const cv = colorValues.value
+  if (!cv.length) return false
+  return variantList.value.some((v) =>
+    (v.selectedOptions || []).some((o) => isColorOpt(o.name) && o.value)
+  )
+})
+// 轮播图：有颜色=各色主图（每色一张）；色图匹配失败(图未绑色)=退化为全部图；无颜色=全部图
 const galleryImages = computed(() => {
   if (!hasColor.value) return imageList.value.map((i) => i.src)
   const arr = []
@@ -254,10 +261,10 @@ const galleryImages = computed(() => {
     const s = colorImageMap.value[cv]
     if (s && !arr.includes(s)) arr.push(s)
   })
-  if (!arr.length && imageList.value[0]) arr.push(imageList.value[0].src)
+  if (!arr.length) return imageList.value.map((i) => i.src) // 图未绑色：全图轮播
   return arr
 })
-// 其余图（非轮播）：放进商品图册
+// 其余图（非轮播）：放进商品图册（色图全匹配失败时轮播=全图，自然无 extra）
 const extraImages = computed(() => {
   if (!hasColor.value) return []
   const g = new Set(galleryImages.value)
@@ -344,6 +351,21 @@ function syncSpecFromVariant() {
     specPick[d.name] = hit && hit.value ? hit.value : d.values[0]
   })
 }
+// 颜色/规格选中态初始化（cache 首屏与 detail 覆盖后共用）
+function initSelection() {
+  // 默认颜色：首个能匹配到主图的色，否则取第一个颜色值
+  activeColor.value = hasColor.value
+    ? (colorValues.value.find((cv) => colorImageMap.value[cv]) || colorValues.value[0] || '')
+    : ''
+  syncSpecFromVariant() // 回填规格维度选中值（如 Battery）
+  resolveVariant() // 依颜色+规格重建选中变体（影响价格/库存）
+}
+// 无色图时的 swatch 兜底色（按色名稳定 hash 出浅色调）
+function swatchDot(cv) {
+  let h = 0
+  for (let i = 0; i < cv.length; i++) h = (h * 31 + cv.charCodeAt(i)) % 360
+  return `hsl(${h}, 55%, 62%)`
+}
 
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同商品时组件被复用 → 必须监听路由重载，否则“永远同一片”
 async function load() {
@@ -364,6 +386,7 @@ async function load() {
   if (cached) {
     product.value = cached
     loading.value = false
+    initSelection() // 缓存数据也带 options/variants，先初始化一次颜色与规格选中态
   }
   // 2️⃣ 缓存未命中时（直链/刷新详情页），先拉列表填充缓存
   if (!cached) {
@@ -372,6 +395,7 @@ async function load() {
     if (retryCached) {
       product.value = retryCached
       loading.value = false
+      initSelection()
     }
   }
   // 3️⃣ 再按 Shopify 单品链接真拉完整详情（覆盖缓存，带重试）
@@ -380,12 +404,7 @@ async function load() {
     if (detail) {
       product.value = detail
       if (activeVariant.value >= (detail.variants || []).length) activeVariant.value = 0
-      // 初始化颜色选择（精选多色商品）：默认首个能匹配到主图的颜色
-      activeColor.value = hasColor.value
-        ? (colorValues.value.find((cv) => colorImageMap.value[cv]) || colorValues.value[0] || '')
-        : ''
-      syncSpecFromVariant() // 回填规格维度选中值（如 Battery）
-      resolveVariant() // 依颜色+规格重建选中变体（影响价格/库存）
+      initSelection() // 用完整数据（含图关联/库存）重算颜色默认值、规格选中与选中变体
       error.value = '' // 清除之前的错误
     } else if (!product.value) {
       error.value = '未找到该商品'
@@ -965,6 +984,10 @@ async function onBuy() {
   border-radius: 8px;
   object-fit: cover;
   background: #fff;
+}
+.color-swatch--dot {
+  display: block;
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 .color-btn span {
   font-size: 12px;
