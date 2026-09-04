@@ -82,7 +82,9 @@ function signupText(a) {
 function goDetail(a) { router.push('/activity/' + a.id) }
 
 function goBack() {
-  if (window.history.length > 1) router.back()
+  const app = window.PXIDApp
+  if (app && typeof app.postMessage === 'function') app.postMessage('closeWebView')
+  else if (window.history.length > 1) router.back()
   else router.push('/discover')
 }
 
