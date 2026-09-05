@@ -1,4 +1,9 @@
 <template>
+  <!-- 单根包裹：Vue 的 <Transition> 只能给「单个根元素」的组件加过渡类，
+       多根（fragment）组件会被静默跳过动画——原本这里有 div.detail / article / teleport
+       三个根级节点，导致从发现页进出详情页时，详情页那一侧的转场完全不生效
+       （表现为只有列表在动，详情是硬切）。包一层后两侧动画才对称。 -->
+  <div class="fd-root">
   <div class="detail" v-if="item">
     <!-- 顶部 -->
     <TopBar sticky :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
