@@ -118,6 +118,23 @@ const routes = [
 const router = createRouter({
   history: createWebHashHistory(),
   routes,
+  // 滚动行为：加了页面转场后必须配套，否则从详情返回列表会直接跳回顶部，
+  // 横滑着回去却看到列表闪回第一条，比没有动画更难看。
+  scrollBehavior(to, from, savedPosition) {
+    // 返回（浏览器后退 / 手势 / 原生返回键）：恢复上次位置
+    if (savedPosition) {
+      // keep-alive 页面重新挂载后 DOM 要一帧才撑开（列表还是接口异步拉的），
+      // 立刻 scrollTo 会滚不动，延后一拍再恢复
+      return new Promise((resolve) => {
+        setTimeout(() => resolve(savedPosition), 80)
+      })
+    }
+    // 底部 tab 互切：平级关系，各自保留自己的浏览位置，不强制滚顶
+    const TABS = ['/discover', '/featured', '/service']
+    if (TABS.includes(to.path) && TABS.includes(from.path)) return false
+    // 新页面从顶部开始
+    return { top: 0 }
+  },
 })
 
 // 服务模块已由 Flutter 原生版提供，H5 侧彻底屏蔽（tab 入口已移除 + 路由级拦截），任何环境都进不去 /service

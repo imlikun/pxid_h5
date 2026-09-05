@@ -1,9 +1,11 @@
 <template>
-  <div class="app-root" ref="rootRef">
+  <div class="app-root" :class="{ 'embed-mode': inApp }" ref="rootRef">
     <router-view v-slot="{ Component }">
-      <keep-alive>
-        <component :is="Component" />
-      </keep-alive>
+      <transition :name="transitionName">
+        <keep-alive>
+          <component :is="Component" />
+        </keep-alive>
+      </transition>
     </router-view>
 
     <!-- 底部 tab bar 已彻底移除——浏览器和 App 内都不再显示，由 App 原生 tab 接管 -->
@@ -15,9 +17,17 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useSwipeBack } from './composables/useSwipeBack'
+import { setupPageTransition, transitionName } from './composables/usePageTransition'
 import { bridge } from './bridge'
 import { initLocale } from './i18n'
+
+const router = useRouter()
+// 页面转场方向（forward / back / 无动画），见 usePageTransition.js
+setupPageTransition(router)
+// 嵌入 Flutter 时原生已有全局返回手势，H5 转场压短时长，避免叠成「两段滑」
+const inApp = ref(bridge.isEmbed)
 
 // 底部 tab bar 已彻底移除：之前依赖 Flutter 桥注入（isEmbed）切换显示，但 Flutter 直接链接加载没注入桥也会显示。
 // 既然 App 原生自带 tab，H5 这层完全多余，直接拿掉，省一道桥依赖。
@@ -83,4 +93,75 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   opacity: 0;
 }
 /* 底部 tab bar 已彻底移除，无需再预留底部空间 */
+</style>
+
+<style>
+/* ============================================================
+   页面转场：横向推进（iOS 默认 / 微信同款）
+   三条硬约定，改之前先看完 useSwipeBack.js 顶部的注释：
+   1) 绝不给 .app-root 写 transform。根容器一旦成为 containing block 并新建合成层，
+      Android WebView 上会出现「页面看着正常、能滚动、但所有点击无效」——本文件只动页面级元素。
+   2) 只让进出双方中的**一方**脱离文档流（fixed），另一方保持 static。
+      两页同时 absolute 会让 .app-root 高度塌陷，列表滚动位置瞬间丢失。
+   3) will-change 只挂在 -active 类上，动画结束由 Vue 摘掉，不长期占用合成层。
+   ============================================================ */
+.slide-forward-enter-active,
+.slide-back-leave-active {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg, #f7f8fa);
+  transition: transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+.slide-forward-leave-active,
+.slide-back-enter-active {
+  transition: transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 300ms ease;
+  will-change: transform, opacity;
+}
+.slide-forward-enter-from {
+  transform: translateX(100%);
+}
+.slide-forward-leave-to {
+  transform: translateX(-22%);
+  opacity: 0.7;
+}
+.slide-back-enter-from {
+  transform: translateX(-22%);
+  opacity: 0.7;
+}
+.slide-back-leave-to {
+  transform: translateX(100%);
+}
+
+/* 嵌入 Flutter：原生全局返回手势本身就会带着整个 WebView 横滑，
+   H5 内部转场压到 220ms，观感上更像一个连贯动作，而不是两段滑 */
+.embed-mode .slide-forward-enter-active,
+.embed-mode .slide-back-leave-active,
+.embed-mode .slide-forward-leave-active,
+.embed-mode .slide-back-enter-active {
+  transition-duration: 220ms;
+}
+
+/* 系统开启「减弱动画」：去掉位移，只留很短的淡入，避免眩晕 */
+@media (prefers-reduced-motion: reduce) {
+  .slide-forward-enter-active,
+  .slide-back-leave-active,
+  .slide-forward-leave-active,
+  .slide-back-enter-active {
+    transition: opacity 120ms ease;
+  }
+  .slide-forward-enter-from,
+  .slide-back-enter-from {
+    transform: none;
+    opacity: 0;
+  }
+  .slide-forward-leave-to,
+  .slide-back-leave-to {
+    transform: none;
+    opacity: 0;
+  }
+}
 </style>
