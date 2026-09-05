@@ -116,15 +116,26 @@
     <!-- 评论区 -->
     <div class="comments" ref="commentsBox">
       <div class="comments__head">{{ t('feed.commentsCount', { n: commentCount }) }}</div>
-      <div v-if="comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
+      <!-- 骨架占位：先用帖子自带的评论数把评论区撑到最终高度，评论接口回来原地替换。
+           此前这里是「0 条 + 暂无评论」，接口一回来突然变成 N 条，整页被顶高一大截（2026-09-05） -->
+      <div v-if="commentsLoading" class="cmt-skeleton">
+        <div v-for="n in skeletonCount" :key="'sk-' + n" class="cmt-sk">
+          <span class="cmt-sk__avatar"></span>
+          <div class="cmt-sk__lines">
+            <span class="cmt-sk__line cmt-sk__line--name"></span>
+            <span class="cmt-sk__line cmt-sk__line--text"></span>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
       <CommentNode
+        v-else
         v-for="c in comments"
         :key="c.id"
         :node="c"
         @reply="onReplyNode"
       />
-
-      </div>
+    </div>
 
     <!-- 输入栏：Teleport 到 body，彻底避开 .app-root transform / keep-alive 等祖先包含块影响 -->
     <teleport to="body">
@@ -284,6 +295,13 @@ const collected = ref(false)
 const collectCount = ref(0)
 const followed = ref(false)
 const comments = ref([])
+// 评论加载中：先用骨架占住高度，避免评论区从 0 条突然变 N 条把整页顶高
+const commentsLoading = ref(false)
+// 骨架条数：帖子自带 comments 是真实条数，这里最多渲染 3 条撑高度即可
+const skeletonCount = computed(() => {
+  const n = Number(item.value && item.value.comments) || 0
+  return Math.min(3, Math.max(1, n))
+})
 const commentText = ref('')
 const toast = ref('')
 let toastTimer = null
@@ -486,11 +504,15 @@ async function load() {
     collectCount.value = snap.favorites || 0
     followed.value = !!snap.followed
     comments.value = []
+    // 有评论就先铺骨架：评论区高度一步到位，接口回来原地替换，页面不再二次撑开
+    commentsLoading.value = Number(snap.comments) > 0
     related.value = []
     loading.value = false
     showLoading.value = false
   } else {
     item.value = null
+    comments.value = []
+    commentsLoading.value = false
     loading.value = true
     showLoading.value = false
     // ② 没有快照（外部链接直开/分享进来）时才等接口；200ms 内回来就不亮加载圈
@@ -499,37 +521,48 @@ async function load() {
   if (isActivity.value) {
     item.value = await fetchActivityDetail(id.value)
     if (item.value) checkMySignup(id.value)
+    commentsLoading.value = false
   } else {
+    // 详情到位后要发的补充请求，全部并行（见下方 Promise.all）
+    const jobs = []
     try {
       const data = await fetchFeedDetail(id.value)
       if (data) {
         item.value = data
+        // 无快照直开时，详情到位的这一刻才知道评论数：同样先铺骨架撑住高度
+        commentsLoading.value = Number(data.comments) > 0
         liked.value = !!data.isLiked
         likeCount.value = data.likes || 0
         collected.value = !!data.isFavorited
         collectCount.value = data.favorites || 0
         followed.value = !!data.followed
-        // 后端详情 followed 硬编码 false（rowToFeed:304），用 /follow/check 补真实关注态
+        // 后端详情 followed 硬编码 false（rowToFeed:304），用 /follow/check 补真实关注态。
+        // 不再 await：此前串行等待会把评论请求整整推迟一个 RTT（实测 880ms），
+        // 评论区因此在转场结束后才姗姗来迟，看起来就像"内容一块一块冒出来"
         if (data.deviceId) {
-          try { followed.value = await checkFollow(data.deviceId) } catch (e) {}
+          jobs.push(
+            checkFollow(data.deviceId).then((v) => { followed.value = v }).catch(() => {})
+          )
         }
         // 记录浏览足迹（H5 自管，个人主页「足迹」Tab 用；静默失败不影响阅读）
         recordFootprint(id.value)
         // 有 token 时补收藏态（公开详情默认不带 isFavorited，避免未登录被 401）
-        checkFavorite(id.value).then((fav) => {
-          collected.value = fav
-        }).catch(() => {})
+        jobs.push(
+          checkFavorite(id.value).then((fav) => { collected.value = fav }).catch(() => {})
+        )
       }
     } catch (e) { /* keep null → show empty */ }
     if (item.value) {
-      await loadComments(id.value)
-      loadRelated()
+      // 评论 / 关注态 / 收藏态 / 相关推荐同时发出，谁先回来谁先渲染；
+      // 评论区有骨架占住高度，先回来也不会把页面顶开
+      await Promise.all([loadComments(id.value), Promise.resolve().then(loadRelated), ...jobs])
     }
   }
   // 接口已回来：撤掉加载态。若接口返回空但手里有快照，保留快照，不闪「内容不存在」空态
   clearTimeout(loadingTimer)
   showLoading.value = false
   loading.value = false
+  commentsLoading.value = false
 }
 
 onMounted(() => {
@@ -546,6 +579,10 @@ async function loadComments(fid) {
     const list = await fetchComments(fid)
     if (list) comments.value = list
   } catch (e) { /* 评论拉取失败不阻断详情 */ }
+  finally {
+    // 无论成败都要撤骨架，否则评论区永远停在灰条
+    commentsLoading.value = false
+  }
 }
 
 // 评论时间友好化（兼容秒/毫秒时间戳与字符串）
@@ -1131,6 +1168,15 @@ function showToast(msg) {
 /* 评论 */
 .comments { background: var(--card); border-top: 1px solid var(--line); padding: 16px; }
 .comments__head { font-size: 15px; font-weight: 600; color: var(--text); }
+
+/* 评论骨架：条数 = 帖子自带的评论数（最多 3 条），高度与真实评论对齐，
+   评论接口回来原地替换，整页高度从渲染第一帧起就是最终高度 */
+.cmt-sk { display: flex; gap: 10px; padding: 12px 0; }
+.cmt-sk__avatar { width: 34px; height: 34px; border-radius: 50%; background: #eef0f4; flex: none; }
+.cmt-sk__lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.cmt-sk__line { height: 10px; border-radius: 5px; background: #eef0f4; }
+.cmt-sk__line--name { width: 30%; }
+.cmt-sk__line--text { width: 78%; }
 .comments__empty { font-size: 13px; color: var(--text-hint); padding: 18px 0; text-align: center; }
 .cmt { display: flex; gap: 10px; padding: 14px 0; border-bottom: 1px solid #f2f3f5; }
 .cmt__avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex: none; }

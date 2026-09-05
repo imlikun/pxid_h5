@@ -1,7 +1,7 @@
 <template>
   <div
     class="discover"
-    :class="{ 'locale-zh': locale === 'zh', 'locale-en': locale === 'en', 'locale-pt': locale === 'pt', 'marquee-paused': docHidden }"
+    :class="{ 'locale-zh': locale === 'zh', 'locale-en': locale === 'en', 'locale-pt': locale === 'pt' }"
     @touchstart.passive="onPtrStart"
     @touchmove.passive="onPtrMove"
     @touchend.passive="onPtrEnd"
@@ -104,11 +104,7 @@
           <img v-if="QUICK_ICON_SVG[q.icon]" class="quick__icon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
           <IconSvg v-else class="quick__icon" :name="q.icon" :size="22" />
           <div class="quick__label">
-            <span
-              class="quick__label__text"
-              :class="{ overflow: quickOverflow[i] }"
-              :ref="(el) => (quickLabelEls[i] = el)"
-            >{{ t('discover.quick.' + q.key) }}</span>
+            <span class="quick__label__text">{{ t('discover.quick.' + q.key) }}</span>
           </div>
         </div>
       </div>
@@ -260,7 +256,8 @@ const bannerSlides = computed(() => {
 const bannerIdx = ref(0)
 let bannerTimer = null
 let bannerTouchX = 0
-const docHidden = ref(false) // 页面隐藏（切 Tab / 手机后台）：暂停 marquee 持续动画，避免制造常驻合成层
+// 页面可见性（切 Tab / 手机后台）：只用于 banner 轮播的起停，
+// 此前还用它暂停 4 宫格文字滚动（marquee，2026-09-05 已去掉，改省略号显示）
 const heroVideoRef = ref(null)
 let videoPlayTimer = null
 
@@ -306,7 +303,6 @@ function stopBannerLoop() {
   }
 }
 function onDocVisibility() {
-  docHidden.value = document.hidden
   if (document.hidden) stopBannerLoop()
   else startBannerLoop()
 }
@@ -323,17 +319,8 @@ const activeFilter = ref('全部')
 // 当前登录用户绑定的车型（来自 getUserInfo().carModel）；仅当其属于在售 12 车型时才在筛选条前置「我的车」
 const myCarModel = ref('')
 
-// 4 宫格标签：仅当文字宽度超出容器时才启用滚动动画（避免短标签「看起来没滚 / 长标签才滚」的不一致）
-// AI 助手（en/pt 较长）滚动统一由 CSS 子选择器驱动，这里跳过不干预
-const quickLabelEls = ref([])
-const quickOverflow = ref([])
-function measureQuick() {
-  quickOverflow.value = quickLabelEls.value.map((el, i) => {
-    const q = discoverQuick[i]
-    if (q && q.key === 'ai') return false
-    return !!el && el.scrollWidth > el.clientWidth + 1
-  })
-}
+// 4 宫格标签：2026-09-05 起改为两行截断（省略号），不再测量宽度、不再滚动。
+// 原因：无限滚动的 marquee 是常驻合成层，和入场动画叠在一起让首屏显得杂乱。
 
 // ---- 地区由语言映射（2026-08-31 定）：语言同时决定界面和内容 ----
 // zh → CN 中国内容，pt → BR 巴西内容，en → US 全球内容
@@ -513,8 +500,7 @@ async function onRegionChanged() {
 watch(currentRegion, (newRegion, oldRegion) => {
   if (oldRegion && newRegion !== oldRegion) onRegionChanged()
 })
-// 语言切换后宫格文案长度变化，重新检测哪些需要滚动（nextTick 等 DOM 文案更新完再量，避免量到旧宽度）
-watch(locale, () => nextTick(measureQuick))
+// 注：此前语言切换后要重新测量宫格文案宽度（驱动 marquee），改省略号后不再需要
 
 // 发现页 banner：拉运营后台配置的 banner（status=on），点击跳 banner.url
 async function fetchBanners() {
@@ -581,8 +567,6 @@ onMounted(async () => {
     // 刚发完帖：切到目标 tab 后补拉一次，保证新帖可见
     await refreshCurrentTab()
   }
-  // 4 宫格标签溢出检测（渲染完成后量一次；语言切换后文案长度变化需重测）
-  measureQuick()
   // Banner 轮播自动播放：统一 4s/张，视频 slide 也定时切走（不再等 @ended，避免视频 loop 卡在第一张）
   startBannerLoop()
   document.addEventListener('visibilitychange', onDocVisibility)
@@ -1006,31 +990,20 @@ function showToast(msg) {
 .quick__label {
   width: 100%;
   overflow: hidden;
-  font-size: 14px;
-  line-height: 1;
+  font-size: 13px;
+  line-height: 1.2;
   color: var(--text);
   text-align: center; /* 各语言标签统一居中（修 EN/PT 通知/积分偏左不齐） */
 }
+/* 两行截断代替横向滚动（marquee 2026-09-05 去掉）：
+   无限滚动是常驻合成层，和首屏入场动画叠在一起显得杂乱；葡语等长文案用省略号收尾，
+   既不制造合成层，各语言表现也一致 */
 .quick__label__text {
-  display: inline-block;
-  white-space: nowrap;
-}
-/* 仅当文字溢出容器才滚动，短标签（如中文）保持静止——保证 4 宫格表现一致 */
-.quick__label__text.overflow {
-  animation: q-marquee 4.5s linear infinite;
-}
-/* 英文/葡萄牙语：智能助手标签较长，用子选择器定位并滚动（纯 CSS 驱动，不依赖 JS 测宽） */
-.discover.locale-en .quick__item--ai .quick__label__text,
-.discover.locale-pt .quick__item--ai .quick__label__text {
-  animation: q-marquee 4.5s linear infinite;
-}
-@keyframes q-marquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
-}
-/* 页面隐藏（切 Tab / App 后台）时暂停滚动动画，避免持续 transform 合成层在 WebView 久驻后干扰整页点击命中 */
-.discover.marquee-paused .quick__label__text {
-  animation-play-state: paused;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 .q-badge {
   position: absolute;
