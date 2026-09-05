@@ -290,6 +290,17 @@ export function initBridge() {
   window.__PXID_EMBED__ = isEmbed()
 }
 
+// 启动即并行预热 token（2026-09-05）：
+// api/feed.js 的 request() 每个请求前都 await getAuthTokenSafe()，而 H5 预览态下 /auth/token
+// 实测近 1s —— 若等到列表请求那一刻才取，首屏就被这一个串行 RTT 白白拖住（实测 3.5s→2.5s）。
+// 这里在应用启动时先发起，等真正要用时通常已就绪；失败不抛，调用方会各自重试。
+export function prewarmAuthToken() {
+  try {
+    const p = bridge.getAuthToken()
+    if (p && typeof p.catch === 'function') p.catch(() => {})
+  } catch (e) { /* 预热失败静默，业务侧正常重试 */ }
+}
+
 // 统一出口：业务代码只调用这里，无需关心当前是 mock 还是原生
 export const bridge = {
   get isEmbed() {
