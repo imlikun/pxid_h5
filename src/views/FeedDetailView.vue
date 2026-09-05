@@ -124,6 +124,7 @@
           <div class="cmt-sk__lines">
             <span class="cmt-sk__line cmt-sk__line--name"></span>
             <span class="cmt-sk__line cmt-sk__line--text"></span>
+            <span class="cmt-sk__line cmt-sk__line--meta"></span>
           </div>
         </div>
       </div>
@@ -1171,12 +1172,20 @@ function showToast(msg) {
 
 /* 评论骨架：条数 = 帖子自带的评论数（最多 3 条），高度与真实评论对齐，
    评论接口回来原地替换，整页高度从渲染第一帧起就是最终高度 */
-.cmt-sk { display: flex; gap: 10px; padding: 12px 0; }
+/* 骨架行高对齐真实评论节点（实测 80px = padding 10/10 + 头像 34 与三行文本取大值），
+   这样接口回来是「原地替换」而不是「整块变高」（2026-09-05） */
+.cmt-sk {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  min-height: 80px;
+}
 .cmt-sk__avatar { width: 34px; height: 34px; border-radius: 50%; background: #eef0f4; flex: none; }
-.cmt-sk__lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.cmt-sk__lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .cmt-sk__line { height: 10px; border-radius: 5px; background: #eef0f4; }
 .cmt-sk__line--name { width: 30%; }
 .cmt-sk__line--text { width: 78%; }
+.cmt-sk__line--meta { width: 22%; height: 9px; }
 .comments__empty { font-size: 13px; color: var(--text-hint); padding: 18px 0; text-align: center; }
 .cmt { display: flex; gap: 10px; padding: 14px 0; border-bottom: 1px solid #f2f3f5; }
 .cmt__avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex: none; }
