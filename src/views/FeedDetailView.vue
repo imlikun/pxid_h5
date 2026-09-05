@@ -20,7 +20,7 @@
   <article class="article">
     <!-- 作者卡：点作者进个人主页（官方帖无 deviceId 不跳） -->
     <header class="article__header">
-      <div class="author fade-up stagger-1" @click="goAuthor">
+      <div class="author" @click="goAuthor">
       <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.value?.author)" />
       <div class="meta">
         <div class="name">
@@ -38,7 +38,7 @@
     </div>
 
     <!-- 标题 -->
-    <h1 class="title fade-up stagger-2">{{ item.title }}</h1>
+    <h1 class="title">{{ item.title }}</h1>
     </header>
 
     <div class="article__body">
@@ -56,7 +56,7 @@
     </div>
 
     <!-- 视频播放器 -->
-    <div v-if="item && item.videoUrl" class="vd-video fade-up stagger-2">
+    <div v-if="item && item.videoUrl" class="vd-video">
       <video
         class="vd-video__el"
         :src="videoSrc"
@@ -68,7 +68,7 @@
     </div>
 
     <!-- 图片九宫格 -->
-    <div v-if="images.length && images[0]" class="gallery fade-up stagger-3" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
+    <div v-if="images.length && images[0]" class="gallery" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
       <img
         v-for="(img, i) in images"
         :key="i"
@@ -81,7 +81,7 @@
     </div>
 
     <!-- 正文富文本 -->
-    <div class="content fade-up stagger-4">
+    <div class="content">
       <span
         v-for="(seg, i) in segments"
         :key="i"
@@ -92,7 +92,7 @@
     </div>
 
     <!-- 标签 / 车型 -->
-    <div class="tags fade-up stagger-5" v-if="tagList.length">
+    <div class="tags" v-if="tagList.length">
       <span
         v-for="(tg, i) in tagList"
         :key="i"
@@ -103,7 +103,7 @@
     </div>
 
     <!-- 种草商品卡 -->
-    <div v-if="item.productCard" class="prod fade-up stagger-6 press" @click="onProductCard">
+    <div v-if="item.productCard" class="prod press" @click="onProductCard">
       <img class="prod__img" :src="item.productCard.cover" :alt="item.productCard.name" />
       <div class="prod__info">
         <div class="prod__name">{{ item.productCard.name }}</div>
@@ -114,7 +114,7 @@
   </article>
 
     <!-- 评论区 -->
-    <div class="comments fade-up stagger-7" ref="commentsBox">
+    <div class="comments" ref="commentsBox">
       <div class="comments__head">{{ t('feed.commentsCount', { n: commentCount }) }}</div>
       <div v-if="comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
       <CommentNode
@@ -149,7 +149,7 @@
     </teleport>
 
     <!-- 相关推荐 -->
-    <div class="related fade-up stagger-8" v-if="related.length">
+    <div class="related" v-if="related.length">
       <div class="related__head">{{ t('feed.related') }}</div>
       <div class="related__grid">
         <div
@@ -173,7 +173,7 @@
   </div>
 
   <!-- 加载中（切帖/首屏先显示，避免闪“内容不存在或已下架”空态） -->
-  <div v-else-if="loading" class="loading">
+  <div v-else-if="showLoading" class="loading">
     <div class="loading__spin"></div>
     <div class="loading__txt">{{ t('common.loading') }}</div>
   </div>
@@ -249,8 +249,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
 import { t, locale, regionFromLocale } from '../i18n'
-import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail, deleteFeed, getDeviceId } from '../api/feed'
+import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail, deleteFeed, getDeviceId, invalidateFeedDetail } from '../api/feed'
 import { mediaUrl } from '../storage'
+import { getFeedSnapshot } from '../utils/feedSnapshot'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
@@ -271,6 +272,10 @@ const authorAvatar = computed(() => resolveAvatar(item.value?.author, item.value
 // 真实数据源（从接口拉取，activity 从 mock 取）
 const item = ref(null)
 const loading = ref(true)
+// 真正决定要不要亮「加载中」的是这个：接口 200ms 内没回来才显示。
+// 有列表快照时根本走不到这里（内容已直出），见 utils/feedSnapshot.js。
+const showLoading = ref(false)
+let loadingTimer = null
 
 // 状态
 const liked = ref(false)
@@ -469,8 +474,28 @@ async function doReport(reason) {
 // 从接口/mock 加载详情并初始化状态
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同 id 时组件被复用 → 必须监听路由重载，否则“永远同一片”
 async function load() {
-  item.value = null
-  loading.value = true
+  clearTimeout(loadingTimer)
+  // ① 列表快照直出：点进来的那一刻内容就在位，转场里不会出现「加载圈 + 加载中」。
+  //    接口返回后再静默替换（stale-while-revalidate），用户全程只看得到一次横滑。
+  const snap = isActivity.value ? null : getFeedSnapshot(id.value)
+  if (snap) {
+    item.value = snap
+    liked.value = !!snap.isLiked
+    likeCount.value = snap.likes || 0
+    collected.value = !!snap.isFavorited
+    collectCount.value = snap.favorites || 0
+    followed.value = !!snap.followed
+    comments.value = []
+    related.value = []
+    loading.value = false
+    showLoading.value = false
+  } else {
+    item.value = null
+    loading.value = true
+    showLoading.value = false
+    // ② 没有快照（外部链接直开/分享进来）时才等接口；200ms 内回来就不亮加载圈
+    loadingTimer = setTimeout(() => { if (!item.value) showLoading.value = true }, 200)
+  }
   if (isActivity.value) {
     item.value = await fetchActivityDetail(id.value)
     if (item.value) checkMySignup(id.value)
@@ -501,6 +526,9 @@ async function load() {
       loadRelated()
     }
   }
+  // 接口已回来：撤掉加载态。若接口返回空但手里有快照，保留快照，不闪「内容不存在」空态
+  clearTimeout(loadingTimer)
+  showLoading.value = false
   loading.value = false
 }
 
@@ -731,6 +759,7 @@ async function onLike() {
     if (j.code === 0 && j.data) {
       liked.value = !!j.data.isLiked
       likeCount.value = j.data.likes
+      invalidateFeedDetail(id.value) // 计数已变，别让 60s 详情缓存喂旧值
     } else {
       // 后端非 0 码（如 401/无权限）：回滚 + 明确提示（原静默失败，用户以为点赞无效）
       rollback()
@@ -903,6 +932,7 @@ async function submitComment() {
         comments.value.unshift(newNode)
       }
       commentText.value = ''
+      invalidateFeedDetail(id.value) // 评论数已变
       showToast(t('feed.toast.commentOk'))
       return
     }

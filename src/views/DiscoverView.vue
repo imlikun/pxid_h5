@@ -2,7 +2,16 @@
   <div
     class="discover"
     :class="{ 'locale-zh': locale === 'zh', 'locale-en': locale === 'en', 'locale-pt': locale === 'pt', 'marquee-paused': docHidden }"
+    @touchstart.passive="onPtrStart"
+    @touchmove.passive="onPtrMove"
+    @touchend.passive="onPtrEnd"
   >
+    <!-- 下拉刷新指示器：从详情返回不再自动重拉列表（避免返回时闪一下），
+         这里保留一个手动刷新入口 -->
+    <div class="ptr" :style="{ height: (ptrBusy ? 44 : ptrDist) + 'px' }">
+      <span v-if="ptrDist > 0 || ptrBusy" class="ptr__dot" :class="{ 'ptr__dot--spin': ptrBusy }"></span>
+    </div>
+
     <!-- 顶部：三 tab + 操作 -->
     <TopBar sticky :show-back="false">
       <template #left>
@@ -569,6 +578,8 @@ onMounted(async () => {
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab)
     publishState.pendingTab = null
+    // 刚发完帖：切到目标 tab 后补拉一次，保证新帖可见
+    await refreshCurrentTab()
   }
   // 4 宫格标签溢出检测（渲染完成后量一次；语言切换后文案长度变化需重测）
   measureQuick()
@@ -591,17 +602,63 @@ onUnmounted(() => {
   if (videoPlayTimer) { clearTimeout(videoPlayTimer); videoPlayTimer = null }
 })
 
-// App.vue 用 <keep-alive> 缓存全部页面：从互动消息页返回时 onMounted 不会重跑，
-// keep-alive 返回时刷新当前 tab 列表（防陈旧数据：补头像/新帖等），30s 内不重复拉
-onActivated(async () => {
+// App.vue 用 <keep-alive> 缓存全部页面：从详情页返回时 onMounted 不会重跑。
+//
+// ⚠️ 2026-09-05 改：返回**不再**自动重拉列表。原因是转场（280ms 横滑）还在跑，
+//    列表一重排就「闪一下」，还和滚动位置恢复互相打架，进出看着非常乱。
+//    现在只在三种情况下刷新：
+//      ① 明确请求过刷新（发完帖 / 语言或地区切换）
+//      ② 距上次拉取超过 5 分钟
+//      ③ 用户手动下拉刷新（见下方 onPtrStart/Move/End）
+onActivated(() => {
   startBannerLoop() // 回到本 Tab 恢复轮播
-  const now = Date.now()
-  if (now - lastListLoadTs > 30000) {
-    lastListLoadTs = now
-    const key = activeTab.value === '推荐' ? 'recommend' : 'dynamic'
-    loadFeed(key)
+  if (pendingListRefresh || Date.now() - lastListLoadTs > STALE_MS) {
+    pendingListRefresh = false
+    refreshCurrentTab()
   }
 })
+
+// 刷新当前 tab（下拉刷新 / 发完帖 / 数据过旧时调用）
+async function refreshCurrentTab() {
+  const key = activeTab.value === '动态' ? 'dynamic' : 'recommend'
+  const jobs = [loadFeed(key)]
+  if (activeTab.value === '推荐') jobs.push(loadActivities(), fetchBanners())
+  await Promise.all(jobs)
+  lastListLoadTs = Date.now()
+}
+
+// ---- 下拉刷新 ----
+const STALE_MS = 5 * 60 * 1000
+let pendingListRefresh = false
+const ptrDist = ref(0)
+const ptrBusy = ref(false)
+let ptrStartY = 0
+let ptrActive = false
+const PTR_TRIGGER = 56
+function onPtrStart(e) {
+  if (ptrBusy.value || showSearchResults.value || window.scrollY > 0) return
+  ptrStartY = e.touches[0].clientY
+  ptrActive = true
+}
+function onPtrMove(e) {
+  if (!ptrActive) return
+  const d = e.touches[0].clientY - ptrStartY
+  // 阻尼：越往下越沉，最多 80px
+  ptrDist.value = d > 0 ? Math.min(80, d * 0.45) : 0
+}
+async function onPtrEnd() {
+  if (!ptrActive) return
+  ptrActive = false
+  const d = ptrDist.value
+  ptrDist.value = 0
+  if (d < PTR_TRIGGER) return
+  ptrBusy.value = true
+  try {
+    await refreshCurrentTab()
+  } finally {
+    ptrBusy.value = false
+  }
+}
 
 function onAdd() {
   // 原生环境：拉起原生发布器（契约 openNative('discover/publish')）
@@ -727,6 +784,29 @@ function showToast(msg) {
   min-height: 100vh;
   background: var(--bg);
   padding-bottom: env(safe-area-inset-bottom);
+}
+/* 下拉刷新：容器高度跟手，内容自然下推；转圈只在真正请求时出现 */
+.ptr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 0;
+  overflow: hidden;
+}
+.ptr__dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--brand, #6c4dff);
+}
+.ptr__dot--spin {
+  animation: ptrspin 0.7s linear infinite;
+}
+@keyframes ptrspin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .tabs {
   display: flex;

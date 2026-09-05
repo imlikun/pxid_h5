@@ -124,12 +124,12 @@ const router = createRouter({
     // 返回（浏览器后退 / 手势 / 原生返回键）：恢复上次位置
     if (savedPosition) {
       return new Promise((resolve) => {
-        // keep-alive 页面重新挂载后，列表是接口异步回填的，DOM 高度逐步撑开，
-        // 单次 scrollTo 大概率滚不到位（实测差 200px），这里有限次重试直到能滚到目标
+        // 返回时列表已不再重拉（DiscoverView 只在显式刷新时才请求），DOM 高度是稳定的，
+        // 单次 scrollTo 基本就能到位；这里最多补 2 次，避免和 280ms 转场抢时间造成抖动。
         let tries = 0
         const attempt = () => {
           window.scrollTo(0, savedPosition.top)
-          if (Math.abs(window.scrollY - savedPosition.top) < 8 || tries++ >= 6) {
+          if (Math.abs(window.scrollY - savedPosition.top) < 8 || tries++ >= 2) {
             resolve(savedPosition)
             return
           }

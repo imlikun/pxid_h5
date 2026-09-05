@@ -126,24 +126,24 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg, #f7f8fa);
-  transition: transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* 左侧一道阴影代替「旧页半透明」：半透明会露出底下的背景色，边缘发白像闪一下 */
+  box-shadow: -6px 0 20px rgba(0, 0, 0, 0.12);
+  transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
   will-change: transform;
 }
 .slide-forward-leave-active,
 .slide-back-enter-active {
-  transition: transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 300ms ease;
-  will-change: transform, opacity;
+  transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
 }
 .slide-forward-enter-from {
   transform: translateX(100%);
 }
 .slide-forward-leave-to {
-  transform: translateX(-22%);
-  opacity: 0.7;
+  transform: translateX(-18%);
 }
 .slide-back-enter-from {
-  transform: translateX(-22%);
-  opacity: 0.7;
+  transform: translateX(-18%);
 }
 .slide-back-leave-to {
   transform: translateX(100%);
@@ -155,7 +155,7 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
 .embed-mode .slide-back-leave-active,
 .embed-mode .slide-forward-leave-active,
 .embed-mode .slide-back-enter-active {
-  transition-duration: 220ms;
+  transition-duration: 200ms;
 }
 
 /* 系统开启「减弱动画」：去掉位移，只留很短的淡入，避免眩晕 */

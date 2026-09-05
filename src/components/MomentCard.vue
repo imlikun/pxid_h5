@@ -1,5 +1,5 @@
 <template>
-  <div class="moment press" @click="open">
+  <div class="moment press" @click="open" @touchstart.passive="onWarm" @mouseenter="onWarm">
     <div class="m-head" @click.stop="goUser">
       <img class="m-avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
       <div class="m-meta">
@@ -68,7 +68,8 @@ import { formatTime } from '../utils/time'
 import { mediaUrl } from '../storage'
 import { captureVideoPoster } from '../utils/videoPoster'
 import { requireLogin } from '../utils/auth'
-import { likeFeed, toggleFavorite, followUser } from '../api/feed'
+import { likeFeed, toggleFavorite, followUser, prefetchFeedDetail } from '../api/feed'
+import { putFeedSnapshot } from '../utils/feedSnapshot'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -124,7 +125,13 @@ const cols = computed(() => {
 })
 
 function open() {
+  // 先把卡片手里的这份数据交给详情页直出（省掉转场里的加载圈，见 utils/feedSnapshot.js）
+  putFeedSnapshot(props.item)
   router.push('/feed/' + props.item.id)
+}
+// 预热：手指按下/鼠标移入就提前拉详情，点进去时多数已返回
+function onWarm() {
+  prefetchFeedDetail(props.item.id)
 }
 // 点作者（头像/昵称）→ 个人主页（他人/自己统一由主页按 id 识别）
 function goUser() {

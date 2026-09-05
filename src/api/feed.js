@@ -114,7 +114,13 @@ export async function publishFeed(payload) {
 export { getDeviceId }
 
 // ---- 详情 ----
-export async function fetchFeedDetail(id) {
+// 详情缓存（60s）+ 请求合并：列表 touchstart 预热、详情页复用同一份结果，
+// 目的是让「横滑进去」的那一刻数据已经就位，不再出现加载圈（2026-09-05）。
+const DETAIL_TTL = 60000
+const detailCache = new Map() // id -> { ts, data }
+const detailInflight = new Map() // id -> Promise（同一 id 并发只发一次请求）
+
+async function fetchFeedDetailRaw(id) {
   if (FEED_API) {
     try {
       const data = await request('/feed/' + id)
@@ -126,6 +132,41 @@ export async function fetchFeedDetail(id) {
   await ensurePublishScope()
   const all = [...publishState.list, ...moments, ...feedItems]
   return all.find((i) => String(i.id) === String(id)) || null
+}
+
+export async function fetchFeedDetail(id) {
+  const key = String(id)
+  const hit = detailCache.get(key)
+  if (hit && Date.now() - hit.ts < DETAIL_TTL) return hit.data ? { ...hit.data } : null
+  let p = detailInflight.get(key)
+  if (!p) {
+    p = fetchFeedDetailRaw(id)
+      .then((data) => {
+        detailCache.set(key, { ts: Date.now(), data })
+        // 简易 LRU：超出上限淘汰最早的一条
+        if (detailCache.size > 30) detailCache.delete(detailCache.keys().next().value)
+        return data
+      })
+      .finally(() => detailInflight.delete(key))
+    detailInflight.set(key, p)
+  }
+  const data = await p
+  return data ? { ...data } : null
+}
+
+// 预热：卡片 touchstart / mouseenter 时提前拉，点进去时多数已返回
+export function prefetchFeedDetail(id) {
+  if (id == null) return
+  const key = String(id)
+  const hit = detailCache.get(key)
+  if ((hit && Date.now() - hit.ts < DETAIL_TTL) || detailInflight.has(key)) return
+  fetchFeedDetail(id).catch(() => {})
+}
+
+// 点赞/评论/删帖后主动失效，避免 60s 内再进详情读到旧计数
+export function invalidateFeedDetail(id) {
+  if (id == null) return
+  detailCache.delete(String(id))
 }
 
 // ---- 删除（仅作者，后端校验身份；软删 status='deleted'）----
