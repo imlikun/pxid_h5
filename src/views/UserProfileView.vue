@@ -15,12 +15,10 @@
         </div>
         <div v-if="user && user.carModel" class="u-car">#{{ user.carModel }}</div>
       </div>
-      <!-- 他人主页：关注 + 发消息 + 更多菜单；自己主页：不显示操作区 -->
+      <!-- 他人主页：只保留「更多」菜单（举报/拉黑入口）。
+           关注 + 发消息入口已下线（2026-09-05 坤哥拍板：全站不做社交关注/私信），
+           与发现页 MomentCard 的关注按钮同步移除，避免两处逻辑不一致。 -->
       <div v-if="!isSelf" class="u-actions">
-        <button class="u-btn u-follow" :class="{ on: user && user.isFollowing }" @click="onToggleFollow">
-          {{ user && user.isFollowing ? '已关注' : '+ 关注' }}
-        </button>
-        <button class="u-btn u-msg" @click="onMessage">发消息</button>
         <button class="u-more-btn" @click="menuOpen = !menuOpen">⋯</button>
         <transition name="fade">
           <div v-if="menuOpen" class="u-menu" @click.stop>

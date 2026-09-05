@@ -6,12 +6,8 @@
         <div class="m-name"><span v-if="item.pinned" class="m-pin">{{ t('feed.pinned') }}</span>{{ item.author }}</div>
         <div class="m-time">{{ formatTime(item.time) }}</div>
       </div>
-      <button
-        v-if="canFollow && !item.followed"
-        class="m-follow"
-        @click.stop="onFollow"
-      >+ 关注</button>
-      <span v-else class="m-followed" @click.stop>已关注</span>
+      <!-- 关注入口已下线（2026-09-05 坤哥拍板：全站不做社交关注）。
+           原「+ 关注 / 已关注」按钮块整体移除；后端 canFollow 字段保留，后续如需恢复在此加回。 -->
     </div>
 
     <div class="m-title">{{ item.title }}</div>
