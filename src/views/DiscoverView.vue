@@ -261,8 +261,12 @@ function nextBanner() {
 }
 // 视频懒加载：preload=none 不占首屏带宽，图片先出；延迟 1.2s 再播视频
 function lazyPlayHeroVideo() {
-  const v = heroVideoRef.value
-  if (!v) return
+  // ⚠️ 这里的 ref 在 v-for 内部，Vue 3 会把它收集成**数组**（每个 video 型 slide 一个），
+  // 直接 v.play() 会抛 "v.play is not a function"（线上 pageerror 可复现），
+  // 结果是 banner 视频永远停在 poster 不自动播。取数组首项并做能力判断。
+  const raw = heroVideoRef.value
+  const v = Array.isArray(raw) ? raw[0] : raw
+  if (!v || typeof v.play !== 'function') return
   videoPlayTimer = setTimeout(() => {
     const p = v.play()
     if (p && p.catch) p.catch(() => { /* iOS 等自动播被拦：停留在 poster，用户滑动后仍可播 */ })

@@ -123,10 +123,19 @@ const router = createRouter({
   scrollBehavior(to, from, savedPosition) {
     // 返回（浏览器后退 / 手势 / 原生返回键）：恢复上次位置
     if (savedPosition) {
-      // keep-alive 页面重新挂载后 DOM 要一帧才撑开（列表还是接口异步拉的），
-      // 立刻 scrollTo 会滚不动，延后一拍再恢复
       return new Promise((resolve) => {
-        setTimeout(() => resolve(savedPosition), 80)
+        // keep-alive 页面重新挂载后，列表是接口异步回填的，DOM 高度逐步撑开，
+        // 单次 scrollTo 大概率滚不到位（实测差 200px），这里有限次重试直到能滚到目标
+        let tries = 0
+        const attempt = () => {
+          window.scrollTo(0, savedPosition.top)
+          if (Math.abs(window.scrollY - savedPosition.top) < 8 || tries++ >= 6) {
+            resolve(savedPosition)
+            return
+          }
+          setTimeout(attempt, 60)
+        }
+        setTimeout(attempt, 60)
       })
     }
     // 底部 tab 互切：平级关系，各自保留自己的浏览位置，不强制滚顶

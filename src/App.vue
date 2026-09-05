@@ -56,12 +56,25 @@ function onVisibilityChange() {
   if (document.visibilityState !== 'visible') return
   initLocale()
 }
+// 预取详情页 chunk：路由是懒加载的，点击时才下载 JS 会让转场「卡一下」——
+// Vue 的 transition 会等新组件挂载才播 enter 动画，实测旧页会停在 leave-to 状态干等 chunk。
+// 首屏空闲时提前把高频详情页拉下来，点击即可立即起转场。
+// 与 router 里的动态 import 指向同一模块，Vite 复用同一个 chunk，不会重复打包。
+function prefetchDetailChunks() {
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500))
+  idle(() => {
+    import('./views/FeedDetailView.vue').catch(() => {})
+    import('./views/ProductDetailView.vue').catch(() => {})
+  })
+}
+
 onMounted(() => {
   // 首屏立即按系统语言初始化（修复：从 Flutter「我的」等全新 WebView 入口进来时，
   // 没有 visibilitychange 事件触发，必须由首屏兜底初始化，否则页面语言停在默认中文，
   // 不跟随 App 系统语言切换。切前台刷新逻辑见 onVisibilityChange）。
   initLocale()
   document.addEventListener('visibilitychange', onVisibilityChange)
+  prefetchDetailChunks()
 })
 onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
 </script>
