@@ -235,7 +235,7 @@
   <transition name="fade">
     <div v-if="toast" class="toast">{{ toast }}</div>
   </transition>
-
+  </div>
 </template>
 
 <script setup>
