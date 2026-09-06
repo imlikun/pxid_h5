@@ -1,6 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { bridge } from '../bridge'
-import { setPendingRestoreScroll } from '../composables/usePageTransition'
 
 // 路由级懒加载：全部页面动态 import，Vite 按路由拆 chunk，
 // 首屏只加载当前页面代码，大幅减小首包体积（原 30+ 页面全打一个 bundle）
@@ -121,17 +120,25 @@ const router = createRouter({
   routes,
   // 滚动行为与转场的交接（iOS 语义，2026-09-06 帧采样定位后重写）：
   //   前进 = 旧页保持滚动位置原样滑出，滚顶推迟到转场结束（App.vue after-enter 同帧做）；
-  //   返回 = 列表带着原滚动位置滑入，恢复动作在转场开始前完成（App.vue before-enter 做）。
+  //   返回 = 列表带着原滚动位置滑入。scrollBehavior 在 DOM 更新后、下一帧绘制前（微任务）执行，
+  //          此刻 keep-alive 列表已插回文档、高度稳定（返回已不重拉列表），直接 scrollTo 即可 ——
+  //          列表滑入的第一帧就是原位置，没有「先显示顶部、中途再跳」的中间帧。
+  //   ⚠️ 不能靠 <transition> 的 before-enter 恢复：enter 钩子在 DOM patch 时同步触发，
+  //      而 scrollBehavior 是 router 在 nextTick 之后才调用的 —— before-enter 先跑，
+  //      pending 永远被提前消费成 null（2026-09-06 探针实测：返回全程零 scrollTo，savedPosition 明明存在）。
   // 此前前进时在这里立即 scrollTo(0,0)，而列表是 static 页面、视觉位置完全由 scrollY 决定，
   // 实测（600px 处点卡片）转场开始帧 scrollY 600→0 硬跳，列表先跳回顶部再滑出 —— 「抖一下」的真凶。
-  // 返回时靠 setTimeout(60ms) 重试恢复，列表滑入的前 60ms 也显示的是顶部内容，同样有跳变。
   scrollBehavior(to, from, savedPosition) {
     const TABS = ['/discover', '/featured', '/service']
     // tab 之间浏览器前进/后退：无转场动画，让路由器直接恢复即可
     if (savedPosition && TABS.includes(to.path) && TABS.includes(from.path)) return savedPosition
     if (savedPosition) {
-      // 返回：记下位置，App.vue 的 before-enter（新页 DOM 已挂载、动画未开始）里恢复
-      setPendingRestoreScroll(savedPosition.top)
+      // 返回：直接恢复（时机正确性见上方注释）
+      window.scrollTo(0, savedPosition.top)
+      // 兜底：万一有异步内容改变高度导致没滚到位，稍后补一次（列表返回不重拉，通常一次到位）
+      setTimeout(() => {
+        if (Math.abs(window.scrollY - savedPosition.top) > 8) window.scrollTo(0, savedPosition.top)
+      }, 120)
       return false
     }
     // tab 互切：平级关系，各自保留自己的浏览位置

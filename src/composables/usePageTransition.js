@@ -15,19 +15,10 @@ const TAB_PATHS = ['/discover', '/featured', '/service']
 
 export const transitionName = ref('')
 
-// 返回时要恢复的滚动位置：router.scrollBehavior 写入，App.vue 转场 before-enter 消费。
-// 为什么不在 scrollBehavior 里直接 scrollTo：那个时机新页 DOM 还没挂载（keep-alive 缓存未插回
-// 文档流），文档高度不足滚不到位；靠 setTimeout 延迟恢复则列表会先以顶部内容滑入、中途再跳变
-// （2026-09-06 帧采样实测两个方向都存在这个问题）。必须在转场开始前、DOM 挂载后那一帧恢复。
-let pendingRestoreScroll = null
-export function setPendingRestoreScroll(top) {
-  pendingRestoreScroll = top
-}
-export function takePendingRestoreScroll() {
-  const v = pendingRestoreScroll
-  pendingRestoreScroll = null
-  return v
-}
+// 返回方向的滚动恢复**不走这里**：直接在 router.scrollBehavior 里做。
+// 时序真相（2026-09-06 探针实测）：transition 的 enter 钩子在 DOM patch 时同步触发，
+// 而 router.scrollBehavior 是 nextTick 之后才调用的 —— 任何「scrollBehavior 写入、
+// before-enter 消费」的中转方案都会因消费发生在写入之前而永远拿到 null。
 
 let lastPos = 0
 let booted = false

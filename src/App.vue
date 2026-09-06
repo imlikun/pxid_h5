@@ -1,7 +1,7 @@
 <template>
   <div class="app-root" :class="{ 'embed-mode': inApp }" ref="rootRef">
     <router-view v-slot="{ Component }">
-      <transition :name="transitionName" @before-enter="onBeforeEnter" @after-enter="onAfterEnter">
+      <transition :name="transitionName" @after-enter="onAfterEnter">
         <keep-alive>
           <component :is="Component" />
         </keep-alive>
@@ -19,7 +19,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSwipeBack } from './composables/useSwipeBack'
-import { setupPageTransition, transitionName, takePendingRestoreScroll } from './composables/usePageTransition'
+import { setupPageTransition, transitionName } from './composables/usePageTransition'
 import { bridge } from './bridge'
 import { initLocale } from './i18n'
 
@@ -30,23 +30,7 @@ setupPageTransition(router)
 // ---- 转场与滚动的交接（iOS 语义）----
 // 前进：旧页（列表，static）保持滚动位置原样滑出，新页是 fixed 容器自带 scrollTop=0；
 //      转场结束摘 fixed 类的同一帧再把 window 滚顶（after-enter 与摘类同 tick，paint 前完成，无中间帧）。
-// 返回：新页（列表）在 before-enter 时 DOM 已挂载、动画未开始，此刻一次性恢复滚动位置，
-//      列表从头到尾带着正确内容滑入（此前靠 60ms 后重试，前 60ms 显示的是顶部内容，同样跳变）。
-let restoreFixTimer1 = null
-let restoreFixTimer2 = null
-function onBeforeEnter() {
-  const top = takePendingRestoreScroll()
-  if (top == null) return
-  window.scrollTo(0, top)
-  // 兜底：列表不重绘后 DOM 高度稳定，通常一次到位；万一异步内容再动高度，80/200ms 各补一次
-  const tryFix = () => {
-    if (Math.abs(window.scrollY - top) > 8) window.scrollTo(0, top)
-  }
-  clearTimeout(restoreFixTimer1)
-  clearTimeout(restoreFixTimer2)
-  restoreFixTimer1 = setTimeout(tryFix, 80)
-  restoreFixTimer2 = setTimeout(tryFix, 200)
-}
+// 返回：列表带着原滚动位置滑入 —— 恢复动作在 router.scrollBehavior 里直接做（时机与原因见其注释）。
 function onAfterEnter() {
   if (transitionName.value === 'slide-forward') window.scrollTo(0, 0)
 }
