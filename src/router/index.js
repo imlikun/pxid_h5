@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { bridge } from '../bridge'
+import { setPendingRestoreScroll } from '../composables/usePageTransition'
 
 // 路由级懒加载：全部页面动态 import，Vite 按路由拆 chunk，
 // 首屏只加载当前页面代码，大幅减小首包体积（原 30+ 页面全打一个 bundle）
@@ -118,31 +119,26 @@ const routes = [
 const router = createRouter({
   history: createWebHashHistory(),
   routes,
-  // 滚动行为：加了页面转场后必须配套，否则从详情返回列表会直接跳回顶部，
-  // 横滑着回去却看到列表闪回第一条，比没有动画更难看。
+  // 滚动行为与转场的交接（iOS 语义，2026-09-06 帧采样定位后重写）：
+  //   前进 = 旧页保持滚动位置原样滑出，滚顶推迟到转场结束（App.vue after-enter 同帧做）；
+  //   返回 = 列表带着原滚动位置滑入，恢复动作在转场开始前完成（App.vue before-enter 做）。
+  // 此前前进时在这里立即 scrollTo(0,0)，而列表是 static 页面、视觉位置完全由 scrollY 决定，
+  // 实测（600px 处点卡片）转场开始帧 scrollY 600→0 硬跳，列表先跳回顶部再滑出 —— 「抖一下」的真凶。
+  // 返回时靠 setTimeout(60ms) 重试恢复，列表滑入的前 60ms 也显示的是顶部内容，同样有跳变。
   scrollBehavior(to, from, savedPosition) {
-    // 返回（浏览器后退 / 手势 / 原生返回键）：恢复上次位置
-    if (savedPosition) {
-      return new Promise((resolve) => {
-        // 返回时列表已不再重拉（DiscoverView 只在显式刷新时才请求），DOM 高度是稳定的，
-        // 单次 scrollTo 基本就能到位；这里最多补 2 次，避免和 280ms 转场抢时间造成抖动。
-        let tries = 0
-        const attempt = () => {
-          window.scrollTo(0, savedPosition.top)
-          if (Math.abs(window.scrollY - savedPosition.top) < 8 || tries++ >= 2) {
-            resolve(savedPosition)
-            return
-          }
-          setTimeout(attempt, 60)
-        }
-        setTimeout(attempt, 60)
-      })
-    }
-    // 底部 tab 互切：平级关系，各自保留自己的浏览位置，不强制滚顶
     const TABS = ['/discover', '/featured', '/service']
+    // tab 之间浏览器前进/后退：无转场动画，让路由器直接恢复即可
+    if (savedPosition && TABS.includes(to.path) && TABS.includes(from.path)) return savedPosition
+    if (savedPosition) {
+      // 返回：记下位置，App.vue 的 before-enter（新页 DOM 已挂载、动画未开始）里恢复
+      setPendingRestoreScroll(savedPosition.top)
+      return false
+    }
+    // tab 互切：平级关系，各自保留自己的浏览位置
     if (TABS.includes(to.path) && TABS.includes(from.path)) return false
-    // 新页面从顶部开始
-    return { top: 0 }
+    // 前进：这里绝不能 scrollTo(0,0)——会旧页跳顶。详情页是 fixed 滚动容器，
+    // 自带 scrollTop=0 起步；window 滚顶推迟到转场结束（App.vue after-enter）
+    return false
   },
 })
 
