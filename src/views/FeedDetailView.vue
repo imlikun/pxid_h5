@@ -490,16 +490,25 @@ async function doReport(reason) {
   }
 }
 
+// load() 调用序号：每次进入 +1，await 之后比对，不一致说明用户已经离开本页
+// （快速「进详情→立刻返回」场景），后续请求一律不发
+let loadSeq = 0
+
 // 从接口/mock 加载详情并初始化状态
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同 id 时组件被复用 → 必须监听路由重载，否则“永远同一片”
 async function load() {
-  // 兜底：id 无效（keep-alive 下返回列表时 params.id 已消失）直接不拉，
-  // 否则会打出 /feed/NaN 一串无效请求
-  if (!Number.isFinite(id.value)) return
+  // ⚠️ id 必须在这里取成局部常量，且每一步 await 之后校验 seq：
+  //    id 是 computed(Number(route.params.id))，快速「进详情→立刻返回」时，
+  //    await 期间路由已经变回列表，id.value 会变成 NaN —— 后续请求就会打成
+  //    /feed/NaN、/feed/NaN/comments（2026-09-06 实测返回瞬间 4-5 个无效请求）。
+  const fid = id.value
+  if (!Number.isFinite(fid)) return
+  const seq = ++loadSeq
+  const stale = () => seq !== loadSeq
   clearTimeout(loadingTimer)
   // ① 列表快照直出：点进来的那一刻内容就在位，转场里不会出现「加载圈 + 加载中」。
   //    接口返回后再静默替换（stale-while-revalidate），用户全程只看得到一次横滑。
-  const snap = isActivity.value ? null : getFeedSnapshot(id.value)
+  const snap = isActivity.value ? null : getFeedSnapshot(fid)
   if (snap) {
     item.value = snap
     liked.value = !!snap.isLiked
@@ -523,14 +532,16 @@ async function load() {
     loadingTimer = setTimeout(() => { if (!item.value) showLoading.value = true }, 200)
   }
   if (isActivity.value) {
-    item.value = await fetchActivityDetail(id.value)
-    if (item.value) checkMySignup(id.value)
+    item.value = await fetchActivityDetail(fid)
+    if (stale()) return
+    if (item.value) checkMySignup(fid)
     commentsLoading.value = false
   } else {
     // 详情到位后要发的补充请求，全部并行（见下方 Promise.all）
     const jobs = []
     try {
-      const data = await fetchFeedDetail(id.value)
+      const data = await fetchFeedDetail(fid)
+      if (stale()) return // 已经离开本页：后面的评论/收藏/关注/推荐都不用再发了
       if (data) {
         item.value = data
         // 无快照直开时，详情到位的这一刻才知道评论数：同样先铺骨架撑住高度
@@ -549,17 +560,18 @@ async function load() {
           )
         }
         // 记录浏览足迹（H5 自管，个人主页「足迹」Tab 用；静默失败不影响阅读）
-        recordFootprint(id.value)
+        recordFootprint(fid)
         // 有 token 时补收藏态（公开详情默认不带 isFavorited，避免未登录被 401）
         jobs.push(
-          checkFavorite(id.value).then((fav) => { collected.value = fav }).catch(() => {})
+          checkFavorite(fid).then((fav) => { collected.value = fav }).catch(() => {})
         )
       }
     } catch (e) { /* keep null → show empty */ }
     if (item.value) {
       // 评论 / 关注态 / 收藏态 / 相关推荐同时发出，谁先回来谁先渲染；
       // 评论区有骨架占住高度，先回来也不会把页面顶开
-      await Promise.all([loadComments(id.value), Promise.resolve().then(loadRelated), ...jobs])
+      await Promise.all([loadComments(fid), Promise.resolve().then(loadRelated), ...jobs])
+      if (stale()) return
     }
   }
   // 接口已回来：撤掉加载态。若接口返回空但手里有快照，保留快照，不闪「内容不存在」空态
