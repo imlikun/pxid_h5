@@ -501,9 +501,10 @@ async function load() {
   //    id 是 computed(Number(route.params.id))，快速「进详情→立刻返回」时，
   //    await 期间路由已经变回列表，id.value 会变成 NaN —— 后续请求就会打成
   //    /feed/NaN、/feed/NaN/comments（2026-09-06 实测返回瞬间 4-5 个无效请求）。
+  // ⚠️ 先自增序号作废上一次调用（返回列表时也会走这里），再判 id 是否有效
+  const seq = ++loadSeq
   const fid = id.value
   if (!Number.isFinite(fid)) return
-  const seq = ++loadSeq
   const stale = () => seq !== loadSeq
   clearTimeout(loadingTimer)
   // ① 列表快照直出：点进来的那一刻内容就在位，转场里不会出现「加载圈 + 加载中」。
@@ -586,11 +587,10 @@ onMounted(() => {
   load()
 })
 // 同一个组件实例下，/feed/:id 或 /activity/:id 变化都重新拉详情。
-// ⚠️ 必须先看是不是本页路由：keep-alive 下返回列表时 fullPath 也会变，
-//    而此时 route.params.id 已不存在 → Number(undefined)=NaN → 会打出
-//    /feed/NaN、/feed/NaN/comments 等一串无效请求（2026-09-06 实测返回瞬间 5 个）。
+// ⚠️ 这里不能提前 return：返回列表时 fullPath 同样会变，必须让 load() 真正跑一遍，
+//    由它开头的 ++loadSeq 把上一次「还在飞」的请求作废。否则快速「进详情→立刻返回」时，
+//    上一次 load 会继续用旧 id 把评论/收藏/关注/推荐全部发出去（2026-09-06 实测 5 个）。
 watch(() => route.fullPath, () => {
-  if (!Number.isFinite(id.value)) return
   load()
 })
 
