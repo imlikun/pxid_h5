@@ -163,6 +163,32 @@ export function prefetchFeedDetail(id) {
   fetchFeedDetail(id).catch(() => {})
 }
 
+// 详情页媒体预热：touchstart 时把详情页会用到的图（九宫格/头像）提前拉起来。
+// 否则冷缓存下这些图在转场后逐张冒出（实测 27ms:1/3 → 121ms:2/3 → 471ms:3/3，
+// 点击后共 19 个图片请求现下载），视觉上就是「进详情像在加载」。
+// 列表卡片只显示过第一张封面，九宫格其余图和头像从未请求过，必须补预热。
+const mediaPrewarmed = new Map() // url -> ts
+const MEDIA_TTL = 5 * 60 * 1000
+export function prewarmFeedMedia(item) {
+  if (!item) return
+  const now = Date.now()
+  const urls = []
+  if (item.avatar) urls.push(item.avatar)
+  for (const im of item.images || []) {
+    const src = typeof im === 'string' ? im : im && im.src
+    if (src) urls.push(src)
+  }
+  for (const u of urls) {
+    if (typeof u !== 'string' || !/^https?:\/\//.test(u)) continue
+    const hit = mediaPrewarmed.get(u)
+    if (hit && now - hit < MEDIA_TTL) continue
+    mediaPrewarmed.set(u, now)
+    const img = new Image()
+    img.decoding = 'async'
+    img.src = u
+  }
+}
+
 // 点赞/评论/删帖后主动失效，避免 60s 内再进详情读到旧计数
 export function invalidateFeedDetail(id) {
   if (id == null) return

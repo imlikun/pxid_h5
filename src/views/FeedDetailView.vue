@@ -3,7 +3,7 @@
        多根（fragment）组件会被静默跳过动画——原本这里有 div.detail / article / teleport
        三个根级节点，导致从发现页进出详情页时，详情页那一侧的转场完全不生效
        （表现为只有列表在动，详情是硬切）。包一层后两侧动画才对称。 -->
-  <div class="fd-root">
+  <div class="fd-root" ref="fdRoot">
   <div class="detail" v-if="item">
     <!-- 顶部 -->
     <TopBar sticky :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
@@ -256,7 +256,7 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
+import { computed, ref, nextTick, onMounted, onUpdated, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
@@ -581,6 +581,34 @@ async function load() {
   loading.value = false
   commentsLoading.value = false
 }
+
+// ---- 图片统一淡入（消「谁先下完谁先冒」的加载感）----
+// 冷缓存实测：详情页 3 张主图 27ms:1/3 → 121ms:2/3 → 471ms:3/3 逐张弹出、
+// 点击后共 19 个图片请求现下载，视觉上就是「进详情在加载」。
+// 做法：img 默认 opacity 0（灰底占位、容器有 aspect-ratio 高度稳定），
+// load/error 完成后加 .is-loaded 整体浮现 250ms——图片晚到也是安静出现，不是弹出。
+// load 不冒泡但走捕获，挂在 fd-root 上即可覆盖九宫格/头像/商品卡/评论头像/相关推荐全部后代。
+const fdRoot = ref(null)
+function markImgSettled(e) {
+  const el = e.target
+  if (el && el.tagName === 'IMG' && !el.classList.contains('is-loaded')) el.classList.add('is-loaded')
+}
+function sweepSettledImgs() {
+  // 补扫：HTTP 缓存命中的图可能在事件挂上之前就 complete（load 已错过）
+  fdRoot.value?.querySelectorAll('img').forEach((el) => {
+    if ((el.complete && el.naturalWidth > 0) || (el.complete && !el.naturalWidth)) el.classList.add('is-loaded')
+  })
+}
+onMounted(() => {
+  fdRoot.value?.addEventListener('load', markImgSettled, true)
+  fdRoot.value?.addEventListener('error', markImgSettled, true)
+  nextTick(sweepSettledImgs)
+})
+onUpdated(() => nextTick(sweepSettledImgs))
+onBeforeUnmount(() => {
+  fdRoot.value?.removeEventListener('load', markImgSettled, true)
+  fdRoot.value?.removeEventListener('error', markImgSettled, true)
+})
 
 onMounted(() => {
   initSelfIdentity()
@@ -1018,6 +1046,17 @@ function showToast(msg) {
 </script>
 
 <style scoped>
+/* 图片统一淡入：默认 opacity 0 + 页面同色底占位（九宫格/商品卡有 aspect-ratio，高度稳定不跳），
+   load/error 后加 .is-loaded 浮现 250ms——图片晚到是「安静浮现」而不是「弹出」。
+   is-loaded 持久在 DOM 上，keep-alive 返回不会重播。 */
+.fd-root img {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background: var(--bg, #f7f8fa);
+}
+.fd-root img.is-loaded {
+  opacity: 1;
+}
 .detail {
   min-height: 100vh;
   background: var(--card);

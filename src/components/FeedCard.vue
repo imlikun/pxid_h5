@@ -26,7 +26,7 @@ import { t } from '../i18n'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 import { mediaUrl } from '../storage'
 import { captureVideoPoster } from '../utils/videoPoster'
-import { prefetchFeedDetail } from '../api/feed'
+import { prefetchFeedDetail, prewarmFeedMedia } from '../api/feed'
 import { putFeedSnapshot } from '../utils/feedSnapshot'
 
 const props = defineProps({
@@ -62,9 +62,10 @@ function go() {
   putFeedSnapshot(props.item)
   router.push('/feed/' + props.item.id)
 }
-// 预热：手指按下/鼠标移入就提前拉详情，点进去时多数已返回
+// 预热：手指按下/鼠标移入就提前拉详情+详情页图片，点进去时多数已返回
 function onWarm() {
   prefetchFeedDetail(props.item.id)
+  prewarmFeedMedia(props.item)
 }
 // 点作者 → 个人主页（他人/自己统一由主页按 id 识别）
 function goUser() {
