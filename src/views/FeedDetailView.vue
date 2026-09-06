@@ -493,6 +493,9 @@ async function doReport(reason) {
 // 从接口/mock 加载详情并初始化状态
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同 id 时组件被复用 → 必须监听路由重载，否则“永远同一片”
 async function load() {
+  // 兜底：id 无效（keep-alive 下返回列表时 params.id 已消失）直接不拉，
+  // 否则会打出 /feed/NaN 一串无效请求
+  if (!Number.isFinite(id.value)) return
   clearTimeout(loadingTimer)
   // ① 列表快照直出：点进来的那一刻内容就在位，转场里不会出现「加载圈 + 加载中」。
   //    接口返回后再静默替换（stale-while-revalidate），用户全程只看得到一次横滑。
@@ -570,8 +573,14 @@ onMounted(() => {
   initSelfIdentity()
   load()
 })
-// 同一个组件实例下，/feed/:id 或 /activity/:id 变化都重新拉详情
-watch(() => route.fullPath, load)
+// 同一个组件实例下，/feed/:id 或 /activity/:id 变化都重新拉详情。
+// ⚠️ 必须先看是不是本页路由：keep-alive 下返回列表时 fullPath 也会变，
+//    而此时 route.params.id 已不存在 → Number(undefined)=NaN → 会打出
+//    /feed/NaN、/feed/NaN/comments 等一串无效请求（2026-09-06 实测返回瞬间 5 个）。
+watch(() => route.fullPath, () => {
+  if (!Number.isFinite(id.value)) return
+  load()
+})
 
 // 拉取真实评论列表
 async function loadComments(fid) {
