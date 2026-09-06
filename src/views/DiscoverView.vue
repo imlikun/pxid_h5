@@ -51,7 +51,7 @@
         v-for="it in searchResults"
         :key="'sr-' + it.id"
         :item="it"
-        class="fade-up"
+        :class="fadeUp()"
       />
       <button class="search-results__clear press" @click="showSearchResults = false; keyword = ''">{{ t('search.clear') || '清除' }}</button>
     </div>
@@ -96,8 +96,8 @@
         <div
         v-for="(q, i) in discoverQuick"
         :key="q.key"
-        class="quick__item fade-up press"
-        :class="['stagger-' + ((i % 10) + 1), { 'quick__item--ai': q.key === 'ai' }]"
+        class="quick__item press"
+        :class="[fadeUp(), 'stagger-' + (i + 1), { 'quick__item--ai': q.key === 'ai' }]"
         @click="onQuick(q)"
       >
           <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
@@ -131,7 +131,7 @@
           v-for="(it, i) in recommendList"
           :key="it.id"
           :item="it"
-          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+          :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
       <!-- 空态：此前筛选无结果/无数据时整片空白，容易被误认为「帖子不显示」 -->
@@ -160,7 +160,7 @@
           v-for="(it, i) in dynamicList"
           :key="it.id"
           :item="it"
-          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+          :class="[fadeUp(), staggerFor(i)]"
         />
         <div v-if="nearLoading" class="empty-tab">{{ t('discover.nearLoading') }}</div>
         <div v-else-if="dynamicList.length === 0" class="empty-tab">{{ t('discover.emptyDynamic') }}</div>
@@ -177,8 +177,8 @@
         <div
           v-for="(p, i) in plazaShowcase"
           :key="p.id"
-          class="showcase fade-up press"
-          :class="'stagger-' + ((i % 10) + 1)"
+          class="showcase press"
+          :class="[fadeUp(), 'stagger-' + (i + 1)]"
           @click="onShowcase(p)"
         >
           <img class="showcase__img" :src="p.cover" :alt="p.name" loading="lazy" />
@@ -193,8 +193,8 @@
         <div
           v-for="(a, i) in actList"
           :key="a.id"
-          class="activity fade-up press"
-          :class="'stagger-' + ((i % 10) + 1)"
+          class="activity press"
+          :class="[fadeUp(), 'stagger-' + (i + 1)]"
           @click="onActivity(a)"
         >
           <img class="act__img" :src="a.cover" :alt="a.title" loading="lazy" />
@@ -429,6 +429,19 @@ const feedPage = {
 const loadingMore = ref(false)
 let lastListLoadTs = 0 // 列表最近一次加载时间（keep-alive 返回时防频繁重拉）
 
+// 入场动画只播一次（2026-09-06）：
+// .fade-up 是 CSS animation，keep-alive 返回时组件 DOM 被重新插入 → 动画整体重播一遍，
+// 表现就是「从详情返回，发现页又像重新加载一样卡片一张张浮上来」（实测返回瞬间 22 个动画在跑、
+// 卡片 opacity 依次 0 → 0.30 → 0.54 → 1）。
+// 做法：首屏播完后把 class 摘掉，之后（返回/切 tab）DOM 再插入也没有动画可播。
+const enterAnim = ref(true)
+let enterAnimTimer = null
+// 只给首屏前 6 张做错开，且错开上限 6 档：
+//   原来用 i % 10 → 第 11 张又从头错开，双列网格里看着就是随机的；
+//   且触底追加的卡片也会带上 stagger，每翻一页都要重播一次。
+const staggerFor = (i) => (enterAnim.value && i < 6 ? 'stagger-' + (i + 1) : '')
+const fadeUp = () => (enterAnim.value ? 'fade-up' : '')
+
 // 从 /feed 接口拉取真实数据（带地区过滤 + 分页）。改用统一数据层 api/feed.js：
 // 动态 tab 自动带 followerDevice → 后端返回「官方+已关注」关注流（修 H1 关注流非全局流）；
 // 归一化/错误回落统一，消除 api/feed.js 死代码（修 H2）
@@ -574,12 +587,18 @@ onMounted(async () => {
   lazyPlayHeroVideo()
   // 触底分页：滚动加载更多（推荐/动态）
   window.addEventListener('scroll', onScroll, { passive: true })
+  // 入场动画播完就摘掉 class：keep-alive 返回时 DOM 重新插入也不会重播
+  // （fade-up 0.45s + 最大 0.25s 错开，留 900ms 余量）
+  clearTimeout(enterAnimTimer)
+  enterAnimTimer = setTimeout(() => { enterAnim.value = false }, 900)
 })
 onDeactivated(() => {
   // 切到别的 Tab（Flutter IndexedStack 隐藏本 WebView）时停掉，避免隐藏期间持续制造合成层
   stopBannerLoop()
 })
 onUnmounted(() => {
+  clearTimeout(enterAnimTimer)
+  enterAnimTimer = null
   stopBannerLoop()
   document.removeEventListener('visibilitychange', onDocVisibility)
   window.removeEventListener('scroll', onScroll)
