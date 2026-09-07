@@ -277,6 +277,10 @@ function go(platform) {
 .dl-btn--dark {
   background: var(--text);
 }
+/* 苹果图形在 viewBox 里墨迹偏沉（叶占顶、果身沉底），光学中心比文字低 ~1.2px，上提对齐（2026-09-07 像素实测） */
+.dl-btn--dark svg {
+  transform: translateY(-1.2px);
+}
 .store-hint {
   margin: 14px 0 0;
   font-size: 12px;
