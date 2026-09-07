@@ -1,0 +1,315 @@
+<template>
+  <div class="dl">
+    <!-- 顶栏：品牌字标 + 地区切换 -->
+    <header class="dl-nav">
+      <div class="logo" aria-label="PXID">PX<span class="logo-i">i</span>D</div>
+      <div class="region" role="tablist">
+        <button class="rg" :class="{ on: region === 'cn' }" @click="region = 'cn'">{{ T.regionCn }}</button>
+        <button class="rg" :class="{ on: region === 'global' }" @click="region = 'global'">{{ T.regionGlobal }}</button>
+      </div>
+    </header>
+
+    <!-- Hero：标题 + 副题 + 系统要求 -->
+    <main class="dl-main">
+      <h1 class="hero">{{ T.title }}</h1>
+      <p class="sub">{{ T.subtitle }}</p>
+      <p class="req">{{ T.requirement }}</p>
+
+      <!-- 下载按钮（九号式描边圆角 + 小牛式适用版本小字） -->
+      <div class="btns">
+        <button class="dl-btn press" @click="go('ios')">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M17.05 12.54c-.03-2.89 2.36-4.27 2.47-4.34-1.35-1.97-3.44-2.24-4.18-2.27-1.78-.18-3.47 1.05-4.37 1.05-.9 0-2.29-1.02-3.77-1-1.94.03-3.72 1.13-4.72 2.86-2.01 3.49-.51 8.66 1.45 11.49.96 1.39 2.1 2.94 3.6 2.88 1.44-.06 1.99-.93 3.73-.93s2.23.93 3.76.9c1.56-.03 2.54-1.41 3.49-2.8 1.1-1.61 1.55-3.17 1.58-3.25-.04-.02-3.02-1.16-3.04-4.59zM14.16 4.06c.8-.97 1.34-2.32 1.19-3.66-1.15.05-2.55.77-3.38 1.73-.74.86-1.39 2.23-1.22 3.55 1.29.1 2.6-.65 3.41-1.62z"/></svg>
+          <span>iOS</span>
+        </button>
+        <button class="dl-btn press" @click="go('android')">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.7-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.43 11.43 0 00-8.94 0L5.65 5.67c-.19-.29-.58-.38-.87-.2-.28.18-.37.54-.22.83L6.4 9.48A10.81 10.81 0 001 18h22a10.81 10.81 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg>
+          <span>Android</span>
+        </button>
+      </div>
+      <p class="store-hint">{{ androidHint }}</p>
+      <p v-if="tip" class="tip">{{ tip }}</p>
+
+      <!-- 功能三卡（纯 CSS/SVG，无外链图不破图） -->
+      <section class="feats">
+        <div class="feat" v-for="f in feats" :key="f.key">
+          <span class="fi" v-html="f.icon"></span>
+          <div class="ft">{{ f.title }}</div>
+          <div class="fd">{{ f.desc }}</div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="dl-foot">© 2026 PXID · {{ T.foot }}</footer>
+  </div>
+</template>
+
+<script setup>
+// ============================================================
+// 品向智行 App 下载页（2026-09-07，参考九号/小牛下载页）
+// - 链接全部来自后端配置：GET /app-download/links（运营后台可改，国内=应用宝/国际=Google Play）
+// - 地区：?region=cn|global 可由 Flutter 直接指定；默认按浏览器语言判断，页头可手动切
+// - 独立落地页：不用 TopBar/TabBar，Flutter WebView 或浏览器直接打开
+// ============================================================
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { locale } from '../i18n'
+
+const route = useRoute()
+const FEED_API = 'https://pxid-api.appin.site'
+
+// ---- 文案（zh / en 双语；跟随时区语言，独立于全局 i18n 字典避免膨胀）----
+const STR = {
+  zh: {
+    title: '品向智行 App',
+    subtitle: '远程控车 · 车友社区 · 帮助中心',
+    requirement: 'App 要求设备支持蓝牙 4.1 及以上；Android 系统需 8.0 及以上、iOS 系统需 13 及以上。安卓手机需卸载当前应用后下载安装该版本。',
+    regionCn: '中国大陆',
+    regionGlobal: '国际版',
+    hintCn: 'Android 将跳转 应用宝 下载',
+    hintGlobal: 'Android 将跳转 Google Play 下载',
+    linkPending: '下载链接配置中，请稍后再试',
+    foot: '品向智造',
+    f1t: '远程控车', f1d: '蓝牙解锁、车辆状态与定位，一手掌握',
+    f2t: '车友社区', f2d: '骑行动态、官方活动与积分商城',
+    f3t: '帮助中心', f3d: '在线客服、附近门店与道路救援',
+  },
+  en: {
+    title: 'PXID App',
+    subtitle: 'Remote Control · Community · Help Center',
+    requirement: 'Requires Bluetooth 4.1+; Android 8.0+ or iOS 13+. On Android, uninstall the current version before installing this update.',
+    regionCn: 'China',
+    regionGlobal: 'Global',
+    hintCn: 'Android downloads via Tencent MyApp',
+    hintGlobal: 'Android downloads via Google Play',
+    linkPending: 'Download links are being configured, please try again later',
+    foot: 'by PXID',
+    f1t: 'Remote Control', f1d: 'Bluetooth unlock, live status and location',
+    f2t: 'Community', f2d: 'Rides, official events and points mall',
+    f3t: 'Help Center', f3d: 'Support, nearby stores and roadside rescue',
+  },
+}
+const T = computed(() => STR[locale.value === 'zh' ? 'zh' : 'en'] || STR.en)
+
+const ICON_CONTROL = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2"/><path d="M7.8 16.2a6 6 0 010-8.4M16.2 7.8a6 6 0 010 8.4M5 19a10 10 0 010-14M19 5a10 10 0 010 14"/></svg>'
+const ICON_COMMUNITY = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>'
+const ICON_HELP = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+
+const feats = computed(() => [
+  { key: 'ctrl', icon: ICON_CONTROL, title: T.value.f1t, desc: T.value.f1d },
+  { key: 'comm', icon: ICON_COMMUNITY, title: T.value.f2t, desc: T.value.f2d },
+  { key: 'help', icon: ICON_HELP, title: T.value.f3t, desc: T.value.f3d },
+])
+
+// ---- 地区与链接 ----
+const region = ref(/^(zh)/i.test(navigator.language || 'zh') ? 'cn' : 'global')
+const links = ref(null) // { cn:{android,ios}, global:{android,ios} }
+const tip = ref('')
+let tipTimer = null
+const androidHint = computed(() => (region.value === 'cn' ? T.value.hintCn : T.value.hintGlobal))
+
+onMounted(async () => {
+  // Flutter 可用 ?region=cn|global 直接指定（语言判断只是浏览器直开时的兜底）
+  const q = String(route.query.region || '').toLowerCase()
+  if (q === 'cn' || q === 'global') region.value = q
+  try {
+    const res = await fetch(FEED_API + '/app-download/links')
+    const json = await res.json()
+    if (json.code === 0 && json.data) links.value = json.data
+  } catch (e) {
+    console.log('[download] load links failed', e)
+  }
+})
+
+function showToast(msg) {
+  tip.value = msg
+  clearTimeout(tipTimer)
+  tipTimer = setTimeout(() => (tip.value = ''), 1800)
+}
+
+function go(platform) {
+  const url = links.value && links.value[region.value] ? links.value[region.value][platform] : ''
+  if (!url) return showToast(T.value.linkPending)
+  window.location.href = url
+}
+</script>
+
+<style scoped>
+.dl {
+  min-height: 100vh;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- 顶栏 ---- */
+.dl-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 10px;
+}
+.logo {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  user-select: none;
+}
+.logo-i {
+  position: relative;
+  font-weight: 800;
+}
+/* PXID 品牌记号：i 顶红块 */
+.logo-i::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 4px;
+  background: #e53935;
+  border-radius: 1px;
+}
+.region {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  background: #fafafa;
+}
+.rg {
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-sub);
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.rg.on {
+  background: var(--text);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ---- Hero ---- */
+.dl-main {
+  flex: 1;
+  padding: 34px 24px 40px;
+  text-align: center;
+}
+.hero {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+.sub {
+  margin: 12px 0 0;
+  font-size: 15px;
+  color: var(--text-sub);
+  letter-spacing: 0.5px;
+}
+.req {
+  margin: 18px auto 0;
+  max-width: 340px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-hint);
+}
+
+/* ---- 下载按钮（描边圆角，按压反馈） ---- */
+.btns {
+  margin-top: 26px;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.dl-btn {
+  min-width: 150px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 13px 26px;
+  border: 1.5px solid var(--text);
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+.dl-btn:active {
+  transform: scale(0.97);
+  background: #f5f5f4;
+}
+.store-hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--text-hint);
+}
+.tip {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #e53935;
+}
+
+/* ---- 功能三卡 ---- */
+.feats {
+  margin-top: 46px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.feat {
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: var(--radius-lg);
+  padding: 20px 10px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.fi {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #eee;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+}
+.ft {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.fd {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-hint);
+}
+
+/* ---- Footer ---- */
+.dl-foot {
+  padding: 18px 0 calc(env(safe-area-inset-bottom, 0px) + 18px);
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-hint);
+}
+
+@media (max-width: 360px) {
+  .hero { font-size: 28px; }
+  .dl-btn { min-width: 132px; padding: 12px 18px; }
+}
+</style>

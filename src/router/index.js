@@ -43,6 +43,8 @@ const InteractionView = () => import('../views/InteractionView.vue')
 const InteractionDetailView = () => import('../views/InteractionDetailView.vue')
 const UserProfileView = () => import('../views/UserProfileView.vue')
 const ProfileEditView = () => import('../views/ProfileEditView.vue')
+// App 下载页（独立落地页，Flutter WebView/浏览器直接打开；链接后台可配）
+const DownloadView = () => import('../views/DownloadView.vue')
 
 // 用 hash 路由：WebView 内加载任意域名/本地文件都不会 404，无需服务端 rewrite
 const routes = [
@@ -113,6 +115,9 @@ const routes = [
   { path: '/points/guide', name: 'points-guide', component: PointsGuideView, meta: { hideTabBar: true, title: '积分玩法' } },
   { path: '/points/mall', name: 'points-mall', component: PointsMallView, meta: { hideTabBar: true, title: '积分商城' } },
   { path: '/publish', name: 'publish', component: PublishView, meta: { hideTabBar: true, title: '发布动态' } },
+
+  // App 下载页（独立落地页，无 TabBar）
+  { path: '/download', name: 'download', component: DownloadView, meta: { hideTabBar: true, title: '品向智行 App 下载' } },
 ]
 
 const router = createRouter({

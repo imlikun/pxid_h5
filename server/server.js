@@ -332,6 +332,14 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_notif_device ON notifications(device_id, id DESC);
+CREATE TABLE IF NOT EXISTS app_download_config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  cn_android_url TEXT NOT NULL DEFAULT '',
+  cn_ios_url TEXT NOT NULL DEFAULT '',
+  global_android_url TEXT NOT NULL DEFAULT '',
+  global_ios_url TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL
+);
 `)
 // 真身份通知适配：接收者支持 member_user_id（ToC 维度），与 device_id 并存；兼容已上线旧库
 try { db.exec("ALTER TABLE notifications ADD COLUMN member_user_id TEXT NOT NULL DEFAULT ''") } catch (_) {}
@@ -415,6 +423,23 @@ addCommentCol('parent_id', "INTEGER NOT NULL DEFAULT 0")
     db.prepare('INSERT OR IGNORE INTO featured_config (id, updated_at) VALUES (1, ?)').run(new Date().toISOString())
   } catch (e) {
     console.error('[pxid-feed] seed featured_config failed:', e.message || e)
+  }
+})()
+
+// 确保 App 下载链接配置单行存在（2026-09-07 品向智行下载页）
+// 默认值为占位链接：国内 Android=应用宝品向智行搜索页，国际=Google Play 搜索页，iOS=App Store 首页
+// 正式链接待与吴彬对齐后，运营后台 PUT /admin/app-download 替换即可，无需改代码
+;(function seedAppDownloadConfig() {
+  try {
+    db.prepare('INSERT OR IGNORE INTO app_download_config (id, cn_android_url, cn_ios_url, global_android_url, global_ios_url, updated_at) VALUES (1, ?, ?, ?, ?, ?)').run(
+      'https://sj.qq.com/appsearch/search?kw=%E5%93%81%E5%90%91%E6%99%BA%E8%A1%8C', // 应用宝搜索「品向智行」
+      'https://apps.apple.com/cn/',                                                  // App Store 中国区（占位）
+      'https://play.google.com/store/search?q=PXID',                                 // Google Play（占位）
+      'https://apps.apple.com/',                                                     // App Store 国际区（占位）
+      new Date().toISOString()
+    )
+  } catch (e) {
+    console.error('[pxid-feed] seed app_download_config failed:', e.message || e)
   }
 })()
 
@@ -3503,6 +3528,58 @@ app.post('/assistant/chat', rateLimit(60 * 1000, 20), async (req, res) => {
   const reply = await callQwen(msgs)
   if (!reply) return res.json(ok({ reply: '', fallback: true, refs: refs.map((r) => r.q) }))
   res.json(ok({ reply, fallback: false, refs: refs.map((r) => r.q) }))
+})
+
+// ============================================================
+// App 下载页配置（2026-09-07 品向智行下载页，Flutter WebView / 浏览器直接打开）
+// 公开读 /app-download/links；运营写 /admin/app-download（ADMIN_TOKEN）
+// Android：国内=应用宝「品向智行」，国际=Google Play；正式链接后台可配
+// ============================================================
+function appDownloadRowToApi(row) {
+  return {
+    cn: { android: row.cn_android_url || '', ios: row.cn_ios_url || '' },
+    global: { android: row.global_android_url || '', ios: row.global_ios_url || '' },
+    updatedAt: row.updated_at || '',
+  }
+}
+app.get('/app-download/links', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM app_download_config WHERE id=1').get()
+    if (!row) return res.json(err(404, '下载配置未初始化'))
+    res.json(ok(appDownloadRowToApi(row)))
+  } catch (e) {
+    res.json(err(500, '读取下载配置失败：' + e.message))
+  }
+})
+app.get('/admin/app-download', requireAdmin, (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM app_download_config WHERE id=1').get()
+    if (!row) return res.json(err(404, '下载配置未初始化'))
+    res.json(ok(appDownloadRowToApi(row)))
+  } catch (e) {
+    res.json(err(500, '读取下载配置失败：' + e.message))
+  }
+})
+app.put('/admin/app-download', requireAdmin, (req, res) => {
+  const body = req.body || {}
+  const colMap = { cnAndroid: 'cn_android_url', cnIos: 'cn_ios_url', globalAndroid: 'global_android_url', globalIos: 'global_ios_url' }
+  const sets = []; const args = []
+  for (const [k, col] of Object.entries(colMap)) {
+    if (body[k] !== undefined) {
+      const v = String(body[k] || '').trim()
+      if (v && !/^https?:\/\//i.test(v)) return res.json(err(400, k + ' 必须是 http(s) 链接'))
+      sets.push(`${col}=?`); args.push(v)
+    }
+  }
+  if (!sets.length) return res.json(err(400, '没有需要更新的字段（支持 cnAndroid/cnIos/globalAndroid/globalIos）'))
+  sets.push('updated_at=?'); args.push(new Date().toISOString()); args.push(1)
+  try {
+    db.prepare(`UPDATE app_download_config SET ${sets.join(', ')} WHERE id=?`).run(...args)
+    const row = db.prepare('SELECT * FROM app_download_config WHERE id=1').get()
+    res.json(ok(appDownloadRowToApi(row)))
+  } catch (e) {
+    res.json(err(500, '更新下载配置失败：' + e.message))
+  }
 })
 
 // ---- 健康检查 ----
