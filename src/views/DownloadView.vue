@@ -4,9 +4,9 @@
     <TopBar :title="T.navTitle" :back="goBack" />
 
     <main class="dl-main">
-      <!-- Hero：App 图标 + 标题 + 副题 -->
+      <!-- Hero：App 图标（官方 logo 源图直贴，深底变体：白字+红块） -->
       <div class="appicon">
-        <span class="ai-text">PX<span class="ai-i">i</span>D</span>
+        <img class="ai-logo" :src="A + 'download/pxid-logo.png'" alt="PXID" />
       </div>
       <h1 class="hero">{{ T.title }}</h1>
       <p class="sub">{{ T.subtitle }}</p>
@@ -178,38 +178,22 @@ function go(platform) {
   text-align: center;
 }
 
-/* ---- App 图标（品牌蓝渐变圆角方块，对齐 App 主色） ---- */
+/* ---- App 图标：官方 logo 源图直贴（LOGO-03 = 深底专用白字变体，白底会隐身） ---- */
 .appicon {
-  width: 84px;
-  height: 84px;
+  width: 96px;
+  height: 96px;
   margin: 18px auto 0;
-  border-radius: 22px;
-  background: var(--brand-gradient);
-  box-shadow: 0 8px 20px rgba(77, 124, 255, 0.28);
+  border-radius: 24px;
+  background: #101014; /* 与样机墙手机壳同色 */
+  box-shadow: 0 8px 20px rgba(17, 24, 39, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.ai-text {
-  color: #fff;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-}
-.ai-i {
-  position: relative;
-}
-/* PXID 品牌记号：i 顶红块 */
-.ai-i::before {
-  content: '';
-  position: absolute;
-  top: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 4px;
-  background: #ff5b5b;
-  border-radius: 1px;
+.ai-logo {
+  display: block;
+  width: 82%;
+  height: auto;
 }
 
 .hero {
