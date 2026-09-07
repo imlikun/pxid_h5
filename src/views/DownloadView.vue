@@ -36,13 +36,13 @@
            换图 = 替换 public/download/shot-*.vN.jpg（文件名升版本号，防 Nginx 7d 图缓存） -->
       <section class="shots" aria-hidden="true">
         <div class="phone phone--side phone--l">
-          <span class="screen"><img :src="A + 'download/shot-vehicle.v2.jpg'" alt="" loading="lazy" decoding="async" /></span>
+          <span class="screen"><img :src="A + 'download/shot-discover.v2.jpg'" alt="" loading="lazy" decoding="async" /></span>
         </div>
         <div class="phone phone--side phone--r">
           <span class="screen"><img :src="A + 'download/shot-service.v2.jpg'" alt="" loading="lazy" decoding="async" /></span>
         </div>
         <div class="phone phone--main">
-          <span class="screen"><img :src="A + 'download/shot-discover.v2.jpg'" alt="" loading="lazy" decoding="async" /></span>
+          <span class="screen"><img :src="A + 'download/shot-vehicle.v2.jpg'" alt="" loading="lazy" decoding="async" /></span>
           <span class="island"></span>
         </div>
       </section>
