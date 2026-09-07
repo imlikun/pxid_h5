@@ -1,5 +1,5 @@
 <template>
-  <div class="hima-page">
+  <div class="pxid-page">
     <!-- 顶栏：直接传 title，TopBar 自带居中+省略号，4 字不滚动 -->
     <TopBar sticky :back="goBack" :title="t('assistant.title')">
       <template #right>
@@ -50,7 +50,7 @@
       <!-- 对话气泡 -->
       <template v-else>
         <div v-for="(m, i) in messages" :key="i" class="msg" :class="m.role">
-          <div v-if="m.role === 'hima'" class="msg__avatar">
+          <div v-if="m.role === 'pxid'" class="msg__avatar">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="5"/><path d="M12 8V4M9 4h6"/></svg>
           </div>
           <div class="msg__col">
@@ -62,7 +62,7 @@
           </div>
         </div>
         <!-- 正在输入 -->
-        <div v-if="typing" class="msg hima">
+        <div v-if="typing" class="msg pxid">
           <div class="msg__avatar">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="5"/><path d="M12 8V4M9 4h6"/></svg>
           </div>
@@ -116,14 +116,14 @@ let vpHandler = null
 // ============================================================
 const L = {
   zh: {
-    heroHi: '你好，我是 HIMA 智能助手',
+    heroHi: '你好，我是 PXID 智能助手',
     heroSub: '你的 PXID 专属出行 AI，查车型、找门店、看公告、解疑问都能问。',
     promoBadge: 'PXID 智能出行',
     promoTitle: '把车交给更懂你的 AI',
     promoDesc: '购车定制、保养提醒、续航优化、道路救援——一句话搞定日常用车。',
     quickTitle: '你可以这样问我',
     demoTip: '演示版 · 正式版将接入 PXID 智能出行大模型',
-    inputPlaceholder: '问问 HIMA 关于用车的一切…',
+    inputPlaceholder: '问问 PXID 关于用车的一切…',
     send: '发送',
     toastEmpty: '对话还是空的',
     toastCleared: '对话已清空',
@@ -146,18 +146,18 @@ const L = {
       interaction: { a: '互动消息（赞/评论/关注/系统）可在「我的 → 消息中心」查看。', action: { type: 'route', to: '/interactions', label: '查看互动消息' } },
       battery: { a: '电池保养建议：日常保持电量 20%-80%，避免亏电长期存放；冬季室内停放可缓解续航缩水。' },
       warranty: { a: '整车保修 2 年（关键部件 3 年），电池 1-2 年（按车型）；非人为故障免费维修，详情见购车合同。' },
-      fallback: { a: '收到～这是 HIMA 的演示回复。当前为前端预览版，正式版将接入 PXID 智能出行大模型，可解答保养、续航、门店与活动等问题。' },
+      fallback: { a: '收到～这是 PXID 的演示回复。当前为前端预览版，正式版将接入 PXID 智能出行大模型，可解答保养、续航、门店与活动等问题。' },
     },
   },
   en: {
-    heroHi: "Hi, I'm HIMA, your AI assistant",
+    heroHi: "Hi, I'm PXID, your AI assistant",
     heroSub: 'Your PXID travel AI — ask about models, stores, notices, or anything.',
     promoBadge: 'PXID Smart Mobility',
     promoTitle: 'Let AI that knows you handle your ride',
     promoDesc: 'Purchase customization, maintenance reminders, range optimization, roadside rescue — all in one sentence.',
     quickTitle: 'Try asking me',
     demoTip: 'Demo version · full version connects to the PXID mobility model',
-    inputPlaceholder: 'Ask HIMA anything about your ride…',
+    inputPlaceholder: 'Ask PXID anything about your ride…',
     send: 'Send',
     toastEmpty: 'Conversation is empty',
     toastCleared: 'Conversation cleared',
@@ -180,18 +180,18 @@ const L = {
       interaction: { a: "Interaction messages (likes/comments/follows/system) are under 'Me → Message Center'.", action: { type: 'route', to: '/interactions', label: 'View interactions' } },
       battery: { a: 'Battery tips: keep charge between 20%-80% daily, avoid long-term depletion; indoor parking in winter helps range.' },
       warranty: { a: 'Vehicle warranty 2 years (key parts 3 years), battery 1-2 years (by model); non-human faults repaired free — see purchase contract.' },
-      fallback: { a: 'Got it~ This is a demo reply from HIMA. The current build is a front-end preview; the full version will connect to the PXID mobility model and answer maintenance, range, store and event questions.' },
+      fallback: { a: 'Got it~ This is a demo reply from PXID. The current build is a front-end preview; the full version will connect to the PXID mobility model and answer maintenance, range, store and event questions.' },
     },
   },
   pt: {
-    heroHi: 'Olá, sou o HIMA, seu assistente IA',
+    heroHi: 'Olá, sou o PXID, seu assistente IA',
     heroSub: 'Sua IA de mobilidade PXID — pergunte sobre modelos, lojas, avisos ou qualquer coisa.',
     promoBadge: 'Mobilidade Inteligente PXID',
     promoTitle: 'Deixe a IA que te conhece cuidar do seu veículo',
     promoDesc: 'Personalização de compra, lembretes de manutenção, otimização de autonomia, resgate na estrada — tudo numa frase.',
     quickTitle: 'Experimente perguntar',
     demoTip: 'Versão demo · a completa conecta ao modelo de mobilidade PXID',
-    inputPlaceholder: 'Pergunte à HIMA qualquer coisa sobre seu veículo…',
+    inputPlaceholder: 'Pergunte ao PXID qualquer coisa sobre seu veículo…',
     send: 'Enviar',
     toastEmpty: 'A conversa está vazia',
     toastCleared: 'Conversa limpa',
@@ -214,7 +214,7 @@ const L = {
       interaction: { a: 'Mensagens de interação (curtidas/comentários/seguidos/sistema) ficam em "Eu → Central de Mensagens".', action: { type: 'route', to: '/interactions', label: 'Ver interações' } },
       battery: { a: 'Dicas de bateria: mantenha carga entre 20%-80%, evite descarga prolongada; estacionar coberto no inverno ajuda a autonomia.' },
       warranty: { a: 'Garantia do veículo 2 anos (peças-chave 3 anos), bateria 1-2 anos (por modelo); falhas não humanas consertadas grátis — veja o contrato.', },
-      fallback: { a: 'Entendi~ Esta é uma resposta demo da HIMA. A versão atual é prévia de front-end; a completa conectará ao modelo de mobilidade PXID e responderá sobre manutenção, autonomia, lojas e eventos.' },
+      fallback: { a: 'Entendi~ Esta é uma resposta demo do PXID. A versão atual é prévia de front-end; a completa conectará ao modelo de mobilidade PXID e responderá sobre manutenção, autonomia, lojas e eventos.' },
     },
   },
 }
@@ -259,8 +259,8 @@ function showToast(m) {
   toastTimer = setTimeout(() => (toastMsg.value = ''), 1600)
 }
 
-function pushHima(text, action) {
-  messages.value.push({ role: 'hima', text, action })
+function pushPxid(text, action) {
+  messages.value.push({ role: 'pxid', text, action })
   scrollDown({ forceBottom: true })
 }
 
@@ -270,7 +270,7 @@ function ask(item) {
   typing.value = true
   setTimeout(() => {
     typing.value = false
-    pushHima(item.a, item.action)
+    pushPxid(item.a, item.action)
   }, 600)
 }
 
@@ -285,7 +285,7 @@ function send() {
   setTimeout(() => {
     typing.value = false
     const r = smartReply(v)
-    pushHima(r.a, r.action)
+    pushPxid(r.a, r.action)
     // 回复气泡/action 回流后两级保底滚到底（字体/action 高度延迟稳定才会算对）
     setTimeout(() => scrollDown({ forceBottom: true }), 150)
     setTimeout(() => scrollDown({ forceBottom: true }), 400)
@@ -301,7 +301,7 @@ function runAction(action) {
       bridge.openNative(action.path)
       showToast(action.label)
     } catch (e) {
-      console.log('[hima] openNative', action.path)
+      console.log('[pxid] openNative', action.path)
     }
   }
 }
@@ -377,12 +377,12 @@ function goBack() {
 </script>
 
 <style scoped>
-.hima-page {
+.pxid-page {
   display: flex;
   flex-direction: column;
   height: 100vh;
   overflow: hidden; /* 兜底：任何子元素溢出都不产生文档滚动，内容只准在 .chat 内滚。
-                       缺它时 .chat 内容高会把 .hima-page 撑破 100vh → 文档滚动 → 内容滚过 sticky 顶栏被遮(真机遮挡真根因) */
+                       缺它时 .chat 内容高会把 .pxid-page 撑破 100vh → 文档滚动 → 内容滚过 sticky 顶栏被遮(真机遮挡真根因) */
   background: var(--bg, #f7f8fa);
 }
 :deep(.tb-bar) { background: var(--card, #fff); }
@@ -398,7 +398,7 @@ function goBack() {
 .chat {
   flex: 1;
   overflow-y: auto;
-  min-height: 0; /* flex 子项可滚必要(默认 min-height:auto 会被内容撑大，撑破 .hima-page 100vh 导致文档滚动+遮挡) */
+  min-height: 0; /* flex 子项可滚必要(默认 min-height:auto 会被内容撑大，撑破 .pxid-page 100vh 导致文档滚动+遮挡) */
   padding: 5px 14px 8px; /* 坤哥指定 top 5px：对话框紧贴顶栏下，padding 5 让内容起 53。
                             滚动后 padding-top 随 scrollTop 滚出，但消息在 48+ 不被顶栏切 */
   -webkit-overflow-scrolling: touch;
@@ -543,7 +543,7 @@ function goBack() {
   word-break: break-word;
   white-space: pre-wrap;
 }
-.msg.hima .msg__bubble {
+.msg.pxid .msg__bubble {
   background: var(--card, #fff);
   color: var(--text, #1a1a1a);
   border-bottom-left-radius: 4px;
