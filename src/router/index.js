@@ -167,8 +167,11 @@ router.beforeEach((to, from, next) => {
 //   部署会整体替换 dist（旧 hash 的懒加载 chunk 被删除）。旧 WebView 会话（未刷新、
 //   仍持有旧 index.html 的模块清单）点懒加载页时，动态 import 旧 hash chunk → 404
 //   → 路由组件加载失败 → 白屏（16:58 部署 → 17:03 用户报障，时间线实测吻合）。
-//   捕获后强制整页刷新：index.html 是 no-cache，刷新必拿到最新模块清单。
-//   sessionStorage 10s 窗口防循环（部署进行中会连续失败，不能无限 reload）。
+//   兜底：把 hash 直指目标页 + 整页 reload——index.html 是 no-cache，刷新必拿到
+//   最新模块清单，冷启动直进用户原本要去的页面。
+//   ⚠️ 不能用 location.replace(同源不同 hash)：hash-only 差异只触发 hashchange，
+//   页面不会重载（实测复现：console 打了兜底日志但白屏依旧）。
+//   sessionStorage 10s 窗口防循环（改 hash 会再触发一次失败导航，不能无限 reload）。
 router.onError((error, to) => {
   const msg = String((error && (error.message || error)) || error)
   const isChunkFail =
@@ -181,11 +184,12 @@ router.onError((error, to) => {
     if (now - Number(sessionStorage.getItem(KEY) || 0) < 10000) return
     sessionStorage.setItem(KEY, String(now))
   } catch (e) { /* sessionStorage 不可用（隐私模式）就直接刷新 */ }
-  console.warn('[router] 懒加载 chunk 失效（发版后旧会话），自动刷新拉新版本:', msg)
-  // hash 路由：刷新后直达用户原本要去的页面，而不是回首页
-  window.location.replace(
-    location.pathname + location.search + '#' + (to && to.fullPath ? to.fullPath : '/')
-  )
+  console.warn('[router] 懒加载 chunk 失效（发版后旧会话），整页刷新拉新版本:', msg)
+  try {
+    // 先把 hash 指向目标页（会触发一次重复失败导航，由上方 10s 窗口挡住），再硬刷新
+    location.hash = (to && to.fullPath) ? to.fullPath : '/'
+  } catch (e) { /* 忽略 */ }
+  window.location.reload()
 })
 
 export default router
