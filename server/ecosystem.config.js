@@ -16,7 +16,10 @@ module.exports = {
       SHOPIFY_WEBHOOK_SECRET: '4b599ad098eaf1ec807a474c49a90a2dfc0fa00edab43f6b78b4bfd20487f49a',
       // 用户侧 token 签名密钥（2026-08-20 SEC-01 修复引入，crypto.randomBytes(64) 生成）
       // 配了才启用 HMAC 验真；ToC Flutter 需用同一 secret 签发 token 给 bridge.getToken()
-      USER_TOKEN_SECRET: '992d7b63db794dee5828ae9746a31422ade8df40342181c8947f5d2548ef381a9c1d64c81408a5b044a745f12dfda58df109864028d6a7a108507d2d476fb596'
+      USER_TOKEN_SECRET: '992d7b63db794dee5828ae9746a31422ade8df40342181c8947f5d2548ef381a9c1d64c81408a5b044a745f12dfda58df109864028d6a7a108507d2d476fb596',
+      // 智能助手 PXiD（2026-09-07）：DashScope 百炼 key，未配则 /assistant/chat 降级演示回复
+      DASHSCOPE_API_KEY: 'sk-ws-H.PDMHLXR.QuSD.MEQCIGYSdBd2NMtIxdJhVhyjess3AyTcaBQS7css_EA-UXKPAiAQZ2CF_SqLZA5flVWFxHkuOcfCDdIX_mSlLTralGG-fA',
+      ASSISTANT_MODEL: 'qwen-turbo'
     }
   }]
 }

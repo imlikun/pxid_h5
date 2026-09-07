@@ -95,6 +95,7 @@ import { useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import bridge from '../bridge'
 import { t, locale } from '../i18n'
+import { askAssistant } from '../api/feed'
 
 const router = useRouter()
 
@@ -264,32 +265,46 @@ function pushPxid(text, action) {
   scrollDown({ forceBottom: true })
 }
 
-function ask(item) {
-  messages.value.push({ role: 'user', text: item.q })
+// 真模型问答（2026-09-07 路线①）：后端 /assistant/chat（百炼 qwen + FAQ 检索）
+// 失败/未配 key（fallback=true）→ 回落本地演示回复，体验不断
+async function respond(userText, canned) {
+  // 快照最近 6 轮作为上下文（push user 之前取，避免与当前问题重复）
+  const history = messages.value
+    .filter((m) => m.text)
+    .slice(-6)
+    .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
+  messages.value.push({ role: 'user', text: userText })
   scrollDown({ forceBottom: true })
   typing.value = true
-  setTimeout(() => {
-    typing.value = false
-    pushPxid(item.a, item.action)
-  }, 600)
+  scrollDown({ forceBottom: true })
+  let reply = ''
+  try {
+    const r = await askAssistant(userText, history)
+    if (r && !r.fallback && r.reply) reply = r.reply
+  } catch (e) {
+    console.log('[pxid] assistant api failed, fallback to demo', e)
+  }
+  typing.value = false
+  if (reply) {
+    pushPxid(reply)
+  } else {
+    pushPxid(canned.a, canned.action)
+  }
+  // 回复气泡/action 回流后两级保底滚到底（字体/action 高度延迟稳定才会算对）
+  setTimeout(() => scrollDown({ forceBottom: true }), 150)
+  setTimeout(() => scrollDown({ forceBottom: true }), 400)
+}
+
+function ask(item) {
+  respond(item.q, item)
 }
 
 function send() {
   const v = input.value.trim()
   if (!v) return
-  messages.value.push({ role: 'user', text: v })
   input.value = ''
-  scrollDown({ forceBottom: true })
-  typing.value = true
-  scrollDown({ forceBottom: true })
-  setTimeout(() => {
-    typing.value = false
-    const r = smartReply(v)
-    pushPxid(r.a, r.action)
-    // 回复气泡/action 回流后两级保底滚到底（字体/action 高度延迟稳定才会算对）
-    setTimeout(() => scrollDown({ forceBottom: true }), 150)
-    setTimeout(() => scrollDown({ forceBottom: true }), 400)
-  }, 650)
+  const r = smartReply(v)
+  respond(v, r)
 }
 
 function runAction(action) {

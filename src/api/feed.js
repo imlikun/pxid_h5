@@ -246,6 +246,13 @@ export async function fetchPlazaGrid() {
   }
 }
 
+// ---- 智能助手 PXiD（2026-09-07 路线①：后端百炼 qwen + FAQ 检索）----
+// 后端未配 key / 调用失败时返回 { fallback: true }，由调用方回落本地演示回复
+export async function askAssistant(message, history = []) {
+  const data = await request('/assistant/chat', { method: 'POST', body: { message, history } })
+  return data // { reply, fallback, refs }
+}
+
 // ---- 评论列表（跨端一致的关键）----
 // 后端 GET /feed/{id}/comments → data.list
 // 失败时返回 null，由调用方回落到本地 seed

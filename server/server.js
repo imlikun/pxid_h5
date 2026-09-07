@@ -3418,6 +3418,93 @@ app.post('/mall-api/orders/claim', requireAuth, (req, res) => {
   res.json(ok({ claimed: r.changes }))
 })
 
+// ============================================================
+// 智能助手 PXiD（路线①：百炼 qwen + FAQ 检索增强，2026-09-07）
+// - 知识库：内置 FAQ 数组（售后政策/App 使用/品牌知识），关键词打分检索 top3
+// - 模型：DashScope OpenAI 兼容端点，model 由 env ASSISTANT_MODEL 控制（默认 qwen-turbo）
+// - 降级：DASHSCOPE_API_KEY 未配 / 调用失败 → data.fallback=true，前端回落本地演示回复
+// - 防幻觉：system prompt 强制只依据检索资料作答，查不到引导「服务」页/人工
+// ============================================================
+const PXID_KB = [
+  { k: ['保养', '维护', '体检', '预约', 'maintenance'], q: '如何预约保养', a: '在 App「服务」页可在线预约车辆体检与保养；官方建议每 2000km 或 3 个月保养一次，也可到附近门店登记。' },
+  { k: ['门店', '网点', '地址', '附近', 'store'], q: '附近门店', a: '「服务 → 附近门店」可按距离查看最近的 PXID 授权门店与营业时间，支持一键导航。' },
+  { k: ['救援', '拖车', '事故', 'rescue'], q: '道路救援', a: '「服务 → 道路救援」可一键呼叫，附近门店接单后会主动联系你。' },
+  { k: ['工单', '报修', '维修进度', 'workorder'], q: '我的工单', a: '「服务 → 我的工单」可查看报修进度，也可在线提交新工单。' },
+  { k: ['公告', '召回', '通知', 'notice'], q: '官方公告', a: '发现页「官方公告」入口可查看召回、版本、活动与安全提醒，重要公告带红点。' },
+  { k: ['活动', '优惠', '促销', '踏春', '折扣'], q: '当前活动', a: '精选商城不定期开启主题专场（如踏春装备季，满 199 减 30，积分可叠加抵扣），可在「精选」页查看。' },
+  { k: ['积分', '兑换', '签到', 'points'], q: '积分怎么用', a: '积分可在积分商城兑换原厂好物，100 积分抵 1 元；签到、发动态都能赚积分。' },
+  { k: ['发布', '发帖', '动态', '帖子'], q: '怎么发动态', a: '在「发现」页点右下角 + 即可发布动态，用 #车型# 标记更易被同好看到。' },
+  { k: ['消息', '点赞', '评论', '关注', '互动'], q: '互动消息', a: '互动消息（赞/评论/关注/系统）可在「我的 → 消息中心」查看。' },
+  { k: ['电池', '充电', '续航', 'battery'], q: '电池保养', a: '日常保持电量 20%-80%，避免亏电长期存放；冬季室内停放可缓解续航缩水。' },
+  { k: ['保修', '质保', '三包', 'warranty'], q: '保修政策', a: '整车保修 2 年（关键部件 3 年），电池 1-2 年（按车型）；非人为故障免费维修，详情见购车合同。' },
+  { k: ['pxid', '品向', '公司', '品牌', '谁'], q: 'PXID 是谁', a: 'PXID（品向智造）是电助力出行产品制造商，提供 ebike/emotorcycle/escooter 的 OEM/ODM 服务，App 提供用车服务与车友社区。' },
+  { k: ['车型', 'ebike', 'emotorcycle', 'escooter', '电助力', '电摩'], q: '有哪些车型', a: 'PXID 提供电助力自行车（ebike）、电摩（emotorcycle）、电踏板车（escooter）等车型的 OEM/ODM 定制与整车方案，App 内可查车型资料。' },
+  { k: ['人工', '客服', '投诉', '反馈'], q: '转人工', a: '可在「服务」页联系门店或在线提交工单，也可以到「我的 → 帮助与反馈」留言，会有人工跟进。' },
+  { k: ['app', '下载', '注册', '登录'], q: 'App 使用', a: '本 App 即 PXID 用户端，注册登录后可使用社区、积分、商城与服务模块；遇到问题可在「帮助与反馈」留言。' },
+]
+function retrieveKB(query) {
+  const q = String(query || '').toLowerCase()
+  if (!q) return []
+  const scored = PXID_KB.map((it) => {
+    let s = 0
+    for (const kw of it.k) if (q.indexOf(kw.toLowerCase()) !== -1) s += kw.length >= 2 ? 2 : 1
+    return { it, s }
+  }).filter((x) => x.s > 0)
+  scored.sort((a, b) => b.s - a.s)
+  return scored.slice(0, 3).map((x) => x.it)
+}
+const ASSISTANT_MODEL = process.env.ASSISTANT_MODEL || 'qwen-turbo'
+async function callQwen(messages) {
+  const key = process.env.DASHSCOPE_API_KEY || ''
+  if (!key) return null
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), 20000)
+  try {
+    const r = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model: ASSISTANT_MODEL, messages, temperature: 0.5, max_tokens: 400 }),
+      signal: ac.signal,
+    })
+    if (!r.ok) { console.error('[assistant] dashscope http', r.status); return null }
+    const j = await r.json()
+    const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content
+    return text ? String(text).trim() : null
+  } catch (e) {
+    console.error('[assistant] dashscope error:', e && e.message)
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+app.post('/assistant/chat', rateLimit(60 * 1000, 20), async (req, res) => {
+  const message = String((req.body && req.body.message) || '').trim().slice(0, 500)
+  if (!message) return res.json(err(400, '消息不能为空'))
+  const history = Array.isArray(req.body.history) ? req.body.history.slice(-6) : []
+  const refs = retrieveKB(message)
+  const refText = refs.length
+    ? refs.map((r, i) => `[${i + 1}] 问：${r.q}\n答：${r.a}`).join('\n')
+    : '（无匹配资料）'
+  const sys = [
+    '你是 PXID（品向智造）App 内的智能助手，名字叫 PXiD。PXID 是电助力出行产品制造商（ebike/emotorcycle/escooter 的 OEM/ODM），本 App 提供用车服务、车友社区、积分商城。',
+    '回答规则：',
+    '1. 只回答与 PXID 产品、本 App 使用、售后相关的问题；无关话题礼貌拒绝并拉回正题。',
+    '2. 只能依据下面的【参考资料】回答业务问题；资料没有覆盖的，坦率说明你不确定，并引导用户去 App「服务」页或联系门店/人工客服，严禁编造价格、政策、参数。',
+    '3. 回答简洁口语化，不超过 3 句话；用户用英文或葡语提问时用对应语言回答。',
+    '【参考资料】\n' + refText,
+  ].join('\n')
+  const msgs = [{ role: 'system', content: sys }]
+  for (const h of history) {
+    const role = h.role === 'user' ? 'user' : 'assistant'
+    const content = String(h.content || '').slice(0, 300)
+    if (content) msgs.push({ role, content })
+  }
+  msgs.push({ role: 'user', content: message })
+  const reply = await callQwen(msgs)
+  if (!reply) return res.json(ok({ reply: '', fallback: true, refs: refs.map((r) => r.q) }))
+  res.json(ok({ reply, fallback: false, refs: refs.map((r) => r.q) }))
+})
+
 // ---- 健康检查 ----
 app.get('/health', (req, res) => res.json(ok({ status: 'up', time: now(), version: APP_VERSION })))
 
