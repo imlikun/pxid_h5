@@ -642,11 +642,16 @@ onActivated(() => {
 // ---- 评论淡入只在「骨架→真实评论」替换时播（任务单 3.3）----
 // 预取命中时评论首帧就完整，.cmt-list 再播 200ms 淡入就是与横推动画叠加的多余闪烁；
 // 预取未命中（慢网络）时骨架→评论的替换仍需淡入兜底防硬切。
-// 用 watch 判断：commentsLoading 真的渲染过 true 再变 false 才算「替换发生」；
-// 预取命中时 true→false 在同一渲染批次内完成，watcher 只看到终态 false，ov 为 false，不会误判。
+// 判据 = 骨架是否真的被绘制过：预取命中时 commentsLoading true→false 在微任务批内完成
+// （跨两次 render 但零 paint，用户看不见骨架），时间差 <1ms；只有跨越真实绘制帧
+// （≥16ms，慢网络）骨架才上过屏，才算「用户可见的替换」。
+let cmtSkelAt = 0
 const cmtReplaced = ref(false)
 watch(commentsLoading, (nv, ov) => {
-  if (ov && !nv && comments.value.length) cmtReplaced.value = true
+  if (nv && !ov) cmtSkelAt = performance.now() // 骨架开始渲染
+  if (ov && !nv && comments.value.length && performance.now() - cmtSkelAt >= 16) {
+    cmtReplaced.value = true
+  }
 })
 
 onMounted(() => {
