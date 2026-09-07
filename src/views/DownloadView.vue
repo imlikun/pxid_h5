@@ -32,6 +32,21 @@
       <p class="store-hint">{{ androidHint }}</p>
       <p v-if="tip" class="tip">{{ tip }}</p>
 
+      <!-- 手机样机墙：CSS 手机壳 + 真实页面截图（同九号下载页手法）。
+           换图 = 替换 public/download/shot-*.jpg（Flutter 截图好后同名覆盖或升版本号） -->
+      <section class="shots" aria-hidden="true">
+        <div class="phone phone--side phone--l">
+          <span class="screen"><img :src="A + 'download/shot-featured.jpg'" alt="" loading="lazy" decoding="async" /></span>
+        </div>
+        <div class="phone phone--side phone--r">
+          <span class="screen"><img :src="A + 'download/shot-service.jpg'" alt="" loading="lazy" decoding="async" /></span>
+        </div>
+        <div class="phone phone--main">
+          <span class="screen"><img :src="A + 'download/shot-discover.jpg'" alt="" loading="lazy" decoding="async" /></span>
+          <span class="island"></span>
+        </div>
+      </section>
+
       <!-- 功能三卡（白卡片 + 蓝图标底，对齐 App 卡片语言） -->
       <section class="feats">
         <div class="feat" v-for="f in feats" :key="f.key">
@@ -62,6 +77,7 @@ import { locale } from '../i18n'
 const route = useRoute()
 const router = useRouter()
 const FEED_API = 'https://pxid-api.appin.site'
+const A = import.meta.env.BASE_URL // './' → 产物相对路径，WebView 任意域名可用
 
 // ---- 文案（zh / en 双语；跟随时区语言，独立于全局 i18n 字典避免膨胀）----
 const STR = {
@@ -287,6 +303,61 @@ function go(platform) {
   font-size: 12px;
   color: var(--price, #e53935);
 }
+
+/* ---- 手机样机墙：CSS 手机壳 + 真实页面截图，两侧出血裁切（九号式） ---- */
+.shots {
+  position: relative;
+  height: 468px;
+  margin: 30px -16px 0; /* 抵消 dl-main 左右 padding，全幅出血 */
+  overflow: hidden;
+}
+.phone {
+  position: absolute;
+  background: #101014;
+  border-radius: 34px;
+  padding: 7px;
+  box-shadow: 0 18px 44px rgba(17, 24, 39, 0.22), 0 2px 8px rgba(17, 24, 39, 0.1);
+}
+.phone .screen {
+  display: block;
+  border-radius: 27px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.phone img {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+/* 主机（发现页）：居中最大，压轴 */
+.phone--main {
+  width: 216px;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+.phone--main .screen,
+.phone--main img { height: 437px; } /* 屏 202px 宽 × 844/390 比例 */
+/* 灵动岛 */
+.island {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 62px;
+  height: 17px;
+  border-radius: 10px;
+  background: #101014;
+  z-index: 2;
+}
+/* 侧机（精选/服务）：压在主机后，向屏幕两侧出血 */
+.phone--side { width: 178px; top: 34px; z-index: 1; }
+.phone--side .screen,
+.phone--side img { height: 355px; }
+.phone--l { left: -54px; }
+.phone--r { right: -54px; }
 
 /* ---- 功能三卡（白卡片 + 浅蓝圆底蓝图标） ---- */
 .feats {
