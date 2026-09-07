@@ -94,7 +94,7 @@
           v-for="(p, i) in hotProducts"
           :key="p.id"
           :product="p"
-          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+          :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
 
@@ -105,7 +105,7 @@
           v-for="(p, i) in springProducts"
           :key="p.id"
           :product="p"
-          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+          :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
 
@@ -121,7 +121,7 @@
           v-for="(p, i) in springProducts"
           :key="p.id"
           :product="p"
-          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+          :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
     </template>
@@ -134,7 +134,7 @@
           v-for="(p, i) in bikeProducts"
           :key="p.id"
           :product="p"
-          :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+          :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
     </template>
@@ -147,7 +147,7 @@
             v-for="(p, i) in searchResults"
             :key="p.id"
             :product="p"
-            :class="['fade-up', 'stagger-' + ((i % 10) + 1)]"
+            :class="[fadeUp(), staggerFor(i)]"
           />
         </div>
         <div v-if="!searchResults.length" class="empty-tab">{{ t('featured.searchEmpty') }}</div>
@@ -196,6 +196,18 @@ async function fetchFeaturedConfig() {
   }
 }
 
+// 入场动画只播一次（2026-09-07，镜像 DiscoverView 同款修复）：
+// .fade-up 是 CSS animation，keep-alive 从详情返回时组件 DOM 被重新插入 → 整屏卡片
+// 重播浮入（0.45s + stagger 错开 ≈ 0.95s），叠在返回转场上观感就是「精选动画乱了」。
+// 做法：首屏播完后把 class 摘掉，之后（返回/切 tab）DOM 再插入也没有动画可播。
+const enterAnim = ref(true)
+let enterAnimTimer = null
+// 只给首屏前 6 张做错开，且错开上限 6 档：
+//   原来用 i % 10 → 双列网格里第 11 张又从头错开，看着随机；
+//   且触底追加/搜索结果卡片也带 stagger，每批都要重播一次。
+const staggerFor = (i) => (enterAnim.value && i < 6 ? 'stagger-' + (i + 1) : '')
+const fadeUp = () => (enterAnim.value ? 'fade-up' : '')
+
 onMounted(async () => {
   try {
     await initLocale() // 语言决定内容地区，见 regionFromLocale
@@ -208,12 +220,19 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  // 入场动画播完就摘掉 class：keep-alive 返回时 DOM 重新插入也不会重播
+  // （fade-up 0.45s + 最大 0.25s 错开，留 900ms 余量；从首屏数据就绪起算，
+  //   慢网下数据晚到动画也来得及完整播完）
+  clearTimeout(enterAnimTimer)
+  enterAnimTimer = setTimeout(() => { enterAnim.value = false }, 900)
   fetchFeaturedConfig() // 后台精选配置：异步补，不阻塞首屏商品渲染（配置回来后各 computed 自动重算）
   startBanner()
   document.addEventListener('visibilitychange', onVis)
 })
 onUnmounted(() => {
   stopBanner()
+  clearTimeout(enterAnimTimer)
+  enterAnimTimer = null
   document.removeEventListener('visibilitychange', onVis)
 })
 onDeactivated(stopBanner) // 切到别的 Tab（IndexedStack 隐藏本 WebView）时停掉，避免隐藏期间持续制造合成层
