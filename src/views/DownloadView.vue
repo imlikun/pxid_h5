@@ -32,17 +32,17 @@
       <p class="store-hint">{{ androidHint }}</p>
       <p v-if="tip" class="tip">{{ tip }}</p>
 
-      <!-- 手机样机墙：CSS 手机壳 + 真实页面截图（同九号下载页手法）。
-           换图 = 替换 public/download/shot-*.jpg（Flutter 截图好后同名覆盖或升版本号） -->
+      <!-- 手机样机墙：CSS 手机壳 + 真机截图（2026-09-07 坤哥提供 Flutter 真机图）。
+           换图 = 替换 public/download/shot-*.vN.jpg（文件名升版本号，防 Nginx 7d 图缓存） -->
       <section class="shots" aria-hidden="true">
         <div class="phone phone--side phone--l">
-          <span class="screen"><img :src="A + 'download/shot-featured.jpg'" alt="" loading="lazy" decoding="async" /></span>
+          <span class="screen"><img :src="A + 'download/shot-vehicle.v2.jpg'" alt="" loading="lazy" decoding="async" /></span>
         </div>
         <div class="phone phone--side phone--r">
-          <span class="screen"><img :src="A + 'download/shot-service.jpg'" alt="" loading="lazy" decoding="async" /></span>
+          <span class="screen"><img :src="A + 'download/shot-service.v2.jpg'" alt="" loading="lazy" decoding="async" /></span>
         </div>
         <div class="phone phone--main">
-          <span class="screen"><img :src="A + 'download/shot-discover.jpg'" alt="" loading="lazy" decoding="async" /></span>
+          <span class="screen"><img :src="A + 'download/shot-discover.v2.jpg'" alt="" loading="lazy" decoding="async" /></span>
           <span class="island"></span>
         </div>
       </section>
