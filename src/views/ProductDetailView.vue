@@ -369,8 +369,13 @@ function swatchDot(cv) {
 
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同商品时组件被复用 → 必须监听路由重载，否则“永远同一片”
 async function load() {
-  await initLocale() // 语言决定内容地区，见 regionFromLocale
   const handle = route.params.id
+  // 离开详情页（返回精选）时 route.params.id 变 undefined：直接放弃，
+  // 组件状态原样交给 keep-alive 离屏缓存。若无此守卫，load 会把 product 置 null，
+  // 根级 v-if 在转场 leave 进行中从 .detail 切成 .empty，Transition 离场被打断，
+  // .empty 会永久残留在精选页顶部（2026-09-07 实测复现）
+  if (!handle) return
+  await initLocale() // 语言决定内容地区，见 regionFromLocale
   product.value = null
   loading.value = true
   error.value = ''
@@ -416,8 +421,10 @@ async function load() {
 }
 
 onMounted(load)
-// 同一个组件实例下，/product/:id 变化重新拉详情（含重置轮播/规格/数量）
-watch(() => route.params.id, load)
+// 同一个组件实例下，/product/:id 变化重新拉详情（含重置轮播/规格/数量）。
+// 守卫：id 为 undefined = 已离开详情页（返回精选/发现），此时绝不能 load()——
+// 否则组件在离屏转场中被置空，.empty 残留主文档（与 FeedDetailView 的 /feed/NaN 同款坑）
+watch(() => route.params.id, (id) => { if (id) load() })
 
 function onGalleryScroll() {
   const el = gallery.value
