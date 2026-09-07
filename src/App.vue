@@ -149,12 +149,11 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
 .slide-forward-enter-from {
   transform: translateX(100%);
 }
-.slide-forward-leave-to {
-  transform: translateX(-18%);
-}
-.slide-back-enter-from {
-  transform: translateX(-18%);
-}
+/* 旧页退场 / 返回进场：不做 -18% 位移（2026-09-07 坤哥拍板去掉）——
+   与 Flutter 其他页面行为统一：旧页纹丝不动，新页直接盖上 / 滑出。
+   注意 leave-active/enter-active 仍声明 transition: transform 340ms，
+   Vue 靠它的 computed duration 计算转场结束时机（无实际位移时走 340ms 超时兜底），
+   这两行 CSS 别和 transition 一起删 */
 .slide-back-leave-to {
   transform: translateX(100%);
 }
