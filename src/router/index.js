@@ -163,4 +163,29 @@ router.beforeEach((to, from, next) => {
   next()
 })
 
+// 发版后 chunk 404 兜底（2026-09-07「精选商品点开白屏」根因修复）：
+//   部署会整体替换 dist（旧 hash 的懒加载 chunk 被删除）。旧 WebView 会话（未刷新、
+//   仍持有旧 index.html 的模块清单）点懒加载页时，动态 import 旧 hash chunk → 404
+//   → 路由组件加载失败 → 白屏（16:58 部署 → 17:03 用户报障，时间线实测吻合）。
+//   捕获后强制整页刷新：index.html 是 no-cache，刷新必拿到最新模块清单。
+//   sessionStorage 10s 窗口防循环（部署进行中会连续失败，不能无限 reload）。
+router.onError((error, to) => {
+  const msg = String((error && (error.message || error)) || error)
+  const isChunkFail =
+    /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading CSS chunk|Loading chunk \d+ failed/i.test(msg) ||
+    (error && (error.type === 'missing' || error.type === 'blocked'))
+  if (!isChunkFail) return
+  try {
+    const KEY = 'pxid:chunk-reload'
+    const now = Date.now()
+    if (now - Number(sessionStorage.getItem(KEY) || 0) < 10000) return
+    sessionStorage.setItem(KEY, String(now))
+  } catch (e) { /* sessionStorage 不可用（隐私模式）就直接刷新 */ }
+  console.warn('[router] 懒加载 chunk 失效（发版后旧会话），自动刷新拉新版本:', msg)
+  // hash 路由：刷新后直达用户原本要去的页面，而不是回首页
+  window.location.replace(
+    location.pathname + location.search + '#' + (to && to.fullPath ? to.fullPath : '/')
+  )
+})
+
 export default router
