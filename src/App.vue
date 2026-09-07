@@ -1,7 +1,7 @@
 <template>
   <div class="app-root" :class="{ 'embed-mode': inApp }" ref="rootRef">
     <router-view v-slot="{ Component }">
-      <transition :name="transitionName" @after-enter="onAfterEnter">
+      <transition :name="transitionName" @before-enter="onBeforeEnter" @after-enter="onAfterEnter" @before-leave="onBeforeLeave" @after-leave="onAfterLeave">
         <keep-alive>
           <component :is="Component" />
         </keep-alive>
@@ -31,8 +31,57 @@ setupPageTransition(router)
 // 前进：旧页（列表，static）保持滚动位置原样滑出，新页是 fixed 容器自带 scrollTop=0；
 //      转场结束摘 fixed 类的同一帧再把 window 滚顶（after-enter 与摘类同 tick，paint 前完成，无中间帧）。
 // 返回：列表带着原滚动位置滑入 —— 恢复动作在 router.scrollBehavior 里直接做（时机与原因见其注释）。
-function onAfterEnter() {
+
+// ---- 详情转场视口高度锁定 + 点击锁（2026-09-07 Flutter 联调任务单 3.1/3.5）----
+// 根因：Flutter 在 H5 横推中途才隐藏原生底栏 → WebView 高度中途扩张 →
+//       fixed inset:0 的转场容器 / fixed bottom:0 的互动栏跟着重算 → 底部闪烁。
+// 做法：进 /feed/:id 的导航确认瞬间记录当前视口高；转场期间给详情容器锁定该高度
+//       （fixed + top:0 + 显式 height 时 bottom 被 over-constrained 忽略，高度不再随视口变）；
+//       after-enter 解锁回全屏。返回方向对称处理离开的详情页（Flutter 恢复底栏同理）。
+//       仅作用于 /feed/:id 导航，登录/商城/服务等路由不受影响。
+const detailLock = { active: false, height: 0, timer: null }
+const isFeedPath = (p) => /^\/feed\/\d+/.test(p)
+let backFromDetail = false
+function releaseLock() {
+  detailLock.active = false
+  clearTimeout(detailLock.timer)
+}
+router.beforeEach((to, from) => {
+  backFromDetail = isFeedPath(from.path) && !isFeedPath(to.path)
+  if (!isFeedPath(to.path)) return true
+  // 3.5 点击锁：详情转场未完成前，再次 push /feed/:id 一律拦截
+  //     （防快速连点产生多条 history、动画中切成另一篇文章）。
+  //     ⚠️ 这里 transitionName 还是上一次的值（afterEach 才更新），方向判断交给 enter/leave 钩子。
+  if (detailLock.active) return false
+  detailLock.active = true
+  detailLock.height = window.innerHeight
+  // after-enter 万一被转场打断丢失，800ms 兜底解锁，点击锁不能死锁
+  clearTimeout(detailLock.timer)
+  detailLock.timer = setTimeout(releaseLock, 800)
+  return true
+})
+
+function onBeforeEnter(el) {
+  if (transitionName.value === 'slide-forward' && detailLock.active) {
+    el.style.height = detailLock.height + 'px' // 锁定：视口中途变高也不再跟随
+  }
+}
+function onAfterEnter(el) {
+  if (el && el.style) el.style.height = '' // keep-alive 复用 DOM，内联高度必须摘掉
   if (transitionName.value === 'slide-forward') window.scrollTo(0, 0)
+  releaseLock()
+  // 通知各页「转场已结束」：详情页底部互动栏此刻才渐入（见 FeedDetailView 3.2）
+  window.dispatchEvent(new CustomEvent('pxid:page-shown'))
+}
+function onBeforeLeave(el) {
+  // 返回方向（详情→列表）：Flutter 恢复原生底栏同样会造成视口变化，锁住滑出的详情页高度
+  if (transitionName.value === 'slide-back' && backFromDetail) {
+    el.style.height = window.innerHeight + 'px'
+  }
+}
+function onAfterLeave(el) {
+  if (el && el.style) el.style.height = ''
+  backFromDetail = false
 }
 // 嵌入 Flutter 时原生已有全局返回手势，H5 转场压短时长，避免叠成「两段滑」
 const inApp = ref(bridge.isEmbed)

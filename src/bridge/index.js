@@ -280,6 +280,13 @@ const mockBridge = {
     logMock('setPullRefresh', enabled)
     return Promise.resolve()
   },
+
+  // 发现/动态卡片点击 → 即将横推进入文章详情（2026-09-07 底部闪烁联调契约）：
+  // Flutter 收到此调用后应在 H5 转场首帧前隐藏原生底栏，与 H5 侧「转场高度锁定」
+  // （App.vue detailLock）双保险，避免 WebView 高度在横推中途变化造成底部闪烁。
+  onOpenDetail(id) {
+    logMock('onOpenDetail', id)
+  },
 }
 
 export function initBridge() {
@@ -383,6 +390,15 @@ export const bridge = {
       return window.PXIDBridge.setPullRefresh(enabled)
     }
     return Promise.resolve()
+  },
+  // 通知原生「即将打开文章详情」（卡片点击、router.push 之前调用，联调契约见 onOpenDetail 注释）：
+  // 原生未实现/未注入时静默——H5 侧转场高度锁定独立生效，不依赖本调用
+  onOpenDetail: (id) => {
+    try {
+      if (window.PXIDBridge && typeof window.PXIDBridge.onOpenDetail === 'function') {
+        window.PXIDBridge.onOpenDetail(id)
+      }
+    } catch (e) { /* 原生未实现时静默 */ }
   },
 }
 

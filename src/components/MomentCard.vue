@@ -127,6 +127,8 @@ const cols = computed(() => {
 function open() {
   // 先把卡片手里的这份数据交给详情页直出（省掉转场里的加载圈，见 utils/feedSnapshot.js）
   putFeedSnapshot(props.item)
+  // 通知原生即将进入详情：Flutter 据此在转场首帧前隐藏原生底栏（底部闪烁联调契约，未实现时静默）
+  bridge.onOpenDetail(props.item.id)
   router.push('/feed/' + props.item.id)
 }
 // 预热：手指按下/鼠标移入就提前拉详情+评论+详情页图片，点进去时多数已返回
