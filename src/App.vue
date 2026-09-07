@@ -70,8 +70,6 @@ function onAfterEnter(el) {
   if (el && el.style) el.style.height = '' // keep-alive 复用 DOM，内联高度必须摘掉
   if (transitionName.value === 'slide-forward') window.scrollTo(0, 0)
   releaseLock()
-  // 通知各页「转场已结束」：详情页底部互动栏此刻才渐入（见 FeedDetailView 3.2）
-  window.dispatchEvent(new CustomEvent('pxid:page-shown'))
 }
 function onBeforeLeave(el) {
   // 返回方向（详情→列表）：Flutter 恢复原生底栏同样会造成视口变化，锁住滑出的详情页高度

@@ -203,7 +203,7 @@
   </div>
 
   <!-- 底部互动栏：左侧输入框 + 右侧点赞/收藏/评论（对齐 App 详情页习惯） -->
-  <div v-if="item" class="actions" :class="{ 'actions--wait': !actionsVisible }" v-show="!commenting">
+  <div v-if="item" class="actions" v-show="!commenting">
     <div class="actions__input press" @click="onCommentBtn">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       <span>{{ t('feed.writeComment') }}</span>
@@ -259,7 +259,7 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick, onMounted, onUpdated, onBeforeUnmount, onActivated, watch } from 'vue'
+import { computed, ref, nextTick, onMounted, onUpdated, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
@@ -613,31 +613,13 @@ onBeforeUnmount(() => {
   fdRoot.value?.removeEventListener('error', markImgSettled, true)
 })
 
-// ---- 底部互动栏「转场后再出现」（2026-09-07 Flutter 联调任务单 3.2）----
-// .actions 是 fixed bottom:0：若转场首帧直接渲染，会先贴在「旧 WebView 底部」，
-// Flutter 中途隐藏原生底栏后 WebView 变高，互动栏突然跳到新底部 = 最直观的闪烁源。
-// 策略：转场期间 opacity 0（占位不变、不参与跳位、不可误触），
-// pxid:page-shown（App.vue after-enter 派发）后 160ms 渐入——互动栏全程只出现一次。
-const actionsVisible = ref(false)
-let actionsTimer = null
-function markActionsShown() {
-  clearTimeout(actionsTimer)
-  actionsVisible.value = true
-  window.removeEventListener('pxid:page-shown', markActionsShown)
-}
-onActivated(() => {
-  clearTimeout(actionsTimer)
-  const midTransition = !!document.querySelector('.slide-forward-enter-active, .slide-back-enter-active')
-  if (midTransition) {
-    actionsVisible.value = false
-    window.addEventListener('pxid:page-shown', markActionsShown, { once: true })
-    // 兜底：转场钩子万一被异常打断，互动栏不能永久消失
-    actionsTimer = setTimeout(() => { if (!actionsVisible.value) markActionsShown() }, 800)
-  } else {
-    // 直链打开 / keep-alive 恢复且无转场：立即显示
-    actionsVisible.value = true
-  }
-})
+// ---- 底部互动栏与内容同帧出现（2026-09-07 坤哥真机反馈：晚出现感知明显）----
+// 曾经的策略（任务单 3.2 方案一）：转场期间 opacity 0、结束后渐入——实测真机上「内容先出、
+// 互动栏后到」不同步感明显，已废弃。
+// 现策略：互动栏转场首帧即渲染。安全性有两层保障：
+// ① 转场中详情容器带 transform，fixed 后代按规范退化为相对容器定位——互动栏跟着页面一起滑入
+//   （探针实测 ax 与容器 cx 逐帧相同：390→22.7→0，y 恒贴容器底），结束时容器铺满视口，位置零跳变；
+// ② 3.1 高度锁保证转场中容器底不随 WebView 视口变化（Flutter 中途隐藏底栏也不影响）。
 
 // ---- 评论淡入只在「骨架→真实评论」替换时播（任务单 3.3）----
 // 预取命中时评论首帧就完整，.cmt-list 再播 200ms 淡入就是与横推动画叠加的多余闪烁；
@@ -1425,13 +1407,8 @@ function showToast(msg) {
   border-top: 1px solid var(--line);
   z-index: 50;
   box-sizing: border-box;
-  /* 3.2：互动栏转场结束后渐入（App.vue after-enter 派发 pxid:page-shown） */
-  transition: opacity 160ms ease;
-}
-/* 3.2 转场等待态：透明 + 不可误触；占位不变，不参与 WebView 高度变化的重排跳位 */
-.actions--wait {
-  opacity: 0;
-  pointer-events: none;
+  /* 互动栏转场首帧即显示（与内容同帧滑入，见上方 script 注释）；
+     无 transition——不需要任何渐入 */
 }
 .actions__input {
   flex: 1 1 auto;
