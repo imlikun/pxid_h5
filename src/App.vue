@@ -136,12 +136,14 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   background: var(--bg, #f7f8fa);
   /* 左侧一道阴影代替「旧页半透明」：半透明会露出底下的背景色，边缘发白像闪一下 */
   box-shadow: -6px 0 20px rgba(0, 0, 0, 0.12);
-  transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  /* 340ms（2026-09-07 坤哥反馈「傻快」）：从 280 放慢到 340，跟微信 0.35s 同档——
+     有过程感的滑入比瞬间到位更优雅；曲线不变，只拉时长 */
+  transition: transform 340ms cubic-bezier(0.32, 0.72, 0, 1);
   will-change: transform;
 }
 .slide-forward-leave-active,
 .slide-back-enter-active {
-  transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 340ms cubic-bezier(0.32, 0.72, 0, 1);
   will-change: transform;
 }
 .slide-forward-enter-from {
@@ -158,12 +160,12 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
 }
 
 /* 嵌入 Flutter：原生全局返回手势本身就会带着整个 WebView 横滑，
-   H5 内部转场压到 220ms，观感上更像一个连贯动作，而不是两段滑 */
+   H5 内部转场压到 260ms，观感上更像一个连贯动作，而不是两段滑 */
 .embed-mode .slide-forward-enter-active,
 .embed-mode .slide-back-leave-active,
 .embed-mode .slide-forward-leave-active,
 .embed-mode .slide-back-enter-active {
-  transition-duration: 200ms;
+  transition-duration: 260ms;
 }
 
 /* 系统开启「减弱动画」：去掉位移，只留很短的淡入，避免眩晕 */

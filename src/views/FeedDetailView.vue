@@ -129,13 +129,16 @@
         </div>
       </div>
       <div v-else-if="comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
-      <CommentNode
-        v-else
-        v-for="c in comments"
-        :key="c.id"
-        :node="c"
-        @reply="onReplyNode"
-      />
+      <!-- 评论列表包一层做「整体淡入」：骨架撤除/首进详情都不再硬切（2026-09-07）。
+           animation 只在节点插入时播一次；keep-alive 返回 DOM 未销毁，不重播 -->
+      <div v-else class="cmt-list">
+        <CommentNode
+          v-for="c in comments"
+          :key="c.id"
+          :node="c"
+          @reply="onReplyNode"
+        />
+      </div>
     </div>
 
     <!-- 输入栏：Teleport 到 body，彻底避开 .app-root transform / keep-alive 等祖先包含块影响 -->
@@ -261,7 +264,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
 import { t, locale, regionFromLocale } from '../i18n'
-import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail, deleteFeed, getDeviceId, invalidateFeedDetail } from '../api/feed'
+import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail, deleteFeed, getDeviceId, invalidateFeedDetail, invalidateComments } from '../api/feed'
 import { mediaUrl } from '../storage'
 import { getFeedSnapshot } from '../utils/feedSnapshot'
 import TopBar from '../components/TopBar.vue'
@@ -1020,6 +1023,7 @@ async function submitComment() {
       }
       commentText.value = ''
       invalidateFeedDetail(id.value) // 评论数已变
+      invalidateComments(id.value) // 评论列表缓存已变（防 60s 内重进少自己刚发的评论）
       showToast(t('feed.toast.commentOk'))
       return
     }
@@ -1234,6 +1238,12 @@ function showToast(msg) {
    评论接口回来原地替换，整页高度从渲染第一帧起就是最终高度 */
 /* 骨架行高对齐真实评论节点（实测 80px = padding 10/10 + 头像 34 与三行文本取大值），
    这样接口回来是「原地替换」而不是「整块变高」（2026-09-05） */
+/* 评论列表整体淡入：骨架→评论/首进详情都不硬切。200ms 与图片淡入同节奏 */
+.cmt-list { animation: cmt-in 0.2s ease both; }
+@keyframes cmt-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 .cmt-sk {
   display: flex;
   gap: 10px;

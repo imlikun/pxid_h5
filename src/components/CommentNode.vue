@@ -1,6 +1,14 @@
 <template>
   <div class="cnode" :class="{ 'cnode--nested': depth > 0 }" :style="indentStyle">
-    <img class="cnode__avatar" :src="avatarUrl" :alt="node.author" @error="(e) => handleAvatarError(e, node.author)" />
+    <img
+      class="cnode__avatar"
+      :class="{ ok: avOk }"
+      ref="avEl"
+      :src="avatarUrl"
+      :alt="node.author"
+      @load="avOk = true"
+      @error="(e) => handleAvatarError(e, node.author)"
+    />
     <div class="cnode__main">
       <div class="cnode__name">{{ node.author }}</div>
       <div class="cnode__text">{{ node.content }}</div>
@@ -27,7 +35,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { t } from '../i18n'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 
@@ -38,6 +46,14 @@ const props = defineProps({
 defineEmits(['reply'])
 
 const avatarUrl = computed(() => resolveAvatar(props.node.author, props.node.avatar))
+
+// 头像淡入：图加载完 250ms 浮现（与详情页图片淡入同节奏），晚到是「安静出现」不是「突现」。
+// 缓存命中时 load 事件可能错过，onMounted 补查 complete（data-URI 兜底头像也会同步 complete）
+const avEl = ref(null)
+const avOk = ref(false)
+onMounted(() => {
+  if (avEl.value && avEl.value.complete) avOk.value = true
+})
 
 // 缩进上限 4 级，避免无限嵌套时行宽失控；逻辑层级仍无上限
 const indentStyle = computed(() => {
@@ -81,6 +97,12 @@ function toggleLike() {
   object-fit: cover;
   flex: 0 0 auto;
   background: #eee;
+  /* 淡入：load 后 250ms 浮现；complete 已 true 的（缓存/data-URI）onMounted 立即 ok 无感 */
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.cnode__avatar.ok {
+  opacity: 1;
 }
 .cnode__main {
   flex: 1 1 auto;

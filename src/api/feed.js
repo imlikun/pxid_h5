@@ -217,6 +217,7 @@ export async function commentFeed(id, text, { parentId = 0 } = {}) {
       method: 'POST',
       body: { content: text, parentId, nickname: profile.nickname || '', avatar: profile.avatar || '' },
     })
+    invalidateComments(id) // 评论列表已变，防 60s 缓存读到旧数据
     return { ok: true, data }
   } catch (e) {
     return { ok: false, message: e.message || '评论失败' }
@@ -248,11 +249,22 @@ export async function fetchPlazaGrid() {
 // ---- 评论列表（跨端一致的关键）----
 // 后端 GET /feed/{id}/comments → data.list
 // 失败时返回 null，由调用方回落到本地 seed
-export async function fetchComments(id) {
+//
+// 评论缓存（60s）+ 请求合并 + 预取（2026-09-07）：
+// 此前每次进详情都现拉评论（RTT 95ms~900ms+ 波动），骨架撤除那一刻
+// 「灰条→文字」同帧硬切 + 头像突现，就是用户感知到的闪变。
+// 现在卡片 touchstart 与详情一起预热评论，点进详情时多数已就位——
+// 整条链路全是微任务，首帧渲染前骨架就撤了，骨架一帧都不出现。
+const COMMENTS_TTL = 60000
+const commentsCache = new Map() // id -> { ts, list }
+const commentsInflight = new Map() // id -> Promise（同一 id 并发只发一次请求）
+
+// 归一化 + 递归楼中楼；失败返回 null（null 不缓存，下次可重试）
+async function fetchCommentsRaw(id) {
   if (!FEED_API) return null
   try {
     const data = await request('/feed/' + id + '/comments')
-    const list = (data.list || []).map((c) => ({
+    return (data.list || []).map((c) => ({
       id: c.id,
       author: c.author,
       avatar: c.avatar || '',
@@ -270,10 +282,45 @@ export async function fetchComments(id) {
         isLiked: !!r.isLiked,
       })),
     }))
-    return list
   } catch (e) {
     return null
   }
+}
+
+export async function fetchComments(id) {
+  const key = String(id)
+  const hit = commentsCache.get(key)
+  if (hit && Date.now() - hit.ts < COMMENTS_TTL) return hit.list.slice()
+  let p = commentsInflight.get(key)
+  if (!p) {
+    p = fetchCommentsRaw(key)
+      .then((list) => {
+        if (list) {
+          commentsCache.set(key, { ts: Date.now(), list })
+          if (commentsCache.size > 40) commentsCache.delete(commentsCache.keys().next().value)
+        }
+        return list
+      })
+      .finally(() => commentsInflight.delete(key))
+    commentsInflight.set(key, p)
+  }
+  const list = await p
+  return list ? list.slice() : null
+}
+
+// 预热评论：卡片 touchstart / mouseenter 时与详情一起提前拉
+export function prefetchComments(id) {
+  if (id == null) return
+  const key = String(id)
+  const hit = commentsCache.get(key)
+  if ((hit && Date.now() - hit.ts < COMMENTS_TTL) || commentsInflight.has(key)) return
+  fetchComments(id).catch(() => {})
+}
+
+// 发评论/删评论后失效，避免 60s 内重进读到旧评论（少自己刚发的那条）
+export function invalidateComments(id) {
+  if (id == null) return
+  commentsCache.delete(String(id))
 }
 
 // ---- 广场热门活动（只读；运营后台可配基础活动；接口空/异常时前端兜底 mock）----
