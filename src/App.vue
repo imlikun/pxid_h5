@@ -71,6 +71,28 @@ function onAfterEnter(el) {
   if (transitionName.value === 'slide-forward') window.scrollTo(0, 0)
   releaseLock()
 }
+
+// 转场类残留保险丝（2026-09-07）：正常转场 340ms（embed 260ms）结束即摘类；但若转场期间
+// 页面根级 v-if 被异步数据切换打断（如详情页 load 置空 product），enter 元素被替换后
+// Vue 的摘类钩子丢失，slide-*-enter-from/active 残留 → 页面永久卡在 translateX(100%) 屏幕外 = 白屏
+// （探针实测：keep-alive 二次进入 4.5s 后类仍残留）。导航稳定后强制清扫一次兜底；
+// 正常场景 700ms 时类早已摘掉，本清扫为 no-op。
+router.afterEach(() => {
+  setTimeout(() => {
+    const root = document.querySelector('.app-root')
+    if (!root) return
+    root
+      .querySelectorAll(
+        '[class*="slide-forward-enter-"],[class*="slide-back-enter-"],[class*="slide-forward-leave-"],[class*="slide-back-leave-"]'
+      )
+      .forEach((el) => {
+        const cleaned = String(el.className)
+          .replace(/ ?slide-(forward|back)-(enter|leave)-(from|active|to)/g, '')
+          .trim()
+        if (cleaned !== el.className) el.className = cleaned
+      })
+  }, 700)
+})
 function onBeforeLeave(el) {
   // 返回方向（详情→列表）：Flutter 恢复原生底栏同样会造成视口变化，锁住滑出的详情页高度
   if (transitionName.value === 'slide-back' && backFromDetail) {

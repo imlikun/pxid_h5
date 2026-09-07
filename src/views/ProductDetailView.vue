@@ -368,6 +368,15 @@ function swatchDot(cv) {
 }
 
 // 因 App.vue 用 <keep-alive> 缓存所有页面，切不同商品时组件被复用 → 必须监听路由重载，否则“永远同一片”
+// ⚠️ 白屏根因（2026-09-07 无头探针实锤）：真机 bridge 是异步 RTT（~150ms），此前的写法是
+//   await initLocale() 之后才 product.value=null → 「根级 v-if 切换」落在 340ms 转场窗口内；
+//   keep-alive 二次进入时组件带着旧商品的 .detail，于是 .detail→.empty→.detail 双重切换打断
+//   enter 转场 → slide-forward-enter-from 残留在被替换的旧元素上 → 新 .detail 卡死在
+//   translateX(100%) 屏幕外 = 白屏。浏览器 mock bridge 同步微任务，null→cached 同 flush 压缩，
+//   无中间帧，所以浏览器全绿、真机必现。
+// 修复原则：await 全部前置；状态变更压缩成一段同步代码、一次 flush 定稿——
+//   缓存命中时根级保持 .detail 只换数据（零根级切换），未命中才置 .empty（单次切换）。
+let loadSeq = 0
 async function load() {
   const handle = route.params.id
   // 离开详情页（返回精选）时 route.params.id 变 undefined：直接放弃，
@@ -375,27 +384,35 @@ async function load() {
   // 根级 v-if 在转场 leave 进行中从 .detail 切成 .empty，Transition 离场被打断，
   // .empty 会永久残留在精选页顶部（2026-09-07 实测复现）
   if (!handle) return
+  const seq = ++loadSeq
+  const stale = () => seq !== loadSeq || route.params.id !== handle
   await initLocale() // 语言决定内容地区，见 regionFromLocale
-  product.value = null
-  loading.value = true
-  error.value = ''
+  if (stale()) return
+  await initRegion()
+  if (stale()) return
+  // —— 以下全程同步，一次 flush 定稿，杜绝转场中的多次根级切换 ——
+  const cached = getProductByHandle(handle)
+  if (cached) {
+    // 缓存命中：根级保持 .detail，数据同帧从旧商品换成新商品（视觉即切，转场不中断）
+    product.value = cached
+    loading.value = false
+    error.value = ''
+  } else {
+    product.value = null
+    loading.value = true
+    error.value = ''
+  }
   activeIdx.value = 0
   activeVariant.value = 0
   activeColor.value = ''
   // 清空规格维度选中值（换商品时防残留上一商品的维度）
   Object.keys(specPick).forEach((k) => delete specPick[k])
   qty.value = 1
-  await initRegion()
-  // 1️⃣ 先用列表缓存快速首屏（含图/价/卖点/规格/描述）
-  const cached = getProductByHandle(handle)
-  if (cached) {
-    product.value = cached
-    loading.value = false
-    initSelection() // 缓存数据也带 options/variants，先初始化一次颜色与规格选中态
-  }
+  if (cached) initSelection() // 缓存数据也带 options/variants，先初始化一次颜色与规格选中态
   // 2️⃣ 缓存未命中时（直链/刷新详情页），先拉列表填充缓存
   if (!cached) {
     try { await fetchProducts() } catch (_) { /* 非阻塞 */ }
+    if (stale()) return
     const retryCached = getProductByHandle(handle)
     if (retryCached) {
       product.value = retryCached
@@ -403,9 +420,11 @@ async function load() {
       initSelection()
     }
   }
-  // 3️⃣ 再按 Shopify 单品链接真拉完整详情（覆盖缓存，带重试）
+  // 3️⃣ 再按 Shopify 单品链接真拉完整详情（覆盖缓存，带重试）。product 已非空，
+  //    此处只更新数据不动根级分支，转场安全
   try {
     const detail = await fetchProductDetail(handle)
+    if (stale()) return
     if (detail) {
       product.value = detail
       if (activeVariant.value >= (detail.variants || []).length) activeVariant.value = 0
@@ -413,6 +432,7 @@ async function load() {
       error.value = '' // 清除之前的错误
     } else if (!product.value) {
       error.value = '未找到该商品'
+      loading.value = false
     }
   } catch (e) {
     if (!product.value) error.value = '详情加载失败，请重试'
