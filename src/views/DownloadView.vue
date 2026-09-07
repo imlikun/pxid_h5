@@ -1,27 +1,30 @@
 <template>
   <div class="dl">
-    <!-- 顶栏：品牌字标 + 地区切换 -->
-    <header class="dl-nav">
-      <div class="logo" aria-label="PXID">PX<span class="logo-i">i</span>D</div>
-      <div class="region" role="tablist">
-        <button class="rg" :class="{ on: region === 'cn' }" @click="region = 'cn'">{{ T.regionCn }}</button>
-        <button class="rg" :class="{ on: region === 'global' }" @click="region = 'global'">{{ T.regionGlobal }}</button>
-      </div>
-    </header>
+    <!-- 顶栏：与 App 内页面一致的 TopBar -->
+    <TopBar :title="T.navTitle" :back="goBack" />
 
-    <!-- Hero：标题 + 副题 + 系统要求 -->
     <main class="dl-main">
+      <!-- Hero：App 图标 + 标题 + 副题 -->
+      <div class="appicon">
+        <span class="ai-text">PX<span class="ai-i">i</span>D</span>
+      </div>
       <h1 class="hero">{{ T.title }}</h1>
       <p class="sub">{{ T.subtitle }}</p>
       <p class="req">{{ T.requirement }}</p>
 
-      <!-- 下载按钮（九号式描边圆角 + 小牛式适用版本小字） -->
+      <!-- 地区切换（segment 控件，对齐 App tab/pill 语言） -->
+      <div class="region" role="tablist">
+        <button class="rg" :class="{ on: region === 'cn' }" @click="region = 'cn'">{{ T.regionCn }}</button>
+        <button class="rg" :class="{ on: region === 'global' }" @click="region = 'global'">{{ T.regionGlobal }}</button>
+      </div>
+
+      <!-- 下载按钮：Android 品牌蓝渐变主按钮 / iOS 深色实心 -->
       <div class="btns">
-        <button class="dl-btn press" @click="go('ios')">
+        <button class="dl-btn dl-btn--dark press" @click="go('ios')">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M17.05 12.54c-.03-2.89 2.36-4.27 2.47-4.34-1.35-1.97-3.44-2.24-4.18-2.27-1.78-.18-3.47 1.05-4.37 1.05-.9 0-2.29-1.02-3.77-1-1.94.03-3.72 1.13-4.72 2.86-2.01 3.49-.51 8.66 1.45 11.49.96 1.39 2.1 2.94 3.6 2.88 1.44-.06 1.99-.93 3.73-.93s2.23.93 3.76.9c1.56-.03 2.54-1.41 3.49-2.8 1.1-1.61 1.55-3.17 1.58-3.25-.04-.02-3.02-1.16-3.04-4.59zM14.16 4.06c.8-.97 1.34-2.32 1.19-3.66-1.15.05-2.55.77-3.38 1.73-.74.86-1.39 2.23-1.22 3.55 1.29.1 2.6-.65 3.41-1.62z"/></svg>
           <span>iOS</span>
         </button>
-        <button class="dl-btn press" @click="go('android')">
+        <button class="dl-btn dl-btn--brand press" @click="go('android')">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.7-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.43 11.43 0 00-8.94 0L5.65 5.67c-.19-.29-.58-.38-.87-.2-.28.18-.37.54-.22.83L6.4 9.48A10.81 10.81 0 001 18h22a10.81 10.81 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg>
           <span>Android</span>
         </button>
@@ -29,7 +32,7 @@
       <p class="store-hint">{{ androidHint }}</p>
       <p v-if="tip" class="tip">{{ tip }}</p>
 
-      <!-- 功能三卡（纯 CSS/SVG，无外链图不破图） -->
+      <!-- 功能三卡（白卡片 + 蓝图标底，对齐 App 卡片语言） -->
       <section class="feats">
         <div class="feat" v-for="f in feats" :key="f.key">
           <span class="fi" v-html="f.icon"></span>
@@ -46,20 +49,24 @@
 <script setup>
 // ============================================================
 // 品向智行 App 下载页（2026-09-07，参考九号/小牛下载页）
+// 视觉对齐 ToC App 规范（2026-09-07 坤哥反馈与发现/精选统一）：
+// 灰底 var(--bg) + TopBar + 品牌蓝 var(--brand) 主按钮 + 白卡片
 // - 链接全部来自后端配置：GET /app-download/links（运营后台可改，国内=应用宝/国际=Google Play）
-// - 地区：?region=cn|global 可由 Flutter 直接指定；默认按浏览器语言判断，页头可手动切
-// - 独立落地页：不用 TopBar/TabBar，Flutter WebView 或浏览器直接打开
+// - 地区：?region=cn|global 可由 Flutter 直接指定；默认按浏览器语言判断，页内可手动切
 // ============================================================
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import TopBar from '../components/TopBar.vue'
 import { locale } from '../i18n'
 
 const route = useRoute()
+const router = useRouter()
 const FEED_API = 'https://pxid-api.appin.site'
 
 // ---- 文案（zh / en 双语；跟随时区语言，独立于全局 i18n 字典避免膨胀）----
 const STR = {
   zh: {
+    navTitle: '品向智行 App 下载',
     title: '品向智行 App',
     subtitle: '远程控车 · 车友社区 · 帮助中心',
     requirement: 'App 要求设备支持蓝牙 4.1 及以上；Android 系统需 8.0 及以上、iOS 系统需 13 及以上。安卓手机需卸载当前应用后下载安装该版本。',
@@ -74,6 +81,7 @@ const STR = {
     f3t: '帮助中心', f3d: '在线客服、附近门店与道路救援',
   },
   en: {
+    navTitle: 'Download PXID App',
     title: 'PXID App',
     subtitle: 'Remote Control · Community · Help Center',
     requirement: 'Requires Bluetooth 4.1+; Android 8.0+ or iOS 13+. On Android, uninstall the current version before installing this update.',
@@ -90,9 +98,9 @@ const STR = {
 }
 const T = computed(() => STR[locale.value === 'zh' ? 'zh' : 'en'] || STR.en)
 
-const ICON_CONTROL = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2"/><path d="M7.8 16.2a6 6 0 010-8.4M16.2 7.8a6 6 0 010 8.4M5 19a10 10 0 010-14M19 5a10 10 0 010 14"/></svg>'
-const ICON_COMMUNITY = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>'
-const ICON_HELP = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+const ICON_CONTROL = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2"/><path d="M7.8 16.2a6 6 0 010-8.4M16.2 7.8a6 6 0 010 8.4M5 19a10 10 0 010-14M19 5a10 10 0 010 14"/></svg>'
+const ICON_COMMUNITY = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>'
+const ICON_HELP = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
 
 const feats = computed(() => [
   { key: 'ctrl', icon: ICON_CONTROL, title: T.value.f1t, desc: T.value.f1d },
@@ -106,6 +114,12 @@ const links = ref(null) // { cn:{android,ios}, global:{android,ios} }
 const tip = ref('')
 let tipTimer = null
 const androidHint = computed(() => (region.value === 'cn' ? T.value.hintCn : T.value.hintGlobal))
+
+// WebView 直开时可能没有历史：有历史就 back，否则回发现页兜底
+function goBack() {
+  if (window.history.length > 1) router.back()
+  else router.replace('/')
+}
 
 onMounted(async () => {
   // Flutter 可用 ?region=cn|global 直接指定（语言判断只是浏览器直开时的兜底）
@@ -136,98 +150,105 @@ function go(platform) {
 <style scoped>
 .dl {
   min-height: 100vh;
-  background: #fff;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* ---- 顶栏 ---- */
-.dl-nav {
+.dl-main {
+  flex: 1;
+  padding: 10px 16px 40px;
+  text-align: center;
+}
+
+/* ---- App 图标（品牌蓝渐变圆角方块，对齐 App 主色） ---- */
+.appicon {
+  width: 84px;
+  height: 84px;
+  margin: 18px auto 0;
+  border-radius: 22px;
+  background: var(--brand-gradient);
+  box-shadow: 0 8px 20px rgba(77, 124, 255, 0.28);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 10px;
+  justify-content: center;
 }
-.logo {
-  font-size: 21px;
+.ai-text {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.ai-i {
+  position: relative;
+}
+/* PXID 品牌记号：i 顶红块 */
+.ai-i::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 4px;
+  background: #ff5b5b;
+  border-radius: 1px;
+}
+
+.hero {
+  margin: 16px 0 0;
+  font-size: 26px;
+  line-height: 1.25;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: var(--text);
-  user-select: none;
-}
-.logo-i {
-  position: relative;
-  font-weight: 800;
-}
-/* PXID 品牌记号：i 顶红块 */
-.logo-i::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 5px;
-  height: 4px;
-  background: #e53935;
-  border-radius: 1px;
-}
-.region {
-  display: flex;
-  gap: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: 3px;
-  background: #fafafa;
-}
-.rg {
-  border: 0;
-  background: transparent;
-  font-size: 12px;
-  color: var(--text-sub);
-  padding: 5px 12px;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-.rg.on {
-  background: var(--text);
-  color: #fff;
-  font-weight: 600;
-}
-
-/* ---- Hero ---- */
-.dl-main {
-  flex: 1;
-  padding: 34px 24px 40px;
-  text-align: center;
-}
-.hero {
-  margin: 0;
-  font-size: 34px;
-  line-height: 1.2;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: var(--text);
 }
 .sub {
-  margin: 12px 0 0;
-  font-size: 15px;
+  margin: 8px 0 0;
+  font-size: 14px;
   color: var(--text-sub);
   letter-spacing: 0.5px;
 }
 .req {
-  margin: 18px auto 0;
+  margin: 14px auto 0;
   max-width: 340px;
   font-size: 12px;
   line-height: 1.7;
   color: var(--text-hint);
 }
 
-/* ---- 下载按钮（描边圆角，按压反馈） ---- */
+/* ---- 地区 segment（surface-2 底 + 激活白底浮起，同 App 控件语言） ---- */
+.region {
+  margin: 20px auto 0;
+  display: inline-flex;
+  padding: 3px;
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+}
+.rg {
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-sub);
+  padding: 7px 18px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.rg.on {
+  background: var(--card);
+  color: var(--brand);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* ---- 下载按钮：Android 品牌蓝渐变主按钮 / iOS 深色实心 ---- */
 .btns {
-  margin-top: 26px;
+  margin-top: 22px;
   display: flex;
   justify-content: center;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .dl-btn {
@@ -237,18 +258,24 @@ function go(platform) {
   justify-content: center;
   gap: 9px;
   padding: 13px 26px;
-  border: 1.5px solid var(--text);
-  border-radius: var(--radius-pill);
-  background: #fff;
-  color: var(--text);
-  font-size: 16px;
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 120ms ease, background 120ms ease;
+  transition: transform 120ms ease, filter 120ms ease;
 }
 .dl-btn:active {
   transform: scale(0.97);
-  background: #f5f5f4;
+  filter: brightness(0.96);
+}
+.dl-btn--brand {
+  background: var(--brand-gradient);
+  box-shadow: 0 4px 12px rgba(77, 124, 255, 0.3);
+}
+.dl-btn--dark {
+  background: var(--text);
 }
 .store-hint {
   margin: 14px 0 0;
@@ -258,39 +285,37 @@ function go(platform) {
 .tip {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #e53935;
+  color: var(--price, #e53935);
 }
 
-/* ---- 功能三卡 ---- */
+/* ---- 功能三卡（白卡片 + 浅蓝圆底蓝图标） ---- */
 .feats {
-  margin-top: 46px;
+  margin-top: 34px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 .feat {
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
+  background: var(--card);
   border-radius: var(--radius-lg);
-  padding: 20px 10px 16px;
+  padding: 18px 10px 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
 }
 .fi {
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: #fff;
-  border: 1px solid #eee;
+  background: var(--brand-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--text);
+  color: var(--brand);
 }
 .ft {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text);
 }
@@ -302,14 +327,14 @@ function go(platform) {
 
 /* ---- Footer ---- */
 .dl-foot {
-  padding: 18px 0 calc(env(safe-area-inset-bottom, 0px) + 18px);
+  padding: 14px 0 18px;
   text-align: center;
   font-size: 11px;
   color: var(--text-hint);
 }
 
 @media (max-width: 360px) {
-  .hero { font-size: 28px; }
+  .hero { font-size: 22px; }
   .dl-btn { min-width: 132px; padding: 12px 18px; }
 }
 </style>
