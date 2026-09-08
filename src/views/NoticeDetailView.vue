@@ -3,15 +3,15 @@
     <TopBar :title="t('notice.detailTitle')" :back="onBack" />
 
     <div v-if="item" class="body">
-      <div class="head fade-up stagger-1">
+      <div class="head" :class="[fadeUp(), staggerFor(1)]">
         <span class="tag" :class="'tag--' + item.type">{{ typeLabel(item.type) }}</span>
         <h1 class="title">{{ item.title }}</h1>
         <div class="meta">{{ item.publisher }} · {{ t('notice.publishedAt') }} {{ item.publishTime }}</div>
         <div class="meta">{{ t('notice.effectiveTime') }}{{ item.effectiveTime }}</div>
       </div>
-      <div class="content fade-up stagger-2">{{ item.content }}</div>
+      <div class="content" :class="[fadeUp(), staggerFor(2)]">{{ item.content }}</div>
 
-      <div v-if="item.forceAck && !acked" class="ack-tip fade-up stagger-3">
+      <div v-if="item.forceAck && !acked" class="ack-tip" :class="[fadeUp(), staggerFor(3)]">
         {{ t('notice.recallWarn') }}
       </div>
     </div>
@@ -23,11 +23,14 @@
     <div v-else class="footer">
       <button class="back-btn press" @click="onBack">{{ t('notice.back') }}</button>
     </div>
+
+    <!-- toast -->
+    <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { notices } from '../data/mock'
 import { t } from '../i18n'
@@ -36,6 +39,21 @@ import { markNoticeRead, markNoticeAck, isNoticeAcked } from '../store/noticeSto
 
 const route = useRoute()
 const router = useRouter()
+
+// 入场动画只播一次（2026-09-08，镜像 DiscoverView/FeaturedView 的 enterAnim 模式）：
+// fade-up 绑定「元素插入文档」，keep-alive 返回再进时 DOM 重插必重播（探针实测 fadeUp 从 0 重播），
+// 二次进入变成「页面滑进来是空的、内容再浮现」，与首次「内容随页面一起滑入」观感割裂。
+// 首次进入播完（0.45s + 最大 stagger 0.15s，900ms 上限留余量）自动摘类，之后返回/切回零动画。
+const enterAnim = ref(true)
+let enterTimer = null
+const fadeUp = () => (enterAnim.value ? 'fade-up' : '')
+const staggerFor = (i) => (enterAnim.value ? 'stagger-' + Math.min(i, 6) : '')
+onMounted(() => {
+  enterTimer = setTimeout(() => { enterAnim.value = false }, 900)
+})
+onUnmounted(() => {
+  if (enterTimer) { clearTimeout(enterTimer); enterTimer = null }
+})
 
 const id = computed(() => route.params.id)
 const item = computed(() => notices.find((n) => n.id === id.value) || null)
@@ -64,11 +82,22 @@ function ack() {
 // 普通公告返回；召回未确认时拦截返回（合规强提醒，正常走底部按钮）
 function onBack() {
   if (item.value && item.value.forceAck && !acked.value) {
-    // 召回未确认：引导先确认（兜底，正常走底部按钮）
+    // 召回未确认：引导先确认（兜底，正常走底部按钮）。给 toast 反馈——
+    // 2026-09-08 坤哥反馈排查中实测：拦截无任何提示，用户会以为返回按钮卡死
+    showToast(t('notice.recallWarn'))
     return
   }
   if (window.history.length > 1) router.back()
   else router.push('/notices')
+}
+
+// toast（本地实现，镜像 FeedDetailView——项目 toast 均为组件内函数，无全局模块）
+const toast = ref('')
+let toastTimer = null
+function showToast(msg) {
+  toast.value = msg
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toast.value = ''), 1600)
 }
 </script>
 
@@ -134,5 +163,21 @@ function onBack() {
   color: #fff;
   border-radius: 10px;
   font-size: 16px;
+}
+
+/* toast（镜像 FeedDetailView） */
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  z-index: 999;
+  max-width: 70vw;
+  text-align: center;
 }
 </style>
