@@ -1133,7 +1133,7 @@ function showToast(msg) {
   display: block;
 }
 .showcase__bar {
-  background: #1a1a1a;
+  background: var(--brand); /* 2026-09-08 坤哥：对齐 App 品牌蓝（原黑底 #1a1a1a） */
   color: #ffffff;
   font-size: 12px;
   text-align: center;
