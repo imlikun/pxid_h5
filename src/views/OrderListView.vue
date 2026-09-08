@@ -132,11 +132,16 @@ async function loadRemote() {
 
 onMounted(loadRemote)
 
-// 返回：原生 WebView 打开时关闭回精选/原生页；浏览器预览退回 router.back()
+// 返回：原生全屏 WebView 第一层关全屏路由回根页；有 H5 内部历史先退上一层（2026-09-08 对接说明）；
+// 浏览器预览退回 router.back()
 function goBack() {
   const app = window.PXIDApp
-  if (app && typeof app.postMessage === 'function') app.postMessage('closeWebView')
-  else if (window.history.length > 1) router.back()
+  if (app && typeof app.postMessage === 'function') {
+    if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
+    else router.back()
+    return
+  }
+  if (window.history.length > 1) router.back()
   else router.push('/featured')
 }
 

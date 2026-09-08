@@ -140,10 +140,12 @@ const router = useRouter()
 function handlePointsBack() {
   const app = window.PXIDApp
   if (app && typeof app.postMessage === 'function') {
-    app.postMessage('closeWebView')
-  } else {
-    router.back()
+    // 全屏 WebView 第一层关全屏路由；有 H5 内部历史先退上一层（2026-09-08 对接说明）
+    if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
+    else router.back()
+    return
   }
+  router.back()
 }
 
 const profile = ref({ balance: 0, continuousDays: 0, signedToday: false, isDemo: false, level: {}, levelIndex: 0, groups: [], medals: [], monthSigns: [] })

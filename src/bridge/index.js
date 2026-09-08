@@ -15,6 +15,29 @@ function isEmbed() {
   return !!(window.PXIDBridge && window.PXIDBridge.isNative === true)
 }
 
+// 本 WebView 的启动路由（模块加载即 app 启动时记录，全程不变）：
+// 根 WebView = /discover 或 /featured；Flutter 全屏二级 WebView = /notices、/feed/1 等白名单页。
+// 用于区分「从根页打开二级页」（发 ToFlutter_H5OpenFullscreen 全屏通道）与
+// 「已在二级 WebView 内」（继续 router.push，Flutter 拒收非根路由的 channel 消息，
+// 若仍 return 不跳转会造成点击无响应——2026-09-08 用户主页 FeedCard 场景实测风险）。
+const BOOT_ROUTE = (() => {
+  try { return (window.location.hash || '').replace(/^#/, '').split('?')[0] } catch (e) { return '' }
+})()
+function isRootWebView() {
+  return BOOT_ROUTE === '/discover' || BOOT_ROUTE === '/featured'
+}
+
+// 全屏二级 WebView 第一层判据：Vue Router 4 在 history.state 维护 position，
+// WebView 初始加载=0，H5 内每 push 一次自增。position<=0 说明没有 H5 内部历史可退，
+// 顶部返回必须交原生 closeWebView（Navigator.pop 关全屏路由回根页）；
+// position>0 时 router.back() 退 H5 内部上一层（如 /notice/:id 退回 /notices）。
+function isWebViewFirstPage() {
+  try {
+    const st = window.history.state
+    return !(st && typeof st.position === 'number') || st.position <= 0
+  } catch (e) { return true }
+}
+
 // 标准化用户资料：兼容 Flutter 可能返回的不同字段名
 // 真机 getUserInfo 的头像/昵称字段名未必是约定的 avatar/nickname（如 headImgUrl / portrait / photo 等），
 // 这里统一归一到 { nickname, avatar, email }，避免 H5 取不到头像（评论/发帖/点赞带身份时丢失头像）。
@@ -407,6 +430,10 @@ export const bridge = {
   // 返回 true = 已交原生处理，调用方必须立即 return，不得再 router.push；
   // 返回 false = 无该 Channel（浏览器预览/桌面端/旧 App），调用方回退 H5 自身路由。
   openFeedDetailNative: (id) => {
+    // 仅发现/精选根 WebView 发送：Flutter 只在根路由接收该 channel。
+    // 用户主页（/user/:id 二级 WebView）等场景 Flutter 拒收，若仍 return 会导致
+    // 卡片点击无响应——必须回退 router.push（2026-09-08 对接说明排查修复）。
+    if (!isRootWebView()) return false
     try {
       const ch = window.ToFlutter_H5OpenFeedDetail
       if (ch && typeof ch.postMessage === 'function') {
@@ -416,6 +443,32 @@ export const bridge = {
     } catch (e) { /* channel 异常走回退 */ }
     return false
   },
+
+  // 发现/精选二级页全屏右滑通道（2026-09-08，对接说明 2026-09-07）：
+  // 根 WebView 内打开白名单二级路由时，交 Flutter 以标准右进左出全屏 WebView 打开
+  // （完整遮住根页与主导航栏，导航栏无隐藏/下移/淡出动画），转场与 H5 slide-forward 一致。
+  // 白名单：/feed/:id /activity/:id /activity-center /notices /notice/:id /message
+  //        /interactions /user/:id /user/me /points /points/guide /points/mall
+  //        /product/:id /cart /cart/checkout /order/list
+  // 返回 true = 已交原生，调用方必须立即 return 禁止再 router.push（否则双跳转）；
+  // 返回 false = 非根 WebView（全屏页内下一层，必须 H5 router.push）或无 channel
+  // （浏览器/旧 App，回退 router.push）。/publish、/vehicle/:id 等继续走 openNative。
+  // 文章详情旧 channel ToFlutter_H5OpenFeedDetail 暂留兼容（Flutter 兼容，不双发）。
+  openFullscreenRoute: (route) => {
+    if (!isRootWebView()) return false
+    try {
+      const ch = window.ToFlutter_H5OpenFullscreen
+      if (ch && typeof ch.postMessage === 'function') {
+        ch.postMessage(route)
+        return true
+      }
+    } catch (e) { /* channel 异常走回退 */ }
+    return false
+  },
+
+  // 全屏二级 WebView 第一层判据（返回规则用）：true=无 H5 内部历史，返回应交原生
+  // closeWebView；false=有内部历史（如 /notice/:id ← /notices），应 router.back()。
+  isWebViewFirstPage: () => isWebViewFirstPage(),
 }
 
 export default bridge

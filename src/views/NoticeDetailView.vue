@@ -36,6 +36,7 @@ import { notices } from '../data/mock'
 import { t } from '../i18n'
 import TopBar from '../components/TopBar.vue'
 import { markNoticeRead, markNoticeAck, isNoticeAcked } from '../store/noticeStore'
+import { bridge } from '../bridge'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,12 +80,20 @@ function ack() {
   if (item.value) markNoticeAck(item.value.id)
   onBack()
 }
-// 普通公告返回；召回未确认时拦截返回（合规强提醒，正常走底部按钮）
+// 普通公告返回（2026-09-08 全屏右滑对接更新）：本页为全屏 WebView 白名单路由——
+// 第一层（无 H5 内部历史）关闭全屏路由回根页；有 H5 历史（/notices 进入的深层）先 back；
+// 召回未确认时拦截返回（合规强提醒，正常走底部按钮）；浏览器回退 router.back()，无历史兜底回列表。
 function onBack() {
   if (item.value && item.value.forceAck && !acked.value) {
     // 召回未确认：引导先确认（兜底，正常走底部按钮）。给 toast 反馈——
     // 2026-09-08 坤哥反馈排查中实测：拦截无任何提示，用户会以为返回按钮卡死
     showToast(t('notice.recallWarn'))
+    return
+  }
+  const app = window.PXIDApp
+  if (app && typeof app.postMessage === 'function') {
+    if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
+    else router.back()
     return
   }
   if (window.history.length > 1) router.back()

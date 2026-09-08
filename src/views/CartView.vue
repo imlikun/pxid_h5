@@ -74,6 +74,14 @@ const checkedCurrency = computed(() => {
 })
 
 function goBack() {
+  // /cart 为全屏 WebView 白名单路由（2026-09-08 对接说明）：
+  // 第一层（无 H5 内部历史）关全屏路由回精选根页；有 H5 内部历史先 back
+  const app = window.PXIDApp
+  if (app && typeof app.postMessage === 'function') {
+    if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
+    else router.back()
+    return
+  }
   router.back()
 }
 function goDiscover() {

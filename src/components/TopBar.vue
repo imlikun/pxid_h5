@@ -24,6 +24,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { bridge } from '../bridge'
 
 const props = defineProps({
   /** 居中标题 */
@@ -42,8 +43,19 @@ const props = defineProps({
 
 const router = useRouter()
 function onBack() {
-  if (props.back) props.back()
-  else router.back()
+  if (props.back) {
+    props.back()
+    return
+  }
+  // 原生全屏 WebView 第一层（2026-09-08 二级页全屏右滑对接）：
+  // 本 WebView 无 H5 内部历史可退，通知原生关闭全屏路由回根页（根页滚动/状态原样露出）。
+  // 有 H5 历史（position>0，如 /notice/:id ← /notices）仍走 router.back()。
+  const app = window.PXIDApp
+  if (app && typeof app.postMessage === 'function' && bridge.isWebViewFirstPage()) {
+    app.postMessage('closeWebView')
+    return
+  }
+  router.back()
 }
 </script>
 

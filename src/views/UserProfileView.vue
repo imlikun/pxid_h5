@@ -157,14 +157,15 @@ function showToast(m) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 1600)
 }
-// 返回：原生全屏 WebView（App「我的」四宫格入口）调 PXIDApp.closeWebView 回 Flutter「我的」页；
-// 有 H5 历史（如从粉丝列表点进他人主页）先回上一页，无历史则关 WebView；浏览器预览退回 router.back()。
+// 返回：原生全屏 WebView（App「我的」四宫格入口 / 2026-09-08 起亦为发现页全屏白名单路由）
+// 第一层（无 H5 内部历史，history.state.position<=0）关 WebView 回「我的」/根页；
+// 有 H5 历史（如从粉丝列表点进他人主页）先回上一页；浏览器预览退回 router.back()。
 // 注意：关闭桥是 window.PXIDApp.postMessage('closeWebView')，不是 PXIDBridge.closeWebView（不存在）。
 function goBack() {
   const app = window.PXIDApp
   if (app && typeof app.postMessage === 'function') {
-    if (window.history.length > 1) router.back()
-    else app.postMessage('closeWebView')
+    if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
+    else router.back()
     return
   }
   if (window.history.length > 1) router.back()

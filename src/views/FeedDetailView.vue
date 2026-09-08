@@ -274,15 +274,16 @@ import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 const route = useRoute()
 const router = useRouter()
 
-// 返回（2026-09-08 原生右滑路由对接，Flutter 对接说明 2026-09-07）：
-// 详情跑在 Flutter 全屏 WebView 中时，顶部返回必须优先关闭原生详情页
+// 返回（2026-09-08 全屏右滑对接更新，对接说明 2026-09-07）：
+// 详情跑在 Flutter 全屏 WebView 中时，第一层（无 H5 内部历史）返回关闭原生详情页
 // （window.PXIDApp.postMessage('closeWebView')，Flutter 走标准右退转场露出根页）；
+// 有 H5 内部历史（相关推荐 /feed/:id 二层）先 router.back() 退上一层，不能直接关 WebView。
 // 浏览器预览/桌面端/H5 独立预览无 PXIDApp 时回退 router.back()。
-// 注意：详情内相关推荐跳转仍用 router.push（同 WebView 内路由），返回时会先回上一个详情。
 function goBack() {
   const app = window.PXIDApp
   if (app && typeof app.postMessage === 'function') {
-    app.postMessage('closeWebView')
+    if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
+    else router.back()
     return
   }
   router.back()

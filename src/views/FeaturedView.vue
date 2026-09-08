@@ -15,7 +15,7 @@
         </div>
       </template>
       <template #right>
-        <span class="my-order-btn" @click="router.push('/order/list')">
+        <span class="my-order-btn" @click="openSecondary('/order/list')">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
           <span class="my-order-btn__txt">{{ t('featured.myOrder') }}</span>
         </span>
@@ -291,7 +291,13 @@ function goBanner(i) {
 }
 function goProduct(p) {
   const h = p.handle || p.id
-  router.push('/product/' + h)
+  openSecondary('/product/' + h)
+}
+
+// 白名单二级路由统一走全屏右滑通道（2026-09-08 对接说明），同 DiscoverView.openSecondary
+function openSecondary(route) {
+  if (bridge.openFullscreenRoute(route)) return
+  router.push(route)
 }
 let _touchX = 0
 function onTouchStart(e) {
@@ -371,7 +377,7 @@ function onQuick(q) {
   } else if (q.key === 'new') {
     activeTab.value = 'spring'
   } else if (q.key === 'points') {
-    router.push('/points')
+    openSecondary('/points')
   }
 }
 

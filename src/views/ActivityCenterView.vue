@@ -37,6 +37,7 @@ import { useRouter } from 'vue-router'
 import { t, locale, initLocale, regionFromLocale } from '../i18n'
 import TopBar from '../components/TopBar.vue'
 import { fetchActivities } from '../api/feed'
+import { bridge } from '../bridge'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
@@ -83,8 +84,13 @@ function goDetail(a) { router.push('/activity/' + a.id) }
 
 function goBack() {
   const app = window.PXIDApp
-  if (app && typeof app.postMessage === 'function') app.postMessage('closeWebView')
-  else if (window.history.length > 1) router.back()
+  if (app && typeof app.postMessage === 'function') {
+    // 全屏 WebView 第一层关全屏路由；有 H5 内部历史先退上一层（2026-09-08 对接说明）
+    if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
+    else router.back()
+    return
+  }
+  if (window.history.length > 1) router.back()
   else router.push('/discover')
 }
 

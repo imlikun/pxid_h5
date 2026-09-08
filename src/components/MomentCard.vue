@@ -142,8 +142,14 @@ function onWarm() {
   prewarmFeedMedia(props.item)
 }
 // 点作者（头像/昵称）→ 个人主页（他人/自己统一由主页按 id 识别）
+// /user/:id 在全屏白名单内（2026-09-08 对接说明）：根 WebView 发全屏通道，
+// 用户主页等二级 WebView 内 openFullscreenRoute 自动回退 router.push
 function goUser() {
-  if (props.item && props.item.deviceId) router.push('/user/' + encodeURIComponent(props.item.deviceId))
+  if (props.item && props.item.deviceId) {
+    const r = '/user/' + encodeURIComponent(props.item.deviceId)
+    if (bridge.openFullscreenRoute(r)) return
+    router.push(r)
+  }
 }
 function onPreview(img) {
   console.log('preview image:', img)

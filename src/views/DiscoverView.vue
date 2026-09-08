@@ -542,10 +542,12 @@ function onBanner() {
       // router.push 只改 H5 内部路由、Flutter tab 状态仍停在发现 → 点底部 tab 不响应（回不来发现）；
       // openNative 是开原生子页(车型/绑车)，不是切 tab → 同样失效。两者都错。
       bridge.navigateTo(seg)
-    } else {
-      // /product/*、/vehicle/* 等子页走原生页指令
-      bridge.openNative(u.slice(1))
-    }
+  } else {
+    // /product/*、/notice/* 等二级子页：白名单路由优先全屏右滑通道（2026-09-08 对接说明），
+    // 无 Channel（旧 App）保持 openNative 旧行为
+    if (bridge.openFullscreenRoute(u)) return
+    bridge.openNative(u.slice(1))
+  }
   } else {
     router.push(u) // 浏览器独立预览兜底
   }
@@ -672,14 +674,20 @@ function onAdd() {
   // H5 预览：跳转 H5 发布页，保证可真实发布
   router.push('/publish')
 }
-function onNotice() { router.push('/interactions') }
+// 白名单二级路由统一走全屏右滑通道（2026-09-08 对接说明）：App 内交 Flutter 全屏打开，
+// 浏览器/旧 App/全屏页内自动回退 router.push（openFullscreenRoute 内部已判根 WebView）
+function openSecondary(route) {
+  if (bridge.openFullscreenRoute(route)) return
+  router.push(route)
+}
+function onNotice() { openSecondary('/interactions') }
 function onQuick(q) {
-  if (q.key === 'notice') { router.push('/notices'); return }
+  if (q.key === 'notice') { openSecondary('/notices'); return }
   // 智能助手（PXID）→ H5 助手页
-  if (q.key === 'ai') { router.push('/message'); return }
+  if (q.key === 'ai') { openSecondary('/message'); return }
   // 决策 2：立即定制 → 跳转 H5 车型定制页（鸿蒙智行风格，VehicleDetailView）
   if (q.key === 'custom') { router.push('/vehicle/scooter-F2'); return }
-  if (q.key === 'points') { router.push('/points'); return }
+  if (q.key === 'points') { openSecondary('/points'); return }
 }
 // 取本机坐标：优先原生桥（Flutter 注入），降级浏览器 geolocation
 async function getLocation() {
@@ -736,8 +744,8 @@ function onShowcase(p) {
     router.push('/publish' + q)
   }
 }
-function onMoreActivity() { router.push('/activity-center') }
-function onActivity(a) { router.push('/activity/' + a.id) }
+function onMoreActivity() { openSecondary('/activity-center') }
+function onActivity(a) { openSecondary('/activity/' + a.id) }
 
 const keyword = ref('')
 const isComposing = ref(false)

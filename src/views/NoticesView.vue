@@ -51,6 +51,7 @@ import { notices } from '../data/mock'
 import { t } from '../i18n'
 import TopBar from '../components/TopBar.vue'
 import { isNoticeRead, isNoticeAcked } from '../store/noticeStore'
+import { bridge } from '../bridge'
 
 const router = useRouter()
 
@@ -84,11 +85,17 @@ function toDetail(id) {
   router.push('/notice/' + id)
 }
 
-// 返回对接：原生「我的」消息入口用 WebView 打开，需主动关闭回「我的」；浏览器预览退回 router.back()
+// 返回对接（2026-09-08 全屏右滑对接更新）：本页现为全屏 WebView 白名单路由——
+// 第一层（无 H5 内部历史）关闭全屏路由回根页；有 H5 历史（如 /notice/:id 退回）先 back；
+// 浏览器预览退回 router.back()
 function goBack() {
   const app = window.PXIDApp
-  if (app && typeof app.postMessage === 'function') app.postMessage('closeWebView')
-  else router.back()
+  if (app && typeof app.postMessage === 'function') {
+    if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
+    else router.back()
+    return
+  }
+  router.back()
 }
 </script>
 
