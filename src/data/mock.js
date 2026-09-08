@@ -165,20 +165,21 @@ export const feedItems = [
 ]
 
 // 广场：车型展示（固定本地车型，与精选/Shopify 无关，仅供发动态关联选车参考）
-// cover 用本地占位图（public/ 下 plaza_p*/feed_r*），不连精选商店
+// 排序（2026-09-08 坤哥拍板）：P 系列 → F 系列 → G 系列
+// cover：优先官方白底图（public/vehicles/*.jpg，900x900 方图），缺图车型（P1/P3/G1）沿用旧占位图
 export const plazaShowcase = [
-  { id: 'scooter-F2', name: 'F2', cover: 'plaza_p2.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P2', name: 'P2', cover: 'plaza_p4.jpg', itemType: 'buy-vehicle' },
-  { id: 'motorcycle-P5', name: 'P5', cover: 'feed_r1.jpg', itemType: 'buy-vehicle' },
   { id: 'scooter-P1', name: 'P1', cover: 'plaza_p1.jpg', itemType: 'buy-vehicle' },
-  { id: 'scooter-G1', name: 'G1', cover: 'plaza_p3.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P2', name: 'P2', cover: 'vehicles/p2.jpg', itemType: 'buy-vehicle' },
   { id: 'scooter-P3', name: 'P3', cover: 'plaza_p5.jpg', itemType: 'buy-vehicle' },
-  { id: 'scooter-F1', name: 'F1', cover: 'plaza_p6.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P4', name: 'P4', cover: 'plaza_p7.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P6', name: 'P6', cover: 'plaza_p8.jpg', itemType: 'buy-vehicle' },
-  { id: 'motorcycle-P7', name: 'P7', cover: 'feed_r2.jpg', itemType: 'buy-vehicle' },
-  { id: 'motorcycle-P8', name: 'P8', cover: 'feed_r3.jpg', itemType: 'buy-vehicle' },
-  { id: 'ebike-P9', name: 'P9', cover: 'feed_r4.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P4', name: 'P4', cover: 'vehicles/p4.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P5', name: 'P5', cover: 'vehicles/p5.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P6', name: 'P6', cover: 'vehicles/p6.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P7', name: 'P7', cover: 'vehicles/p7.jpg', itemType: 'buy-vehicle' },
+  { id: 'motorcycle-P8', name: 'P8', cover: 'vehicles/p8.jpg', itemType: 'buy-vehicle' },
+  { id: 'ebike-P9', name: 'P9', cover: 'vehicles/p9.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-F1', name: 'F1', cover: 'vehicles/f1.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-F2', name: 'F2', cover: 'vehicles/f2.jpg', itemType: 'buy-vehicle' },
+  { id: 'scooter-G1', name: 'G1', cover: 'plaza_p3.jpg', itemType: 'buy-vehicle' },
 ]
 
 // 真实车型 handle 全集（车型页「热门推荐」用；当前仍映射到 Shopify handle）
