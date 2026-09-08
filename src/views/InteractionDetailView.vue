@@ -36,7 +36,7 @@
       <div
         v-if="item.targetType === 'feed' && item.targetId"
         class="relcard press"
-        @click="router.push('/feed/' + item.targetId)"
+        @click="openRelPost"
       >
         <img v-if="relCover" class="relcard__cover" :src="relCover" alt="" @error="relCover = ''" />
         <div v-else class="relcard__cover relcard__ph">PXID</div>
@@ -67,9 +67,16 @@ import { getNotification, cacheNotifications } from '../store/notificationStore'
 import { fetchNotifications } from '../api/notifications'
 import { fetchFeedDetail } from '../api/feed'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
+import { bridge } from '../bridge'
 
 const route = useRoute()
 const router = useRouter()
+
+// 关联原动态跳转（对接说明 2026-09-07）：App 环境优先原生右滑路由，失败回退 H5 路由
+function openRelPost() {
+  if (bridge.openFeedDetailNative(item.value.targetId)) return
+  router.push('/feed/' + item.value.targetId)
+}
 const id = computed(() => String(route.params.id))
 
 const item = ref(getNotification(id.value))

@@ -127,7 +127,11 @@ const cols = computed(() => {
 function open() {
   // 先把卡片手里的这份数据交给详情页直出（省掉转场里的加载圈，见 utils/feedSnapshot.js）
   putFeedSnapshot(props.item)
-  // 通知原生即将进入详情：Flutter 据此在转场首帧前隐藏原生底栏（底部闪烁联调契约，未实现时静默）
+  // App 环境：交 Flutter 原生右进左出路由全屏打开（根页与底栏原样保留），
+  // 发送成功必须 return，不得再 router.push（对接说明 2026-09-07）
+  if (bridge.openFeedDetailNative(props.item.id)) return
+  // 浏览器预览/桌面端/旧 App 回退：H5 自身路由
+  // onOpenDetail 通知原生即将进详情（旧契约：Flutter 转场首帧前藏底栏，未实现时静默）
   bridge.onOpenDetail(props.item.id)
   router.push('/feed/' + props.item.id)
 }

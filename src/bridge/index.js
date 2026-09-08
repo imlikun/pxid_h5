@@ -400,6 +400,22 @@ export const bridge = {
       }
     } catch (e) { /* 原生未实现时静默 */ }
   },
+
+  // 发现/精选根页打开文章详情 → 原生右滑路由（2026-09-08，Flutter 对接说明 2026-09-07）：
+  // App 环境优先发原生 channel ToFlutter_H5OpenFeedDetail（'/feed/<id>'），Flutter 以标准
+  // 右进左出路由全屏打开详情，覆盖根页面与主导航栏（导航栏不做隐藏/滑出动画）。
+  // 返回 true = 已交原生处理，调用方必须立即 return，不得再 router.push；
+  // 返回 false = 无该 Channel（浏览器预览/桌面端/旧 App），调用方回退 H5 自身路由。
+  openFeedDetailNative: (id) => {
+    try {
+      const ch = window.ToFlutter_H5OpenFeedDetail
+      if (ch && typeof ch.postMessage === 'function') {
+        ch.postMessage('/feed/' + id)
+        return true
+      }
+    } catch (e) { /* channel 异常走回退 */ }
+    return false
+  },
 }
 
 export default bridge

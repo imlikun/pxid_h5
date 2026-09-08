@@ -108,6 +108,7 @@ import { t } from '../i18n'
 import { fetchNotifications, markNotificationRead, markAllRead } from '../api/notifications'
 import { cacheNotifications } from '../store/notificationStore'
 import { handleAvatarError } from '../utils/avatar'
+import { bridge } from '../bridge'
 
 const router = useRouter()
 const list = ref([])
@@ -233,6 +234,8 @@ async function toggle(g) {
 
 function goPost(g) {
   if (!g.target || !g.target.id) return
+  // App 环境优先原生右滑路由（对接说明 2026-09-07：所有打开文章详情的入口统一走桥接优先、失败回退）
+  if (bridge.openFeedDetailNative(g.target.id)) return
   router.push('/feed/' + g.target.id)
 }
 

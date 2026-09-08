@@ -5,8 +5,8 @@
        （表现为只有列表在动，详情是硬切）。包一层后两侧动画才对称。 -->
   <div class="fd-root" ref="fdRoot">
   <div class="detail" v-if="item">
-    <!-- 顶部 -->
-    <TopBar sticky :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
+    <!-- 顶部：返回优先关闭原生详情 WebView（App 原生右滑路由），回退 router.back() -->
+    <TopBar sticky :back="goBack" :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
       <template #right>
         <span class="more press" @click="onMoreClick">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
@@ -199,7 +199,7 @@
       <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
     </div>
     <div class="empty__txt">{{ t('feed.notFound') }}</div>
-    <button class="empty__back" @click="router.back()">{{ t('feed.back') }}</button>
+    <button class="empty__back" @click="goBack">{{ t('feed.back') }}</button>
   </div>
 
   <!-- 底部互动栏：左侧输入框 + 右侧点赞/收藏/评论（对齐 App 详情页习惯） -->
@@ -273,6 +273,20 @@ import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 
 const route = useRoute()
 const router = useRouter()
+
+// 返回（2026-09-08 原生右滑路由对接，Flutter 对接说明 2026-09-07）：
+// 详情跑在 Flutter 全屏 WebView 中时，顶部返回必须优先关闭原生详情页
+// （window.PXIDApp.postMessage('closeWebView')，Flutter 走标准右退转场露出根页）；
+// 浏览器预览/桌面端/H5 独立预览无 PXIDApp 时回退 router.back()。
+// 注意：详情内相关推荐跳转仍用 router.push（同 WebView 内路由），返回时会先回上一个详情。
+function goBack() {
+  const app = window.PXIDApp
+  if (app && typeof app.postMessage === 'function') {
+    app.postMessage('closeWebView')
+    return
+  }
+  router.back()
+}
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
@@ -465,7 +479,7 @@ async function doDelete() {
     const r = await deleteFeed(id.value)
     if (r && r.ok !== false) {
       showToast('已删除')
-      router.back()
+      goBack() // 原生环境关详情 WebView 回根页；浏览器回退 router.back()
     } else {
       showToast('删除失败')
     }
