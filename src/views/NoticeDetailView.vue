@@ -3,15 +3,15 @@
     <TopBar :title="t('notice.detailTitle')" :back="onBack" />
 
     <div v-if="item" class="body">
-      <div class="head" :class="[fadeUp(), staggerFor(1)]">
+      <div class="head">
         <span class="tag" :class="'tag--' + item.type">{{ typeLabel(item.type) }}</span>
         <h1 class="title">{{ item.title }}</h1>
         <div class="meta">{{ item.publisher }} · {{ t('notice.publishedAt') }} {{ item.publishTime }}</div>
         <div class="meta">{{ t('notice.effectiveTime') }}{{ item.effectiveTime }}</div>
       </div>
-      <div class="content" :class="[fadeUp(), staggerFor(2)]">{{ item.content }}</div>
+      <div class="content">{{ item.content }}</div>
 
-      <div v-if="item.forceAck && !acked" class="ack-tip" :class="[fadeUp(), staggerFor(3)]">
+      <div v-if="item.forceAck && !acked" class="ack-tip">
         {{ t('notice.recallWarn') }}
       </div>
     </div>
@@ -30,7 +30,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { notices } from '../data/mock'
 import { t } from '../i18n'
@@ -41,29 +41,35 @@ import { bridge } from '../bridge'
 const route = useRoute()
 const router = useRouter()
 
-// 入场动画只播一次（2026-09-08，镜像 DiscoverView/FeaturedView 的 enterAnim 模式）：
-// fade-up 绑定「元素插入文档」，keep-alive 返回再进时 DOM 重插必重播（探针实测 fadeUp 从 0 重播），
-// 二次进入变成「页面滑进来是空的、内容再浮现」，与首次「内容随页面一起滑入」观感割裂。
-// 首次进入播完（0.45s + 最大 stagger 0.15s，900ms 上限留余量）自动摘类，之后返回/切回零动画。
-const enterAnim = ref(true)
-let enterTimer = null
-const fadeUp = () => (enterAnim.value ? 'fade-up' : '')
-const staggerFor = (i) => (enterAnim.value ? 'stagger-' + Math.min(i, 6) : '')
-onMounted(() => {
-  enterTimer = setTimeout(() => { enterAnim.value = false }, 900)
-})
-onUnmounted(() => {
-  if (enterTimer) { clearTimeout(enterTimer); enterTimer = null }
-})
+// 入场动画说明（2026-09-08 闪屏修复）：本页曾用 fade-up+stagger 入场（镜像列表页），
+// 但内容页与列表页观感完全不同——animation backwards 使正文初始 opacity:0，
+// 首次进入变成「空白页滑入 340ms → 内容再浮现」两段式跳变（坤哥报"闪屏"，screencast 帧实锤：
+// t=130ms 整屏详情页但正文全透明）。内容页应内容直出、随页面一起滑入（对齐 feed 详情/微信语义），
+// 故删除本页全部入场动画；发现/精选列表的 fade-up 是多卡片渐次浮现的设计感，保留不动。
 
 const id = computed(() => route.params.id)
-const item = computed(() => notices.find((n) => n.id === id.value) || null)
-// 召回强确认状态（响应式）：未确认前保留横幅与强制确认按钮
-const acked = computed(() => isNoticeAcked(id.value))
-
-// 进入详情即标记已读 → 发现页「官方公告」入口红点与列表未读圆点立即消失（产品诉求：读完就消）
-// 召回公告同样消除红点，但其强提醒由 ack 状态单独控制，不因点开而解除
-watch(id, (v) => { if (v) markNoticeRead(v) }, { immediate: true })
+// 「最后有效公告」缓存（2026-09-08 闪屏修复）：item 若直接 computed 依赖 route.params.id，
+// 返回列表时参数瞬间变 undefined → item=null → 离场转场进行中正文被 v-if 清空，
+// 用户看到「空壳详情页滑出」（screencast t=30ms 帧实锤：滑出页只剩顶栏+按钮）。
+// 改为 watch 缓存最后有效对象：离开转场中内容保持完整，切到别的公告时才换内容。
+const lastItem = ref(null)
+watch(
+  id,
+  (v) => {
+    if (!v) return
+    const found = notices.find((n) => n.id === v)
+    if (found) lastItem.value = found
+    // 进入详情即标记已读 → 发现页「官方公告」入口红点与列表未读圆点立即消失（产品诉求：读完就消）
+    // 召回公告同样消除红点，但其强提醒由 ack 状态单独控制，不因点开而解除
+    markNoticeRead(v)
+  },
+  { immediate: true }
+)
+const item = computed(() => lastItem.value)
+// 召回强确认状态（响应式）：未确认前保留横幅与强制确认按钮。
+// 基于 item（缓存版）而非 id：返回转场中 id 已变 undefined，若读 id 会导致
+// 已确认状态瞬间回退 false，底部「已知悉/返回」按钮在滑出过程中闪切（同类闪屏源）
+const acked = computed(() => (item.value ? isNoticeAcked(item.value.id) : false))
 
 function typeLabel(type) {
   return {
