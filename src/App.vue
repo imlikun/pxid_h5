@@ -68,7 +68,10 @@ function onBeforeEnter(el) {
 }
 function onAfterEnter(el) {
   if (el && el.style) el.style.height = '' // keep-alive 复用 DOM，内联高度必须摘掉
-  if (transitionName.value === 'slide-forward') window.scrollTo(0, 0)
+  // ⚠️ 前进滚顶已挪到 onAfterLeave（2026-09-08 坤哥录屏「详情页加载结束后消失再出现」根因）：
+  //    enter/leave 的 transitionend 是两个独立事件，afterEnter 触发时列表 DOM 可能还在文档里，
+  //    此刻 scrollTo(0,0) 会把视口滚到列表顶部 → 渲染出一帧列表 → 列表移除后详情才回来（真机可见）。
+  //    挪到 afterLeave 后：列表刚移除、文档只剩详情，同任务内滚顶 = 原子渲染无中间帧。
   releaseLock()
 }
 
@@ -101,6 +104,12 @@ function onBeforeLeave(el) {
 }
 function onAfterLeave(el) {
   if (el && el.style) el.style.height = ''
+  // 前进转场收尾滚顶（自 onAfterEnter 挪入，原因见其注释）：列表 DOM 刚移除，
+  // 文档只剩详情页，同任务内 scrollTo 是原子渲染；rAF 兜底防异步内容再改高度。
+  if (transitionName.value === 'slide-forward') {
+    window.scrollTo(0, 0)
+    requestAnimationFrame(() => { if (window.scrollY !== 0) window.scrollTo(0, 0) })
+  }
   backFromDetail = false
 }
 // 嵌入 Flutter 时原生已有全局返回手势，H5 转场压短时长，避免叠成「两段滑」

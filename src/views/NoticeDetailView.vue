@@ -30,7 +30,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { notices } from '../data/mock'
 import { t } from '../i18n'
@@ -53,19 +53,26 @@ const id = computed(() => route.params.id)
 // 用户看到「空壳详情页滑出」（screencast t=30ms 帧实锤：滑出页只剩顶栏+按钮）。
 // 改为 watch 缓存最后有效对象：离开转场中内容保持完整，切到别的公告时才换内容。
 const lastItem = ref(null)
+let readTimer = null
 watch(
   id,
   (v) => {
     if (!v) return
     const found = notices.find((n) => n.id === v)
     if (found) lastItem.value = found
-    // 进入详情即标记已读 → 发现页「官方公告」入口红点与列表未读圆点立即消失（产品诉求：读完就消）
+    // 进入详情标记已读 → 发现页「官方公告」入口红点与列表未读圆点消失（产品诉求：读完就消）。
+    // ⚠️ 必须延迟到转场结束后（2026-09-08 坤哥录屏线索「列表会重新加载/闪一下」）：
+    //    激活瞬间同步 markNoticeRead 会让列表页在详情推入前就重绘（点击卡片的标题蓝→黑、
+    //    红点消失）——推入还没开始列表先闪变。450ms（转场 340ms+余量）后列表已离屏，
+    //    重绘发生在离屏 DOM 上不可见，返回时才看到已读态（微信同语义）。
     // 召回公告同样消除红点，但其强提醒由 ack 状态单独控制，不因点开而解除
-    markNoticeRead(v)
+    clearTimeout(readTimer)
+    readTimer = setTimeout(() => { if (v) markNoticeRead(v) }, 450)
   },
   { immediate: true }
 )
 const item = computed(() => lastItem.value)
+onUnmounted(() => clearTimeout(readTimer))
 // 召回强确认状态（响应式）：未确认前保留横幅与强制确认按钮。
 // 基于 item（缓存版）而非 id：返回转场中 id 已变 undefined，若读 id 会导致
 // 已确认状态瞬间回退 false，底部「已知悉/返回」按钮在滑出过程中闪切（同类闪屏源）
