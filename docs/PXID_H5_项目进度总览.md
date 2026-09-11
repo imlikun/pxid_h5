@@ -1,21 +1,17 @@
 # PXID H5 项目进度总览
 
-> 用途：换会话/接手时快速对齐。读完这份即可继续开发，不必翻历史。
-> 最后更新：2026-08-19，最新 commit `e162bed`（动态详情页下拉刷新）。
+> 用途：换会话/换人时快速对齐「做到哪了」。
+> 🔴 **操作手册请读仓库根的 [`AGENTS.md`](../AGENTS.md)**（命令 / 代码地图 / 契约 / 红线 / 事故）。
+> 最后更新：2026-09-11（对应 commit `dea3af5`）。
 
 ---
 
 ## 1. 项目定位
 
-- **是什么**：PXID（江苏品向智造电助力车 OEM/ODM）ToC App 的 **H5 模块**，嵌入 Flutter App 的 WebView 内运行。
-- **当前承载的功能**：
-  - 发现页（社区动态三 tab：推荐 / 动态 / 广场）
-  - 发布页（发动态 + 上传图片 + 关联车型）
-  - 动态详情页（内容 / 点赞 / 评论）
-  - 消息页（铃铛入口，桩页）
-  - 精选页（`#/featured`，独立推荐流，结构同发现但内容不同）
-- **技术栈**：Vue3 + Vite，hash 路由（`base: './'`），纯移动端 H5，无 SSR。
-- **仓库目录**：`pxid_h5`（本地 `d:\WorkBuddy\2026-08-13-11-34-45\pxid_h5\`）。
+- **是什么**：PXID（江苏品向智造）ToC App 的 **H5 内容层**，嵌入 Flutter App 的 WebView 运行。
+- **承载的 tab**：发现（`/discover`）/ 精选（`/featured`）/ 服务（`/service`）；「购车」「我的」由 Flutter 原生提供。
+- **技术栈**：Vue3 + Vite，hash 路由（`base: './'`），无 UI 库（组件全手写），无 SSR。
+- **仓库**：`pxid_h5`（本地 `D:/品向/pxid_h5`，Windows 为准；macOS 侧只读不改）。
 
 ---
 
@@ -23,111 +19,104 @@
 
 | 项 | 值 |
 |---|---|
-| 线上地址 | `https://appin.site/nav/pxid-h5/` |
-| 后端 API 基地址 | `https://pxid-api.appin.site` |
-| 构建命令 | `node node_modules/vite/bin/vite.js build`（用托管 node：`C:\Users\Kun.li\.workbuddy\binaries\node\versions\22.22.2\node.exe`） |
-| 部署命令 | 见下方 |
-| App 加载源 | **已解决**（之前 hy3 会话把 WebView 切到线上地址，热更新部署后 App 内直接生效。**不要再提"Trae 切地址 + 清缓存"**） |
+| 线上地址 | `https://appin.site/nav/pxid-h5/`（nginx alias → 仓库内 `dist/`） |
+| 后端 API | `https://pxid-api.appin.site`（自建，pm2 `pxid-feed`） |
+| 构建 | `node node_modules/vite/bin/vite.js build` → `dist/`（**Windows 禁用 `npm run build`，会假死**） |
+| 部署 | `git push` 后 `ssh root@101.133.136.140 "bash /root/deploy-pxid-h5.sh"` |
+| 推送 | **四远端六 ref**：origin / github / gitlab × master / main（详见 `AGENTS.md` §1） |
 
-**部署（务必 `-C dist .`，否则铺到子目录）：**
-```bash
-cd pxid_h5
-rm -rf dist
-node node_modules/vite/bin/vite.js build
-tar czf - -C dist . | ssh -o BatchMode=yes root@101.133.136.140 \
-  "rm -rf /www/wwwroot/appin.site/nav/pxid-h5 && \
-   mkdir -p /www/wwwroot/appin.site/nav/pxid-h5 && \
-   tar xzf - -C /www/wwwroot/appin.site/nav/pxid-h5 && \
-   chown -R www:www /www/wwwroot/appin.site/nav/pxid-h5"
-```
-
-**双 remote（都要 push，fast-forward）：**
-- `origin` = `ssh://root@101.133.136.140/srv/sync/pxid_h5.git`，分支 `master`（**ECS 权威部署源**）
-- `gitlab` = `git@47.100.82.63:likun/pxid_h5.git`，分支 `master`（镜像）
-- 提交后用：`git push origin master` + `git push gitlab master:master`
-
-> ⚠️ **分叉坑**：gitlab 的 `main` 分支与 ECS `master` 完全分叉（跨分叉合并会丢/混代码），**只维护 `master`，`main` 保留不动，待用户裁决**。外部同事 clone 文档指向 `main`，他们拿到的是非线上版本。
+- 部署脚本做的事：`git pull` → 构建到 `dist.tmp` → 原子替换 `dist`（**零空窗**）→ 回补上一代 chunk（防旧会话白屏）
+  → 同步 `server.js / moderation.js / ecosystem.config.js` 到 `/root/pxid-feed-server` → `pm2 reload pxid-feed`。
+- 🔴 **禁止 scp/tar 覆盖 ECS**；线上目录是 git 工作副本，只能通过 git + 脚本更新。
+- 部署后核验：线上 `index.html` 引用的 chunk hash 必须等于本地 `dist/index.html` 里那个。
 
 ---
 
-## 3. 后端架构边界（极易混淆，务必看清）
+## 3. 后端架构边界（极易混淆）
 
-这个项目有 **三个独立 owner**，别混：
-
-1. **社区 feed 后端 = 八戒（我们）自己搭的** ✅
-   - 服务名 `pxid-feed-server`（Node + better-sqlite3，SQLite `feed.db`）
-   - 上线 `https://pxid-api.appin.site`（FEED_API）
-   - 接口（契约见 `docs/PXID_ToC_后端接口规范.md` §3）：
-     - `GET /feed?tab=recommend|dynamic|plaza`
-     - `POST /feed`（发帖，author 由后端按 token 注入）
-     - `GET /feed/{id}`（详情）
-     - `POST /feed/{id}/like`
-     - `POST /feed/{id}/comment` / `GET /feed/{id}/comments`
-   - **已实测**：评论写库 + 跨端可读（round-trip 验证通过，2026-08-19）。DELETE 评论接口**未实现**（要清只能 SSH 进 SQLite 删）。
-
-2. **Java 同事后端** = 正式 H5 数据后端 + Shopify 代理 + 结账编排 + webhook 接收（另一套，与 feed server 无关）。
-
-3. **Shopify** = 独立店铺（另一兄弟用 Codex 写），多国每国一个店。H5 只做浏览/列表/自有详情/加购/确认订单 → 点"去支付"跳 Java `POST /shopify/checkout` → Flutter WebView 打开 Shopify 结账。
-
----
-
-## 4. 已完成功能（进度）
-
-| 功能 | 说明 | commit |
+| 角色 | 谁 | 说明 |
 |---|---|---|
-| 车型体系统一 | 提取 11 个在售车型（电摩 P5/P8/P7、电助力 P6/P5/P4/P2、电动滑板车 F2/F1/P1/P3），统一数据源 `src/data/carModels.js`，发现 chips / 发布选择 / 广场展示共用；同名 P5 用系列前缀区分 | `c1e3a22` |
-| 车型简化为代号 | label 去掉"电摩/电助力/滑板车"前缀，按字母序 F1 F2 P1 P2 P3 P4 P5 P5 P6 P7 P8 | `cade831` |
-| 车型选择 UI | 先露出默认项 + 4~5 款 chip（一键选中），超出进「更多」底部弹层（`ModelPicker.vue`，单行横滚适配手机）；发现/发布一致 | `9b763a4`→`2e18cdd` |
-| 发布图片上传 | file input → canvas 压缩 → base64（≤1MB 单张 / ≤9 张 / 可删），经 `POST /feed` 的 `images` 字段 | `c1e3a22` |
-| 精选下拉刷新 + topbar 对齐 | 精选加下拉刷新（与发现一致）；topbar 去 sticky、padding 14/16/8、active `#000`，动作图标统一 24×24 | `5366b76`/`6ad35a0`/`cade831` |
-| 下拉刷新 = 热更新 | `src/utils/hotUpdate.js`：doRefresh 时对比线上 `index.html` 的 JS 包 hash，有新版（样式/逻辑）则 `location.reload()` 整页重载，否则只刷数据；发现/精选/详情三页接入 | `5c165d9` |
-| 评论跨端可见 | 详情页加 `fetchComments`，打开时 + 发完评论后都从后端取最新列表（失败回落本地 seed） | `ac1485a` |
-| 动态详情页下拉刷新 | 复用发现页手势，仅刷评论+点赞数（有新版仍整页 reload）；指示器在 sticky 顶栏下方 | `e162bed` |
-| 排序图标移除 | 发现页筛选栏右侧排序小标去掉 | `2e18cdd` |
+| 社区/商城/成长后端 | **我们自建** | `server/server.js`（Node + better-sqlite3，SQLite `feed.db`，28 张表，101 个路由），线上 `pxid-api.appin.site`，pm2 名 `pxid-feed` |
+| 正式 ToC 中台 | 公司 ToC 网关（另一团队） | 账号体系 / 封禁同步（HMAC，见 `.env.example`），H5 侧只做对接 |
+| Shopify | 独立店铺（另一同事用 Codex 写） | 多国每国一店；H5 **不自建支付**：后端 `checkout-v2` 建车 → `bridge.openShopify(url)` 打开结账 |
 
 ---
 
-## 5. 关键文件清单
+## 4. 已完成能力（截至 2026-09-11）
+
+**发现 / 社区**
+- 三 tab（推荐 / 动态 / 广场）、车型筛选、Banner 轮播、快捷入口、消息中心（四类）、官方公告（含召回强确认）、活动中心
+- 发布动态（图片压缩上传 ≤9 张、关联车型）、内容详情（点赞 / 收藏 / 评论 / 举报）、互动消息、个人主页（四宫格）
+- **详情页微信式右进左出转场**（340ms，`cubic-bezier(.32,.72,0,1)`）+ 列表→详情快照直出（`feedSnapshot`，跨 WebView 双写 sessionStorage/localStorage）
+- 「我的车」chip：取 `getUserInfo().carModel`（`normalizeCarModel` 归一化）+ **有绑定车型默认筛选** + 空内容兜底回「全部」
+- 官方公告详情第一层返回走全屏护栏（`closeWebView`）
+- 下拉刷新 = 热更新（比对线上 bundle hash，不一致整页 reload）
+
+**精选 / 商城**
+- 商品列表（`GET /mall-api/products`，Shopify 代理）+ 运营配置（`/featured-config`）+ 商品详情
+- 加购 → 本地购物车 `/cart` → 确认订单 `/cart/checkout` → 后端 `checkout-v2` → `openShopify` 打开结账
+- 订单列表 `/order/list`（`/mall-api/orders` + `orders/claim` 认领）
+
+**服务**
+- 道路救援 / 使用指南（视频 + 资料）/ 车辆体检 / 意见反馈 / 三包政策 / 附近门店 / 我的工单 + 工单详情 / 常见问题（搜索 + 筛选 + 详情）
+
+**平台能力**
+- 桥接：两套契约（`PXIDBridge` 原生注入 / `PXIDApp` H5 回传）+ mock 兜底，浏览器可独立预览
+- **全屏二级页通道**：`openFullscreenRoute` + `FULLSCREEN_WHITELIST`（15+ 条）+ 根 WebView 判定；根页内二级页交 Flutter 新开全屏 WebView（无原生底栏、右滑返回）
+- 三语三地区（`zh→CN / pt→BR / en→US`，语言决定内容地区）
+- 侧滑返回手势（`useSwipeBack`）、页面转场方向管理（`usePageTransition`）
+- 发版白屏防线：部署保留上一代 chunk + `router.onError` 捕获 chunk 404 → `location.reload()`
+- 智能助手 PXiD（`POST /assistant/chat`，DashScope）
+
+---
+
+## 5. 关键文件清单（完整地图见 `AGENTS.md` §2）
 
 | 文件 | 作用 |
 |---|---|
-| `src/data/carModels.js` | 11 车型统一数据源（CAR_MODELS / CAR_MODEL_LABELS / 按系列分组） |
-| `src/data/mock.js` | mock 动态流 / 筛选 / 广场展示（已接入 carModels） |
-| `src/components/ModelPicker.vue` | 车型 chip + 更多 底部弹层（通用） |
-| `src/components/MomentCard.vue` / `FeedCard.vue` | 动态卡片（图片 base64 直渲，标签 `#车型`） |
-| `src/views/DiscoverView.vue` | 发现页（三 tab + 车型筛选 + 下拉刷新 + 热更新） |
-| `src/views/FeaturedView.vue` | 精选页（下拉刷新 + topbar 对齐） |
-| `src/views/PublishView.vue` | 发布页（图片上传 + 车型选择） |
-| `src/views/FeedDetailView.vue` | 动态详情（评论列表 + 下拉刷新） |
-| `src/api/feed.js` | feed 数据层（FEED_API=pxid-api.appin.site，含 fetchComments/commentFeed） |
-| `src/utils/hotUpdate.js` | 热更新检测（对比线上 JS hash） |
-| `src/store/publish.js` | 本地发布存储（localStorage 兜底） |
+| `src/bridge/index.js` | 原生桥唯一出口：方法封装 / 全屏通道 / 白名单 / 根 WebView 判定 |
+| `src/router/index.js` | 约 40 条路由全表 |
+| `src/views/DiscoverView.vue` | 发现页（三 tab + 筛选 + 我的车默认筛选 + 下拉刷新） |
+| `src/views/FeedDetailView.vue` | 内容/活动详情（快照直出 + 评论 + 返回护栏） |
+| `src/views/VehicleDetailView.vue` | 车型详情（「立即定制」落地页） |
+| `src/views/FeaturedView.vue` / `ProductDetailView.vue` / `CartView.vue` | 商城链路 |
+| `src/api/feed.js` / `shop.js` | 数据层（接口优先 + mock 兜底） |
+| `src/data/carModels.js` | 车型唯一数据源 + `normalizeCarModel()` |
+| `src/utils/feedSnapshot.js` / `hotUpdate.js` | 快照直出 / 热更新检测 |
+| `src/store/cart.js` | 购物车（localStorage 持久化） |
+| `server/server.js` | 后端全部接口（101 路由 / 28 表） |
 
 ---
 
-## 6. 坤哥的硬性要求（接手必看）
+## 6. 硬性要求（接手必看）
 
-- **组件化铁律**：TopBar / TabBar / Card / 筛选条等跨页通用件必须抽组件复用，**不许每页各写一份导致小差异**。改之前先 `ls src/components/` 看有没有可复用。
-- **回复风格**：结论 + 3 条以内要点，别堆模板/多级标题/大段说明。
-- **别把负担推回给用户**：东西他给的就存好、维护好；需要他额外记忆/操作的设计一律重新想。
-- **移动端适配**：坤哥手机 vivo x300pro（宽屏），chip 必须单行横滚不换行、字号留余量。
-- **积分/费用**：截图类操作贵（Playwright 起无头 Chromium ≈100 积分/张），需渲染先报量；日常对话 token 消耗是基线。
+- **五步流程**：🔴 读代码 → 🟠 找唯一根因 → 🟡 提方案（拍板后动）→ 🟢 解决 + 实测 → 🔵 收尾（干净 + 记录）。
+- **回复要短**：结论 + ≤3 条要点，不要多级标题/大段说明。
+- **组件化铁律**：TopBar / TabBar / 卡片 / 筛选条等跨页件必须复用，不许每页各写一份。
+- **一次改齐**：同类入口/同类问题一次改完，避免两处不一致。
+- **别把负担推回给用户**：不要让他「自己另存 / 自己翻 / 自己记」。
+- 手机 vivo X300 Pro（宽屏）：chip 横滚**单行不换行**。
+- 视觉：macOS 风格 + Apple 极简（克制 / 通透 / 留白 / 单一品牌色）。
 
 ---
 
 ## 7. 遗留 / 待办
 
-- 广场 11 款车封面是占位图（`plaza_*.jpg` / `feed_*.jpg`），待 Shopify 真实商品图替换。
-- **Shopify 对接阻塞（Codex 兄弟侧）**：Storefront Token 未确认、约定 Collection/Metafield 缺失、return_to 需改 Checkout Kit——H5 暂无需改，等补齐联调。
-- 评论 DELETE 接口后端未实现（测试数据只能 SSH 进 SQLite 删）。
-- gitlab `main` 与 ECS `master` 分叉，勿自行合并（见 §2）。
+- **内容 carModel 标签缺失**（线上首屏仅 P5 有 2 条）→ 「默认筛我的车」多数会落到兜底「全部」；彻底解决要靠内容侧补标签或切服务端过滤（后端 `/feed` 已支持 `carModel` 参数）。
+- 车型页冷加载 2.9~8s（先拉全列表再拉单品详情），加载态仅一行文字。
+- 缩略图未压（首屏图 760KB → 目标 ~40KB）。
+- 评论 DELETE 接口未实现；订单详情 / 退货申请接口后端缺失（前端本地降级）。
+- `/purchase/customize`（`CustomizeView`）零入口（「立即定制」现指向 `/vehicle/ant5`）。
+- 部分图片仍是占位（`public/plaza_*.jpg` 未入 git，勿引用）。
+- 安全债：`server/ecosystem.config.js` 明文密钥入库。
+- `pm2 pxid-feed` 重启计数偏高（312 次），需要时排查 `pm2 logs pxid-feed --err`。
 
 ---
 
 ## 8. 接手三步
 
-1. 改代码 → `node node_modules/vite/bin/vite.js build` → 部署 ECS（§2 命令）。
-2. `git add` 相关文件 → `git commit` → `git push origin master` + `git push gitlab master:master`。
-3. 手机浏览器或 App 内下拉刷新验证（热更新已接，样式改动下拉即见）。
+1. 读 `AGENTS.md` → 确认需求 → 改代码（手术式，先读再动）。
+2. 本地 `vite build`（EXIT=0）→ 提交 → **六条 push** → `ssh … deploy-pxid-h5.sh`。
+3. 核验：六 ref 一致 + 线上 chunk hash 与本地一致 + 线上实测（App 内下拉刷新即可拿到新版本）。
 
-> 验证后端在线：`curl https://pxid-api.appin.site/feed/1/comments` 应返回 `{"code":0,"data":{"list":[...]}}`。
+> 后端在线自检：`curl https://pxid-api.appin.site/health`。

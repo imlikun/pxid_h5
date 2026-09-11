@@ -4,6 +4,10 @@
 
 > 本工程无重型 UI 库（零依赖组件，全部手写），mock 数据驱动，可直接在浏览器独立预览，也可嵌入原生。
 
+> 🔴 **改代码前先读 [`AGENTS.md`](./AGENTS.md)** —— 命令、代码地图、桥契约、部署流程、红线与历史事故都在那里。
+> 本文档是项目简介；`AGENTS.md` 是操作手册（与本文冲突时以 `AGENTS.md` + 代码为准）。
+> Flutter 对接看 [`INTEGRATION.md`](./INTEGRATION.md)。
+
 ---
 
 ## 1. 快速开始
@@ -14,6 +18,9 @@ npm run dev        # 开发预览 → http://localhost:5173
 npm run build      # 生产构建 → dist/
 npm run preview    # 构建产物预览（默认 4173 端口）
 ```
+
+> ⚠️ **Windows 沙箱里 `npm run build` 会假死**（实测 13 分钟零输出）—— 必须直跑
+> `node node_modules/vite/bin/vite.js build` 并把输出重定向到文件，详见 `AGENTS.md` §1。
 
 独立预览（浏览器 / 手机浏览器）URL 带 `?embed=1` 时隐藏演示底部 tab 栏；不带则显示演示 tab 便于浏览。
 
@@ -27,18 +34,21 @@ npm run preview    # 构建产物预览（默认 4173 端口）
 ## 2. 已实现功能
 
 ### 发现
-- 推荐 / 动态 / 广场 三 tab，车型筛选各自独立（推荐=全部 MOTA Z3 / PX-4 / CoolPlay PX-2、动态=最新、广场=P1-P6）
-- Banner 用设计稿轮播图（`public/discover-banner.jpg`）
-- 快捷入口：立即定制 / 官方公告 / 智能助手 / 积分兑换（→ 我的积分页 `/points`）
-- 卡片内容与作者（PXID 官方产品经理 / 一路向前）按设计稿对齐
-- 广场：P1-P6 六车型展示 + 热门活动 2 条（封面按设计稿顺序）
+- 推荐 / 动态 / 广场 三 tab；车型筛选条统一用 12 个在售代号（P1–P9、F1/F2、G1，真源 `src/data/carModels.js`）
+- 「我的车」chip：登录用户绑定了车型时插在「全部」之后，且**默认筛该车型**（库里没内容时自动回「全部」，不空屏）
+- Banner 轮播、快捷入口（立即定制 → 车型页 `/vehicle/ant5`、官方公告、智能助手、积分兑换）
+- 内容详情：点赞 / 收藏 / 评论 / 举报，列表→详情快照直出 + 微信式右进左出转场
+- 官方公告（含召回强确认）、活动中心、互动消息
 - 消息中心：系统 / 服务 / 车辆 / 互动 四类
+- 下拉刷新 = 热更新（有新版整页重载，否则只刷数据）
 
-### 精选（商城，与 Shopify 打通）
-- 首页三 tab（推荐 / 踏春装备 / Bikes）+ 热购榜单 + 限时直降
-- **商品点击 / 「去购买」统一跳 Shopify 成交**（H5 仅展示商品数据，不自建购物车 / 结算 / 订单流）
-- 商品详情页保留，购买按钮走 `bridge.openShopify(product.shopUrl)`
-- `CartView / CheckoutView / OrderListView / OrderSuccessView` 为招商遗留孤儿页，联调无需关注
+### 精选（商城，Shopify 代理）
+- 首页三 tab + `GET /featured-config` 运营配置（榜单 / 限时直降）
+- 商品数据来自后端 `GET /mall-api/products`（Shopify 代理）；详情 `/mall-api/products/:handle`
+- **下单链路**：加购 → 本地购物车 `/cart` → 确认订单 `/cart/checkout` → `POST /mall-api/checkout-v2`
+  （后端建 Shopify 车 + 预填邮箱/地址/region）→ `bridge.openShopify(url)` 打开结账
+- 订单列表 `/order/list` 走 `GET /mall-api/orders`（未认领需先 `POST /mall-api/orders/claim`）
+- ⚠️ 订单**详情**与**退货申请**的后端接口尚未实现（前端本地降级兜着）
 
 ### 我的积分（`/points`）
 - 积分余额 + 积分规则 + 玩转积分 banner + 积分好物列表（价格 / 积分 / 兑换）
@@ -66,26 +76,30 @@ npm run preview    # 构建产物预览（默认 4173 端口）
 
 ## 4. 目录结构
 
+完整代码地图（含每个目录职责、后端路由/表、文档索引）见 **[`AGENTS.md`](./AGENTS.md) §2**。
+
 ```
 pxid_h5/
 ├─ index.html
-├─ vite.config.js          # base './'（CDN/file:// 都能加载）
-├─ package.json
-├─ README.md               # 本文件
+├─ vite.config.js          # base './'（WebView / 任意域名都能加载）
+├─ AGENTS.md               # 🔴 开发代理/接手人操作手册（先读）
 ├─ INTEGRATION.md          # JS Bridge 契约（给 Flutter 原生侧）
-├─ public/                 # 设计稿原图资源（banner / 卡片封面 / 车型图）
+├─ docs/                   # 契约 / 对接 / 规范类文档（25 份，索引见 AGENTS.md §5）
+├─ public/                 # 设计稿原图资源
+├─ server/                 # 自建后端（Node + better-sqlite3，pm2: pxid-feed）
 └─ src/
-   ├─ main.js / App.vue
-   ├─ bridge/index.js      # JS Bridge：getToken/navigateTo/requestPurchase/callPhone/openMap/openNative
-   ├─ router/index.js      # hash 路由
-   ├─ store/cart.js        # 购物车（勾选/合计）
-   ├─ data/mock.js         # 全部 mock 数据（接 API 时整文件替换）
-   ├─ styles/tokens.css    # 设计 token
-   ├─ components/          # DemoTabBar / ProductCard / FeedCard / StoreCard / FaqItem / SectionHeader / QuickActions
-   └─ views/
-      ├─ DiscoverView / MessageView
-      ├─ FeaturedView / ProductDetailView / CartView / CheckoutView / OrderListView / OrderSuccessView
-      └─ ServiceView + 13 个服务子页
+   ├─ main.js / App.vue           # 入口 / 壳（keep-alive + 全局转场）
+   ├─ bridge/                     # 原生桥（PXIDBridge + PXIDApp）、全屏通道、白名单
+   ├─ router/                     # hash 路由（约 40 条）
+   ├─ api/                        # feed（发现）/ shop（精选·Shopify 代理）/ growth / notifications
+   ├─ store/                      # cart / feedCache / noticeStore / notificationStore / publish / ui
+   ├─ utils/                      # auth / avatar / device / feedSnapshot / hotUpdate / videoPoster / time
+   ├─ composables/                # usePageTransition / useSwipeBack
+   ├─ data/carModels.js           # 车型唯一数据源（含 normalizeCarModel）
+   ├─ i18n/                       # zh→CN / pt→BR / en→US
+   ├─ styles/tokens.css           # 设计 token
+   ├─ components/                 # TopBar / FeedCard / MomentCard / ProductCard / ModelPicker …
+   └─ views/                      # 38 个页面（命名即路由）
 ```
 
 ---
@@ -106,42 +120,33 @@ pxid_h5/
 
 ---
 
-## 7. 双机协作（Windows ⇄ macOS）
+## 7. 多机协作（Windows ⇄ macOS）与远端
 
-代码仓库有 **两个远端**：
+代码仓库有 **三个远端、各带 `master` + `main` 两个分支 = 提交后必须推 6 条 ref**：
 
-| remote | 地址 | 用途 |
+| remote | 地址 | 角色 |
 |---|---|---|
-| `origin` | `ssh://root@101.133.136.140/srv/sync/pxid_h5.git` | ECS 裸仓（双机同步主通道） |
-| `gitlab` | `http://likun:<PAT>@47.100.82.63:8099/likun/pxid_h5.git` | 公司自建 GitLab（web 可看、备份） |
+| `origin` | `ssh://root@101.133.136.140/srv/sync/pxid_h5.git` | **ECS 裸仓（唯一部署源）**，`deploy-pxid-h5.sh` 从这里 pull |
+| `github` | `git@github.com:imlikun/pxid_h5.git` | 备份镜像 |
+| `gitlab` | `http://<token>@47.100.82.63:8099/likun/pxid_h5.git` | 公司自建 GitLab（默认分支是 `main`） |
 
 ```bash
-# 首次拉取（任意一个远端）
-git clone ssh://root@101.133.136.140/srv/sync/pxid_h5.git
-# 或
-git clone http://git.pxidiot.com:8099/likun/pxid_h5.git
-cd pxid_h5 && npm install && npm run dev
-
-# 日常：改完推送（ECS 主通道 + GitLab 备份，一次推两个）
-git add -A && git commit -m "说明"
-git push origin master
-git push gitlab master:main
-
-# 换机接手前：先拉
-git pull origin master
+git push origin master && git push origin master:main
+git push github master && git push github master:main
+git -c credential.helper= push gitlab master:master
+git -c credential.helper= push gitlab master:main
+# 再核验六 ref：
+git -c credential.helper= ls-remote origin | grep 'refs/heads/\(master\|main\)$'
 ```
 
-> ⚠️ 双远端**交替操作必须先 pull 再 push**，禁止 `push --force`。
-> ⚠️ GitLab 走 HTTP+PAT（SSH 22 在部分网络被墙）；本地 `credential.helper` 已置空，token 直挂 remote URL。
-> ⚠️ GitLab 默认分支为 `main`，本地为 `master`，推送用 `master:main` 显式映射。
-
-备份三处冗余：本地 git 库 + 本地副本（`pxid_h5_backup_20260813` / `pxid_h5_backup_20260814`）+ ECS 裸仓 + GitLab。
+> ⚠️ 只推 `master` 会让另外 3 个 ref 悄悄落后；**永远以 `ls-remote` 哈希为准**，不看 push 回显。
+> ⚠️ `-c credential.helper=` 必加（本机 Git Credential Manager 在非交互环境会卡死 → exit 128 全空输出）。
+> ⚠️ 换机接手前先 `git pull origin master`；**禁止 `push --force`**。
+> ⚠️ 详细排障（分叉判定 / GIT_TRACE / 部署核验）见 `AGENTS.md` §1 与 skill `pxid-h5-3remote-sync`。
 
 ---
 
-## 8. 待办 / 下一步
+## 8. 待办 / 已知问题
 
-- 订单详情页（订单列表「查看详情」按钮目前占位）
-- FAQ 详情页完整 A 文案（列表 A 摘要按设计稿截断显示）
-- 商品/卡片封面换设计稿真实图（目前商品图为 emoji 占位，部分 feed 封面用设计稿子目录原图）
-- 附近门店 / FAQ 等按后续设计稿标注精调视觉
+见 **[`AGENTS.md`](./AGENTS.md) §9**（每次改动会同步更新，避免两处不一致）。要点：内容 carModel 标签缺失、
+车型页冷加载 2.9~8s、缩略图未压、评论 DELETE 与订单详情/退货接口后端未实现、`CustomizeView` 零入口。
