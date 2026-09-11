@@ -685,14 +685,19 @@ function onQuick(q) {
   if (q.key === 'notice') { openSecondary('/notices'); return }
   // 智能助手（PXID）→ H5 助手页
   if (q.key === 'ai') { openSecondary('/message'); return }
-  // 决策 2：立即定制 → 车型定制页（鸿蒙智行风格，VehicleDetailView）
+  // 决策 2：立即定制 → 车型定制页（VehicleDetailView）
   // ⚠️ 不可裸 router.push：本入口在发现页（根 WebView），H5 内 push 等于把 /vehicle
   //    开在根 WebView 里 → 底部露出 Flutter 原生 tab（2026-09-11 截图问题③）。
-  //    真机交原生 openNative('vehicle/scooter-F2') 全屏打开；预览/浏览器回退 H5 路由
-  //    （与下方 onPublish 同一模式）。同页 notice/ai/points 走 openSecondary，此处对齐。
+  //    真机交原生 openNative('vehicle/F2') 全屏打开（Flutter 全屏承载，无原生底栏）；
+  //    预览/浏览器回退 H5 路由。
+  // 🔴 标识必须是「型号代号」F2，不能是 H5 复合 id `scooter-F2`：
+  //    openNative 契约（INTEGRATION.md 🔴.3）要求 `vehicle/<型号>`，如 P2 / MOTA Z3；
+  //    `scooter-F2` 只是 plazaShowcase 的 mock id，Flutter 不认识 → 点击无反应
+  //    （2026-09-11 回归事故：cebf0b4 误传复合 id 致「立即定制」打不开）。
+  //    H5 侧 `carModelToHandle` 里 F2→ant5，两种写法都能解析，统一用代号更贴合契约。
   if (q.key === 'custom') {
-    if (bridge.isNative()) { bridge.openNative('vehicle/scooter-F2'); return }
-    router.push('/vehicle/scooter-F2')
+    if (bridge.isNative()) { bridge.openNative('vehicle/F2'); return }
+    router.push('/vehicle/F2')
     return
   }
   if (q.key === 'points') { openSecondary('/points'); return }
