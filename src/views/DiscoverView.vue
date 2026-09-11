@@ -685,13 +685,15 @@ function onQuick(q) {
   if (q.key === 'notice') { openSecondary('/notices'); return }
   // 智能助手（PXID）→ H5 助手页
   if (q.key === 'ai') { openSecondary('/message'); return }
-  // 决策 2：立即定制 → H5 自研购车定制页 /purchase/customize（CustomizeView）
-  // ⚠️ 不可裸 router.push：本入口在发现页（根 WebView），H5 内 push 会把定制页开在
+  // 决策 2：立即定制 → H5 自研「车型详情页」/vehicle/ant5（VehicleDetailView）
+  // （2026-09-11 坤哥纠正：落地页是车型详情页——选版本/配色 + 车主口碑 + 热门推荐 + 品牌卡，
+  //   不是 /purchase/customize 那张自研定制表单页。）
+  // ⚠️ 不可裸 router.push：本入口在发现页（根 WebView），H5 内 push 会把车型页开在
   //    根 WebView 里 → 底部露出 Flutter 原生 tab（2026-09-11 截图问题③ 同款症状）。
   //    走 openSecondary → openFullscreenRoute：真机交 Flutter 新开全屏 WebView 承载本页
   //    （右滑返回、无原生底栏）；浏览器/非根 WebView 内部自动回退 router.push。
-  // ⚠️ Flutter 侧全屏白名单必须同步包含 /purchase/customize，否则静默拒收 = 点击无反应。
-  if (q.key === 'custom') { openSecondary('/purchase/customize'); return }
+  // ⚠️ Flutter 侧全屏白名单必须同步包含 /vehicle/ant5（或通配 /vehicle/:id），否则静默拒收 = 点击无反应。
+  if (q.key === 'custom') { openSecondary('/vehicle/ant5'); return }
   if (q.key === 'points') { openSecondary('/points'); return }
 }
 // 取本机坐标：优先原生桥（Flutter 注入），降级浏览器 geolocation

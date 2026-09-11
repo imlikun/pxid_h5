@@ -2,7 +2,7 @@
   <div class="page">
     <!-- 顶部导航：透明浮层在 Hero 图上 -->
     <div class="nav-bar">
-      <button class="back press" @click="router.back()">
+      <button class="back press" @click="goBack">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <span class="nav-title">{{ v?.shortName || '车型' }}</span>
@@ -14,7 +14,7 @@
       <p v-if="loading">加载中…</p>
       <template v-else>
         <p>未找到该车型</p>
-        <button class="press back-btn" @click="router.back()">返回</button>
+        <button class="press back-btn" @click="goBack">返回</button>
       </template>
     </div>
 
@@ -169,6 +169,7 @@ import { fetchProducts, fetchProductDetail, getProductByHandle, sym, initRegion 
 import { initLocale } from '../i18n'
 import { plazaShowcase, VEHICLE_HANDLES, carModelToHandle } from '../data/mock'
 import { handleAvatarError } from '../utils/avatar'
+import bridge from '../bridge'
 
 const router = useRouter()
 const route = useRoute()
@@ -311,6 +312,20 @@ function relatedName(h) {
 // 复用精选已打通的购物车/结算流程（checkout-v2 + openShopify），保证两端购买体验一致，不裸跳 Shopify。
 function onOrder() {
   router.push('/product/' + handle.value)
+}
+
+// 返回（2026-09-11）：本页会被 Flutter 全屏 WebView 承载（发现页「立即定制」落地页）。
+// 全屏第一层（无 H5 内部历史）→ 交原生关闭全屏页（closeWebView，走右退转场露出根页）；
+// 有 H5 内部历史（例如从热门推荐 /vehicle/:id 进来）→ router.back() 退上一层。
+// 浏览器预览/桌面端无 PXIDApp 时回退 router.back()。
+function goBack() {
+  const app = window.PXIDApp
+  if (app && typeof app.postMessage === 'function') {
+    if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
+    else router.back()
+    return
+  }
+  router.back()
 }
 function onCommunity() {
   router.push('/discover')
