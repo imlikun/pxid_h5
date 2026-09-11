@@ -118,7 +118,7 @@
           :key="f.value"
           class="chip chip-bounce"
           :class="{ active: activeFilter === f.value, mine: f.mine }"
-          @click="activeFilter = f.value"
+          @click="pickFilter(f.value)"
           >{{ f.label }}</span
         >
       </div>
@@ -140,7 +140,7 @@
         <span
           v-if="activeFilter !== '全部'"
           class="empty-tab__reset press"
-          @click="activeFilter = '全部'"
+          @click="pickFilter('全部')"
         >{{ t('discover.clearFilter') }}</span>
       </div>
       <div v-if="currentFeedKey && recommendList.length" class="load-more">
@@ -318,6 +318,22 @@ const activeTab = ref('推荐')
 const activeFilter = ref('全部')
 // 当前登录用户绑定的车型（来自 getUserInfo().carModel）；仅当其属于在售 12 车型时才在筛选条前置「我的车」
 const myCarModel = ref('')
+// 用户是否手动点过筛选 chip：getUserInfo 是异步桥接（真机 300~800ms），
+// 期间用户完全可能已点了某个 chip，回包后不可再覆盖他的选择（2026-09-11）
+let filterTouched = false
+
+// 各 tab 的默认筛选：有绑定车型 → 默认筛该车型（坤哥 2026-09-11：进页面就该是自己的车）；
+// 无绑定车型 → 维持原行为（推荐=全部、动态=最新）
+function defaultFilter(tab) {
+  const mine = myCarModel.value
+  if (mine && CAR_MODEL_LABELS.includes(mine)) return mine
+  return tab === '推荐' ? '全部' : '最新'
+}
+// 筛选 chip 点击统一入口：置「用户已操作」标记，避免被迟到的 getUserInfo 回包覆盖
+function pickFilter(v) {
+  filterTouched = true
+  activeFilter.value = v
+}
 
 // 4 宫格标签：2026-09-05 起改为两行截断（省略号），不再测量宽度、不再滚动。
 // 原因：无限滚动的 marquee 是常驻合成层，和入场动画叠在一起让首屏显得杂乱。
@@ -410,9 +426,11 @@ const currentFeedKey = computed(() =>
   activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
 )
 
-function setTab(t) {
+function setTab(t, forceDefault = false) {
   activeTab.value = t
-  activeFilter.value = t === '推荐' ? '全部' : '最新'
+  // 常规切 tab：有绑定车型就带着它走（两 tab 的筛选条都含车型 chip，语义一致）；
+  // forceDefault=true 用于「刚发完帖回来」，强制看最新/全部，避免默认车型把新帖筛掉
+  activeFilter.value = forceDefault ? (t === '推荐' ? '全部' : '最新') : defaultFilter(t)
   // 切 tab 必须退出搜索态：搜索态会整块隐藏列表（Banner/快捷入口/筛选/帖子），
   // 不重置会让新 tab 同样一片空白，表现为「帖子不显示」
   showSearchResults.value = false
@@ -562,13 +580,18 @@ onMounted(async () => {
   // ⚠️ 必须过 normalizeCarModel：Flutter 回传值可能是 'p2' / 'scooter-P2' / 带空格，
   //    直接 includes() 会判死 → chip 静默不出现（线上实测踩过，2026-09-11）。
   try {
-    const u = await bridge.getUserInfo().catch(() => ({}))
-    let car = normalizeCarModel(u && u.carModel)
+    // ⚠️ 区分两种「取不到」：getUserInfo 失败（null）= 桥不通，保留本地缓存；
+    //    桥通但 carModel 为空 = 用户没绑/已解绑 → 清缓存，避免默认筛一个不存在的车型。
+    const u = await bridge.getUserInfo().catch(() => null)
+    let car = u ? normalizeCarModel(u.carModel) : ''
+    if (u && !car) { try { localStorage.removeItem('pxid_my_car_model') } catch (e) {} }
     if (!car) car = normalizeCarModel(localStorage.getItem('pxid_my_car_model'))
     if (car) {
       myCarModel.value = car
       // 双向同步：本地存一份，保证 Flutter 接上前后表现一致
       try { localStorage.setItem('pxid_my_car_model', car) } catch (e) {}
+      // 有绑定车型 → 进页面默认就筛自己的车（用户已点过 chip 则不覆盖）
+      if (!filterTouched) activeFilter.value = defaultFilter(activeTab.value)
     }
   } catch (e) { /* getUserInfo 失败则无「我的车」chip */ }
   loading.value = true
@@ -576,7 +599,7 @@ onMounted(async () => {
   loading.value = false
   lastListLoadTs = Date.now()
   if (publishState.pendingTab) {
-    setTab(publishState.pendingTab)
+    setTab(publishState.pendingTab, true)
     publishState.pendingTab = null
     // 刚发完帖：切到目标 tab 后补拉一次，保证新帖可见
     await refreshCurrentTab()
