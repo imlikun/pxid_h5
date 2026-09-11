@@ -38,6 +38,37 @@ function isWebViewFirstPage() {
   } catch (e) { return true }
 }
 
+// 全屏二级路由白名单（2026-09-07 对接说明，文档 1）：
+// Flutter 侧只接收下列路由，其余一律拒收。H5 这侧若不做同样的校验，
+// 一旦传入非白名单路由 → Flutter 静默拒收 + 本方法 return true → 点击完全无响应（极难排查）。
+// 故发送前先自查：不在白名单则不发送、返回 false，由调用方回退 H5 router.push。
+// 与契约同源：/feed/:id /activity/:id /activity-center /notices /notice/:id /message
+//              /interactions /user/:id /user/me /points /points/guide /points/mall
+//              /product/:id /cart /cart/checkout /order/list
+const FULLSCREEN_WHITELIST = [
+  /^\/feed\/[^/]+$/,
+  /^\/activity\/[^/]+$/,
+  /^\/activity-center$/,
+  /^\/notices$/,
+  /^\/notice\/[^/]+$/,
+  /^\/message$/,
+  /^\/interactions$/,
+  /^\/user\/[^/]+$/, // 含 /user/me
+  /^\/points$/,
+  /^\/points\/guide$/,
+  /^\/points\/mall$/,
+  /^\/product\/[^/]+$/,
+  /^\/cart$/,
+  /^\/cart\/checkout$/,
+  /^\/order\/list$/,
+]
+function isFullscreenWhitelisted(route) {
+  try {
+    const path = String(route || '').split('?')[0].split('#')[0]
+    return FULLSCREEN_WHITELIST.some((re) => re.test(path))
+  } catch (e) { return false }
+}
+
 // 标准化用户资料：兼容 Flutter 可能返回的不同字段名
 // 真机 getUserInfo 的头像/昵称字段名未必是约定的 avatar/nickname（如 headImgUrl / portrait / photo 等），
 // 这里统一归一到 { nickname, avatar, email }，避免 H5 取不到头像（评论/发帖/点赞带身份时丢失头像）。
@@ -456,6 +487,9 @@ export const bridge = {
   // 文章详情旧 channel ToFlutter_H5OpenFeedDetail 暂留兼容（Flutter 兼容，不双发）。
   openFullscreenRoute: (route) => {
     if (!isRootWebView()) return false
+    // 白名单自查（2026-09-11）：非白名单直接返回 false，交调用方回退 router.push，
+    // 避免「发了 Flutter 会拒收 → 点击无响应」的静默失败。
+    if (!isFullscreenWhitelisted(route)) return false
     try {
       const ch = window.ToFlutter_H5OpenFullscreen
       if (ch && typeof ch.postMessage === 'function') {
