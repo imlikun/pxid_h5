@@ -129,24 +129,39 @@ const inApp = ref(bridge.isEmbed)
 //    position 从 0 递增到 1，该函数注释里写「初始=0」与实际不符（另案，见本次记录）。
 const ROOT_TAB_BOOT_PATHS = ['', '/', '/discover', '/featured', '/service']
 const wvPushIn = ref(false)
-let bootPushTimer = null
 try {
   const bootPath = (window.location.hash || '').replace(/^#/, '').split('?')[0]
-  if (bridge.isNative() && !ROOT_TAB_BOOT_PATHS.includes(bootPath)) {
+  // 系统开了「减弱动画」就不播（也避免 animation:none 收不到 animationend 造成类滞留）
+  const reduceMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (bridge.isNative() && !reduceMotion && !ROOT_TAB_BOOT_PATHS.includes(bootPath)) {
     wvPushIn.value = true
-    // ⚠️ 摘类时机必须跟「动画真的播完」对齐，不能从 setup 起算固定时长：
-    //    路由组件是懒加载的，setup → 元素首次渲染之间隔着 chunk 下载 + Vue 渲染，
-    //    固定 380ms 会在元素出现前就把类摘掉 → 动画根本不播（探针实测 class 0 帧）。
+    // ⚠️ 摘类时机不能从 setup 起算固定时长：
+    //    路由组件是懒加载的，setup → 元素首次渲染之间隔着 chunk 下载 + Vue 渲染
+    //    （线上实测 App 挂载 t=3.7s → 详情元素 t=7.4s，隔 3.7 秒），
+    //    固定 380ms/2s 都会在元素出现前就把类摘掉 → 动画根本不播（探针实测 0 帧）。
     //    CSS animation 是「元素首次渲染时」才启动的，所以只要类还在，动画一定会播完。
+    let bootTimer = null
+    let mo = null
     const release = () => {
       wvPushIn.value = false
       document.removeEventListener('animationend', onAnimEnd)
-      clearTimeout(bootPushTimer)
+      if (bootTimer) clearTimeout(bootTimer)
+      if (mo) mo.disconnect()
     }
     const onAnimEnd = (e) => { if (e.animationName === 'wvPushIn') release() }
     document.addEventListener('animationend', onAnimEnd)
-    // 兜底：万一动画没播（reduced-motion / 异常），2s 后也要解锁，类不能常驻（常驻 = 页面长期 fixed）
-    bootPushTimer = setTimeout(release, 2000)
+    // 兜底 1：元素一出现就挂 1.2s 解锁 —— 覆盖「动画没播/被打断」，保证类绝不长期滞留
+    //        （类滞留 = 页面长期 fixed，window 滚动会废掉）
+    mo = new MutationObserver(() => {
+      if (!document.querySelector('.app-root > *:not(.swipe-toast)')) return
+      mo.disconnect()
+      bootTimer = setTimeout(release, 1200)
+    })
+    if (document.body) mo.observe(document.body, { childList: true, subtree: true })
+    // 兜底 2：元素始终不渲染（chunk 加载失败等）也不能让类常驻
+    setTimeout(() => { if (wvPushIn.value) release() }, 20000)
   }
 } catch (e) { /* 判定失败则不播，不影响页面 */ }
 
