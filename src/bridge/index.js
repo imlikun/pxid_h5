@@ -27,14 +27,28 @@ function isRootWebView() {
   return BOOT_ROUTE === '/discover' || BOOT_ROUTE === '/featured'
 }
 
-// 全屏二级 WebView 第一层判据：Vue Router 4 在 history.state 维护 position，
-// WebView 初始加载=0，H5 内每 push 一次自增。position<=0 说明没有 H5 内部历史可退，
-// 顶部返回必须交原生 closeWebView（Navigator.pop 关全屏路由回根页）；
-// position>0 时 router.back() 退 H5 内部上一层（如 /notice/:id 退回 /notices）。
+// 全屏二级 WebView 第一层判据（2026-09-11 重写，旧版两处判据全错）：
+//
+// 旧实现读 history.state.position，假设「WebView 初始加载=0，push 一次自增」→ `position <= 0`。
+// 真机实测两条都不成立：
+//   ① Vue Router 初始导航后 position 就是 1（不是 0，探针实测 {position:1,replaced:true}），
+//      `<= 0` 永不成立；
+//   ② 全屏 WebView 的**初始历史项由原生 loadUrl 建立、没有 state 对象**，position 不可信。
+// 后果（坤哥真机实测）：第一层返回永远走 router.back() → 本 WebView 没有 H5 内部历史 →
+//   history.go(-1) 落到 WebView 初始 URL（无 hash）→ App 重新 boot 回默认页 →
+//   公告详情返回「直接掉到发现栏目」。
+//
+// 新判据：比「当前 hash 路径」与「本 WebView 启动路径」（BOOT_ROUTE）。
+//   相等 = 还在启动那一层，没有 H5 内部层级 → 交原生 closeWebView 关全屏路由回根页；
+//   不等 = H5 内部已 push 过（如 /notice/:id ← /notices）→ router.back() 退上一层。
+// 不依赖 history 内部结构，且天然兼容「退回启动页后再点返回」（回到启动页 = 该退出了）。
+// ⚠️ 根 WebView（/discover、/featured）不是「全屏二级页」，没有关 WebView 这回事，
+//    一律返回 false 走 router.back()，避免误发 closeWebView 把根页也关了。
 function isWebViewFirstPage() {
+  if (isRootWebView()) return false
   try {
-    const st = window.history.state
-    return !(st && typeof st.position === 'number') || st.position <= 0
+    const cur = (window.location.hash || '').replace(/^#/, '').split('?')[0]
+    return cur === BOOT_ROUTE
   } catch (e) { return true }
 }
 
