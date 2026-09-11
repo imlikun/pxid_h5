@@ -37,6 +37,21 @@ export const CAR_MODELS = [
 // 展示名列表（用于 发现 chips / 发布车型选择 / 广场筛选）：纯代号，去重避免 P5 双显重复
 export const CAR_MODEL_LABELS = [...new Set(CAR_MODELS.map((m) => m.displayLabel))]
 
+// 🔴 车型代号归一化（2026-09-11）：Flutter 经 getUserInfo().carModel 回传用户绑定车型，
+// 线上实测只有**严格大写代号**才认（'P2'✅），'p2' / 'scooter-P2' / 'ebike-P2' / 带空格
+// 一律被 includes() 判死 →「我的车」chip 静默不出现（极难排查）。
+// 这里统一归一：trim → 去系列前缀（英文/中文）→ 大写；仍认不出则返回 ''（按无绑定车型处理，绝不猜）。
+export function normalizeCarModel(raw) {
+  const s = String(raw == null ? '' : raw).trim()
+  if (!s) return ''
+  if (CAR_MODEL_LABELS.includes(s)) return s
+  const up = s.toUpperCase()
+  if (CAR_MODEL_LABELS.includes(up)) return up
+  const stripped = up.replace(/^(SCOOTER|EBIKE|MOTORCYCLE|助|摩|板)[\s_\-]*/, '')
+  if (CAR_MODEL_LABELS.includes(stripped)) return stripped
+  return ''
+}
+
 // 按系列分组（便于后续做分组 chips，当前暂未用）
 export const CAR_MODELS_BY_SERIES = CAR_SERIES.map((s) => ({
   ...s,

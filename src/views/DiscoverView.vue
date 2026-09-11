@@ -229,7 +229,7 @@ import {
   recommendFilters,
   dynamicFilters,
 } from '../data/mock'
-import { CAR_MODEL_LABELS } from '../data/carModels'
+import { CAR_MODEL_LABELS, normalizeCarModel } from '../data/carModels'
 import { clearNewMoment } from '../store/ui'
 import { publishState } from '../store/publish'
 import bridge from '../bridge'
@@ -559,14 +559,13 @@ onMounted(async () => {
   // 地区由当前语言自动映射：zh→CN、pt→BR、en→US，见 regionFromLocale
   // 取登录用户绑定车型（用于「我的车」快捷筛选 chip）
   // 第一方案：Flutter getUserInfo().carModel；回退方案：H5 localStorage 记忆（Flutter 未返回时使用）
+  // ⚠️ 必须过 normalizeCarModel：Flutter 回传值可能是 'p2' / 'scooter-P2' / 带空格，
+  //    直接 includes() 会判死 → chip 静默不出现（线上实测踩过，2026-09-11）。
   try {
     const u = await bridge.getUserInfo().catch(() => ({}))
-    let car = (u && u.carModel) || ''
-    if (!car) {
-      const lsCar = localStorage.getItem('pxid_my_car_model')
-      if (lsCar && CAR_MODEL_LABELS.includes(lsCar)) car = lsCar
-    }
-    if (car && CAR_MODEL_LABELS.includes(car)) {
+    let car = normalizeCarModel(u && u.carModel)
+    if (!car) car = normalizeCarModel(localStorage.getItem('pxid_my_car_model'))
+    if (car) {
       myCarModel.value = car
       // 双向同步：本地存一份，保证 Flutter 接上前后表现一致
       try { localStorage.setItem('pxid_my_car_model', car) } catch (e) {}
