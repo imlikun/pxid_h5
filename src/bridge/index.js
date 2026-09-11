@@ -58,7 +58,7 @@ function isWebViewFirstPage() {
 // 故发送前先自查：不在白名单则不发送、返回 false，由调用方回退 H5 router.push。
 // 与契约同源：/feed/:id /activity/:id /activity-center /notices /notice/:id /message
 //              /interactions /user/:id /user/me /points /points/guide /points/mall
-//              /product/:id /cart /cart/checkout /order/list
+//              /product/:id /cart /cart/checkout /order/list /purchase/customize
 const FULLSCREEN_WHITELIST = [
   /^\/feed\/[^/]+$/,
   /^\/activity\/[^/]+$/,
@@ -75,6 +75,7 @@ const FULLSCREEN_WHITELIST = [
   /^\/cart$/,
   /^\/cart\/checkout$/,
   /^\/order\/list$/,
+  /^\/purchase\/customize$/, // 立即定制（H5 自研购车定制页，2026-09-11 接入全屏通道）
 ]
 function isFullscreenWhitelisted(route) {
   try {
