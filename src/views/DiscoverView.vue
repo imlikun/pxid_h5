@@ -685,8 +685,16 @@ function onQuick(q) {
   if (q.key === 'notice') { openSecondary('/notices'); return }
   // 智能助手（PXID）→ H5 助手页
   if (q.key === 'ai') { openSecondary('/message'); return }
-  // 决策 2：立即定制 → 跳转 H5 车型定制页（鸿蒙智行风格，VehicleDetailView）
-  if (q.key === 'custom') { router.push('/vehicle/scooter-F2'); return }
+  // 决策 2：立即定制 → 车型定制页（鸿蒙智行风格，VehicleDetailView）
+  // ⚠️ 不可裸 router.push：本入口在发现页（根 WebView），H5 内 push 等于把 /vehicle
+  //    开在根 WebView 里 → 底部露出 Flutter 原生 tab（2026-09-11 截图问题③）。
+  //    真机交原生 openNative('vehicle/scooter-F2') 全屏打开；预览/浏览器回退 H5 路由
+  //    （与下方 onPublish 同一模式）。同页 notice/ai/points 走 openSecondary，此处对齐。
+  if (q.key === 'custom') {
+    if (bridge.isNative()) { bridge.openNative('vehicle/scooter-F2'); return }
+    router.push('/vehicle/scooter-F2')
+    return
+  }
   if (q.key === 'points') { openSecondary('/points'); return }
 }
 // 取本机坐标：优先原生桥（Flutter 注入），降级浏览器 geolocation

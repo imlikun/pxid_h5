@@ -151,6 +151,10 @@ function prefetchDetailChunks() {
   idle(() => {
     import('./views/FeedDetailView.vue').catch(() => {})
     import('./views/ProductDetailView.vue').catch(() => {})
+    // 公告列表/详情 chunk 预热（2026-09-08）：公告数据本身打包在 JS 里零网络拉取，
+    // 但页面代码是懒加载 chunk，首次点击要现下载——发现页空闲时提前拉好，点公告零等待。
+    import('./views/NoticesView.vue').catch(() => {})
+    import('./views/NoticeDetailView.vue').catch(() => {})
   })
 }
 

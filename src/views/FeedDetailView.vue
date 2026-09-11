@@ -187,10 +187,29 @@
     </div>
   </div>
 
-  <!-- 加载中（切帖/首屏先显示，避免闪“内容不存在或已下架”空态） -->
-  <div v-else-if="showLoading" class="loading">
-    <div class="loading__spin"></div>
-    <div class="loading__txt">{{ t('common.loading') }}</div>
+  <!-- 首帧骨架（2026-09-11 方案 1+2）：
+       判据必须含 loading（初值 true）。此前只判 showLoading（200ms 后才置位），
+       初始帧 item=null + showLoading=false 直接落到 v-else.empty →
+       真机表现「进详情先闪『内容不存在或已下架』」；200ms 后 showLoading 置位又切
+       成转圈 → 观感「进详情在转圈加载」。两症状同一行判据。
+       现在首帧就走骨架：转场里滑入的是一页「长得像详情」的内容，无空态、无转圈。 -->
+  <div v-else-if="loading || showLoading" class="fd-skel">
+    <TopBar sticky :back="goBack" :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')" />
+    <div class="fd-skel__body">
+      <div class="fd-skel__author">
+        <span class="sk sk--avatar"></span>
+        <div class="fd-skel__col">
+          <span class="sk sk--name"></span>
+          <span class="sk sk--time"></span>
+        </div>
+      </div>
+      <span class="sk sk--title"></span>
+      <span class="sk sk--title sk--title--2"></span>
+      <span class="sk sk--cover"></span>
+      <span class="sk sk--line"></span>
+      <span class="sk sk--line"></span>
+      <span class="sk sk--line sk--line--short"></span>
+    </div>
   </div>
 
   <!-- 空态（仅加载完成且内容确实为空才显示） -->
@@ -300,8 +319,18 @@ const signedUp = ref(false)
 const authorAvatar = computed(() => resolveAvatar(item.value?.author, item.value?.avatar))
 
 // 真实数据源（从接口拉取，activity 从 mock 取）
-const item = ref(null)
-const loading = ref(true)
+// 🔴 首帧直出（2026-09-11 方案 3）：快照必须在 setup 阶段同步读一次，不能等 onMounted 里的 load()。
+//    onMounted 晚于首次渲染，若在那里才读快照，首帧 item 仍是 null → 必然先闪一帧
+//    骨架/空态，再跳成内容。提到 setup 后：从列表点进来（快照已由卡片写入，跨 WebView 也读得到，
+//    见 utils/feedSnapshot.js）→ 首帧就是完整内容，骨架、空态、加载圈一个都不出现；
+//    外部直开/分享进来（无快照）→ loading 保持 true，走骨架等接口。
+const bootSnap = (() => {
+  if (isActivity.value) return null
+  const fid = Number(route.params.id)
+  return Number.isFinite(fid) ? getFeedSnapshot(fid) : null
+})()
+const item = ref(bootSnap)
+const loading = ref(!bootSnap)
 // 真正决定要不要亮「加载中」的是这个：接口 200ms 内没回来才显示。
 // 有列表快照时根本走不到这里（内容已直出），见 utils/feedSnapshot.js。
 const showLoading = ref(false)
@@ -321,6 +350,15 @@ const skeletonCount = computed(() => {
   const n = Number(item.value && item.value.comments) || 0
   return Math.min(3, Math.max(1, n))
 })
+// 快照同步落到各状态位：否则首帧会先画「0 赞 / 未收藏 / 未关注」再被 load() 修正（一帧跳变）
+if (bootSnap) {
+  liked.value = !!bootSnap.isLiked
+  likeCount.value = bootSnap.likes || 0
+  collected.value = !!bootSnap.isFavorited
+  collectCount.value = bootSnap.favorites || 0
+  followed.value = !!bootSnap.followed
+  commentsLoading.value = Number(bootSnap.comments) > 0
+}
 const commentText = ref('')
 const toast = ref('')
 let toastTimer = null
@@ -522,7 +560,8 @@ async function load() {
   // ⚠️ 先自增序号作废上一次调用（返回列表时也会走这里），再判 id 是否有效
   const seq = ++loadSeq
   const fid = id.value
-  if (!Number.isFinite(fid)) return
+  // id 无效（路由异常）不能停在骨架分支：loading 初值 true，否则页面卡死在骨架上
+  if (!Number.isFinite(fid)) { loading.value = false; showLoading.value = false; return }
   const stale = () => seq !== loadSeq
   clearTimeout(loadingTimer)
   // ① 列表快照直出：点进来的那一刻内容就在位，转场里不会出现「加载圈 + 加载中」。
@@ -1365,26 +1404,23 @@ function showToast(msg) {
 .rcard__like { display: flex; align-items: center; gap: 2px; font-size: 11px; color: var(--text-hint); }
 
 /* 加载中 */
-.loading {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  color: var(--text-hint);
-  background: var(--bg);
-}
-.loading__spin {
-  width: 28px;
-  height: 28px;
-  border: 3px solid #ececef;
-  border-top-color: var(--brand);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-.loading__txt { font-size: 14px; }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* 首帧骨架（替代原「转圈 + 加载中」文案，2026-09-11）：
+   用「页面形状」占位——转场滑入时观感是「内容来了」，而不是「在加载」。
+   只做明暗呼吸，不做旋转/位移：不制造「在转」的观感。 */
+.fd-skel { min-height: 100vh; background: var(--bg); }
+.fd-skel__body { padding: 18px 16px 24px; display: flex; flex-direction: column; gap: 14px; }
+.fd-skel__author { display: flex; align-items: center; gap: 10px; }
+.fd-skel__col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.sk { display: block; background: #eef0f4; border-radius: 6px; animation: skBreath 1.5s ease-in-out infinite; }
+.sk--avatar { width: 40px; height: 40px; border-radius: 50%; flex: none; }
+.sk--name { width: 32%; height: 12px; }
+.sk--time { width: 20%; height: 10px; }
+.sk--title { height: 20px; }
+.sk--title--2 { width: 58%; }
+.sk--cover { height: 176px; border-radius: 12px; }
+.sk--line { height: 12px; }
+.sk--line--short { width: 62%; }
+@keyframes skBreath { 0%, 100% { background: #eef0f4 } 50% { background: #f5f7fa } }
 
 /* 空态 */
 .empty {
