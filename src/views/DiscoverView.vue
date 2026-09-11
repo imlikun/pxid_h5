@@ -334,6 +334,17 @@ function pickFilter(v) {
   filterTouched = true
   activeFilter.value = v
 }
+// 默认选中「我的车」后的兜底：该车型在库里一条内容都没有时，静默退回「全部/最新」，
+// 否则用户一进发现页就是一片空白（chip 仍在第一位，想筛随时点）。
+// ⚠️ 只在「当前选中项就是我的车」且「该 tab 数据已回来」时才动，绝不干扰用户手动选择。
+function ensureFilterHasContent() {
+  const f = activeFilter.value
+  if (!f || f === '全部' || f === '最新' || f !== myCarModel.value) return
+  const src = activeTab.value === '推荐' ? recommendData.value : dynamicData.value
+  if (!src.length) return
+  if (src.some((i) => i.carModel === f)) return
+  activeFilter.value = activeTab.value === '推荐' ? '全部' : '最新'
+}
 
 // 4 宫格标签：2026-09-05 起改为两行截断（省略号），不再测量宽度、不再滚动。
 // 原因：无限滚动的 marquee 是常驻合成层，和入场动画叠在一起让首屏显得杂乱。
@@ -436,6 +447,7 @@ function setTab(t, forceDefault = false) {
   showSearchResults.value = false
   keyword.value = ''
   if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
+  ensureFilterHasContent() // 该 tab 缓存的列表若无「我的车」内容，同步退回默认筛选
 }
 
 // 触底分页状态（推荐/动态各自维护 page + hasMore；广场活动量小不分页）
@@ -487,6 +499,8 @@ async function loadFeed(tabKey, { append = false } = {}) {
     } else {
       if (tabKey === 'recommend') recommendData.value = list
       else dynamicData.value = list
+      // 首屏数据到位后校正一次筛选：避免默认选中的「我的车」在库里没内容时留一片空白
+      ensureFilterHasContent()
     }
   } catch (e) {
     loadErr.value = t('discover.loadFail')
