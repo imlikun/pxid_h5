@@ -1,5 +1,5 @@
 <template>
-  <div class="app-root" :class="{ 'embed-mode': inApp }" ref="rootRef">
+  <div class="app-root" :class="{ 'embed-mode': inApp, 'wv-push-in': wvPushIn }" ref="rootRef">
     <router-view v-slot="{ Component }">
       <transition :name="transitionName" @before-enter="onBeforeEnter" @after-enter="onAfterEnter" @before-leave="onBeforeLeave" @after-leave="onAfterLeave">
         <keep-alive>
@@ -114,6 +114,42 @@ function onAfterLeave(el) {
 }
 // 嵌入 Flutter 时原生已有全局返回手势，H5 转场压短时长，避免叠成「两段滑」
 const inApp = ref(bridge.isEmbed)
+
+// ---- 全屏 WebView 首屏推入（2026-09-11）----
+// 背景：从发现/精选点进详情，由 Flutter 新开全屏 WebView 承载（9-07 全屏右滑契约）。
+//      对 H5 而言那是一个**全新页面**，全局 <transition> 的首屏不播 enter 动画，
+//      「从右往左推」这段观感在 H5 侧原本完全缺失 —— 真机表现就是「原地加载一下，内容直接出现」。
+// 做法：真机 + 本 WebView 首屏 + 非根 tab 路由时，给首帧补一段与 H5 内部 slide-forward
+//      完全同曲线、同时长（340ms 微信档）的右→左推入。
+// 边界（三不播）：根 tab（/discover /featured /service，它们是承载页不是被推进来的层级）不播；
+//      浏览器/预览（无原生桥）不播；keep-alive 二次进入不播（setup 只跑一次）。
+// ⚠️ 不需要（也不能）用 bridge.isWebViewFirstPage() 判首屏：App.vue 的 setup 只在
+//    「WebView 加载页面」时执行一次，本身就是天然的首屏判据。
+//    实测 history.state 在初始导航后是 {position:1, replaced:true} —— Vue Router 的
+//    position 从 0 递增到 1，该函数注释里写「初始=0」与实际不符（另案，见本次记录）。
+const ROOT_TAB_BOOT_PATHS = ['', '/', '/discover', '/featured', '/service']
+const wvPushIn = ref(false)
+let bootPushTimer = null
+try {
+  const bootPath = (window.location.hash || '').replace(/^#/, '').split('?')[0]
+  if (bridge.isNative() && !ROOT_TAB_BOOT_PATHS.includes(bootPath)) {
+    wvPushIn.value = true
+    // ⚠️ 摘类时机必须跟「动画真的播完」对齐，不能从 setup 起算固定时长：
+    //    路由组件是懒加载的，setup → 元素首次渲染之间隔着 chunk 下载 + Vue 渲染，
+    //    固定 380ms 会在元素出现前就把类摘掉 → 动画根本不播（探针实测 class 0 帧）。
+    //    CSS animation 是「元素首次渲染时」才启动的，所以只要类还在，动画一定会播完。
+    const release = () => {
+      wvPushIn.value = false
+      document.removeEventListener('animationend', onAnimEnd)
+      clearTimeout(bootPushTimer)
+    }
+    const onAnimEnd = (e) => { if (e.animationName === 'wvPushIn') release() }
+    document.addEventListener('animationend', onAnimEnd)
+    // 兜底：万一动画没播（reduced-motion / 异常），2s 后也要解锁，类不能常驻（常驻 = 页面长期 fixed）
+    bootPushTimer = setTimeout(release, 2000)
+  }
+} catch (e) { /* 判定失败则不播，不影响页面 */ }
+
 
 // 底部 tab bar 已彻底移除：之前依赖 Flutter 桥注入（isEmbed）切换显示，但 Flutter 直接链接加载没注入桥也会显示。
 // 既然 App 原生自带 tab，H5 这层完全多余，直接拿掉，省一道桥依赖。
@@ -238,6 +274,37 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
    这两行 CSS 别和 transition 一起删 */
 .slide-back-leave-to {
   transform: translateX(100%);
+}
+
+/* ============================================================
+   全屏 WebView 首屏推入（2026-09-11）
+   真机从发现/精选点进详情时，详情由 Flutter 新开全屏 WebView 承载，
+   对 H5 是全新页面 —— 全局 <transition> 首屏不播 enter 动画，
+   「从右往左推」这段观感在 H5 侧原本完全缺失（真机表现：原地加载后直接出现）。
+   这里给首屏补一段与 slide-forward 同曲线、同时长的推入，让「进详情」在
+   任何环境下都是微信式右进左出。
+   ⚠️ 触发条件由 script 判定（原生桥 + 本 WebView 首屏 + 非根 tab 路由），
+      浏览器预览 / keep-alive 二次进入 / 根 tab 首屏都不带这个类。
+   ============================================================ */
+.app-root.wv-push-in > *:not(.swipe-toast) {
+  /* 转场期间只此一页，用 fixed 脱离文档流：不产生横向溢出，也不影响 .app-root 自身 */
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg, #f7f8fa);
+  /* 与 slide-forward 同一道左侧阴影（推入时像一页纸盖过来） */
+  box-shadow: -6px 0 20px rgba(0, 0, 0, 0.12);
+  animation: wvPushIn 340ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+@keyframes wvPushIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-root.wv-push-in > *:not(.swipe-toast) { animation: none; }
 }
 
 /* 嵌入 Flutter：原生全局返回手势本身就会带着整个 WebView 横滑，
