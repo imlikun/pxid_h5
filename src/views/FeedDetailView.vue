@@ -116,22 +116,9 @@
     <!-- 评论区 -->
     <div class="comments" ref="commentsBox">
       <div class="comments__head">{{ t('feed.commentsCount', { n: commentCount }) }}</div>
-      <!-- 骨架占位：先用帖子自带的评论数把评论区撑到最终高度，评论接口回来原地替换。
-           此前这里是「0 条 + 暂无评论」，接口一回来突然变成 N 条，整页被顶高一大截（2026-09-05） -->
-      <div v-if="commentsLoading" class="cmt-skeleton">
-        <div v-for="n in skeletonCount" :key="'sk-' + n" class="cmt-sk">
-          <span class="cmt-sk__avatar"></span>
-          <div class="cmt-sk__lines">
-            <span class="cmt-sk__line cmt-sk__line--name"></span>
-            <span class="cmt-sk__line cmt-sk__line--text"></span>
-            <span class="cmt-sk__line cmt-sk__line--meta"></span>
-          </div>
-        </div>
-      </div>
-      <div v-else-if="comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
-      <!-- 评论列表包一层做「整体淡入」：骨架撤除/首进详情都不再硬切（2026-09-07）。
-           animation 只在节点插入时播一次；keep-alive 返回 DOM 未销毁，不重播 -->
-      <div v-else class="cmt-list" :class="{ 'cmt-list--fadein': cmtReplaced }">
+      <!-- 评论数据返回后直接显示，不再渲染灰色骨架或补播淡入。 -->
+      <div v-if="!commentsLoading && comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
+      <div v-else-if="comments.length" class="cmt-list">
         <CommentNode
           v-for="c in comments"
           :key="c.id"
@@ -343,13 +330,8 @@ const collected = ref(false)
 const collectCount = ref(0)
 const followed = ref(false)
 const comments = ref([])
-// 评论加载中：先用骨架占住高度，避免评论区从 0 条突然变 N 条把整页顶高
-const commentsLoading = ref(false)
-// 骨架条数：帖子自带 comments 是真实条数，这里最多渲染 3 条撑高度即可
-const skeletonCount = computed(() => {
-  const n = Number(item.value && item.value.comments) || 0
-  return Math.min(3, Math.max(1, n))
-})
+// 加载期间仅保留评论区标题，完成后再决定显示评论或空态。
+const commentsLoading = ref(true)
 // 快照同步落到各状态位：否则首帧会先画「0 赞 / 未收藏 / 未关注」再被 load() 修正（一帧跳变）
 if (bootSnap) {
   liked.value = !!bootSnap.isLiked
@@ -357,7 +339,7 @@ if (bootSnap) {
   collected.value = !!bootSnap.isFavorited
   collectCount.value = bootSnap.favorites || 0
   followed.value = !!bootSnap.followed
-  commentsLoading.value = Number(bootSnap.comments) > 0
+  commentsLoading.value = true
 }
 const commentText = ref('')
 const toast = ref('')
@@ -575,8 +557,8 @@ async function load() {
     collectCount.value = snap.favorites || 0
     followed.value = !!snap.followed
     comments.value = []
-    // 有评论就先铺骨架：评论区高度一步到位，接口回来原地替换，页面不再二次撑开
-    commentsLoading.value = Number(snap.comments) > 0
+    // 等待评论响应，期间不提前显示空态。
+    commentsLoading.value = true
     related.value = []
     loading.value = false
     showLoading.value = false
@@ -602,8 +584,8 @@ async function load() {
       if (stale()) return // 已经离开本页：后面的评论/收藏/关注/推荐都不用再发了
       if (data) {
         item.value = data
-        // 无快照直开时，详情到位的这一刻才知道评论数：同样先铺骨架撑住高度
-        commentsLoading.value = Number(data.comments) > 0
+        // 详情先显示，评论独立等待响应。
+        commentsLoading.value = true
         liked.value = !!data.isLiked
         likeCount.value = data.likes || 0
         collected.value = !!data.isFavorited
@@ -674,21 +656,6 @@ onBeforeUnmount(() => {
 // ① 转场中详情容器带 transform，fixed 后代按规范退化为相对容器定位——互动栏跟着页面一起滑入
 //   （探针实测 ax 与容器 cx 逐帧相同：390→22.7→0，y 恒贴容器底），结束时容器铺满视口，位置零跳变；
 // ② 3.1 高度锁保证转场中容器底不随 WebView 视口变化（Flutter 中途隐藏底栏也不影响）。
-
-// ---- 评论淡入只在「骨架→真实评论」替换时播（任务单 3.3）----
-// 预取命中时评论首帧就完整，.cmt-list 再播 200ms 淡入就是与横推动画叠加的多余闪烁；
-// 预取未命中（慢网络）时骨架→评论的替换仍需淡入兜底防硬切。
-// 判据 = 骨架是否真的被绘制过：预取命中时 commentsLoading true→false 在微任务批内完成
-// （跨两次 render 但零 paint，用户看不见骨架），时间差 <1ms；只有跨越真实绘制帧
-// （≥16ms，慢网络）骨架才上过屏，才算「用户可见的替换」。
-let cmtSkelAt = 0
-const cmtReplaced = ref(false)
-watch(commentsLoading, (nv, ov) => {
-  if (nv && !ov) cmtSkelAt = performance.now() // 骨架开始渲染
-  if (ov && !nv && comments.value.length && performance.now() - cmtSkelAt >= 16) {
-    cmtReplaced.value = true
-  }
-})
 
 onMounted(() => {
   initSelfIdentity()
@@ -1311,30 +1278,6 @@ function showToast(msg) {
 .comments { background: var(--card); border-top: 1px solid var(--line); padding: 16px; }
 .comments__head { font-size: 15px; font-weight: 600; color: var(--text); }
 
-/* 评论骨架：条数 = 帖子自带的评论数（最多 3 条），高度与真实评论对齐，
-   评论接口回来原地替换，整页高度从渲染第一帧起就是最终高度 */
-/* 骨架行高对齐真实评论节点（实测 80px = padding 10/10 + 头像 34 与三行文本取大值），
-   这样接口回来是「原地替换」而不是「整块变高」（2026-09-05） */
-/* 评论列表整体淡入：骨架→评论/首进详情都不硬切。200ms 与图片淡入同节奏 */
-/* 3.3：默认不播动画——预取命中时评论首帧即完整，淡入会与转场横推叠加；
-   只有「骨架→真实评论」真替换（慢网络）才挂 .cmt-list--fadein 播淡入防硬切 */
-.cmt-list--fadein { animation: cmt-in 0.2s ease both; }
-@keyframes cmt-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.cmt-sk {
-  display: flex;
-  gap: 10px;
-  padding: 10px 0;
-  min-height: 80px;
-}
-.cmt-sk__avatar { width: 34px; height: 34px; border-radius: 50%; background: #eef0f4; flex: none; }
-.cmt-sk__lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.cmt-sk__line { height: 10px; border-radius: 5px; background: #eef0f4; }
-.cmt-sk__line--name { width: 30%; }
-.cmt-sk__line--text { width: 78%; }
-.cmt-sk__line--meta { width: 22%; height: 9px; }
 .comments__empty { font-size: 13px; color: var(--text-hint); padding: 18px 0; text-align: center; }
 .cmt { display: flex; gap: 10px; padding: 14px 0; border-bottom: 1px solid #f2f3f5; }
 .cmt__avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex: none; }
