@@ -1,5 +1,5 @@
 <template>
-  <div class="featured">
+  <div class="featured" :class="{ 'featured--native': bridge.isNative() }">
     <!-- 顶部：三 tab + 我的订单入口（右上角） -->
     <TopBar sticky :show-back="false">
       <template #left>
@@ -398,7 +398,11 @@ async function retry() {
 .featured {
   min-height: 100vh;
   background: var(--bg);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+}
+/* 原生底栏可能覆盖 WebView：安全区不代表底栏高度，末项需要可滚入可见区域。 */
+.featured--native {
+  padding-bottom: calc(var(--tab-h, 56px) + max(16px, env(safe-area-inset-bottom, 0px)));
 }
 .tabs {
   display: flex;
