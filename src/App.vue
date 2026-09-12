@@ -123,6 +123,7 @@ const inApp = ref(bridge.isEmbed)
 //      「从右往左推」这段观感在 H5 侧原本完全缺失 —— 真机表现就是「原地加载一下，内容直接出现」。
 // 做法：真机 + 本 WebView 首屏 + 非根 tab 路由时，给首帧补一段与 H5 内部 slide-forward
 //      完全同曲线、同时长（340ms 微信档）的右→左推入。
+// 商品全屏首屏由 Flutter 独占推入，明确排除；以下只保留其它旧页面行为。
 // 边界（三不播）：根 tab（/discover /featured /service，它们是承载页不是被推进来的层级）不播；
 //      浏览器/预览（无原生桥）不播；keep-alive 二次进入不播（setup 只跑一次）。
 // ⚠️ 不需要（也不能）用 bridge.isWebViewFirstPage() 判首屏：App.vue 的 setup 只在
@@ -137,7 +138,9 @@ try {
   const reduceMotion =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (bridge.isNative() && !reduceMotion && !ROOT_TAB_BOOT_PATHS.includes(bootPath)) {
+  // 商品全屏页已由 Flutter 推入整个 WebView，H5 再补播会形成第二次左推。
+  const nativeProductPage = /^\/product\/[^/]+$/.test(bootPath)
+  if (bridge.isNative() && !nativeProductPage && !reduceMotion && !ROOT_TAB_BOOT_PATHS.includes(bootPath)) {
     wvPushIn.value = true
     // ⚠️ 摘类时机不能从 setup 起算固定时长：
     //    路由组件是懒加载的，setup → 元素首次渲染之间隔着 chunk 下载 + Vue 渲染
@@ -340,10 +343,6 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
 .app-root.product-transition .slide-back-leave-active {
   transition-duration: 500ms;
   transition-timing-function: cubic-bezier(.22, .55, .3, 1);
-}
-.app-root.product-transition.wv-push-in > *:not(.swipe-toast) {
-  animation-duration: 500ms;
-  animation-timing-function: cubic-bezier(.22, .55, .3, 1);
 }
 
 /* 系统开启「减弱动画」：去掉位移，只留很短的淡入，避免眩晕 */

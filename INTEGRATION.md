@@ -444,3 +444,8 @@ window.PXIDApp = {
 商品卡片和精选 Banner 继续通过原有 `ToFlutter_H5OpenFullscreen` 打开 `/product/:handle`，增加可选 query：`cover`（点击时首图）、`region`（来源店铺地区），能从数据明确关联时附带 `variant` 和 `color`。没有新增桥方法或路由白名单项。Flutter 应按 path 校验原白名单，并完整保留 query；不能截掉 `?` 后内容。H5 同源 localStorage 保存最多 20 条、10 分钟有效的展示快照；即使 WebView 不共享存储，URL 首图仍可直出。
 
 详情同步显示列表首图，只请求当前商品，不再先请求商品列表。完整详情按图片与变体关联选择颜色，接口回包不替换来源首图；切色才挂载该色图片。无明确关联的多色商品保留来源首图并要求选色，不按数组顺序猜测。原生全屏 query 保留与真机效果仍需上线联调验证。
+
+
+## 2026-09-12 商品详情重复左推修复
+
+商品全屏 WebView 首次打开由 Flutter 执行原生推入，H5 `/product/:handle` 首屏不再播放 `wvPushIn`。颜色 query 和快照继续保留；单次点击仍只发一次全屏 channel，发送成功后不再 `router.push`。同一 WebView 内的商品页导航保留 H5 转场。此修订取代此前对商品全屏首屏补播500ms动画的做法。
