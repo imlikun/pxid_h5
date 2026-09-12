@@ -157,6 +157,7 @@
 </template>
 
 <script setup>
+import { productRoute } from '../utils/productNavigation'
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import QuickActions from '../components/QuickActions.vue'
@@ -290,8 +291,7 @@ function goBanner(i) {
   startBanner()
 }
 function goProduct(p) {
-  const h = p.handle || p.id
-  openSecondary('/product/' + h)
+  openSecondary(productRoute(p))
 }
 
 // 白名单二级路由统一走全屏右滑通道（2026-09-08 对接说明），同 DiscoverView.openSecondary

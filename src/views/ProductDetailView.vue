@@ -1,4 +1,5 @@
 <template>
+  <div class="product-page">
   <div class="detail" v-if="product">
     <!-- 顶栏 -->
     <TopBar sticky :title="product.name" :back="goBack">
@@ -10,15 +11,15 @@
       </template>
     </TopBar>
 
-    <!-- 图廊：横向滑动 + 圆点（轮播=颜色主图，无颜色则全部图） -->
+    <!-- 当前颜色图廊：首帧沿用列表封面，切色才加载对应图片 -->
     <div class="gallery" ref="gallery" @scroll="onGalleryScroll">
       <img
         v-for="(src, i) in galleryImages"
-        :key="i"
+        :key="src"
         class="slide"
         :src="src"
         :alt="product.name"
-        loading="lazy"
+        :loading="i === 0 ? 'eager' : 'lazy'"
       />
       <div v-if="!galleryImages.length" class="slide empty-slide">无图</div>
     </div>
@@ -60,6 +61,7 @@
     <!-- 颜色选择（有颜色选项时显示，联动轮播图与规格） -->
     <div class="card color-card" v-if="hasColor">
       <div class="block__title">选择颜色</div>
+      <p v-if="detailReady && !activeColor" class="color-hint">请选择颜色以查看对应图片</p>
       <div class="colors">
         <button
           v-for="cv in colorValues"
@@ -67,8 +69,9 @@
           class="color-btn"
           :class="{ active: activeColor === cv }"
           @click="selectColor(cv)"
+          :disabled="!detailReady"
         >
-          <img v-if="colorImageMap[cv]" :src="colorImageMap[cv]" :alt="cv" class="color-swatch" />
+          <img v-if="activeColor === cv && colorImageMap[cv]" :src="colorImageMap[cv]" :alt="cv" class="color-swatch" />
           <span v-else class="color-swatch color-swatch--dot" :style="{ background: swatchDot(cv) }"></span>
           <span>{{ cv }}</span>
         </button>
@@ -125,7 +128,7 @@
     <!-- 商品描述（Shopify body_html 富文本） -->
     <div class="card desc" v-if="product.description">
       <div class="block__title">商品详情</div>
-      <div class="prose" v-html="product.description"></div>
+      <div class="prose" v-html="descriptionHtml"></div>
       <div class="more-link press" @click="openOrigin" v-if="product.shopUrl">
         前往 Shopify 查看完整详情 ↗
       </div>
@@ -137,27 +140,13 @@
       </div>
     </div>
 
-    <!-- 商品图册：轮播之外的其余图（场景/细节/参数图） -->
-    <div class="card gallery-extra" v-if="extraImages.length">
-      <div class="block__title">商品图册</div>
-      <div class="extra-imgs">
-        <img
-          v-for="(src, i) in extraImages"
-          :key="i"
-          class="extra-img"
-          :src="src"
-          :alt="product.name"
-          loading="lazy"
-        />
-      </div>
-    </div>
-
+    <div v-if="error" class="detail-error">{{ error }} <button @click="reload">重新加载</button></div>
     <div class="gap"></div>
 
     <!-- 底部吸底操作 -->
     <div class="actions">
-      <button class="btn btn--cart pop press" @click="onAddCart">加入购物车</button>
-      <button class="btn btn--buy pop press" @click="onBuy">立即购买</button>
+      <button class="btn btn--cart pop press" @click="onAddCart" :disabled="!detailReady || (variantList.length > 0 && !currentVariant)">加入购物车</button>
+      <button class="btn btn--buy pop press" @click="onBuy" :disabled="!detailReady || (variantList.length > 0 && !currentVariant)">立即购买</button>
     </div>
 
     <transition name="fade">
@@ -175,13 +164,16 @@
       </div>
     </template>
   </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchProducts, fetchProductDetail, getProductByHandle, getStore, sym, API_BASE, initRegion, getRegion } from '../api/shop'
+import { fetchProductDetail, getStore, sym, API_BASE, getRegion } from '../api/shop'
 import { initLocale } from '../i18n'
+import { productEntry } from '../utils/productNavigation'
+import { variantForCover, colorOf, imagesForColor, sameImage } from '../utils/productPresentation'
 import { addToCart, cartCount } from '../store/cart'
 import { bridge } from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
@@ -191,6 +183,9 @@ const route = useRoute()
 const router = useRouter()
 
 const product = ref(null)
+const detailReady = ref(false)
+const entryCover = ref('')
+const productRegion = ref('')
 const loading = ref(true)
 const error = ref('')
 const activeIdx = ref(0)
@@ -201,7 +196,7 @@ const gallery = ref(null)
 
 const currentVariant = computed(() => {
   const vs = product.value && product.value.variants
-  if (vs && vs.length) return vs[activeVariant.value] || vs[0]
+  if (vs && vs.length) return vs[activeVariant.value] || null
   return null
 })
 const displayPrice = computed(() => {
@@ -216,6 +211,12 @@ const imageList = computed(() =>
     typeof im === 'string' ? { src: im, alt: '', id: '', variantIds: [] } : im
   )
 )
+const descriptionHtml = computed(() => {
+  if (!product.value?.description) return ''
+  const doc = new DOMParser().parseFromString(product.value.description, 'text/html')
+  doc.querySelectorAll('img').forEach((im) => { im.setAttribute('loading', 'lazy'); im.setAttribute('decoding', 'async') })
+  return doc.body.innerHTML
+})
 const variantList = computed(() => product.value?.variants || [])
 const colorOption = computed(() =>
   (product.value?.options || []).find((o) => /color|colour|颜色/i.test(o.name)) || null
@@ -244,8 +245,7 @@ const colorImageMap = computed(() => {
   colorValues.value.forEach((cv) => { m[cv] = pickColorImage(cv) })
   return m
 })
-// 有 Color 维度变体即认为可选手色（不再强依赖「图能否匹配到色」——图未绑色的商品也能选色，
-// 只是轮播退化为全图）；防 1 色 1 图重复卡与 Title-only 商品
+// 有颜色选项即可选色；缺少图片关联时显示占位，不加载其它颜色冒充。
 const hasColor = computed(() => {
   const cv = colorValues.value
   if (!cv.length) return false
@@ -253,22 +253,14 @@ const hasColor = computed(() => {
     (v.selectedOptions || []).some((o) => isColorOpt(o.name) && o.value)
   )
 })
-// 轮播图：有颜色=各色主图（每色一张）；色图匹配失败(图未绑色)=退化为全部图；无颜色=全部图
+// 列表封面在详情补全后继续保留；只渲染当前颜色，不把其它颜色先塞入 DOM。
 const galleryImages = computed(() => {
-  if (!hasColor.value) return imageList.value.map((i) => i.src)
-  const arr = []
-  colorValues.value.forEach((cv) => {
-    const s = colorImageMap.value[cv]
-    if (s && !arr.includes(s)) arr.push(s)
-  })
-  if (!arr.length) return imageList.value.map((i) => i.src) // 图未绑色：全图轮播
-  return arr
-})
-// 其余图（非轮播）：放进商品图册（色图全匹配失败时轮播=全图，自然无 extra）
-const extraImages = computed(() => {
-  if (!hasColor.value) return []
-  const g = new Set(galleryImages.value)
-  return imageList.value.map((i) => i.src).filter((s) => s && !g.has(s))
+  if (!product.value) return []
+  const selected = hasColor.value
+    ? (colorValues.value.length === 1 ? imageList.value.map((i) => i.src) : imagesForColor(product.value, activeColor.value))
+    : (detailReady.value ? imageList.value.map((i) => i.src) : [])
+  const first = entryCover.value || selected[0] || (!hasColor.value ? product.value.cover : '') || ''
+  return first ? [first, ...selected.filter((s) => !sameImage(s, first))] : selected
 })
 const activeColor = ref('')
 const specPick = reactive({}) // 颜色之外各规格维度的当前选中值 { Battery: '10 Ah' }
@@ -314,15 +306,17 @@ function matchVariant(v, overrides = {}) {
   return true
 }
 
-// 颜色卡点击：更新色 → 轮播跳该色主图 → 重建选中变体
+// 颜色卡点击：替换当前色图片，并选择该颜色下存在的规格组合。
 function selectColor(cv) {
+  if (!detailReady.value) return
   activeColor.value = cv
-  const idx = galleryImages.value.indexOf(colorImageMap.value[cv])
-  if (idx >= 0) jumpTo(idx)
+  entryCover.value = ''
   resolveVariant()
+  resetGallery()
 }
 // 规格维度点击：更新该维值 → 重建选中变体
 function pickSpec(dimName, val) {
+  if (!detailReady.value) return
   const exists = variantList.value.some((v) => matchVariant(v, { [dimName]: val }))
   if (!exists) return // 该颜色下无此组合，忽略点击
   specPick[dimName] = val
@@ -334,12 +328,16 @@ function specComboAvailable(dimName, val) {
     (v) => v.available !== false && matchVariant(v, { [dimName]: val })
   )
 }
-// 依当前 activeColor + specPick 重建选中变体（找不到则保持原索引）
+// 优先保留其它规格；不存在该组合时回退到新颜色的首个真实变体。
 function resolveVariant() {
   const vs = variantList.value
   if (!vs.length) return
   const idx = vs.findIndex((v) => matchVariant(v))
   if (idx >= 0) activeVariant.value = idx
+  else {
+    const colorIndex = vs.findIndex((v) => colorOf(v) === activeColor.value)
+    if (colorIndex >= 0) { activeVariant.value = colorIndex; syncSpecFromVariant() }
+  }
 }
 // 从当前选中变体回填各规格维度的默认选中值（首次进入/换商品时）
 function syncSpecFromVariant() {
@@ -352,99 +350,74 @@ function syncSpecFromVariant() {
   })
 }
 // 颜色/规格选中态初始化（cache 首屏与 detail 覆盖后共用）
-function initSelection() {
-  // 默认颜色：首个能匹配到主图的色，否则取第一个颜色值
-  activeColor.value = hasColor.value
-    ? (colorValues.value.find((cv) => colorImageMap.value[cv]) || colorValues.value[0] || '')
-    : ''
-  syncSpecFromVariant() // 回填规格维度选中值（如 Battery）
-  resolveVariant() // 依颜色+规格重建选中变体（影响价格/库存）
+function initSelection(preferredId = '') {
+  const vs = variantList.value
+  const preferred = vs.find((v) => String(v.id) === String(preferredId))
+    || variantForCover(product.value, entryCover.value || product.value?.cover)
+    || (colorValues.value.length <= 1 ? vs[0] : null)
+  activeVariant.value = vs.indexOf(preferred)
+  activeColor.value = colorOf(preferred)
+  syncSpecFromVariant()
+}
+function resetGallery() {
+  activeIdx.value = 0
+  nextTick(() => { if (gallery.value) gallery.value.scrollLeft = 0 })
 }
 // 无色图时的 swatch 兜底色（按色名稳定 hash 出浅色调）
 function swatchDot(cv) {
   let h = 0
   for (let i = 0; i < cv.length; i++) h = (h * 31 + cv.charCodeAt(i)) % 360
-  return `hsl(${h}, 55%, 62%)`
+  const colors = { black: '#222', white: '#fff', red: '#c83b39', blue: '#3576b9', green: '#49855a', brown: '#92613f', golden: '#c8a34a', gold: '#c8a34a', silver: '#b7bcc3', grey: '#888', gray: '#888', 黑色: '#222', 白色: '#fff', 红色: '#c83b39', 蓝色: '#3576b9' }
+  return colors[cv.toLowerCase()] || `hsl(${h}, 55%, 62%)`
 }
 
-// 因 App.vue 用 <keep-alive> 缓存所有页面，切不同商品时组件被复用 → 必须监听路由重载，否则“永远同一片”
-// ⚠️ 白屏根因（2026-09-07 无头探针实锤）：真机 bridge 是异步 RTT（~150ms），此前的写法是
-//   await initLocale() 之后才 product.value=null → 「根级 v-if 切换」落在 340ms 转场窗口内；
-//   keep-alive 二次进入时组件带着旧商品的 .detail，于是 .detail→.empty→.detail 双重切换打断
-//   enter 转场 → slide-forward-enter-from 残留在被替换的旧元素上 → 新 .detail 卡死在
-//   translateX(100%) 屏幕外 = 白屏。浏览器 mock bridge 同步微任务，null→cached 同 flush 压缩，
-//   无中间帧，所以浏览器全绿、真机必现。
-// 修复原则：await 全部前置；状态变更压缩成一段同步代码、一次 flush 定稿——
-//   缓存命中时根级保持 .detail 只换数据（零根级切换），未命中才置 .empty（单次切换）。
+// 在首次 setup / 路由切换的同步阶段展示快照；异步回包只补当前商品。
 let loadSeq = 0
 async function load() {
-  const handle = route.params.id
-  // 离开详情页（返回精选）时 route.params.id 变 undefined：直接放弃，
-  // 组件状态原样交给 keep-alive 离屏缓存。若无此守卫，load 会把 product 置 null，
-  // 根级 v-if 在转场 leave 进行中从 .detail 切成 .empty，Transition 离场被打断，
-  // .empty 会永久残留在精选页顶部（2026-09-07 实测复现）
-  if (!handle) return
+  if (route.name !== 'product') return
+  const handle = String(route.params.id)
+  const path = route.fullPath
   const seq = ++loadSeq
-  const stale = () => seq !== loadSeq || route.params.id !== handle
-  await initLocale() // 语言决定内容地区，见 regionFromLocale
-  if (stale()) return
-  await initRegion()
-  if (stale()) return
-  // —— 以下全程同步，一次 flush 定稿，杜绝转场中的多次根级切换 ——
-  const cached = getProductByHandle(handle)
-  if (cached) {
-    // 缓存命中：根级保持 .detail，数据同帧从旧商品换成新商品（视觉即切，转场不中断）
-    product.value = cached
-    loading.value = false
-    error.value = ''
-  } else {
-    product.value = null
-    loading.value = true
-    error.value = ''
-  }
-  activeIdx.value = 0
+  const query = { ...route.query }
+  const stale = () => seq !== loadSeq || route.fullPath !== path
+  const snapshot = productEntry(handle, query)
+  product.value = snapshot
+  entryCover.value = snapshot?.cover || ''
+  detailReady.value = false
+  loading.value = true
+  error.value = ''
   activeVariant.value = 0
   activeColor.value = ''
-  // 清空规格维度选中值（换商品时防残留上一商品的维度）
   Object.keys(specPick).forEach((k) => delete specPick[k])
   qty.value = 1
-  if (cached) initSelection() // 缓存数据也带 options/variants，先初始化一次颜色与规格选中态
-  // 2️⃣ 缓存未命中时（直链/刷新详情页），先拉列表填充缓存
-  if (!cached) {
-    try { await fetchProducts() } catch (_) { /* 非阻塞 */ }
-    if (stale()) return
-    const retryCached = getProductByHandle(handle)
-    if (retryCached) {
-      product.value = retryCached
-      loading.value = false
-      initSelection()
-    }
-  }
-  // 3️⃣ 再按 Shopify 单品链接真拉完整详情（覆盖缓存，带重试）。product 已非空，
-  //    此处只更新数据不动根级分支，转场安全
+  resetGallery()
+  // 列表数据可能没有图与变体关联，不猜颜色；可解析时同步选中。
+  if (snapshot && query.variant) initSelection(query.variant)
   try {
-    const detail = await fetchProductDetail(handle)
+    await initLocale()
+    if (stale()) return
+    productRegion.value = ['CN', 'US', 'BR'].includes(query.region) ? query.region : getRegion()
+    // 直链/全屏冷启动同样只请求这一件商品，不再请求商品全列表。
+    const detail = await fetchProductDetail(handle, productRegion.value)
     if (stale()) return
     if (detail) {
       product.value = detail
-      if (activeVariant.value >= (detail.variants || []).length) activeVariant.value = 0
-      initSelection() // 用完整数据（含图关联/库存）重算颜色默认值、规格选中与选中变体
-      error.value = '' // 清除之前的错误
-    } else if (!product.value) {
-      error.value = '未找到该商品'
-      loading.value = false
+      if (!entryCover.value) entryCover.value = detail.cover || ''
+      initSelection(query.variant)
+      detailReady.value = true
+    } else {
+      error.value = '详情加载失败，请重试'
     }
   } catch (e) {
-    if (!product.value) error.value = '详情加载失败，请重试'
+    if (!stale()) error.value = '详情加载失败，请重试'
+  } finally {
+    if (!stale()) loading.value = false
   }
-  loading.value = false
 }
-
-onMounted(load)
-// 同一个组件实例下，/product/:id 变化重新拉详情（含重置轮播/规格/数量）。
-// 守卫：id 为 undefined = 已离开详情页（返回精选/发现），此时绝不能 load()——
-// 否则组件在离屏转场中被置空，.empty 残留主文档（与 FeedDetailView 的 /feed/NaN 同款坑）
-watch(() => route.params.id, (id) => { if (id) load() })
+watch(() => route.name === 'product' ? route.fullPath : '', (path) => {
+  if (path) load()
+  else ++loadSeq // 离屏时废弃在途请求，不重置正在离场的 DOM。
+}, { immediate: true, flush: 'sync' })
 
 function onGalleryScroll() {
   const el = gallery.value
@@ -484,20 +457,23 @@ function goCart() {
 function openOrigin() {
   if (product.value && product.value.shopUrl) bridge.openShopify(product.value.shopUrl)
 }
+function productStore() {
+  try { return new URL(product.value.shopUrl).hostname } catch { return getStore() }
+}
 function onAddCart() {
-  if (!product.value) return
+  if (!product.value || !detailReady.value || (variantList.value.length && !currentVariant.value)) return
   addToCart(product.value, {
     variantId: currentVariant.value ? currentVariant.value.id : 'def',
     variantTitle: currentVariant.value ? currentVariant.value.title : '',
     price: displayPrice.value,
     qty: qty.value,
-    region: 'US',
-    store: getStore(),
+    region: productRegion.value || getRegion(),
+    store: productStore(),
   })
   showToast('已加入购物车')
 }
 async function onBuy() {
-  if (!product.value) return
+  if (!product.value || !detailReady.value) return
   const vid = currentVariant.value ? currentVariant.value.id : 'def'
   // 走后端 checkout-v2 建 Shopify 购物车并预填邮箱/地址（region + Multipass 收敛在后端）
   try {
@@ -510,7 +486,7 @@ async function onBuy() {
       body: JSON.stringify({
         variantId: vid,
         qty: qty.value,
-        region: getRegion(),
+        region: productRegion.value || getRegion(),
         email: profile.email || '',
         shippingAddress: profile.shippingAddress || null,
       }),
@@ -522,7 +498,7 @@ async function onBuy() {
     showToast('正在前往 Shopify…')
   } catch (e) {
     // 兜底：直接拼 permalink，保证不阻塞
-    const store = getStore()
+    const store = productStore()
     if (store) {
       bridge.openShopify(`https://${store}/cart/${vid}:${qty.value}`)
       showToast('正在前往 Shopify…')
@@ -534,6 +510,10 @@ async function onBuy() {
 </script>
 
 <style scoped>
+.product-page { min-height: 100vh; }
+.color-hint { color: var(--text-sub); font-size: 13px; margin-bottom: 12px; }
+.btn:disabled { opacity: .45; }
+.detail-error { padding: 16px; text-align: center; }
 .detail {
   min-height: 100vh;
   background: var(--bg);
@@ -1027,18 +1007,5 @@ async function onBuy() {
 .color-btn span {
   font-size: 12px;
   color: var(--text);
-}
-/* 商品图册（轮播之外的其余图） */
-.gallery-extra .extra-imgs {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.extra-img {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: 10px;
-  background: var(--bg);
 }
 </style>

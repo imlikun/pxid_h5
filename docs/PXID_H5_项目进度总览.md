@@ -120,3 +120,11 @@
 3. 核验：六 ref 一致 + 线上 chunk hash 与本地一致 + 线上实测（App 内下拉刷新即可拿到新版本）。
 
 > 后端在线自检：`curl https://pxid-api.appin.site/health`。
+
+
+## 2026-09-12 本地修改：精选商品首图和颜色
+
+- 商品卡片、精选 Banner 统一传递首图快照，支持全屏新 WebView 和存储不共享场景。
+- 商品详情只请求当前商品，首图保持来源颜色，切色联动真实变体并按需加载图片。取消自动铺开其它颜色图册，描述图片延迟加载。
+- 相关文件：`src/utils/productNavigation.js`、`src/utils/productPresentation.js`、`ProductCard.vue`、`FeaturedView.vue`、`ProductDetailView.vue`；query 约定见 `INTEGRATION.md`。
+- 验证：构建、11 项浏览器回归、4 项关联测试通过；尚未部署，需真机核验原生完整保留 query。
