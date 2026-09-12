@@ -64,7 +64,10 @@
           @click="selectColor(cv)"
           :disabled="!detailReady"
         >
-          <span class="color-swatch color-swatch--dot" :style="{ background: swatchDot(cv) }"></span>
+          <img v-if="colorPreviews[cv] && !failedPreviews[colorPreviews[cv]]" class="color-swatch"
+            :src="colorPreviews[cv]" alt="" aria-hidden="true" loading="lazy" decoding="async"
+            @error="failedPreviews[colorPreviews[cv]] = true" />
+          <span v-else class="color-swatch color-swatch--empty" aria-hidden="true">—</span>
           <span>{{ cv }}</span>
         </button>
       </div>
@@ -167,7 +170,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { fetchProductDetail, getStore, sym, API_BASE, getRegion } from '../api/shop'
 import { initLocale } from '../i18n'
 import { productEntry } from '../utils/productNavigation'
-import { variantForCover, colorOf, imagesForColor, sameImage } from '../utils/productPresentation'
+import { variantForCover, colorOf, imagesForColor, sameImage, colorPreview } from '../utils/productPresentation'
 import { addToCart, cartCount } from '../store/cart'
 import { bridge } from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
@@ -335,13 +338,11 @@ function resetGallery() {
   activeIdx.value = 0
   nextTick(() => { if (gallery.value) gallery.value.scrollLeft = 0 })
 }
-// 无色图时的 swatch 兜底色（按色名稳定 hash 出浅色调）
-function swatchDot(cv) {
-  let h = 0
-  for (let i = 0; i < cv.length; i++) h = (h * 31 + cv.charCodeAt(i)) % 360
-  const colors = { black: '#222', white: '#fff', red: '#c83b39', blue: '#3576b9', green: '#49855a', brown: '#92613f', golden: '#c8a34a', gold: '#c8a34a', silver: '#b7bcc3', grey: '#888', gray: '#888', 黑色: '#222', 白色: '#fff', 红色: '#c83b39', 蓝色: '#3576b9' }
-  return colors[cv.toLowerCase()] || `hsl(${h}, 55%, 62%)`
-}
+// 颜色选项始终使用该颜色关联的小图，文字与图共用同一颜色键。
+const failedPreviews = reactive({})
+const colorPreviews = computed(() => Object.fromEntries(
+  colorValues.value.map((color) => [color, colorPreview(product.value, color)])
+))
 
 // 在首次 setup / 路由切换的同步阶段展示快照；异步回包只补当前商品。
 let loadSeq = 0
@@ -963,11 +964,15 @@ async function onBuy() {
   width: 52px;
   height: 52px;
   border-radius: 8px;
+  object-fit: contain;
   background: #fff;
 }
-.color-swatch--dot {
-  display: block;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+.color-swatch--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-hint);
+  border: 1px solid var(--line);
 }
 .color-btn span {
   font-size: 12px;
