@@ -117,59 +117,10 @@ function onAfterLeave(el) {
 // 嵌入 Flutter 时原生已有全局返回手势，H5 转场压短时长，避免叠成「两段滑」
 const inApp = ref(bridge.isEmbed)
 
-// ---- 全屏 WebView 首屏推入（2026-09-11）----
-// 背景：从发现/精选点进详情，由 Flutter 新开全屏 WebView 承载（9-07 全屏右滑契约）。
-//      对 H5 而言那是一个**全新页面**，全局 <transition> 的首屏不播 enter 动画，
-//      「从右往左推」这段观感在 H5 侧原本完全缺失 —— 真机表现就是「原地加载一下，内容直接出现」。
-// 做法：真机 + 本 WebView 首屏 + 非根 tab 路由时，给首帧补一段与 H5 内部 slide-forward
-//      完全同曲线、同时长（340ms 微信档）的右→左推入。
-// 商品全屏首屏由 Flutter 独占推入，明确排除；以下只保留其它旧页面行为。
-// 边界（三不播）：根 tab（/discover /featured /service，它们是承载页不是被推进来的层级）不播；
-//      浏览器/预览（无原生桥）不播；keep-alive 二次进入不播（setup 只跑一次）。
-// ⚠️ 不需要（也不能）用 bridge.isWebViewFirstPage() 判首屏：App.vue 的 setup 只在
-//    「WebView 加载页面」时执行一次，本身就是天然的首屏判据。
-//    实测 history.state 在初始导航后是 {position:1, replaced:true} —— Vue Router 的
-//    position 从 0 递增到 1，该函数注释里写「初始=0」与实际不符（另案，见本次记录）。
-const ROOT_TAB_BOOT_PATHS = ['', '/', '/discover', '/featured', '/service']
+// 新 WebView 的首屏推入由 Flutter 负责；H5 不再补播。
+// 对所有落地路由一致，且不依赖桥或全屏标识的注入时机。
+// 同一 WebView 内的前进/返回仍由 router-view transition 处理。
 const wvPushIn = ref(false)
-try {
-  const bootPath = (window.location.hash || '').replace(/^#/, '').split('?')[0]
-  // 系统开了「减弱动画」就不播（也避免 animation:none 收不到 animationend 造成类滞留）
-  const reduceMotion =
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  // 商品全屏页已由 Flutter 推入整个 WebView，H5 再补播会形成第二次左推。
-  const nativeProductPage = /^\/product\/[^/]+$/.test(bootPath)
-  if (bridge.isNative() && !nativeProductPage && !reduceMotion && !ROOT_TAB_BOOT_PATHS.includes(bootPath)) {
-    wvPushIn.value = true
-    // ⚠️ 摘类时机不能从 setup 起算固定时长：
-    //    路由组件是懒加载的，setup → 元素首次渲染之间隔着 chunk 下载 + Vue 渲染
-    //    （线上实测 App 挂载 t=3.7s → 详情元素 t=7.4s，隔 3.7 秒），
-    //    固定 380ms/2s 都会在元素出现前就把类摘掉 → 动画根本不播（探针实测 0 帧）。
-    //    CSS animation 是「元素首次渲染时」才启动的，所以只要类还在，动画一定会播完。
-    let bootTimer = null
-    let mo = null
-    const release = () => {
-      wvPushIn.value = false
-      document.removeEventListener('animationend', onAnimEnd)
-      if (bootTimer) clearTimeout(bootTimer)
-      if (mo) mo.disconnect()
-    }
-    const onAnimEnd = (e) => { if (e.animationName === 'wvPushIn') release() }
-    document.addEventListener('animationend', onAnimEnd)
-    // 兜底 1：元素一出现就挂 1.2s 解锁 —— 覆盖「动画没播/被打断」，保证类绝不长期滞留
-    //        （类滞留 = 页面长期 fixed，window 滚动会废掉）
-    mo = new MutationObserver(() => {
-      if (!document.querySelector('.app-root > *:not(.swipe-toast)')) return
-      mo.disconnect()
-      bootTimer = setTimeout(release, 1200)
-    })
-    if (document.body) mo.observe(document.body, { childList: true, subtree: true })
-    // 兜底 2：元素始终不渲染（chunk 加载失败等）也不能让类常驻
-    setTimeout(() => { if (wvPushIn.value) release() }, 20000)
-  }
-} catch (e) { /* 判定失败则不播，不影响页面 */ }
-
 
 // 底部 tab bar 已彻底移除：之前依赖 Flutter 桥注入（isEmbed）切换显示，但 Flutter 直接链接加载没注入桥也会显示。
 // 既然 App 原生自带 tab，H5 这层完全多余，直接拿掉，省一道桥依赖。

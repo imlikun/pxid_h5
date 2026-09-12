@@ -151,15 +151,22 @@
     </transition>
   </div>
 
+  <!-- 无点击快照的冷启动也保留详情结构，不再切到整页加载文案。 -->
+  <div v-else-if="loading" class="detail product-skeleton" aria-busy="true" aria-label="正在加载商品信息">
+    <TopBar sticky title="" :back="goBack" />
+    <div class="gallery-frame product-skeleton__cover" aria-hidden="true"></div>
+    <div class="content-placeholder" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="actions">
+      <button class="btn btn--cart" disabled>加入购物车</button>
+      <button class="btn btn--buy" disabled>立即购买</button>
+    </div>
+  </div>
   <div class="empty" v-else>
-    <p v-if="loading">加载中…</p>
-    <template v-else>
       <p>{{ error || '商品不存在' }}</p>
       <div class="empty__acts">
         <button class="press btn--retry" @click="goBack">返回精选</button>
         <button class="press btn--retry" @click="reload">重新加载</button>
       </div>
-    </template>
   </div>
   </div>
 </template>
@@ -488,6 +495,7 @@ async function onBuy() {
 
 <style scoped>
 .product-page { min-height: 100vh; }
+.product-skeleton .product-skeleton__cover { background: #f3f3f3; }
 .content-placeholder { padding: 24px 16px; min-height: 240px; }
 .content-placeholder span { display: block; height: 18px; margin-bottom: 20px; border-radius: 6px; background: #eee; }
 .content-placeholder span:last-child { width: 45%; }
