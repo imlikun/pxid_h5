@@ -1,5 +1,5 @@
 <template>
-  <div class="app-root" :class="{ 'embed-mode': inApp, 'wv-push-in': wvPushIn }" ref="rootRef">
+  <div class="app-root" :class="{ 'embed-mode': inApp, 'wv-push-in': wvPushIn, 'product-transition': productTransition }" ref="rootRef">
     <router-view v-slot="{ Component }">
       <transition :name="transitionName" @before-enter="onBeforeEnter" @after-enter="onAfterEnter" @before-leave="onBeforeLeave" @after-leave="onAfterLeave">
         <keep-alive>
@@ -24,6 +24,8 @@ import { bridge } from './bridge'
 import { initLocale } from './i18n'
 
 const router = useRouter()
+const productTransition = ref(false)
+router.afterEach((to, from) => { productTransition.value = to.name === 'product' || from.name === 'product' })
 // 页面转场方向（forward / back / 无动画），见 usePageTransition.js
 setupPageTransition(router)
 
@@ -331,6 +333,19 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   transition-duration: 260ms;
 }
 
+/* 商品详情：500ms 渐缓推入，避免旧曲线前半程过快和 App 260ms 覆盖。 */
+.app-root.product-transition .slide-forward-enter-active,
+.app-root.product-transition .slide-forward-leave-active,
+.app-root.product-transition .slide-back-enter-active,
+.app-root.product-transition .slide-back-leave-active {
+  transition-duration: 500ms;
+  transition-timing-function: cubic-bezier(.22, .55, .3, 1);
+}
+.app-root.product-transition.wv-push-in > *:not(.swipe-toast) {
+  animation-duration: 500ms;
+  animation-timing-function: cubic-bezier(.22, .55, .3, 1);
+}
+
 /* 系统开启「减弱动画」：去掉位移，只留很短的淡入，避免眩晕 */
 @media (prefers-reduced-motion: reduce) {
   .slide-forward-enter-active,
@@ -348,6 +363,15 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   .slide-back-leave-to {
     transform: none;
     opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-root.product-transition .slide-forward-enter-active,
+  .app-root.product-transition .slide-forward-leave-active,
+  .app-root.product-transition .slide-back-enter-active,
+  .app-root.product-transition .slide-back-leave-active {
+    transition-duration: 120ms;
+    transition-timing-function: ease;
   }
 }
 </style>

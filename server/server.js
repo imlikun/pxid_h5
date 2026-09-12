@@ -3010,6 +3010,12 @@ function toTags(p) {
   return []
 }
 
+// 列表与详情共享图片元数据，H5 首帧就能匹配颜色，不下载图片本体。
+function normalizeProductImages(p) {
+  return (p.images || []).map((i) => ({ src: i.src, alt: i.alt || '', id: String(i.id || ''),
+    variantIds: Array.isArray(i.variant_ids) ? i.variant_ids.map(String) : [] })).filter((i) => i.src)
+}
+
 // 服务端归一化（与前端 api/shop.js 字段对齐，供 M-MVP1 聚合源）
 function normalizeProduct(p, store, currency) {
   const v0 = (p.variants && p.variants[0]) || {}
@@ -3034,6 +3040,7 @@ function normalizeProduct(p, store, currency) {
     vendor: p.vendor || '',
     cover: imgs[0] || (p.featured_image && p.featured_image.src) || '',
     images: imgs,
+    imageDetails: normalizeProductImages(p),
     tag: tagsArr[0] || p.product_type || '',
     tags: tagsArr,
     collection,
@@ -3181,14 +3188,7 @@ function extractSpecs(p) {
 function normalizeProductDetail(p, store, currency) {
   const v0 = (p.variants && p.variants[0]) || {}
   // 透传图对象（含 alt / id / variantIds），供前端按颜色匹配主图；列表接口 normalizeProduct 仍用字符串数组，保持商品卡兼容
-  const imgs = (p.images || [])
-    .map((i) => ({
-      src: i.src,
-      alt: i.alt || '',
-      id: String(i.id || ''),
-      variantIds: Array.isArray(i.variant_ids) ? i.variant_ids.map(String) : [],
-    }))
-    .filter((i) => i.src)
+  const imgs = normalizeProductImages(p)
   const type = (p.product_type || '').toLowerCase()
   const tagsArr = toTags(p)
   const tags = tagsArr.join(' ').toLowerCase()

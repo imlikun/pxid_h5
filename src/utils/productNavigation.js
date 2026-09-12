@@ -1,7 +1,7 @@
 import { getRegion } from '../api/shop'
 import { variantForCover, colorOf } from './productPresentation'
 
-const KEY = 'pxid_product_entries_v1'
+const KEY = 'pxid_product_entries_v2'
 const TTL = 10 * 60 * 1000
 function entries() {
   try {
@@ -13,10 +13,15 @@ export function productRoute(product) {
   const handle = String(product.handle || product.id)
   const region = getRegion()
   const cover = product.cover || ''
-  const variant = variantForCover(product, cover)
-  // 不保存描述 HTML，避免快照阶段加载无关图片；只携带商品展示数据。
+  const images = product.imageDetails || product.images || []
+  const variant = variantForCover({ ...product, images }, cover)
+  // 列表已有的完整展示字段一次交给详情；图片元数据不会触发资源加载。
   const snap = { id: product.id, handle, name: product.name, price: product.price, currency: product.currency, cover,
-    images: cover ? [cover] : [], options: product.options || [], variants: product.variants || [], shopUrl: product.shopUrl || '' }
+    images, options: product.options || [], variants: product.variants || [], shopUrl: product.shopUrl || '',
+    origin: product.origin, vendor: product.vendor || '', tag: product.tag || '', tagline: product.tagline || '',
+    description: product.description || '', specs: product.specs || [], sellingPoints: product.sellingPoints || [],
+    presentationComplete: true }
+
   try {
     const list = entries().filter((e) => e.handle !== handle || e.region !== region)
     list.push({ handle, region, time: Date.now(), product: snap })

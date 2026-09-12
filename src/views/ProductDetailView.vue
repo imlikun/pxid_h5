@@ -12,6 +12,7 @@
     </TopBar>
 
     <!-- 当前颜色图廊：首帧沿用列表封面，切色才加载对应图片 -->
+    <div class="gallery-frame">
     <div class="gallery" ref="gallery" @scroll="onGalleryScroll">
       <img
         v-for="(src, i) in galleryImages"
@@ -29,21 +30,13 @@
         :key="i"
         class="dot"
         :class="{ active: i === activeIdx }"
+        @click="jumpTo(i)"
       ></span>
     </div>
 
-    <!-- 缩略图 -->
-    <div class="thumbs" v-if="galleryImages.length > 1">
-      <img
-        v-for="(src, i) in galleryImages"
-        :key="i"
-        class="thumb"
-        :class="{ active: i === activeIdx }"
-        :src="src"
-        @click="jumpTo(i)"
-      />
     </div>
 
+    <div class="product-content" v-if="product.name">
     <!-- 信息卡 -->
     <div class="card info">
       <div class="name">{{ product.name }}</div>
@@ -71,8 +64,7 @@
           @click="selectColor(cv)"
           :disabled="!detailReady"
         >
-          <img v-if="activeColor === cv && colorImageMap[cv]" :src="colorImageMap[cv]" :alt="cv" class="color-swatch" />
-          <span v-else class="color-swatch color-swatch--dot" :style="{ background: swatchDot(cv) }"></span>
+          <span class="color-swatch color-swatch--dot" :style="{ background: swatchDot(cv) }"></span>
           <span>{{ cv }}</span>
         </button>
       </div>
@@ -140,6 +132,8 @@
       </div>
     </div>
 
+    </div>
+    <div v-else class="content-placeholder" aria-label="正在加载商品信息"><span></span><span></span><span></span></div>
     <div v-if="error" class="detail-error">{{ error }} <button @click="reload">重新加载</button></div>
     <div class="gap"></div>
 
@@ -189,7 +183,7 @@ const productRegion = ref('')
 const loading = ref(true)
 const error = ref('')
 const activeIdx = ref(0)
-const activeVariant = ref(0)
+const activeVariant = ref(-1)
 const qty = ref(1)
 const toast = ref('')
 const gallery = ref(null)
@@ -223,28 +217,6 @@ const colorOption = computed(() =>
 )
 const colorValues = computed(() => (colorOption.value ? colorOption.value.values || [] : []))
 const isColorOpt = (name) => /color|colour|颜色/i.test(name || '')
-// 颜色值 -> 主图 src（优先级：variant.imageId 回查 > image.variantIds 命中 > alt 含色名）
-function pickColorImage(cv) {
-  const v = variantList.value.find((x) =>
-    (x.selectedOptions || []).some((o) => isColorOpt(o.name) && o.value === cv)
-  )
-  if (v && v.imageId) {
-    const im = imageList.value.find((i) => String(i.id) === String(v.imageId))
-    if (im) return im.src
-  }
-  if (v) {
-    const im = imageList.value.find((i) => (i.variantIds || []).map(String).includes(String(v.id)))
-    if (im) return im.src
-  }
-  const byAlt = imageList.value.find((i) => (i.alt || '').toLowerCase().includes(cv.toLowerCase()))
-  if (byAlt) return byAlt.src
-  return null
-}
-const colorImageMap = computed(() => {
-  const m = {}
-  colorValues.value.forEach((cv) => { m[cv] = pickColorImage(cv) })
-  return m
-})
 // 有颜色选项即可选色；缺少图片关联时显示占位，不加载其它颜色冒充。
 const hasColor = computed(() => {
   const cv = colorValues.value
@@ -386,13 +358,13 @@ async function load() {
   detailReady.value = false
   loading.value = true
   error.value = ''
-  activeVariant.value = 0
+  activeVariant.value = -1
   activeColor.value = ''
   Object.keys(specPick).forEach((k) => delete specPick[k])
   qty.value = 1
   resetGallery()
   // 列表数据可能没有图与变体关联，不猜颜色；可解析时同步选中。
-  if (snapshot && query.variant) initSelection(query.variant)
+  if (snapshot) initSelection(query.variant)
   try {
     await initLocale()
     if (stale()) return
@@ -401,7 +373,11 @@ async function load() {
     const detail = await fetchProductDetail(handle, productRegion.value)
     if (stale()) return
     if (detail) {
-      product.value = detail
+      // 展示文案采用本次点击快照，避免接口返回后整块插入/改行高；价格库存仍用实时变体。
+      const display = snapshot?.presentationComplete ? Object.fromEntries(
+        ['name', 'vendor', 'tag', 'tagline', 'origin', 'description', 'specs', 'sellingPoints'].map((key) => [key, snapshot[key]])
+      ) : {}
+      product.value = { ...detail, ...display }
       if (!entryCover.value) entryCover.value = detail.cover || ''
       initSelection(query.variant)
       detailReady.value = true
@@ -511,8 +487,11 @@ async function onBuy() {
 
 <style scoped>
 .product-page { min-height: 100vh; }
+.content-placeholder { padding: 24px 16px; min-height: 240px; }
+.content-placeholder span { display: block; height: 18px; margin-bottom: 20px; border-radius: 6px; background: #eee; }
+.content-placeholder span:last-child { width: 45%; }
 .color-hint { color: var(--text-sub); font-size: 13px; margin-bottom: 12px; }
-.btn:disabled { opacity: .45; }
+.btn:disabled { cursor: wait; }
 .detail-error { padding: 16px; text-align: center; }
 .detail {
   min-height: 100vh;
@@ -542,7 +521,8 @@ async function onBuy() {
   text-align: center;
   box-sizing: border-box;
 }
-/* 图廊 */
+/* 固定图廊，导航叠在图片内，数据补齐不改变后续内容位置。 */
+.gallery-frame { position: relative; height: 360px; background: #fff; }
 .gallery {
   display: flex;
   overflow-x: auto;
@@ -567,11 +547,15 @@ async function onBuy() {
   color: #888;
 }
 .dots {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
   display: flex;
   gap: 6px;
   justify-content: center;
   padding: 8px 0;
-  background: #fff;
+  background: transparent;
 }
 .dot {
   width: 6px;
@@ -583,24 +567,6 @@ async function onBuy() {
   background: var(--brand);
   width: 16px;
   border-radius: 3px;
-}
-.thumbs {
-  display: flex;
-  gap: 8px;
-  padding: 0 12px 10px;
-  background: #fff;
-  overflow-x: auto;
-}
-.thumb {
-  width: 52px;
-  height: 52px;
-  border-radius: 8px;
-  object-fit: cover;
-  border: 2px solid transparent;
-  flex: none;
-}
-.thumb.active {
-  border-color: var(--brand);
 }
 /* 卡片 */
 .card {
@@ -997,7 +963,6 @@ async function onBuy() {
   width: 52px;
   height: 52px;
   border-radius: 8px;
-  object-fit: cover;
   background: #fff;
 }
 .color-swatch--dot {
