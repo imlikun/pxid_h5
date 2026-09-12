@@ -1,7 +1,7 @@
 <template>
   <div class="app-root" :class="{ 'embed-mode': inApp, 'wv-push-in': wvPushIn, 'product-transition': productTransition }" ref="rootRef">
     <router-view v-slot="{ Component }">
-      <transition :name="transitionName" @before-enter="onBeforeEnter" @after-enter="onAfterEnter" @before-leave="onBeforeLeave" @after-leave="onAfterLeave">
+      <transition :name="transitionName" @before-enter="onBeforeEnter" @after-enter="onAfterEnter" @before-leave="onBeforeLeave" @after-leave="onAfterLeave" @enter-cancelled="onEnterCancelled" @leave-cancelled="onLeaveCancelled">
         <keep-alive>
           <component :is="Component" />
         </keep-alive>
@@ -63,57 +63,80 @@ router.beforeEach((to, from) => {
   return true
 })
 
+// 入场结束和旧页移除是独立事件：两者完成前保留新页的固定定位。
+// 不让详情提前回到列表之后的文档流，也不同时固定两页。
+const leavingPages = new Set()
+const enteringPages = new Map()
+function finishEntries() {
+  if (leavingPages.size) return
+  for (const [el, finished] of enteringPages) {
+    if (!finished) continue
+    window.scrollTo(0, 0)
+    el.classList.remove('page-enter-held')
+    el.style.height = ''
+    enteringPages.delete(el)
+  }
+}
 function onBeforeEnter(el) {
-  if (transitionName.value === 'slide-forward' && detailLock.active) {
-    el.style.height = detailLock.height + 'px' // 锁定：视口中途变高也不再跟随
+  if (transitionName.value === 'slide-forward') {
+    enteringPages.set(el, false)
+    el.classList.add('page-enter-held')
+    if (detailLock.active) el.style.height = detailLock.height + 'px'
   }
 }
 function onAfterEnter(el) {
-  if (el && el.style) el.style.height = '' // keep-alive 复用 DOM，内联高度必须摘掉
-  // ⚠️ 前进滚顶已挪到 onAfterLeave（2026-09-08 坤哥录屏「详情页加载结束后消失再出现」根因）：
-  //    enter/leave 的 transitionend 是两个独立事件，afterEnter 触发时列表 DOM 可能还在文档里，
-  //    此刻 scrollTo(0,0) 会把视口滚到列表顶部 → 渲染出一帧列表 → 列表移除后详情才回来（真机可见）。
-  //    挪到 afterLeave 后：列表刚移除、文档只剩详情，同任务内滚顶 = 原子渲染无中间帧。
+  if (enteringPages.has(el)) {
+    enteringPages.set(el, true)
+    finishEntries()
+  } else el.style.height = ''
   releaseLock()
 }
-
-// 转场类残留保险丝（2026-09-07）：正常转场 340ms（embed 260ms）结束即摘类；但若转场期间
-// 页面根级 v-if 被异步数据切换打断（如详情页 load 置空 product），enter 元素被替换后
-// Vue 的摘类钩子丢失，slide-*-enter-from/active 残留 → 页面永久卡在 translateX(100%) 屏幕外 = 白屏
-// （探针实测：keep-alive 二次进入 4.5s 后类仍残留）。导航稳定后强制清扫一次兜底；
-// 正常场景 700ms 时类早已摘掉，本清扫为 no-op。
-router.afterEach(() => {
-  setTimeout(() => {
-    const root = document.querySelector('.app-root')
-    if (!root) return
-    root
-      .querySelectorAll(
-        '[class*="slide-forward-enter-"],[class*="slide-back-enter-"],[class*="slide-forward-leave-"],[class*="slide-back-leave-"]'
-      )
-      .forEach((el) => {
-        const cleaned = String(el.className)
-          .replace(/ ?slide-(forward|back)-(enter|leave)-(from|active|to)/g, '')
-          .trim()
-        if (cleaned !== el.className) el.className = cleaned
-      })
-  }, 700)
-})
+function onEnterCancelled(el) {
+  enteringPages.delete(el)
+  el.classList.remove('page-enter-held')
+  el.style.height = ''
+  releaseLock()
+}
 function onBeforeLeave(el) {
-  // 返回方向（详情→列表）：Flutter 恢复原生底栏同样会造成视口变化，锁住滑出的详情页高度
+  leavingPages.add(el)
+  // 快速返回时，旧入场的固定定位不能遗留到下一次 keep-alive 激活。
+  enteringPages.delete(el)
+  el.classList.remove('page-enter-held')
+  el.style.height = ''
   if (transitionName.value === 'slide-back' && backFromDetail) {
     el.style.height = window.innerHeight + 'px'
   }
 }
 function onAfterLeave(el) {
-  if (el && el.style) el.style.height = ''
-  // 前进转场收尾滚顶（自 onAfterEnter 挪入，原因见其注释）：列表 DOM 刚移除，
-  // 文档只剩详情页，同任务内 scrollTo 是原子渲染；rAF 兜底防异步内容再改高度。
-  if (transitionName.value === 'slide-forward') {
-    window.scrollTo(0, 0)
-    requestAnimationFrame(() => { if (window.scrollY !== 0) window.scrollTo(0, 0) })
-  }
+  leavingPages.delete(el)
+  el.style.height = ''
+  finishEntries()
   backFromDetail = false
 }
+function onLeaveCancelled(el) {
+  leavingPages.delete(el)
+  el.style.height = ''
+  finishEntries()
+}
+
+// 清理任务仅属于本次成功导航；旧任务不得剥掉下一次转场的样式。
+let transitionCleanup = null
+router.beforeEach(() => { clearTimeout(transitionCleanup) })
+router.afterEach((to, from, failure) => {
+  if (failure) return
+  clearTimeout(transitionCleanup)
+  transitionCleanup = setTimeout(() => {
+    const root = document.querySelector('.app-root')
+    if (!root) return
+    root.querySelectorAll('[class*="slide-forward-"],[class*="slide-back-"]').forEach((el) => {
+      // 正在执行的 Vue 转场交给自己的完成/取消钩子，兜底只清理孤立残留。
+      if (enteringPages.has(el) || leavingPages.has(el)) return
+      const cleaned = String(el.className).replace(/ ?slide-(forward|back)-(enter|leave)-(from|active|to)/g, '').trim()
+      if (cleaned !== el.className) el.className = cleaned
+    })
+  }, 700)
+})
+onUnmounted(() => clearTimeout(transitionCleanup))
 // 嵌入 Flutter 时原生已有全局返回手势，H5 转场压短时长，避免叠成「两段滑」
 const inApp = ref(bridge.isEmbed)
 
@@ -215,6 +238,7 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
       两页同时 absolute 会让 .app-root 高度塌陷，列表滚动位置瞬间丢失。
    3) will-change 只挂在 -active 类上，动画结束由 Vue 摘掉，不长期占用合成层。
    ============================================================ */
+.page-enter-held,
 .slide-forward-enter-active,
 .slide-back-leave-active {
   position: fixed;
