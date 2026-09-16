@@ -3,7 +3,7 @@
     <TopBar sticky :back="goBack" title="我的订单" />
 
     <!-- 状态 tab -->
-    <div class="tabs">
+    <div class="tabs" v-if="hasAny">
       <span
         v-for="tb in orderTabs"
         :key="tb"
@@ -45,7 +45,15 @@
         </div>
       </div>
 
-      <div v-if="filteredOrders.length === 0" class="empty">{{ loading ? '加载中…' : '暂无订单' }}</div>
+      <div v-if="filteredOrders.length === 0" class="empty">
+        <template v-if="loading">加载中…</template>
+        <template v-else-if="!hasAny">
+          <p class="empty-title">你还没有购物</p>
+          <p class="empty-sub">快去选一台心意的车吧</p>
+          <button class="empty-cta" @click="goShop">去逛逛</button>
+        </template>
+        <template v-else>该分类下暂无订单</template>
+      </div>
     </div>
   </div>
 </template>
@@ -53,7 +61,6 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { orderTabs, orders as mockOrders } from '../data/mock'
 import { addToCart } from '../store/cart'
 import { bridge } from '../bridge'
 import { API_BASE, sym } from '../api/shop'
@@ -64,6 +71,8 @@ const router = useRouter()
 const activeTab = ref('全部')
 const remoteOrders = ref([])
 const loading = ref(false)
+const orderTabs = ['全部', '待付款', '待发货', '已发货', '已完成']
+const hasAny = computed(() => remoteOrders.value.length > 0)
 
 const statusKey = (s) =>
   ({ 待付款: 'pay', 待发货: 'ship', 已发货: 'sent', 已完成: 'done', 已下单: 'done' }[s] || '')
@@ -145,8 +154,12 @@ function goBack() {
   else router.push('/featured')
 }
 
-// 真实订单优先；无真实订单时回退 mock 演示数据
-const allOrders = computed(() => (remoteOrders.value.length ? remoteOrders.value : mockOrders))
+function goShop() {
+  router.push('/featured')
+}
+
+// 仅展示真实订单（mall-api/orders 回流），无接口/无订单即空态
+const allOrders = computed(() => remoteOrders.value)
 
 const filteredOrders = computed(() =>
   activeTab.value === '全部' ? allOrders.value : allOrders.value.filter((o) => o.status === activeTab.value)
@@ -278,5 +291,17 @@ function showToast(msg) {
 .btn.dark { background: #1a1a1a; color: #ffffff; }
 .btn.ghost { background: #ffffff; border: 1px solid #e0e0e0; color: #333; }
 
-.empty { text-align: center; color: #999; padding: 48px 0; font-size: 13px; }
+.empty { text-align: center; color: #999; padding: 64px 24px; font-size: 13px; }
+.empty-title { font-size: 16px; color: #1a1a1a; font-weight: 600; margin: 0; }
+.empty-sub { font-size: 14px; color: #999; margin: 8px 0 22px; }
+.empty-cta {
+  display: inline-block;
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 11px 30px;
+  font-size: 14px;
+  cursor: pointer;
+}
 </style>

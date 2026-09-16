@@ -642,26 +642,6 @@ export const feedbackFaqs = [
   { id: 26, category: '使用指导', q: '安全骑行须知', a: '头盔必戴；不超载（最大载重见车型参数）；不涉水骑行（涉水深度 < 10cm）；夜间开启大灯尾灯；不与机动车抢道，遵守交规。' },
 ]
 
-// ---------------- 精选 · 我的订单 ----------------
-export const orderTabs = ['全部', '待付款', '待发货', '已发货', '已完成']
-
-export const orders = [
-  {
-    id: 'PX20260812003',
-    time: '2026-08-12 15:22',
-    status: '已发货',
-    items: [{ name: '原装后轮 适配P1', cover: 'gear', price: 6800, qty: 1 }],
-    total: 6800,
-  },
-  {
-    id: 'PX20260810007',
-    time: '2026-08-10 11:03',
-    status: '已完成',
-    items: [{ name: '智能中控屏 P1', cover: 'device', price: 1299, qty: 1 }],
-    total: 1299,
-  },
-]
-
 // ---------------- 动态流（关注流 UGC，独立数据源）----------------
 export const moments = [
   { id: 101, itemType: 'moment', author: '骑手老王', avatar: 'unsplash/photo-1500648767791-00dcc994a43e_w_80_q_80.jpg', title: '今天跑了 120 公里，P1 载货版续航真顶', content: '早上 6 点出门，中午充了一次电，晚上回来还剩 18%。载了三箱水加两袋米，起步一点不肉。', images: ['feed_d1.jpg', 'feed_r2.jpg', 'feed_d3.jpg', 'feed_r3.jpg'], tags: ['日常跑单', '续航实测'], carModel: 'P1', likes: 88, isLiked: false, comments: 21, time: '2小时前', followed: false, focusCar: 'P1' },

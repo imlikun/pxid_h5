@@ -60,7 +60,6 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { API_BASE, sym } from '../api/shop'
 import { bridge } from '../bridge'
-import { orders as mockOrders } from '../data/mock'
 import { addToCart } from '../store/cart'
 import { t } from '../i18n'
 import IconSvg from '../components/IconSvg.vue'
@@ -71,13 +70,9 @@ const router = useRouter()
 const order = ref(null)
 const loading = ref(true)
 
-// 列表传入的 id：真实订单是 #123，mock 是 PX2026...；统一去掉 # 后查找
+// 列表传入的 id：真实订单是 #123；统一去掉 # 后查找
 const rawId = route.params.id
 const lookId = String(rawId || '').replace(/^#/, '')
-
-function findMock(id) {
-  return (mockOrders || []).find((o) => String(o.id).replace(/^#/, '') === id)
-}
 
 function statusHint(s) {
   return (
@@ -121,8 +116,8 @@ async function load() {
         console.warn('[order-detail] remote failed, fallback mock:', e.message || e)
       }
     }
-    // 兜底：本地 mock
-    order.value = findMock(lookId) || null
+    // 兜底：无真实订单接口时置空，由模板展示「订单不存在」
+    order.value = null
   } finally {
     loading.value = false
   }
