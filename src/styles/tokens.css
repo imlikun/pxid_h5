@@ -44,6 +44,21 @@ body {
   overflow-x: clip;
 }
 
+/* 全局隐藏滚动条（2026-09-16 坤哥反馈：发现/精选页右侧出现浏览器式灰竖条）。
+   根因：页面竖向滚动发生在文档根（html/body），而 Android WebView(Chromium)
+   会给滚动容器画 overlay 滚动条 —— 就是那条竖条。
+   ⚠️ 只隐藏外观，绝不改 overflow —— 不改变滚动容器语义、不影响 sticky 顶栏与滚动位置。
+   页面内原有横向滚动区（.chips / .mp / .gallery / .related-scroll）本就逐个隐藏，这里统一收口。 */
+* {
+  scrollbar-width: none;      /* Firefox / 部分 WebView 内核 */
+  -ms-overflow-style: none;   /* 旧 Edge/IE */
+}
+*::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue',
     Helvetica, 'Microsoft YaHei', Arial, sans-serif;
