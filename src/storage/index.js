@@ -2,6 +2,8 @@
 // 切换存储仅改 VITE_STORAGE_DRIVER（local | oss），业务代码零改：
 //   local = 落 ECS /uploads，前端走 /media/upload，getUrl 拼 API_BASE
 //   oss   = 阿里云 OSS + CDN，前端直传 OSS SDK（STS），getUrl 拼 CDN_BASE
+import { compressImage } from '../utils/imageCompress'
+
 const DRIVER = (import.meta.env && import.meta.env.VITE_STORAGE_DRIVER) || 'local'
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 const CDN_BASE = (import.meta.env && import.meta.env.VITE_CDN_BASE) || ''
@@ -21,8 +23,11 @@ export async function uploadMedia(file, token) {
   if (DRIVER === 'oss') {
     throw new Error('OSS 直传未实现（迁移阶段，请切 VITE_STORAGE_DRIVER=local）')
   }
+  // 图片统一在此压缩（2026-09-19）：所有上传入口（发帖图片/头像/视频封面）都过这里，
+  // 一处生效。非图片（视频）、GIF、已足够小的图、解码失败 → 原样上传，见 utils/imageCompress.js。
+  const toSend = await compressImage(file)
   const fd = new FormData()
-  fd.append('file', file)
+  fd.append('file', toSend)
   const r = await fetch(API_BASE + '/media/upload', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token },

@@ -10,6 +10,10 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>PXID 智能两轮</title>
+    <!-- 提前与 API 域名建连（2026-09-19）：跨域接口首次调用要额外一次 DNS+TLS 握手，
+         实测首次 TTFB 235ms vs 复用连接后 40ms → 预连接可省 ~150-200ms。 -->
+    <link rel="preconnect" href="https://pxid-api.appin.site" crossorigin />
+    <link rel="dns-prefetch" href="https://pxid-api.appin.site" />
   </head>
   <body>
     <div id="app"></div>
