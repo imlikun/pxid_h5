@@ -420,7 +420,12 @@ async function onPublish() {
         content: content.value.trim(),
         images,
         carModel: cm,
-        tags: cm ? [cm] : [],
+        // 🔴 不再把车型塞进 tags（2026-09-19 坤哥反馈「详情页出现两个 #P5」）：
+        //    此前 `tags: cm ? [cm] : []` 让同一车型被渲染两次——tags 出一个蓝色话题标签、
+        //    carModel 出一个灰色车型标签。车型只走 carModel 字段即可（详情页/卡片都读它）。
+        //    后端 feeds.tags 唯一功能性用途是活动话题统计（`tags LIKE '%act{xx}%'`），
+        //    不依赖车型，去掉不影响任何后端逻辑（已核 server.js）。
+        tags: [],
         region,
         // ⚠️ 不再兜底「骑友」（2026-09-01 北帆整改清单 问题D）：取不到就传空，
         //    由后端按 token 身份从 user_profiles 解析真实昵称；传「骑友」会被写进 feeds 表

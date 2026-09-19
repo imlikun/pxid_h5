@@ -96,7 +96,9 @@ export async function publishFeed(payload) {
     title: text.slice(0, 20) || '我的动态',
     content: text,
     images: payload.images || [],
-    tags: cm ? [cm] : payload.tags || [],
+    // 🔴 车型不再塞进 tags（2026-09-19，同 PublishView 修复）：车型只走 carModel，
+    //    否则详情页会渲染出两个同值标签（tags 蓝色 + carModel 灰色）。
+    tags: payload.tags || [],
     carModel: cm,
     likes: 0,
     isLiked: false,
