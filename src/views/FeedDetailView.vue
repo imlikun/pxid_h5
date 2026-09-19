@@ -831,11 +831,23 @@ const segments = computed(() => {
 })
 
 // 标签：话题 + 车型
+// 🔴 去重（2026-09-19 坤哥反馈「详情页出现两个 #P5，去掉灰色那个」）：
+//    发帖时车型会【同时】写进 tags（api/feed.js publishFeed: `tags: cm ? [cm] : ...`）
+//    与 carModel 字段，这里两边都 push 就会渲染出两个同值标签
+//    （蓝色话题 #P5 + 灰色车型 #P5）。按值去重后：重复时只留蓝色话题标签，
+//    车型不重复时灰色标签照常显示（不受影响）。
 const tagList = computed(() => {
   if (!item.value) return []
   const list = []
-  ;(item.value.tags || []).forEach((t) => list.push({ v: t, car: false }))
-  if (item.value.carModel) list.push({ v: item.value.carModel, car: true })
+  const seen = new Set()
+  ;(item.value.tags || []).forEach((t) => {
+    const v = String(t || '').trim()
+    if (!v) return
+    seen.add(v.toUpperCase())
+    list.push({ v, car: false })
+  })
+  const cm = String(item.value.carModel || '').trim()
+  if (cm && !seen.has(cm.toUpperCase())) list.push({ v: cm, car: true })
   return list
 })
 
