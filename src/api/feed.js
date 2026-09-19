@@ -10,6 +10,7 @@
 //   发帖写本地存储，刷新不丢、本机可回看；动态流 = 我的发布 + 官方 mock moments。
 // 后端就绪后：在下方 FEED_API 填真实 Base URL 即自动切换（保留 mock 兜底）。
 // ============================================================
+import { uploadMedia as uploadToStorage } from '../storage'
 
 import { publishState, addMoment, ensurePublishScope } from '../store/publish'
 import { moments, feedItems, defaultAvatar } from '../data/mock'
@@ -450,17 +451,12 @@ export async function updateMyProfile(payload) {
 }
 
 // 上传媒体（头像等）：multipart/form-data → /media/upload，返回可访问 URL
+// 2026-09-19：改走 storage 层的统一上传（会先做图片压缩），
+// 避免头像这条路径绕过 `utils/imageCompress` 把几 MB 原图直接传上去。
 export async function uploadMedia(file) {
   const tk = await getAuthTokenSafe()
-  const form = new FormData()
-  form.append('file', file)
-  const headers = {}
-  if (tk) headers.Authorization = 'Bearer ' + tk
-  const res = await fetch(FEED_API + '/media/upload', { method: 'POST', headers, body: form })
-  if (!res.ok) throw new Error('HTTP ' + res.status)
-  const json = await res.json()
-  if (json.code !== 0) throw new Error(json.message || '上传失败')
-  return json.data.url
+  const r = await uploadToStorage(file, tk)
+  return r.url
 }
 
 // ---- 某人发布的动态（个人主页动态流，按 device_id / member_user_id 双身份过滤，解决 ToC 双 ID 漂移）----
