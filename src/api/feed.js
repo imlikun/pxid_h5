@@ -36,7 +36,7 @@ async function getAuthTokenSafe() {
 //   改因：详情页冷启动实测被 token 串行阻塞拖慢（真机桥调用 300~800ms；预览态 /auth/token 2680ms）。
 async function request(path, { method = 'GET', body, auth = 'wait' } = {}) {
   const headers = { 'Content-Type': 'application/json' }
-  const tk = auth === 'peek' ? await authTokenReady(400) : await getAuthTokenSafe()
+  const tk = auth === 'peek' ? await authTokenReady(80) : await getAuthTokenSafe()
   if (tk) headers.Authorization = 'Bearer ' + tk
   const res = await fetch(FEED_API + path, {
     method,

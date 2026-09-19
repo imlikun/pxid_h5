@@ -384,7 +384,11 @@ export function peekAuthToken() {
 
 // 等 token 就绪，最多等 ms 毫秒；超时返回当前已就绪值（可能为空串）。
 // 用于公开读接口：既尽量带上 token，又绝不被桥调用长时间阻塞。
-export function authTokenReady(ms = 400) {
+// ⚠️ 默认只等 80ms（2026-09-19 实测修正）：token 由 prewarmAuthToken 在启动时就并行预热，
+//    到首屏发请求时通常已就绪（peek 命中即为 0 等待）；未就绪时宽限越小首屏越快。
+//    曾用 400ms，实测让详情页数据到位白白推迟 ~400ms（首屏 1377ms → 预期 ~900ms）。
+//    个性化状态（点赞/收藏）另有 checkFavorite / checkFollow 兜底。
+export function authTokenReady(ms = 80) {
   if (_authTokenCache) return Promise.resolve(_authTokenCache)
   return Promise.race([
     _loadAuthToken(),
