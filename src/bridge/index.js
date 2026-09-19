@@ -367,6 +367,48 @@ export function initBridge() {
   window.__PXID_EMBED__ = isEmbed()
 }
 
+// ---- 登录 token 缓存（2026-09-19 性能修复）----
+// 背景：getAuthToken() 原来【每次调用】都走一遍 getUserInfo()/getToken() 桥调用，
+//   而 api/feed.js 的 request() 每个请求前都 await 它 —— 详情页冷启动实测被串行拖住
+//   （真机桥调用 300~800ms；H5 预览态 mockBridge 的 /auth/token 实测 2680ms）。
+// 做法：① 结果缓存，桥调用只走一次（顺带解决 getUserInfo 首屏被反复调用的老问题）；
+//      ② 暴露 peekAuthToken() 供「公开读接口」零等待取值 —— 拿不到就先不带 token 发，
+//         个性化状态（点赞/收藏）由后端公开字段 + checkFavorite/checkFollow 后续补。
+let _authTokenCache = ''
+let _authTokenPromise = null
+
+// 同步读已就绪的 token（不发起任何桥调用/网络请求）
+export function peekAuthToken() {
+  return _authTokenCache || ''
+}
+
+// 等 token 就绪，最多等 ms 毫秒；超时返回当前已就绪值（可能为空串）。
+// 用于公开读接口：既尽量带上 token，又绝不被桥调用长时间阻塞。
+export function authTokenReady(ms = 400) {
+  if (_authTokenCache) return Promise.resolve(_authTokenCache)
+  return Promise.race([
+    _loadAuthToken(),
+    new Promise((resolve) => setTimeout(() => resolve(_authTokenCache || ''), ms)),
+  ]).catch(() => '')
+}
+
+async function _loadAuthToken() {
+  if (_authTokenCache) return _authTokenCache
+  if (_authTokenPromise) return _authTokenPromise
+  _authTokenPromise = (async () => {
+    try {
+      const u = await window.PXIDBridge.getUserInfo()
+      if (u && u.token) { _authTokenCache = u.token; return u.token }
+    } catch (e) { /* 真机未实现 getUserInfo 时回退 */ }
+    try {
+      const t = await window.PXIDBridge.getToken()
+      if (t) { _authTokenCache = t; return t }
+    } catch (e) { /* 原生未注入时回退 */ }
+    return ''
+  })().finally(() => { _authTokenPromise = null })
+  return _authTokenPromise
+}
+
 // 启动即并行预热 token（2026-09-05）：
 // api/feed.js 的 request() 每个请求前都 await getAuthTokenSafe()，而 H5 预览态下 /auth/token
 // 实测近 1s —— 若等到列表请求那一刻才取，首屏就被这一个串行 RTT 白白拖住（实测 3.5s→2.5s）。
@@ -388,17 +430,9 @@ export const bridge = {
   getToken: () => window.PXIDBridge.getToken(),
   // 统一登录态 token：真机优先 getUserInfo 注入的登录 token，回退 getToken()（mock/匿名）
   // 修复：真机 getToken() 未必返回登录 token，但登录态经 getUserInfo 注入 → 评论/点赞统一走这里
-  getAuthToken: async () => {
-    try {
-      const u = await window.PXIDBridge.getUserInfo()
-      if (u && u.token) return u.token
-    } catch (e) { /* 真机未实现 getUserInfo 时回退 */ }
-    try {
-      const t = await window.PXIDBridge.getToken()
-      if (t) return t
-    } catch (e) { /* 原生未注入时回退 */ }
-    return null
-  },
+  // ⚠️ 2026-09-19：改为走 _loadAuthToken()（结果缓存），桥调用只发生一次；
+  //    此前每次调用都重新 getUserInfo()+getToken()，是详情页冷启动被串行拖慢的主因之一。
+  getAuthToken: () => _loadAuthToken().then((t) => t || null),
   getUserInfo: () => Promise.resolve(window.PXIDBridge.getUserInfo()).then(normalizeProfile),
   // 关注列表 / 粉丝列表（App 账号关系，Flutter 经桥返回；原生未实现时 reject，由上层回退 H5 本地）
   getFollowList: () =>

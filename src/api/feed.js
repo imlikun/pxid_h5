@@ -14,7 +14,7 @@
 import { publishState, addMoment, ensurePublishScope } from '../store/publish'
 import { moments, feedItems, defaultAvatar } from '../data/mock'
 import { getDeviceId } from '../utils/device'
-import bridge from '../bridge'
+import bridge, { authTokenReady } from '../bridge'
 
 // 后端就绪后改为真实地址（2026-08-18 已上线 pxid-api.appin.site）
 const FEED_API = 'https://pxid-api.appin.site'
@@ -28,9 +28,15 @@ async function getAuthTokenSafe() {
   }
 }
 
-async function request(path, { method = 'GET', body } = {}) {
+// auth 参数（2026-09-19 性能修复）：
+//   'wait'（默认）= 必须鉴权的接口（发帖/评论/点赞/收藏/关注/个人数据）—— 等 token 就绪再发；
+//   'peek'        = 公开读接口（动态列表 / 详情 / 评论列表 / banner / 活动 / 他人主页）——
+//                   不长时间等 token：已就绪就带上，未就绪先发请求（后端公开字段照常返回，
+//                   个性化状态由 checkFavorite / checkFollow 后续补）。
+//   改因：详情页冷启动实测被 token 串行阻塞拖慢（真机桥调用 300~800ms；预览态 /auth/token 2680ms）。
+async function request(path, { method = 'GET', body, auth = 'wait' } = {}) {
   const headers = { 'Content-Type': 'application/json' }
-  const tk = await getAuthTokenSafe()
+  const tk = auth === 'peek' ? await authTokenReady(400) : await getAuthTokenSafe()
   if (tk) headers.Authorization = 'Bearer ' + tk
   const res = await fetch(FEED_API + path, {
     method,
@@ -58,7 +64,7 @@ export async function fetchFeeds(tab = 'dynamic', params = {}) {
       // 动态：关注流，传当前设备 ID 让后端按「关注 + 官方」过滤；near 模式显式传 followerDevice='' 则不过滤
       if (tab === 'dynamic' && params.followerDevice === undefined) qsParams.followerDevice = await getDeviceId()
       const qs = new URLSearchParams(qsParams).toString()
-      const data = await request('/feed?' + qs)
+      const data = await request('/feed?' + qs, { auth: 'peek' })
       return { list: (data.list || []).map(normalize), total: data.total || 0 }
     } catch (e) {
       console.warn('[fetchFeeds] API error:', e.message || e)
@@ -125,7 +131,7 @@ const detailInflight = new Map() // id -> Promise（同一 id 并发只发一次
 async function fetchFeedDetailRaw(id) {
   if (FEED_API) {
     try {
-      const data = await request('/feed/' + id)
+      const data = await request('/feed/' + id, { auth: 'peek' })
       return normalize(data)
     } catch (e) {
       /* 回落 */
@@ -272,7 +278,7 @@ const commentsInflight = new Map() // id -> Promise（同一 id 并发只发一�
 async function fetchCommentsRaw(id) {
   if (!FEED_API) return null
   try {
-    const data = await request('/feed/' + id + '/comments')
+    const data = await request('/feed/' + id + '/comments', { auth: 'peek' })
     return (data.list || []).map((c) => ({
       id: c.id,
       author: c.author,

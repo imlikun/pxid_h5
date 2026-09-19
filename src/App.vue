@@ -177,15 +177,28 @@ function onVisibilityChange() {
 // 首屏空闲时提前把高频详情页拉下来，点击即可立即起转场。
 // 与 router 里的动态 import 指向同一模块，Vite 复用同一个 chunk，不会重复打包。
 function prefetchDetailChunks() {
-  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500))
-  idle(() => {
-    import('./views/FeedDetailView.vue').catch(() => {})
-    import('./views/ProductDetailView.vue').catch(() => {})
+  // 2026-09-19 性能修复：原来在 idle 里【并发】import 4 个页面模块，连带 20+ 个 chunk
+  // 同时下载，与首屏 entry JS/CSS 抢带宽（实测 4G 下 entry JS 896ms、CSS 1288ms，
+  // 详情页冷启动 4.9s → 触发 App 加载判定超时反复重载）。
+  // 改为：① 等首屏资源加载完成（window load）再开始；② 四个模块【串行】预取，一个完成再拉下一个。
+  const idle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 2000 }) : setTimeout(fn, 1200))
+  const loaders = [
+    () => import('./views/FeedDetailView.vue'),
+    () => import('./views/ProductDetailView.vue'),
     // 公告列表/详情 chunk 预热（2026-09-08）：公告数据本身打包在 JS 里零网络拉取，
     // 但页面代码是懒加载 chunk，首次点击要现下载——发现页空闲时提前拉好，点公告零等待。
-    import('./views/NoticesView.vue').catch(() => {})
-    import('./views/NoticeDetailView.vue').catch(() => {})
-  })
+    () => import('./views/NoticesView.vue'),
+    () => import('./views/NoticeDetailView.vue'),
+  ]
+  let i = 0
+  const next = () => {
+    if (i >= loaders.length) return
+    const load = loaders[i++]
+    idle(() => { load().catch(() => {}).finally(next) })
+  }
+  const start = () => idle(next)
+  if (document.readyState === 'complete') start()
+  else window.addEventListener('load', start, { once: true })
 }
 
 onMounted(() => {
