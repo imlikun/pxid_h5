@@ -193,6 +193,17 @@ router.push('/feed/123')                              // 否则（预览/旧 App
   这是**安全债**：文件已入库。代理**绝对不要**把密钥值复制到任何新文件、文档、日志、提交信息里；
   需要新增密钥时改 `.env.example` 占位 + 线上 pm2 env 注入，不要硬编码进 `server.js`。
 - 后端 fail-closed 策略（2026-08-20 起）：`ADMIN_TOKEN` 未配 → admin 接口 500；`SHOPIFY_WEBHOOK_SECRET` 未配 → webhook 503。
+- **用户上传的图片/视频（2026-09-19 起）**：
+  - 落盘 `/root/pxid-feed-server/uploads/`（`server.js` 用 `express.static` 暴露在 `/uploads/*`）。
+  - **H5 上传前已压缩**：所有上传走 `src/storage/index.js` 的 `uploadMedia()` → `src/utils/imageCompress.js`
+    （最长边 1920 / JPEG q82；GIF、非图片、≤260KB、解码失败一律原样上传）。**别再写直连 `/media/upload` 的上传**（绕过压缩）。
+  - **nginx 给 `/uploads/` 配了长缓存**：`pxid-api.appin.site` vhost 里 `location ^~ /uploads/` → `Cache-Control: public, max-age=31536000, immutable`
+    （文件名带时间戳，天然唯一）。⚠️ 改这里必须用 **`proxy_hide_header Cache-Control`** 剥掉上游的 `max-age=0`——
+    `proxy_ignore_headers` 只影响 nginx 自身处理、**不会删响应头**，会留下两条冲突的 Cache-Control。
+    改完 `nginx -t` + `-s reload`，配置备份形如 `pxid-api.appin.site.conf.bak-uploadscache-<ts>`。
+  - 接口（非 `/uploads/`）仍强制 `no-store`，别动。
+  - ⚠️ **服务器上没有任何图片处理工具**（无 imagemagick / ffmpeg / sharp）——批量重压历史图要**在沙箱里用 Chromium canvas 跑**
+    （参考 `batch-compress.mjs`），先 `tar czf /root/uploads-backup-<ts>.tar.gz -C /root/pxid-feed-server uploads` 备份再覆盖。
 
 ---
 
@@ -228,6 +239,7 @@ router.push('/feed/123')                              // 否则（预览/旧 App
 10. **默认值类改动必须带空数据兜底**（例：发现页「我的车」默认筛选 —— 库里没该车型内容时静默回「全部」，否则用户进页面看到空白页）。
 11. **密钥不进代码/文档/日志**（见 §4）。
 12. 改 `server/server.js` 后**记得它会随部署脚本自动同步**；新增独立脚本必须手动 scp + 记录。
+13. **上传文件必须走统一入口** `src/storage/index.js` 的 `uploadMedia()`（内含图片压缩）；不要新写直连 `/media/upload` 的 fetch。
 
 ---
 
@@ -271,7 +283,10 @@ router.push('/feed/123')                              // 否则（预览/旧 App
   「默认筛我的车」目前多数会落到兜底的「全部」。要真正见效需内容侧补标签，或 H5 切服务端过滤
   （后端 `/feed` **已支持 `carModel` 参数**，前端暂未用，仍在纯前端过滤）。
 - **车型页冷加载 2.9~8s**（`VehicleDetailView` 先拉商品全列表再拉单品详情），加载态仅一行文字；提速方向 = sessionStorage 快照（同 `feedSnapshot.js`）。
-- **缩略图未压**：首屏图 760KB → 目标 ~40KB。
+- ~~**缩略图未压**：首屏图 760KB → 目标 ~40KB。~~ **2026-09-19 已解决**：新上传走客户端压缩（≤260KB）；
+  历史 10 张 `uploads/*.jpg` 已批量重压 **18.50MB → 1.61MB**（服务器 tar 备份 `/root/uploads-backup-20260919-190636.tar.gz`）；
+  nginx 给 `/uploads/` 上了 1 年 `immutable`（之前是 `no-store`，每次进详情页都重下）。详见 §4。
+  ⚠️ 历史 `.mp4`（11~14MB/个）**未处理**——视频重编码要另议（服务器无 ffmpeg）。
 - **评论 DELETE 接口后端未实现**（测试数据只能进 SQLite 删）。
 - **订单详情 / 退货申请的后端接口不存在**：前端 `OrderDetailView` 调 `/mall-api/order/:id`、`OrderListView` 调
   `/mall-api/order/return-request`，后端只有 `/mall-api/orders`（列表）—— 目前靠前端本地降级兜着，
