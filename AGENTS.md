@@ -221,6 +221,7 @@ router.push('/feed/123')                              // 否则（预览/旧 App
 | `docs/Flutter_桥方法对接.md` · `docs/发布_Flutter对接.md` · `docs/用户主页_Flutter对接.md` · `docs/Flutter_我的页四格统计对接-2026-08-29.md` | 各专题 Flutter 对接 |
 | `docs/PXID_迁移_服务接管_热更新_对接.md` | 迁移 / 服务接管 / 热更新 |
 | `docs/ToC_App_视觉开发规范.md` | 视觉规范 |
+| `docs/PXID_详情页WebView重载_Flutter排查单.md` | **详情页「转圈 → 网络有问题」排查单（2026-09-19）**：H5+服务端已排除的证据链、可配合的「页面就绪」桥信号方案、给 Flutter 的三件事与验收清单。**这问题仍未修，改详情页/加载逻辑前先看它** |
 | `FLUTTER_PENDING.md` · `HANDOFF.md` | Flutter 待办 / 交接快照（历史） |
 
 ---
