@@ -4,8 +4,8 @@
     <div class="tb-left">
       <slot name="left">
         <span v-if="showBack" class="tb-back press" @click="onBack">
-          <svg v-if="close" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-          <svg v-else viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <svg v-if="close" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.5 19.5-7.5-7.5 7.5-7.5"/></svg>
         </span>
       </slot>
     </div>
@@ -60,17 +60,25 @@ function onBack() {
 </script>
 
 <style>
-/* 全站统一顶栏：48px 高 · 三栏布局 · 返回箭头 22 / 操作图标 24
+/* 全站统一顶栏（2026-09-21 对齐 Flutter 原生 AppBar 基准）
+   规格来源：坤哥给的 Flutter 侧 AppBar 精确规格 ——
+     · 高度 56px（不含状态栏；status bar 由 Flutter SafeArea 承担，H5 不再叠加 env）
+     · 背景纯白 #FFFFFF，无边框/无阴影/无滚动染色
+     · 标题 18px / 500 / #000000DD，工具栏内垂直居中（中心距上沿 28px）
+     · 返回键：18×18 图标盒、单尖括号（无箭杆），热区 48×48 距左 4px、距上沿 4px，
+       故图标中心落在 (28, 28)；左/右布局槽均 56px
    类名 tb-* 全局唯一，slot 内容样式仍由各页面 scoped 样式负责 */
 .tb-bar {
   position: relative;
-  height: 48px;
+  height: 56px;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* 8px 基础内边距：返回键用 -4px 抵消后热区左缘正好落在 4px（见 .tb-back），
+     而 root 页（发现/精选/服务）的 Tab 组仍保持 8+8=16px 的左对齐，不被牵动 */
   padding: 0 8px;
-  background: var(--bg, #ffffff);
+  background: #ffffff;
 }
 .tb-sticky {
   position: sticky;
@@ -87,28 +95,33 @@ function onBack() {
 }
 .tb-right {
   justify-content: flex-end;
+  /* 与返回键对称：24px 图标右缘落在 16px 处 → 图标中心距右 28px */
+  padding-right: 8px;
 }
 .tb-back {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin-left: -8px;
+  /* 48×48 点击热区（Material 默认），距工具栏上沿 4px（56-48)/2 */
+  width: 48px;
+  height: 48px;
+  /* 8px 内边距 - 4px = 热区左缘 4px；图标中心 = 4 + 24 = 28px */
+  margin-left: -4px;
   border-radius: 50%;
-  color: var(--text, #1a1a1a);
+  color: #000000DD;
 }
 .tb-back:active {
-  background: rgba(0, 0, 0, 0.05);
+  /* 对应 Flutter 主题覆盖色 #26808080（ARGB）= 15% 灰；无扩散水波纹 */
+  background: rgba(128, 128, 128, 0.15);
 }
 .tb-title {
   position: absolute;
   left: 56px;
   right: 56px;
   text-align: center;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text, #1a1a1a);
+  font-size: 18px;
+  font-weight: 500;
+  color: #000000DD;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

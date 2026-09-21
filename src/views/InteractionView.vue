@@ -326,16 +326,14 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   background: var(--bg, #f7f8fa);
   padding-bottom: env(safe-area-inset-bottom);
 }
-/* 防御性覆盖：确保顶栏背景为浅色，避免某些 WebView/深色模式下被渲染成黑色 */
+/* 防御性覆盖：确保顶栏背景为浅色，避免某些 WebView/深色模式下被渲染成黑色
+   （全局顶栏 2026-09-21 起已是纯白 #FFFFFF，此处保留作二次保险） */
 :deep(.tb-bar) {
   background: var(--card, #ffffff);
 }
-/* 本页标题放大（全局 TopBar 默认 16px/600），仅互动消息页生效 */
-:deep(.tb-title) {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-}
+/* 2026-09-21 移除本页「标题放大」覆盖（原 19px/700）：
+   坤哥要求全站顶栏对齐 Flutter 原生 AppBar 的 18px / 500，
+   本页单独放大后与「我的积分 / 我的订单 / 活动中心」等页不一致，故回归全局规格。 */
 
 /* ---- 顶栏右侧筛选按钮 ---- */
 .filter-btn {
