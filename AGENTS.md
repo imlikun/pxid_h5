@@ -162,6 +162,29 @@ router.push('/feed/123')                              // 否则（预览/旧 App
 - 商品/地区：`src/api/shop.js` 的 `region` 由**界面语言**映射（`zh→CN / pt→BR / en→US`），不再由 Flutter 单独注入。
 - 购物车 `src/store/cart.js` 本地持久化；结算走**后端** `POST /mall-api/checkout-v2`（后端建 Shopify 车 + 预填邮箱/地址/region）→ 拿 url → `bridge.openShopify(url)`。
 
+### 3.6 顶栏（TopBar）规格 —— 对齐 Flutter 原生 AppBar（2026-09-21 定案）
+
+`src/components/TopBar.vue` 是全站唯一顶栏（35+ 页面在用）。规格由坤哥从 **Flutter 侧 AppBar 实测反推**，
+**改它等于改全站**，动手前先读本节：
+
+| 项 | 规格 | 现状实现 |
+|---|---|---|
+| 高度 | **56px**（不含状态栏；status bar 由 Flutter SafeArea 承担，H5 绝不叠加 `env(safe-area-inset-top)`） | `.tb-bar { height: 56px }` |
+| 背景 | **纯白 #FFFFFF**，无边框 / 无阴影 / 无滚动染色 | `.tb-bar { background: #ffffff }` |
+| 标题 | **18px / 500 / #000000DD**，工具栏内垂直居中（中心距上沿 28px），居中（`titleCenterX === vwCenterX`） | `.tb-title` |
+| 返回键图标 | **18×18 图标盒**，单个左向尖括号（无箭杆） | 内联 SVG（viewBox 24，`m15.5 19.5-7.5-7.5 7.5-7.5`） |
+| 返回键热区 | **48×48**，距左 4px、距上沿 4px → **图标中心 (28, 28)** | `.tb-back { 48×48; margin-left:-4px }`（抵消 bar 的 8px padding，同时保住 root 页 Tab 的 16px 左对齐） |
+| 左右布局槽 | 各 56px | `.tb-left/.tb-right { min-width: 56px }` |
+| 右侧控件 | 与左侧对称：24px 图标中心距右 28px | `.tb-right { padding-right: 8px }` |
+| 按下反馈 | 无扩散水波纹，短暂灰底（Flutter 主题覆盖色 `#26808080`） | `.tb-back:active { background: rgba(128,128,128,.15) }` |
+| 正文底色 | #F5F5F5（我们的 `--bg` = #F5F5F4，差 1/255，视觉不可辨，**故意不动**） | `tokens.css --bg` |
+
+⚠️ **两处例外，别顺手"统一"掉**：
+1. `VehicleDetailView`（车型详情）用**自绘沉浸式导航栏**（`.nav-bar`，浮在 Hero 图上、深色渐变 + 白字）——不是 TopBar，**不要**改成白色。
+2. `InteractionView` / `MessageView` / `InteractionDetailView` 里有 `:deep(.tb-bar){background:var(--card)}` 的**防御性覆盖**（防深色模式被渲成黑），值与全局一致，留着无害。
+
+⚠️ 页面级 `:deep(.tb-title)` 覆盖已被清理（原「互动消息」19px/700）——**不要再单独放大某个页面的标题**，全站统一 18/500。
+
 ### 3.5 两个容易改错的机制
 
 1. **keep-alive + 全局 transition**：`App.vue` 用 `<transition>` 包 `<keep-alive>`。红线：
