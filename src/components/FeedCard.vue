@@ -89,8 +89,13 @@ function goUser() {
 
 <style scoped>
 .fcard {
-  background: transparent;
-  border-radius: var(--radius);
+  /* 白底卡片（2026-09-21 坤哥反馈：发现页推荐列表每条改白色背景）。
+     对齐 MomentCard 的既有白卡规范：--card 底 + 卡片档圆角 + 极轻阴影，
+     与「动态」tab 单列白卡在视觉上统一（此前这里是 transparent，文字直接压在灰底上）。
+     图片仍通栏贴顶（靠 overflow:hidden 裁出上方圆角），文字区留 10px 内边距。 */
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   overflow: hidden;
 }
 .fcard__coverwrap {
@@ -130,7 +135,7 @@ function goUser() {
   pointer-events: none;
 }
 .fcard__title {
-  padding: 10px 0 0;
+  padding: 10px 10px 0;
   font-size: 14px;
   color: var(--text);
   line-height: 1.45;
@@ -141,7 +146,7 @@ function goUser() {
   overflow: hidden;
 }
 .fcard__foot {
-  padding: 8px 0 0;
+  padding: 8px 10px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;

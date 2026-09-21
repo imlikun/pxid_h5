@@ -945,11 +945,17 @@ function showToast(msg) {
 /* 搜索结果（内联） */
 .search-results {
   padding: 8px 12px 16px;
+  /* 卡片改白底后必须拉开间距，否则堆叠的白卡会粘成一片（2026-09-21）。
+     用 gap 统一节奏，卡片自身不加 margin，避免与 .grid2 的 gap 叠加。 */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .search-results__head {
   font-size: 13px;
   color: var(--text-hint);
-  padding: 4px 4px 12px;
+  /* 底距交给上面的 gap（原来是 12px，会与 gap 叠加） */
+  padding: 4px 4px 0;
 }
 .search-results__empty {
   text-align: center;
