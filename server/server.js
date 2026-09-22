@@ -55,7 +55,18 @@ app.use((req, res, next) => {
 // ---- 请求日志（真机排障临时启用，稳定后移除）----
 app.use((req, res, next) => {
   const ip = (req.headers['x-forwarded-for'] && req.headers['x-forwarded-for'].split(',')[0].trim()) || req.ip || req.socket.remoteAddress || 'unknown'
-  const auth = String(req.headers.authorization || '').slice(0, 60)
+  // 🔴 token 绝不落日志（2026-09-22 修，AGENTS.md §4 红线 11）：
+  //   原来打的是 `Authorization` 的前 60 字符 —— ToC 受限 token 只有 32 位 hex，等于**全量明文**写进 pm2 日志
+  //   （当时已累积 1.4 万行带 token 的记录，任何人拿到日志即可冒充用户）。
+  //   现在只输出「形态 + 长度」：既够排障（区分 ToC 受限 token / 自签 HMAC / 未带 / 其他），又不泄露凭证。
+  const auth = (() => {
+    const h = String(req.headers.authorization || '')
+    if (!h) return ''
+    const t = h.startsWith('Bearer ') ? h.slice(7) : h
+    if (!t) return 'bearer-empty'
+    const kind = t.includes('.') ? 'hmac' : /^[0-9a-f]{32}$/i.test(t) ? 'toc' : 'other'
+    return `${kind}(len=${t.length})`
+  })()
   console.log(`[req] ${req.method} ${req.path} ip=${ip} auth=${auth}`)
   next()
 })
