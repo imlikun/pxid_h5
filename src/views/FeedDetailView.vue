@@ -1244,6 +1244,7 @@ function showToast(msg) {
   font-size: 16px;
   color: var(--text);
   line-height: 1.85;
+  white-space: pre-line; /* 长文保留换行：content 里的 \n 渲染成段落，避免糊成一行 */
 }
 .seg--car, .seg--at { color: var(--brand); }
 
