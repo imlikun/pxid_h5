@@ -126,13 +126,23 @@
 
     <!-- 推荐：双列网格 -->
     <div v-if="activeTab === '推荐' && !showSearchResults" class="content">
-      <div class="grid2">
-        <FeedCard
-          v-for="(it, i) in recommendList"
-          :key="it.id"
-          :item="it"
-          :class="[fadeUp(), staggerFor(i)]"
-        />
+      <div class="wf2">
+        <div class="wf-col">
+          <FeedCard
+            v-for="(it, i) in wfColA"
+            :key="it.id"
+            :item="it"
+            :class="[fadeUp(), staggerFor(i)]"
+          />
+        </div>
+        <div class="wf-col">
+          <FeedCard
+            v-for="(it, i) in wfColB"
+            :key="it.id"
+            :item="it"
+            :class="[fadeUp(), staggerFor(i)]"
+          />
+        </div>
       </div>
       <!-- 空态：此前筛选无结果/无数据时整片空白，容易被误认为「帖子不显示」 -->
       <div v-if="!recommendList.length && !loading" class="empty-tab">
@@ -418,6 +428,9 @@ const recommendList = computed(() => {
   const list = f === '全部' ? recommendData.value : recommendData.value.filter((i) => i.carModel === f)
   return rankList(list)
 })
+// 瀑布流两列：交错分配（第 1 条左、第 2 条右…），保证阅读顺序从左到右
+const wfColA = computed(() => recommendList.value.filter((_, i) => i % 2 === 0))
+const wfColB = computed(() => recommendList.value.filter((_, i) => i % 2 === 1))
 // 推荐区空态文案：车型筛选无结果 vs 全部无数据，语义分开给，避免白屏无解释
 const recommendEmptyText = computed(() =>
   activeFilter.value === '全部' ? t('discover.emptyAll') : t('discover.emptyDynamic')
@@ -1164,6 +1177,25 @@ function showToast(msg) {
   font-size: 12px;
   color: var(--text-hint);
   padding: 20px 0 8px;
+}
+.wf2 {
+  display: flex;
+  gap: 10px;
+  padding: 0 12px;
+  align-items: flex-start;
+}
+.wf-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* 封面按图片原始比例撑开 → 卡片高矮不一，形成瀑布流错落 */
+.wf-col :deep(.fcard__cover) {
+  aspect-ratio: auto;
+  height: auto;
+  min-height: 120px;
 }
 .grid2 {
   display: grid;
