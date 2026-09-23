@@ -124,7 +124,22 @@
       </div>
     </div>
 
-    <!-- 推荐：双列网格 -->
+    <!-- 热门话题：从动态自带 tags 聚合，点选后在推荐流内筛选 -->
+    <div v-if="activeTab === '推荐' && !showSearchResults && hotTopics.length" class="topics">
+      <div class="topics__bar">
+        <span class="topic" :class="{ on: !activeTopic }" @click="activeTopic = ''">全部</span>
+        <span
+          v-for="tp in hotTopics"
+          :key="tp.name"
+          class="topic"
+          :class="{ on: activeTopic === tp.name }"
+          @click="pickTopic(tp.name)"
+          >#{{ tp.name }}<em>{{ tp.n }}</em></span
+        >
+      </div>
+    </div>
+
+    <!-- 推荐：瀑布流（两列错落） -->
     <div v-if="activeTab === '推荐' && !showSearchResults" class="content">
       <div class="wf2">
         <div class="wf-col">
@@ -422,10 +437,30 @@ function rankList(list) {
     return tsOf(b) - tsOf(a)
   })
 }
-// 推荐：按车型筛选 + 置顶优先 + 排序
+// 热门话题：从已加载推荐数据的 tags 聚合（跳过 P5 / ant5 这类车型代号标签）
+const activeTopic = ref('')
+const hotTopics = computed(() => {
+  const cnt = {}
+  recommendData.value.forEach((x) =>
+    (x.tags || []).forEach((t) => {
+      if (!t) return
+      if (/^(P|G)?\d+$/i.test(t)) return
+      cnt[t] = (cnt[t] || 0) + 1
+    })
+  )
+  return Object.entries(cnt)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 9)
+    .map(([name, n]) => ({ name, n }))
+})
+const pickTopic = (t) => {
+  activeTopic.value = activeTopic.value === t ? '' : t
+}
+// 推荐：按车型筛选 + 话题筛选 + 置顶优先 + 排序
 const recommendList = computed(() => {
   const f = activeFilter.value
-  const list = f === '全部' ? recommendData.value : recommendData.value.filter((i) => i.carModel === f)
+  let list = f === '全部' ? recommendData.value : recommendData.value.filter((i) => i.carModel === f)
+  if (activeTopic.value) list = list.filter((i) => (i.tags || []).includes(activeTopic.value))
   return rankList(list)
 })
 // 瀑布流两列：交错分配（第 1 条左、第 2 条右…），保证阅读顺序从左到右
@@ -1177,6 +1212,42 @@ function showToast(msg) {
   font-size: 12px;
   color: var(--text-hint);
   padding: 20px 0 8px;
+}
+.topics {
+  padding: 2px 0 10px;
+}
+.topics__bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.topics__bar::-webkit-scrollbar {
+  display: none;
+}
+.topic {
+  flex: none;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  white-space: nowrap;
+}
+.topic em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-hint);
+  margin-left: 3px;
+}
+.topic.on {
+  background: var(--brand);
+  color: #fff;
+}
+.topic.on em {
+  color: rgba(255, 255, 255, 0.75);
 }
 .wf2 {
   display: flex;
