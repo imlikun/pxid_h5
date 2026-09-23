@@ -124,39 +124,48 @@
       </div>
     </div>
 
-    <!-- 热门话题：从动态自带 tags 聚合，点选后在推荐流内筛选 -->
-    <div v-if="activeTab === '推荐' && !showSearchResults && hotTopics.length" class="topics">
-      <div class="topics__bar">
-        <span class="topic" :class="{ on: !activeTopic }" @click="activeTopic = ''">全部</span>
-        <span
-          v-for="tp in hotTopics"
-          :key="tp.name"
-          class="topic"
-          :class="{ on: activeTopic === tp.name }"
-          @click="pickTopic(tp.name)"
-          >#{{ tp.name }}<em>{{ tp.n }}</em></span
-        >
-      </div>
-    </div>
-
-    <!-- 推荐：瀑布流（两列错落） -->
+    <!-- 推荐：瀑布流（两列错落，热门话题卡穿插在流内） -->
     <div v-if="activeTab === '推荐' && !showSearchResults" class="content">
       <div class="wf2">
         <div class="wf-col">
-          <FeedCard
-            v-for="(it, i) in wfColA"
-            :key="it.id"
-            :item="it"
-            :class="[fadeUp(), staggerFor(i)]"
-          />
+          <template v-for="(x, i) in wfColA" :key="x.__key || x.id">
+            <div
+              v-if="x.__topic"
+              class="topiccard press"
+              :class="{ 'topiccard--on': x.__active }"
+              @click="pickTopic(x.__topic.name)"
+            >
+              <div class="tc__t">
+                <span class="tc__hash">#</span>
+                <span class="tc__name">{{ x.__topic.name }}</span>
+              </div>
+              <div class="tc__n">
+                {{ x.__active ? x.__topic.n + ' 条 · 再点退出' : x.__topic.n + ' 篇热议' }}
+              </div>
+              <div class="tc__go">{{ x.__active ? '退出话题' : '查看全部' }} ›</div>
+            </div>
+            <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" />
+          </template>
         </div>
         <div class="wf-col">
-          <FeedCard
-            v-for="(it, i) in wfColB"
-            :key="it.id"
-            :item="it"
-            :class="[fadeUp(), staggerFor(i)]"
-          />
+          <template v-for="(x, i) in wfColB" :key="x.__key || x.id">
+            <div
+              v-if="x.__topic"
+              class="topiccard press"
+              :class="{ 'topiccard--on': x.__active }"
+              @click="pickTopic(x.__topic.name)"
+            >
+              <div class="tc__t">
+                <span class="tc__hash">#</span>
+                <span class="tc__name">{{ x.__topic.name }}</span>
+              </div>
+              <div class="tc__n">
+                {{ x.__active ? x.__topic.n + ' 条 · 再点退出' : x.__topic.n + ' 篇热议' }}
+              </div>
+              <div class="tc__go">{{ x.__active ? '退出话题' : '查看全部' }} ›</div>
+            </div>
+            <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" />
+          </template>
         </div>
       </div>
       <!-- 空态：此前筛选无结果/无数据时整片空白，容易被误认为「帖子不显示」 -->
@@ -463,9 +472,34 @@ const recommendList = computed(() => {
   if (activeTopic.value) list = list.filter((i) => (i.tags || []).includes(activeTopic.value))
   return rankList(list)
 })
+// 瀑布流混合流：动态卡片 + 热门话题卡（插在第 3、8、13 位，与动态错落排布）
+const wfFeed = computed(() => {
+  const arr = recommendList.value
+  // 话题筛选态：流首放一张“当前话题卡”，点它退出筛选
+  if (activeTopic.value) {
+    return [
+      { __active: true, __topic: { name: activeTopic.value, n: arr.length }, __key: 'tp-active' },
+      ...arr
+    ]
+  }
+  const tops = hotTopics.value.slice(0, 3)
+  if (!tops.length) return arr
+  // 插入位取偶数索引，使话题卡落点变成 左(p=2) / 右(p=9) / 左(p=16) 交替，不挤在同一列
+  const slots = [2, 8, 14]
+  const out = []
+  let ti = 0
+  arr.forEach((it, i) => {
+    if (slots.includes(i) && tops[ti]) {
+      out.push({ __topic: tops[ti], __key: 'tp-' + tops[ti].name })
+      ti++
+    }
+    out.push(it)
+  })
+  return out
+})
 // 瀑布流两列：交错分配（第 1 条左、第 2 条右…），保证阅读顺序从左到右
-const wfColA = computed(() => recommendList.value.filter((_, i) => i % 2 === 0))
-const wfColB = computed(() => recommendList.value.filter((_, i) => i % 2 === 1))
+const wfColA = computed(() => wfFeed.value.filter((_, i) => i % 2 === 0))
+const wfColB = computed(() => wfFeed.value.filter((_, i) => i % 2 === 1))
 // 推荐区空态文案：车型筛选无结果 vs 全部无数据，语义分开给，避免白屏无解释
 const recommendEmptyText = computed(() =>
   activeFilter.value === '全部' ? t('discover.emptyAll') : t('discover.emptyDynamic')
@@ -1248,6 +1282,49 @@ function showToast(msg) {
 }
 .topic.on em {
   color: rgba(255, 255, 255, 0.75);
+}
+/* 流内热门话题卡：与动态卡片错落排布 */
+.topiccard {
+  background: var(--brand-soft, #eef3ff);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.tc__t {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-bottom: 5px;
+}
+.tc__hash {
+  color: var(--brand);
+  font-size: 16px;
+  font-weight: 500;
+}
+.tc__name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+.tc__n {
+  font-size: 11px;
+  color: var(--text-hint);
+}
+.tc__go {
+  font-size: 11px;
+  color: var(--brand);
+  margin-top: 6px;
+}
+.topiccard--on {
+  background: var(--brand);
+}
+.topiccard--on .tc__hash,
+.topiccard--on .tc__name,
+.topiccard--on .tc__go {
+  color: #fff;
+}
+.topiccard--on .tc__n {
+  color: rgba(255, 255, 255, 0.8);
 }
 .wf2 {
   display: flex;
