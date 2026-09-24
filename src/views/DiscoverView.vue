@@ -1453,6 +1453,21 @@ function showToast(msg) {
   aspect-ratio: auto;
   height: auto;
   min-height: 120px;
+  object-fit: cover;
+}
+/* 2026-09-24 领导反馈"发现页平淡"：AI 换图后全是 1:1 方图，错落被抹平。
+   治本——封面按位置轮换 4:3/1:1/3:4，左右列相位错开（source 仍方图，object-fit:cover 裁切显示），
+   两列高度重新上下起伏，恢复瀑布流呼吸感。 */
+.wf-col:nth-child(1) :deep(.fcard:nth-child(3n+1) .fcard__cover) { aspect-ratio: 4 / 3; }
+.wf-col:nth-child(1) :deep(.fcard:nth-child(3n+2) .fcard__cover) { aspect-ratio: 1 / 1; }
+.wf-col:nth-child(1) :deep(.fcard:nth-child(3n+3) .fcard__cover) { aspect-ratio: 3 / 4; }
+.wf-col:nth-child(2) :deep(.fcard:nth-child(3n+1) .fcard__cover) { aspect-ratio: 1 / 1; }
+.wf-col:nth-child(2) :deep(.fcard:nth-child(3n+2) .fcard__cover) { aspect-ratio: 3 / 4; }
+.wf-col:nth-child(2) :deep(.fcard:nth-child(3n+3) .fcard__cover) { aspect-ratio: 4 / 3; }
+/* 白卡加柔光阴影：原 4% 单层投影太轻、卡片像贴纸贴灰底；
+   双层柔光（近处淡 + 远处大柔）让卡片"浮"起来，增强立体层次。 */
+.wf-col :deep(.fcard) {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 6px 16px rgba(16, 24, 40, 0.08);
 }
 .grid2 {
   display: grid;
