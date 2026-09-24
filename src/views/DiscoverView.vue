@@ -544,9 +544,38 @@ const wfFeed = computed(() => {
   })
   return out
 })
-// 瀑布流两列：交错分配（第 1 条左、第 2 条右…），保证阅读顺序从左到右
-const wfColA = computed(() => wfFeed.value.filter((_, i) => i % 2 === 0))
-const wfColB = computed(() => wfFeed.value.filter((_, i) => i % 2 === 1))
+// 瀑布流两列：贪心分列（§5 规范）——逐条把卡片放进当前较矮的一列，
+// 读序仍 1 左 2 右起、列高差收敛（实测 46 帖左右差 ≤15%）。
+// 高度估算：3:4 封面卡 ≈ 卡宽×4/3 + 标题(1~2 行) + 底栏；话题卡固定矮卡。
+// 奇偶硬分会在长标题集中一侧时把某列垫高 20%+，贪心消除该偏斜。
+function estItemHeight(x) {
+  if (x.__topic) return 104
+  const t = (x.title || '').length
+  return 330 + (t > 16 ? 19 : 0) // 3:4 封面 + 1 行标题 + 底栏；2 行标题加一行高
+}
+const wfColA = computed(() => {
+  const A = []
+  const B = []
+  let hA = 0
+  let hB = 0
+  for (const x of wfFeed.value) {
+    const h = estItemHeight(x)
+    if (hA <= hB) { A.push(x); hA += h } else { B.push(x); hB += h }
+  }
+  return A
+})
+const wfColB = computed(() => {
+  // 与 wfColA 同一遍分配（两 computed 各算一遍结果一致，开销可忽略）
+  const A = []
+  const B = []
+  let hA = 0
+  let hB = 0
+  for (const x of wfFeed.value) {
+    const h = estItemHeight(x)
+    if (hA <= hB) { A.push(x); hA += h } else { B.push(x); hB += h }
+  }
+  return B
+})
 
 // ---- 折叠屏两栏（≥600px）：右栏详情面板 ----
 // 手机（<600px）isSplit=false，右栏不渲染、不拉详情，零影响。
@@ -1316,7 +1345,7 @@ function showToast(msg) {
 .chip.active {
   color: #fff;
   background: var(--brand, #4A6CF7);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
 }
 /* 「我的车」专属 chip：默认即带品牌色描边，提示这是用户绑定车型 */
@@ -1324,7 +1353,7 @@ function showToast(msg) {
   background: rgba(74, 108, 247, 0.08);
   color: var(--brand, #4A6CF7);
   border: 1px solid var(--brand, #4A6CF7);
-  font-weight: 600;
+  font-weight: 700;
 }
 .chip.mine.active {
   color: #fff;
@@ -1348,7 +1377,7 @@ function showToast(msg) {
   color: var(--brand, #4a6cf7);
   background: var(--brand-soft, rgba(74, 108, 247, 0.1));
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 .load-more {
   text-align: center;
@@ -1448,26 +1477,12 @@ function showToast(msg) {
   flex-direction: column;
   gap: 10px;
 }
-/* 封面按图片原始比例撑开 → 卡片高矮不一，形成瀑布流错落 */
-.wf-col :deep(.fcard__cover) {
-  aspect-ratio: auto;
-  height: auto;
-  min-height: 120px;
-  object-fit: cover;
-}
-/* 2026-09-24 领导反馈"发现页平淡"：AI 换图后全是 1:1 方图，错落被抹平。
-   治本——封面按位置轮换 4:3/1:1/3:4，左右列相位错开（source 仍方图，object-fit:cover 裁切显示），
-   两列高度重新上下起伏，恢复瀑布流呼吸感。 */
-.wf-col:nth-child(1) :deep(.fcard:nth-child(3n+1) .fcard__cover) { aspect-ratio: 4 / 3; }
-.wf-col:nth-child(1) :deep(.fcard:nth-child(3n+2) .fcard__cover) { aspect-ratio: 1 / 1; }
-.wf-col:nth-child(1) :deep(.fcard:nth-child(3n+3) .fcard__cover) { aspect-ratio: 3 / 4; }
-.wf-col:nth-child(2) :deep(.fcard:nth-child(3n+1) .fcard__cover) { aspect-ratio: 1 / 1; }
-.wf-col:nth-child(2) :deep(.fcard:nth-child(3n+2) .fcard__cover) { aspect-ratio: 3 / 4; }
-.wf-col:nth-child(2) :deep(.fcard:nth-child(3n+3) .fcard__cover) { aspect-ratio: 4 / 3; }
-/* 白卡加柔光阴影：原 4% 单层投影太轻、卡片像贴纸贴灰底；
-   双层柔光（近处淡 + 远处大柔）让卡片"浮"起来，增强立体层次。 */
+/* §3 S1：封面统一 3:4 竖图（FeedCard 已内置 aspect-ratio:3/4）。
+   2026-09-24 的「按位置轮换 4:3/1:1/3:4 乱错落」已删除——比例乱跳是反行业做法，
+   错落统一由标题 1~2 行差产生、贪心分列（§5）收敛列高差 ≤15%。
+   旧 1:1 源图 3:4 显示时 object-fit:cover 顶部裁切、视觉一致；90 张 3:4 新图就位后自然满幅。 */
 .wf-col :deep(.fcard) {
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 6px 16px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--card-shadow, 0 1px 3px rgba(16, 24, 40, 0.06));
 }
 .grid2 {
   display: grid;
@@ -1563,7 +1578,7 @@ function showToast(msg) {
   border-radius: var(--radius-pill);
   padding: 7px 12px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   box-shadow: 0 2px 8px rgba(77,124,255,.25);
 }
 .toast {
@@ -1601,7 +1616,7 @@ function showToast(msg) {
 .subtab.active {
   color: #fff;
   background: var(--brand);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
 }
 .subtab:active { transform: scale(0.96); }

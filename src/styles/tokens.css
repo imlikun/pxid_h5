@@ -27,6 +27,11 @@
   --sp-28: 28px;
   --sp-32: 32px;
   --tab-h: 56px;
+  /* 卡片统一阴影（视觉规范 v1 §2）：单层 6%，取代旧 4% 单层/双层 8% 混用。
+     白卡类（FeedCard/MomentCard/ProductCard）统一用此 token；hover/按下态才允许加深。 */
+  --card-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+  /* 字重三档（§2.5）：400 正文 / 500 标题·chip / 700 仅价格数字·选中态。
+     思源·苹方·雅黑 600/800 无实字重，写了是合成假粗（发毛），全站禁用。 */
 }
 
 * {
@@ -60,8 +65,10 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue',
-    Helvetica, 'Microsoft YaHei', Arial, sans-serif;
+  /* §2.5 字体栈：iOS=苹方，安卓=思源 Noto（微信/小红书/B站实际所用），桌面 Win 才落雅黑。
+     不引 webfont（WebView 首屏白字 + 折叠屏字体闪烁），全用设备自带系统字，无授权风险。 */
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans CJK SC',
+    'Source Han Sans SC', 'Microsoft YaHei', Arial, sans-serif;
   color: var(--text);
   background: #e9ebef; /* 桌面预览时手机框外的底色 */
   font-size: 14px;

@@ -1,8 +1,12 @@
 <template>
-  <div class="fcard press" @click="go" @touchstart.passive="onWarm" @mouseenter="onWarm">
+  <div :class="['fcard', 'press', { 'is-pinned': item.pinned }]" @click="go" @touchstart.passive="onWarm" @mouseenter="onWarm">
     <div class="fcard__coverwrap">
       <img class="fcard__cover" :src="coverUrl" :alt="item.title" loading="lazy" @error="onImgErr" />
       <span v-if="item.pinned" class="fcard__pin">{{ t('feed.pinned') }}</span>
+      <!-- §3 S1：封面内右下标签 chip（≤2 个，半透明黑底白字，图上零描边零阴影） -->
+      <div v-if="coverTags.length" class="fcard__tags">
+        <span v-for="tag in coverTags" :key="tag" class="fcard__tag">{{ tag }}</span>
+      </div>
       <span v-if="item.videoUrl" class="fcard__play"><svg viewBox="0 0 24 24" width="18" height="18" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
     </div>
     <div class="fcard__title">{{ item.title }}</div>
@@ -56,6 +60,11 @@ function updateCover() {
 updateCover()
 watch(() => props.item, updateCover)
 const avatarUrl = computed(() => resolveAvatar(props.item.author, props.item.avatar))
+// §3 S1：图上标签 chip，最多 2 个（动态自带 tags），半透明黑底白字
+const coverTags = computed(() => {
+  const tags = (props.item && props.item.tags) || []
+  return Array.isArray(tags) ? tags.slice(0, 2) : []
+})
 function onImgErr(e) {
   // 网络抖动/原图失效 → 换兜底（再失败也不再递归）
   if (e && e.target && e.target.src !== FALLBACK) e.target.src = FALLBACK
@@ -103,17 +112,45 @@ function goUser() {
      图片仍通栏贴顶（靠 overflow:hidden 裁出上方圆角），文字区留 10px 内边距。 */
   background: var(--card);
   border-radius: var(--radius-lg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--card-shadow); /* §2 统一单层 6%，取代旧 4% */
   overflow: hidden;
+}
+/* §3 S2 官方/置顶卡：品牌蓝 1.5px 实色描边（一屏 ≤2 张，超了退 S1） */
+.fcard.is-pinned {
+  border: 1.5px solid var(--brand);
 }
 .fcard__coverwrap {
   position: relative;
 }
 .fcard__cover {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  /* §3 S1：统一 3:4 竖图（生成规格 768×1024），错落靠标题 1~2 行，不做封面比例乱跳 */
+  aspect-ratio: 3 / 4;
   object-fit: cover;
   display: block;
+}
+/* §2 图上标签 chip：半透明黑底 + 10px 白字/500，≤2 个，右下角；零描边零阴影 */
+.fcard__tags {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 2;
+  pointer-events: none;
+}
+.fcard__tag {
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  max-width: 72px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .fcard__pin {
   position: absolute;
@@ -143,11 +180,13 @@ function goUser() {
   pointer-events: none;
 }
 .fcard__title {
+  /* §2.5 卡片标题 13px/500；不再固定 min-height —— 1~2 行差就是瀑布流错落的来源（§5），
+     列高差交给贪心分列补偿（≤15%）。 */
   padding: 10px 10px 0;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text);
   line-height: 1.45;
-  min-height: 42px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -173,7 +212,8 @@ function goUser() {
   flex: none;
 }
 .name {
-  font-size: 12px;
+  /* §2.5 metadata 11px/400 灰 */
+  font-size: 11px;
   color: var(--text-sub);
   white-space: nowrap;
   overflow: hidden;
@@ -183,7 +223,7 @@ function goUser() {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-hint);
   flex: none;
 }
