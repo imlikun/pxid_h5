@@ -1,11 +1,14 @@
 <template>
   <div
     class="discover"
-    :class="{ 'locale-zh': locale === 'zh', 'locale-en': locale === 'en', 'locale-pt': locale === 'pt' }"
+    :class="{ 'locale-zh': locale === 'zh', 'locale-en': locale === 'en', 'locale-pt': locale === 'pt', split: isSplit }"
     @touchstart.passive="onPtrStart"
     @touchmove.passive="onPtrMove"
     @touchend.passive="onPtrEnd"
   >
+    <!-- 两栏容器：≥600px 分栏态 .leftcol(左：Tab/搜索/banner/瀑布流错落，独立滚动) + .panel(右：详情)；
+         <600px 手机态 .cols 塌成单栏、.panel 不渲染，与现状一致。 -->
+    <div class="cols"><div class="leftcol" ref="leftcolRef" @scroll="onLeftcolScroll">
     <!-- 下拉刷新指示器：从详情返回不再自动重拉列表（避免返回时闪一下），
          这里保留一个手动刷新入口 -->
     <div class="ptr" :style="{ height: (ptrBusy ? 44 : ptrDist) + 'px' }">
@@ -144,7 +147,7 @@
               </div>
               <div class="tc__go">{{ x.__active ? '退出话题' : '查看全部' }} ›</div>
             </div>
-            <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" />
+            <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
         </div>
         <div class="wf-col">
@@ -164,7 +167,7 @@
               </div>
               <div class="tc__go">{{ x.__active ? '退出话题' : '查看全部' }} ›</div>
             </div>
-            <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" />
+            <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
         </div>
       </div>
@@ -184,7 +187,7 @@
     </div>
 
     <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 + 非搜索态 -->
-    <template v-else-if="activeTab === '动态' && !showSearchResults">
+    <template v-if="activeTab === '动态' && !showSearchResults">
       <div class="subtabs">
         <span class="subtab" :class="{ active: dynamicSubtab === 'follow' }" @click="setDynamicSub('follow')">{{ t('discover.subFollow') }}</span>
         <span class="subtab" :class="{ active: dynamicSubtab === 'near' }" @click="setDynamicSub('near')">{{ t('discover.subNear') }}</span>
@@ -240,6 +243,50 @@
         </div>
       </div>
     </div>
+    </div><!-- /leftcol -->
+
+    <!-- 折叠屏右栏详情面板：分栏态（≥600px）下作为 .cols 直接子节点与 .leftcol 左右并排。
+         仅推荐 tab + 分栏态渲染；点左栏卡片切换、▲▼连翻、默认置顶条。手机态不渲染。 -->
+    <div v-if="activeTab === '推荐' && !showSearchResults && isSplit" class="panel">
+      <div class="panel__nav">
+        <span class="panel__tag" v-if="selectedFeed && selectedFeed.pinned">置顶推荐</span>
+        <button class="panel__navbtn" @click="stepDetail(-1)" :disabled="!recommendList.length">▲ 上一条</button>
+        <button class="panel__navbtn" @click="stepDetail(1)" :disabled="!recommendList.length">▼ 下一条</button>
+      </div>
+      <div v-if="detailLoading || !detailItem" class="panel__loading">
+        <span v-if="!selectedFeed">选一条动态看看</span>
+        <span v-else>加载详情中…</span>
+      </div>
+      <template v-else>
+        <img v-if="detailItem.images && detailItem.images.length" class="panel__img" :src="detailItem.images[0]" :alt="detailItem.title || ''" />
+        <div class="panel__body">
+          <div class="panel__title">{{ detailItem.title || (detailItem.content || '').slice(0, 30) }}</div>
+          <div class="panel__author">
+            <img v-if="detailItem.avatar" :src="detailItem.avatar" :alt="detailItem.author" />
+            <div class="panel__authinfo">
+              <span>{{ detailItem.author }}</span>
+              <em>{{ detailItem.kind === 'official' ? '官方' : '车主' }}</em>
+            </div>
+          </div>
+          <div class="panel__text">{{ detailItem.content }}</div>
+          <div class="panel__stat">
+            <span><b>{{ detailItem.likes }}</b> 赞</span>
+            <span>{{ detailItem.comments || 0 }} 评论</span>
+          </div>
+        </div>
+        <div v-if="detailComments.length" class="panel__cmt">
+          <h4>评论</h4>
+          <div v-for="cm in detailComments" :key="cm.id" class="panel__cmtitem">
+            <img v-if="cm.avatar" :src="cm.avatar" :alt="cm.author" />
+            <div>
+              <div class="panel__cmname">{{ cm.author }}</div>
+              <div class="panel__cmttext">{{ cm.content }}</div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+    </div><!-- /cols -->
 
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
@@ -271,7 +318,7 @@ import { t, locale, initLocale, regionFromLocale } from '../i18n'
 // 官方公告未读数（驱动发现页快捷区红点）：必须走响应式 store
 // 直接读 mock.notices 的 isRead 不会触发更新 —— mock 是普通数组，属性变化不会被 computed 追踪
 import { noticeUnread } from '../store/noticeStore'
-import { fetchFeeds, fetchActivities } from '../api/feed'
+import { fetchFeeds, fetchActivities, fetchFeedDetail, fetchComments } from '../api/feed'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
@@ -500,6 +547,58 @@ const wfFeed = computed(() => {
 // 瀑布流两列：交错分配（第 1 条左、第 2 条右…），保证阅读顺序从左到右
 const wfColA = computed(() => wfFeed.value.filter((_, i) => i % 2 === 0))
 const wfColB = computed(() => wfFeed.value.filter((_, i) => i % 2 === 1))
+
+// ---- 折叠屏两栏（≥600px）：右栏详情面板 ----
+// 手机（<600px）isSplit=false，右栏不渲染、不拉详情，零影响。
+// 854 / 1017 / 1337 都 ≥600 → 两栏；1337 的左侧 320 导航 rail 由 Flutter 提供，
+// H5 只做「左瀑布流 + 右详情」两栏，自动等分吃满 H5 拿到的宽度。
+const SPLIT_MQ = window.matchMedia('(min-width: 600px)')
+const isSplit = ref(SPLIT_MQ.matches)
+function onSplitChange(e) { isSplit.value = e.matches }
+if (SPLIT_MQ.addEventListener) SPLIT_MQ.addEventListener('change', onSplitChange)
+else SPLIT_MQ.addListener(onSplitChange)
+onUnmounted(() => {
+  if (SPLIT_MQ.removeEventListener) SPLIT_MQ.removeEventListener('change', onSplitChange)
+  else SPLIT_MQ.removeListener(onSplitChange)
+})
+
+// 右栏选中项 + 全量详情 + 评论（分栏态点左栏卡片只切右栏，不跳页）
+const selectedFeed = ref(null)
+const detailLoading = ref(false)
+const detailItem = ref(null)      // fetchFeedDetail 全量（含正文长文 / 图片）
+const detailComments = ref([])    // fetchComments 前 6 条
+async function loadPanel(id) {
+  selectedFeed.value = recommendList.value.find((x) => String(x.id) === String(id)) || null
+  if (!selectedFeed.value) return
+  detailLoading.value = true
+  const [d, c] = await Promise.all([
+    fetchFeedDetail(id),
+    fetchComments(id).catch(() => []),
+  ])
+  // 快速连点/翻页时，旧请求返回不得覆盖当前选中
+  if (String(selectedFeed.value && selectedFeed.value.id) !== String(id)) return
+  detailItem.value = d
+  detailComments.value = (c || []).slice(0, 6)
+  detailLoading.value = false
+}
+function selectDetail(item) {
+  if (item && item.id != null) loadPanel(item.id)
+}
+// ▲ 上一条 / ▼ 下一条：在推荐流（置顶优先排序）里循环翻
+function stepDetail(delta) {
+  const list = recommendList.value
+  if (!list.length) return
+  const i = list.findIndex((x) => String(x.id) === String(selectedFeed.value && selectedFeed.value.id))
+  const n = i < 0 ? 0 : (i + delta + list.length) % list.length
+  selectDetail(list[n])
+}
+// 分栏首屏：列表数据回来后默认选中置顶那条（list[0]），右栏不留白
+watch(recommendList, (l) => {
+  if (isSplit.value && l.length && !selectedFeed.value) selectDetail(l[0])
+})
+watch(isSplit, (v) => {
+  if (v && !selectedFeed.value && recommendList.value.length) selectDetail(recommendList.value[0])
+})
 // 推荐区空态文案：车型筛选无结果 vs 全部无数据，语义分开给，避免白屏无解释
 const recommendEmptyText = computed(() =>
   activeFilter.value === '全部' ? t('discover.emptyAll') : t('discover.emptyDynamic')
@@ -598,6 +697,16 @@ function onScroll() {
     const key = activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
     if (key) loadFeed(key, { append: true })
   }
+}
+
+// 分栏态（≥600px）左栏是独立滚动容器（.leftcol height:100vh overflow-y:auto），
+// 文档 window 不再滚 → 单独监听 .leftcol 的 scroll 做触底分页。非分栏态 .leftcol 非滚动容器、监听永不触发，无害。
+const leftcolRef = ref(null)
+function onLeftcolScroll() {
+  const el = leftcolRef.value
+  if (!el) return
+  const key = activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
+  if (key && el.scrollHeight - el.scrollTop - el.clientHeight < 300) loadFeed(key, { append: true })
 }
 
 // 广场热门活动（随地区切换，走统一数据层）
@@ -1481,4 +1590,126 @@ function showToast(msg) {
   line-height: 1;
 }
 .subtab:active { transform: scale(0.96); }
+
+/* ===== 折叠屏两栏（≥600px）：左瀑布流错落 + 右详情面板 =====
+   手机 <600px：.cols 塌成单栏（.leftcol 无 width 约束、.panel 不渲染），与现状一致。
+   两栏各自 100vh 独立滚动（iPad 双 pane 范式）：左栏整列滚、右栏整列滚。 */
+@media (min-width: 600px) {
+  .cols {
+    display: flex;
+    align-items: flex-start;
+  }
+  .leftcol {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .panel {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--card);
+    border-left: 1px solid var(--line);
+  }
+}
+
+/* 右栏详情面板内部（仅分栏态出现） */
+.panel__nav {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--card);
+  border-bottom: 1px solid #F0F0F0;
+}
+.panel__tag {
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-radius: 9px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.panel__navbtn {
+  margin-left: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-sub);
+}
+.panel__navbtn + .panel__navbtn { margin-left: 6px; }
+.panel__navbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.panel__loading {
+  padding: 40px 16px;
+  color: var(--text-hint);
+  font-size: 13px;
+  text-align: center;
+}
+.panel__img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  display: block;
+  background: #eee;
+}
+.panel__body { padding: 14px; }
+.panel__title {
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+.panel__author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.panel__author img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #eee;
+  object-fit: cover;
+}
+.panel__authinfo span { font-size: 13px; color: var(--text); display: block; }
+.panel__authinfo em { font-style: normal; font-size: 11px; color: var(--text-hint); }
+.panel__text {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text);
+  margin-bottom: 16px;
+  white-space: pre-line;
+}
+.panel__stat {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-hint);
+  padding-bottom: 14px;
+  border-bottom: 1px solid #F0F0F0;
+}
+.panel__stat b { color: var(--price); font-weight: 500; }
+.panel__cmt { padding: 14px; }
+.panel__cmt h4 { font-size: 13px; color: var(--text-sub); margin: 0 0 12px; }
+.panel__cmtitem { display: flex; gap: 9px; margin-bottom: 14px; }
+.panel__cmtitem img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #eee;
+  flex: none;
+  object-fit: cover;
+}
+.panel__cmname { font-size: 12px; color: var(--text-hint); margin-bottom: 3px; }
+.panel__cmttext { font-size: 13px; line-height: 1.5; color: var(--text); }
 </style>

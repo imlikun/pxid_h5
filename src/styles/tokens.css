@@ -77,6 +77,20 @@ body {
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
 }
 
+/* 折叠屏/大屏（≥600px）：放开 480px 手机模拟框，吃满 WebView 宽度、去掉两侧灰墙。
+   <600px 手机态完全不变（480 居中 + 灰底 + 阴影，桌面预览照常）。
+   配合 DiscoverView 两栏：发现页 ≥600px 自动分「左瀑布流 + 右详情」。 */
+@media (min-width: 600px) {
+  #app {
+    max-width: none;
+    width: 100%;
+    box-shadow: none;
+  }
+  body {
+    background: var(--bg); /* 去掉 #e9ebef 灰墙，与页面底色统一 */
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;

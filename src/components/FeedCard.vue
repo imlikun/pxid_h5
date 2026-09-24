@@ -32,6 +32,9 @@ import { putFeedSnapshot } from '../utils/feedSnapshot'
 
 const props = defineProps({
   item: { type: Object, required: true },
+  // 可选回调：发现页分栏态（≥600px）下点卡片不跳页，改为通知父级在右栏选中详情。
+  // 传了它则点击只触发 onSelect、不再走原生全屏/H5 路由；不传则维持原 go() 行为（其他页不受影响）。
+  onSelect: { type: Function, default: null },
 })
 const router = useRouter()
 // 封面兜底：cover → images[0] → 静态占位图（避免 src='' 出现 broken 图）
@@ -59,6 +62,11 @@ function onImgErr(e) {
 }
 
 function go() {
+  // 分栏态（发现页 ≥600px）：点卡片不改页、不跳原生，交给父级在右栏选中详情
+  if (props.onSelect) {
+    props.onSelect(props.item)
+    return
+  }
   // 先把卡片手里的这份数据交给详情页直出（省掉转场里的加载圈，见 utils/feedSnapshot.js）
   putFeedSnapshot(props.item)
   // App 环境：交 Flutter 原生右进左出路由全屏打开（根页与底栏原样保留），
