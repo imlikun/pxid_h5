@@ -41,7 +41,7 @@
     <!-- 搜索：推荐/广场显示 -->
     <div v-if="activeTab !== '动态'" class="search" @click="onSearch">
       <span class="sicon">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
       </span>
       <input class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearchEnter" @compositionstart="isComposing = true" @compositionend="onCompositionEnd" @click.stop />
     </div>
@@ -1154,15 +1154,14 @@ function showToast(msg) {
 .act--add { transform-origin: center; }
 .search {
   margin: 10px 16px 0;
-  height: 40px;
-  background: var(--surface-2);
+  height: 36px;
+  background: #F2F2F7;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 14px;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
+  padding: 0 12px;
 }
 /* 搜索结果（内联） */
 .search-results {
@@ -1196,18 +1195,19 @@ function showToast(msg) {
   border-radius: var(--radius-pill);
 }
 .sicon {
-  color: var(--text-hint);
+  color: #8E8E93;
   display: flex;
   align-items: center;
 }
 .sinput {
   flex: 1;
-  font-size: 14px;
-  color: var(--text);
+  font-size: 15px;
+  color: #1C1C1E;
   background: transparent;
+  caret-color: #007AFF;
 }
 .sinput::placeholder {
-  color: var(--text-hint);
+  color: #8E8E93;
 }
 .banner {
   position: relative;
