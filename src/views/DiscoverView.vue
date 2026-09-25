@@ -103,9 +103,11 @@
         :class="[fadeUp(), 'stagger-' + (i + 1), { 'quick__item--ai': q.key === 'ai' }]"
         @click="onQuick(q)"
       >
-          <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
-          <img v-if="QUICK_ICON_SVG[q.icon]" class="quick__icon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
-          <IconSvg v-else class="quick__icon" :name="q.icon" :size="22" />
+          <div class="quick__thumb">
+            <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
+            <img v-if="QUICK_ICON_SVG[q.icon]" class="quick__icon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
+            <IconSvg v-else class="quick__icon" :name="q.icon" :size="22" />
+          </div>
           <div class="quick__label">
             <span class="quick__label__text">{{ t('discover.quick.' + q.key) }}</span>
           </div>
@@ -1263,31 +1265,36 @@ function showToast(msg) {
 }
 .quick__item {
   position: relative;
-  height: 72px;
   min-width: 0; /* 葡语等长文案不会把该列撑宽，保证 4 宫格各语言等宽 */
-  background: #ffffff;
-  border: none;
-  border-radius: var(--radius-xl);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 6px;
+}
+.quick__thumb {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  background: #ffffff;
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 6px 4px;
   transition: transform .15s ease, box-shadow .15s ease;
 }
-.quick__item:active { transform: scale(.96); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.quick__item:active .quick__thumb { transform: scale(.96); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .quick__icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   color: var(--text);
 }
 .quick__label {
   width: 100%;
   overflow: hidden;
-  font-size: 13px;
-  line-height: 1.2;
+  font-size: 12px;
+  line-height: 1.25;
   color: var(--text);
   text-align: center; /* 各语言标签统一居中（修 EN/PT 通知/积分偏左不齐） */
 }
@@ -1303,8 +1310,8 @@ function showToast(msg) {
 }
 .q-badge {
   position: absolute;
-  top: 8px;
-  right: 14px;
+  top: 3px;
+  right: 3px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
