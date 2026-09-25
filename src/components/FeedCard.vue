@@ -33,6 +33,7 @@ import { captureVideoPoster } from '../utils/videoPoster'
 import bridge from '../bridge'
 import { prefetchFeedDetail, prefetchComments, prewarmFeedMedia } from '../api/feed'
 import { putFeedSnapshot } from '../utils/feedSnapshot'
+import { GENERATED_COVERS } from '../constants/feedCovers'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -55,7 +56,8 @@ function updateCover() {
     if (src) nextTick(() => captureVideoPoster(src).then((d) => { if (d) coverUrl.value = d }))
     return
   }
-  coverUrl.value = it.cover || (Array.isArray(it.images) && it.images[0]) || FALLBACK
+  // AI 生成封面（与标题语义相关）优先于用户上传原图
+  coverUrl.value = GENERATED_COVERS[it.id] || it.cover || (Array.isArray(it.images) && it.images[0]) || FALLBACK
 }
 updateCover()
 watch(() => props.item, updateCover)
