@@ -1286,8 +1286,8 @@ function showToast(msg) {
 }
 .quick__item:active .quick__thumb { transform: scale(.96); box-shadow: 0 1px 4px rgba(0,0,0,.09); }
 .quick__icon {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   color: var(--text);
 }
 .quick__label {
