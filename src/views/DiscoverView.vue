@@ -1155,7 +1155,7 @@ function showToast(msg) {
 .search {
   margin: 10px 16px 0;
   height: 36px;
-  background: #F2F2F7;
+  background: #E5E5EA;
   border: none;
   border-radius: 12px;
   display: flex;
@@ -1260,8 +1260,8 @@ function showToast(msg) {
 .quick {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin: 14px 14px 24px;
+  gap: 12px;
+  margin: 16px 16px 24px;
 }
 .quick__item {
   position: relative;
@@ -1269,32 +1269,32 @@ function showToast(msg) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 .quick__thumb {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 60px;
+  height: 60px;
   background: #ffffff;
   border: none;
-  border-radius: var(--radius);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .07);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: transform .15s ease, box-shadow .15s ease;
 }
-.quick__item:active .quick__thumb { transform: scale(.96); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.quick__item:active .quick__thumb { transform: scale(.96); box-shadow: 0 1px 4px rgba(0,0,0,.09); }
 .quick__icon {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   color: var(--text);
 }
 .quick__label {
   width: 100%;
   overflow: hidden;
-  font-size: 12px;
-  line-height: 1.25;
+  font-size: 13px;
+  line-height: 1.3;
   color: var(--text);
   text-align: center; /* 各语言标签统一居中（修 EN/PT 通知/积分偏左不齐） */
 }
@@ -1310,8 +1310,8 @@ function showToast(msg) {
 }
 .q-badge {
   position: absolute;
-  top: 3px;
-  right: 3px;
+  top: 4px;
+  right: 4px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
