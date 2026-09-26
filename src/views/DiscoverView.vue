@@ -138,6 +138,7 @@
               v-if="x.__topic"
               class="topiccard press"
               :class="{ 'topiccard--on': x.__active }"
+              :style="x.__active ? {} : { '--tc-bg': TOPIC_PALETTE[x.__topic.colorIndex].bg, '--tc-color': TOPIC_PALETTE[x.__topic.colorIndex].color }"
               @click="pickTopic(x.__topic.name)"
             >
               <div class="tc__t">
@@ -158,6 +159,7 @@
               v-if="x.__topic"
               class="topiccard press"
               :class="{ 'topiccard--on': x.__active }"
+              :style="x.__active ? {} : { '--tc-bg': TOPIC_PALETTE[x.__topic.colorIndex].bg, '--tc-color': TOPIC_PALETTE[x.__topic.colorIndex].color }"
               @click="pickTopic(x.__topic.name)"
             >
               <div class="tc__t">
@@ -496,6 +498,15 @@ function rankList(list) {
   })
 }
 // 热门话题：从已加载推荐数据的 tags 聚合（跳过 P5 / ant5 这类车型代号标签）
+// 2026-09-26 多彩话题卡：给每个话题分配一个柔和彩色，避免整页只有品牌蓝/橙
+const TOPIC_PALETTE = [
+  { bg: '#FFE8F0', color: '#E9407A' }, // 粉
+  { bg: '#FFF0E6', color: '#FF7A2F' }, // 橙
+  { bg: '#FFF8E0', color: '#E6A700' }, // 黄
+  { bg: '#E8F9F1', color: '#18B566' }, // 绿
+  { bg: '#EEF3FF', color: '#4D7CFF' }, // 蓝
+  { bg: '#F2EDFF', color: '#7C5CFF' }, // 紫
+]
 const activeTopic = ref('')
 const hotTopics = computed(() => {
   const cnt = {}
@@ -509,7 +520,7 @@ const hotTopics = computed(() => {
   return Object.entries(cnt)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 9)
-    .map(([name, n]) => ({ name, n }))
+    .map(([name, n], i) => ({ name, n, colorIndex: i % TOPIC_PALETTE.length }))
 })
 const pickTopic = (t) => {
   activeTopic.value = activeTopic.value === t ? '' : t
@@ -1148,7 +1159,7 @@ function showToast(msg) {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--price);
+  background: var(--accent);
   z-index: 2;
 }
 .act--add { transform-origin: center; }
@@ -1271,14 +1282,13 @@ function showToast(msg) {
   align-items: center;
   gap: 8px;
 }
+/* A 方案（2026-09-27）：去彩色圆底，深灰单色图标，纯功能导航，不抢焦点 */
 .quick__thumb {
   position: relative;
-  width: 56px;
-  height: 56px;
-  background: transparent;
+  width: 26px;
+  height: 26px;
+  background: none;
   border: none;
-  border-radius: 0;
-  box-shadow: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1286,11 +1296,9 @@ function showToast(msg) {
 }
 .quick__item:active .quick__thumb { transform: scale(.94); }
 .quick__icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 13px;
+  width: 26px;
+  height: 26px;
   object-fit: contain;
-  color: #0088FF;
 }
 .quick__label {
   width: 100%;
@@ -1317,9 +1325,9 @@ function showToast(msg) {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--price);
+  background: var(--accent);
   border: 1.5px solid #fff;
-  box-shadow: 0 1px 3px rgba(255, 59, 48, .35);
+  box-shadow: 0 1px 3px rgba(255, 122, 47, .35);
   z-index: 2;
 }
 .filter {
@@ -1339,14 +1347,18 @@ function showToast(msg) {
   padding: 4px 2px;
 }
 .chips::-webkit-scrollbar { display: none; }
+/* 车型筛选 chip：统一选中/未选中逻辑（2026-09-27 诊断书修正）
+   未选中 = 白底 + 浅灰边 + 深灰字；选中 = 品牌蓝实心 + 白字；
+   「我的车」取消常驻蓝边，仅保留 🚗 前缀，避免视觉第三态 */
 .chip {
   font-size: 13px;
-  color: var(--text-sub);
+  color: #4B5563;
   line-height: 1;
   white-space: nowrap;
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-pill);
-  background: var(--surface-2);
+  background: #fff;
+  border: 1px solid #E5E7EB;
   transition: all 0.15s ease;
   font-weight: 500;
   flex-shrink: 0;
@@ -1357,19 +1369,9 @@ function showToast(msg) {
 .chip.active {
   color: #fff;
   background: var(--brand, #4A6CF7);
+  border-color: var(--brand, #4A6CF7);
   font-weight: 700;
   line-height: 1;
-}
-/* 「我的车」专属 chip：默认即带品牌色描边，提示这是用户绑定车型 */
-.chip.mine {
-  background: rgba(74, 108, 247, 0.08);
-  color: var(--brand, #4A6CF7);
-  border: 1px solid var(--brand, #4A6CF7);
-  font-weight: 700;
-}
-.chip.mine.active {
-  color: #fff;
-  background: var(--brand, #4A6CF7);
 }
 .content {
   margin-top: 16px;
@@ -1433,9 +1435,9 @@ function showToast(msg) {
 .topic.on em {
   color: rgba(255, 255, 255, 0.75);
 }
-/* 流内热门话题卡：与动态卡片错落排布 */
+/* 流内热门话题卡：与动态卡片错落排布；按 TOPIC_PALETTE 多彩色循环 */
 .topiccard {
-  background: var(--brand-soft, #eef3ff);
+  background: var(--tc-bg, var(--accent-soft));
   border-radius: 16px;
   padding: 14px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -1447,7 +1449,7 @@ function showToast(msg) {
   margin-bottom: 5px;
 }
 .tc__hash {
-  color: var(--brand);
+  color: var(--tc-color, var(--accent));
   font-size: 16px;
   font-weight: 500;
 }
@@ -1462,7 +1464,7 @@ function showToast(msg) {
 }
 .tc__go {
   font-size: 11px;
-  color: var(--brand);
+  color: var(--tc-color, var(--accent));
   margin-top: 6px;
 }
 .topiccard--on {

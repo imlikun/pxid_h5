@@ -4,6 +4,8 @@
   --brand-light: #7DA2FF;                 /* 主色浅一档（渐变用） */
   --brand-gradient: linear-gradient(90deg, #7DA2FF, #4D7CFF);
   --brand-soft: #EEF3FF;                  /* 主色浅底（选中/标签底） */
+  --accent: #FF7A2F;                      /* 活力橙：与品牌蓝搭配的第二强调色（未读点/话题卡/四宫格点缀） */
+  --accent-soft: #FFF1E8;                /* 橙浅底（话题卡底/四宫格图标底） */
   --price: #e53935;                       /* 价格红 */
   --bg: #F5F5F4;                          /* 常规页面背景，统一对齐 App「我的」页背景 */
   --card: #ffffff;                        /* 卡片表面 surface */

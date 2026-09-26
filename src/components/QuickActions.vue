@@ -1,13 +1,15 @@
 <template>
   <div class="quick">
     <div
-      v-for="q in items"
+      v-for="(q, idx) in items"
       :key="q.key"
       class="qitem press"
       @click="$emit('tap', q)"
     >
-      <img v-if="QUICK_ICON_SVG[q.icon]" class="qicon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
-      <IconSvg v-else class="qicon" :name="q.icon" :size="22" />
+      <div class="gicon" :class="'g'+(idx+1)">
+        <img v-if="QUICK_ICON_SVG[q.icon]" class="qicon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
+        <IconSvg v-else class="qicon" :name="q.icon" :size="22" />
+      </div>
       <span class="qlabel">{{ q.label }}</span>
     </div>
   </div>
@@ -24,30 +26,44 @@ defineEmits(['tap'])
 
 <style scoped>
 .quick {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 14px 12px 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  margin: 14px 8px 0;
 }
 .qitem {
   flex: 1;
-  background: #ffffff;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 12px 4px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 6px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
+.gicon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border: 1.5px solid rgba(0, 0, 0, 0.18);
+}
+.g1 { background: linear-gradient(135deg, #7DA2FF, #4D7CFF); }
+.g2 { background: linear-gradient(135deg, #FF9F59, #FF7A2F); }
+.g3 { background: linear-gradient(135deg, #50E3A3, #18B566); }
+.g4 { background: linear-gradient(135deg, #A18CFF, #7C5CFF); }
 .qicon {
-  width: 22px;
-  height: 22px;
-  color: var(--text);
+  width: 24px;
+  height: 24px;
+  color: #fff;
 }
 .qlabel {
-  font-size: 13px;
-  color: var(--text);
+  font-size: 12px;
+  color: #333;
 }
 </style>
