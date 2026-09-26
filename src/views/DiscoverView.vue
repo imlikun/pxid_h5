@@ -1273,21 +1273,23 @@ function showToast(msg) {
 }
 .quick__thumb {
   position: relative;
-  width: 60px;
-  height: 60px;
-  background: #ffffff;
+  width: 56px;
+  height: 56px;
+  background: transparent;
   border: none;
-  border-radius: 14px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .07);
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform .15s ease, box-shadow .15s ease;
+  transition: transform .15s ease;
 }
-.quick__item:active .quick__thumb { transform: scale(.96); box-shadow: 0 1px 4px rgba(0,0,0,.09); }
+.quick__item:active .quick__thumb { transform: scale(.94); }
 .quick__icon {
-  width: 32px;
-  height: 32px;
+  width: 56px;
+  height: 56px;
+  border-radius: 13px;
+  object-fit: contain;
   color: #0088FF;
 }
 .quick__label {
@@ -1310,12 +1312,15 @@ function showToast(msg) {
 }
 .q-badge {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 8px;
-  height: 8px;
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--price);
+  border: 1.5px solid #fff;
+  box-shadow: 0 1px 3px rgba(255, 59, 48, .35);
+  z-index: 2;
 }
 .filter {
   display: flex;
