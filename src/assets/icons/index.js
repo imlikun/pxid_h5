@@ -1,13 +1,13 @@
-// 快捷入口 3D 彩色图标映射：icon 名 → 打包后的 SVG 资源 URL
+// 快捷入口品牌蓝线性图标映射（Lucide / iOS 风格）
 // Vite 会将 .svg import 编译为带 hash 的资源 URL，可直接给 <img :src> 使用
 // 3D 彩色旧版保留在 ./scissors-3d.svg 等，按需可回退
 import flame from './flame-3d.svg'
 import sparkles from './sparkles-3d.svg'
 import award from './award-3d.svg'
-import scissors from './scissors-3d.svg'
-import megaphone from './megaphone-3d.svg'
-import headset from './headset-3d.svg'
-import gift from './gift-3d.svg'
+import scissors from './sparkles-lucide.svg'
+import megaphone from './megaphone-lucide.svg'
+import headset from './bot-lucide.svg'
+import gift from './gift-lucide.svg'
 
 export const QUICK_ICON_SVG = {
   flame,

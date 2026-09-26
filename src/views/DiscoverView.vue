@@ -1288,7 +1288,7 @@ function showToast(msg) {
 .quick__icon {
   width: 32px;
   height: 32px;
-  color: var(--text);
+  color: #0088FF;
 }
 .quick__label {
   width: 100%;
