@@ -18,25 +18,25 @@
     <!-- 顶部：三 tab + 操作 -->
     <TopBar sticky :show-back="false">
       <template #left>
-        <div class="tabs">
-          <span
+        <div class="tabs" role="tablist" :aria-label="t('discover.sections')">
+          <button type="button" role="tab"
             v-for="t in tabs"
             :key="t"
-            class="tab tab-bounce"
+            class="tab" :aria-selected="activeTab === t"
             :class="{ active: activeTab === t }"
             @click="setTab(t)"
-            >{{ tabLabel(t) }}</span
+            >{{ tabLabel(t) }}</button
           >
         </div>
       </template>
       <template #right>
         <div class="topacts">
-          <span class="act act--search float-in press" :class="{ 'act--on': searchOpen }" @click="toggleSearch">
+          <button type="button" :aria-label="t('discover.search')" :aria-expanded="searchOpen" class="act act--search press" :class="{ 'act--on': searchOpen }" @click="toggleSearch">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
-          </span>
-          <span class="act act--add float-in press" @click="onAdd">
+          </button>
+          <button type="button" :aria-label="t('discover.publish')" class="act act--add press" @click="onAdd">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-          </span>
+          </button>
         </div>
       </template>
     </TopBar>
@@ -59,7 +59,7 @@
       <FeedCard
         v-for="it in searchResults"
         :key="'sr-' + it.id"
-        :item="it"
+        :item="it" appearance="discover"
         :class="fadeUp()"
       />
       <button class="search-results__clear press" @click="showSearchResults = false; keyword = ''">{{ t('search.clear') || '清除' }}</button>
@@ -88,25 +88,29 @@
               @error="onVideoError"
               @ended="nextBanner"
             ></video>
-            <img v-else class="banner__media" :src="b.src" :alt="b.title || 'Banner'" loading="lazy" />
+            <img v-else class="banner__media" :src="b.src" :alt="b.title || 'Banner'"  :loading="i === 0 ? 'eager' : 'lazy'" />
+            <div class="banner__copy">
+              <h2>{{ i < LOCAL_BANNERS.length ? t('discover.heroTitle') : b.title }}</h2>
+              <p>{{ t('discover.heroSubtitle') }}</p>
+            </div>
           </div>
         </div>
         <div v-if="bannerSlides.length > 1" class="banner__dots">
-          <span
+          <button type="button" :aria-label="t('discover.slide', { n: i + 1 })" :aria-current="bannerIdx === i ? 'true' : undefined"
             v-for="(b, i) in bannerSlides"
             :key="i"
             class="banner__dot"
             :class="{ on: bannerIdx === i }"
             @click.stop="bannerIdx = i"
-          ></span>
+          ></button>
         </div>
       </div>
       <div class="quick">
-        <div
+        <button type="button"
         v-for="(q, i) in discoverQuick"
         :key="q.key"
         class="quick__item press"
-        :class="[fadeUp(), 'stagger-' + (i + 1), { 'quick__item--ai': q.key === 'ai' }]"
+
         @click="onQuick(q)"
       >
           <div class="quick__thumb">
@@ -117,20 +121,20 @@
           <div class="quick__label">
             <span class="quick__label__text">{{ t('discover.quick.' + q.key) }}</span>
           </div>
-        </div>
+        </button>
       </div>
     </template>
 
     <!-- 车型筛选：仅推荐/动态显示（推荐=全部、动态=最新；广场无筛选条，与设计稿一致）+ 非搜索态 -->
     <div v-if="activeTab !== '广场' && !showSearchResults" class="filter">
       <div class="chips">
-        <span
+        <button type="button" :aria-pressed="activeFilter === f.value"
           v-for="f in currentFilters"
           :key="f.value"
-          class="chip chip-bounce"
+          class="chip"
           :class="{ active: activeFilter === f.value, mine: f.mine }"
           @click="pickFilter(f.value)"
-          >{{ f.label }}</span
+          >{{ f.label }}</button
         >
       </div>
     </div>
@@ -140,54 +144,18 @@
       <div class="wf2">
         <div class="wf-col">
           <template v-for="(x, i) in wfColA" :key="x.__key || x.id">
-            <div
-              v-if="x.__topic"
-              class="topiccard press"
-              :class="{ 'topiccard--on': x.__active }"
-              :style="x.__active ? '' : topicCardStyle(x.__topic)"
-              @click="pickTopic(x.__topic.name)"
-            >
-              <div class="tc__cover">
-                <span class="tc__emoji">{{ topicEmoji(x.__topic.name) }}</span>
-                <span class="tc__cat">{{ topicCat(x.__topic.name) }}</span>
-              </div>
-              <div class="tc__body">
-                <div class="tc__t">
-                  <span class="tc__hash">#</span>
-                  <span class="tc__name">{{ x.__topic.name }}</span>
-                </div>
-                <div class="tc__n">
-                  {{ x.__active ? x.__topic.n + ' 条 · 再点退出' : topicMeta(x.__topic) }}
-                </div>
-              </div>
-            </div>
-            <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
+            <DiscoverTopicCard v-if="x.__topic" :name="x.__topic.name" :count="x.__topic.n" :active="!!x.__active"
+              :emoji="topicEmoji(x.__topic.name)" :category="topicCat(x.__topic.name)" :style="topicCardStyle(x.__topic)"
+              @click="pickTopic(x.__topic.name)" />
+            <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
         </div>
         <div class="wf-col">
           <template v-for="(x, i) in wfColB" :key="x.__key || x.id">
-            <div
-              v-if="x.__topic"
-              class="topiccard press"
-              :class="{ 'topiccard--on': x.__active }"
-              :style="x.__active ? '' : topicCardStyle(x.__topic)"
-              @click="pickTopic(x.__topic.name)"
-            >
-              <div class="tc__cover">
-                <span class="tc__emoji">{{ topicEmoji(x.__topic.name) }}</span>
-                <span class="tc__cat">{{ topicCat(x.__topic.name) }}</span>
-              </div>
-              <div class="tc__body">
-                <div class="tc__t">
-                  <span class="tc__hash">#</span>
-                  <span class="tc__name">{{ x.__topic.name }}</span>
-                </div>
-                <div class="tc__n">
-                  {{ x.__active ? x.__topic.n + ' 条 · 再点退出' : topicMeta(x.__topic) }}
-                </div>
-              </div>
-            </div>
-            <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
+            <DiscoverTopicCard v-if="x.__topic" :name="x.__topic.name" :count="x.__topic.n" :active="!!x.__active"
+              :emoji="topicEmoji(x.__topic.name)" :category="topicCat(x.__topic.name)" :style="topicCardStyle(x.__topic)"
+              @click="pickTopic(x.__topic.name)" />
+            <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
         </div>
       </div>
@@ -200,10 +168,7 @@
           @click="pickFilter('全部')"
         >{{ t('discover.clearFilter') }}</span>
       </div>
-      <div v-if="currentFeedKey && recommendList.length" class="load-more">
-        <span v-if="loadingMore">{{ t('discover.loadingMore') }}</span>
-        <span v-else-if="!feedPage[currentFeedKey].hasMore">{{ t('discover.noMore') }}</span>
-      </div>
+      <FeedLoadState v-if="currentFeedKey && recommendList.length" :loading="loadingMore" :finished="!feedPage[currentFeedKey].hasMore" />
     </div>
 
     <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 + 非搜索态 -->
@@ -221,10 +186,7 @@
         />
         <div v-if="nearLoading" class="empty-tab">{{ t('discover.nearLoading') }}</div>
         <div v-else-if="dynamicList.length === 0" class="empty-tab">{{ t('discover.emptyDynamic') }}</div>
-        <div v-if="currentFeedKey && dynamicList.length" class="load-more">
-          <span v-if="loadingMore">{{ t('discover.loadingMore') }}</span>
-          <span v-else-if="!feedPage[currentFeedKey].hasMore">{{ t('discover.noMore') }}</span>
-        </div>
+        <FeedLoadState v-if="currentFeedKey && dynamicList.length" :loading="loadingMore" :finished="!feedPage[currentFeedKey].hasMore" />
       </div>
     </template>
 
@@ -318,6 +280,8 @@
 import { ref, computed, watch, onMounted, onActivated, onDeactivated, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
+import FeedLoadState from '../components/FeedLoadState.vue'
+import DiscoverTopicCard from '../components/DiscoverTopicCard.vue'
 import MomentCard from '../components/MomentCard.vue'
 import IconSvg from '../components/IconSvg.vue'
 import TopBar from '../components/TopBar.vue'
@@ -531,20 +495,12 @@ function topicEmoji(name) {
 }
 function topicCat(name) {
   const up = name.toUpperCase()
-  if (/官方|活动|品牌|公告|PXID/.test(name)) return '官方'
-  if (/^(P|G)?\d/.test(up)) return '车型'
-  return '玩法'
+  if (/官方|活动|品牌|公告|PXID/.test(name)) return t('discover.topicOfficial')
+  if (/^(P|G)?\d/.test(up)) return t('discover.topicModel')
+  return t('discover.topic')
 }
-function fmtCount(n) {
-  if (n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + 'w'
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
-  return String(n)
-}
-function topicMeta(t) {
-  const discuss = fmtCount(t.n)
-  const join = fmtCount(Math.max(t.n, Math.round(t.n * 1.6)))
-  return `🔥 ${discuss} 讨论 · ${join} 参与`
-}
+
+
 function topicCardStyle(topic) {
   const p = TOPIC_PALETTE[(topic.colorIndex || 0) % TOPIC_PALETTE.length]
   return {
@@ -603,38 +559,24 @@ const wfFeed = computed(() => {
   })
   return out
 })
-// 瀑布流两列：贪心分列（§5 规范）——逐条把卡片放进当前较矮的一列，
-// 读序仍 1 左 2 右起、列高差收敛（实测 46 帖左右差 ≤15%）。
-// 高度估算：3:4 封面卡 ≈ 卡宽×4/3 + 标题(1~2 行) + 底栏；话题卡固定矮卡。
-// 奇偶硬分会在长标题集中一侧时把某列垫高 20%+，贪心消除该偏斜。
+// 精选两张使用图上标题；常规卡片统一横图，分页追加时保持已有排列稳定。
+const featuredIds = computed(() => new Set(recommendList.value.slice(0, 2).map(x => x.id)))
 function estItemHeight(x) {
-  if (x.__topic) return 132 // 封面 72 + body 约 60
-  const t = (x.title || '').length
-  return 330 + (t > 16 ? 19 : 0) // 3:4 封面 + 1 行标题 + 底栏；2 行标题加一行高
+  if (x.__topic) return 204
+  if (featuredIds.value.has(x.id)) return 212
+  return 192 + ((x.title || '').length > 14 ? 20 : 0)
 }
-const wfColA = computed(() => {
-  const A = []
-  const B = []
-  let hA = 0
-  let hB = 0
+const wfColumns = computed(() => {
+  const columns = [[], []], heights = [0, 0]
   for (const x of wfFeed.value) {
-    const h = estItemHeight(x)
-    if (hA <= hB) { A.push(x); hA += h } else { B.push(x); hB += h }
+    const i = heights[0] <= heights[1] ? 0 : 1
+    columns[i].push(x)
+    heights[i] += estItemHeight(x) + 12
   }
-  return A
+  return columns
 })
-const wfColB = computed(() => {
-  // 与 wfColA 同一遍分配（两 computed 各算一遍结果一致，开销可忽略）
-  const A = []
-  const B = []
-  let hA = 0
-  let hB = 0
-  for (const x of wfFeed.value) {
-    const h = estItemHeight(x)
-    if (hA <= hB) { A.push(x); hA += h } else { B.push(x); hB += h }
-  }
-  return B
-})
+const wfColA = computed(() => wfColumns.value[0])
+const wfColB = computed(() => wfColumns.value[1])
 
 // ---- 折叠屏两栏（≥600px）：右栏详情面板 ----
 // 手机（<600px）isSplit=false，右栏不渲染、不拉详情，零影响。
@@ -1159,53 +1101,26 @@ function showToast(msg) {
   }
 }
 .tabs {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  /* TopBar 自带 padding:0 8px，这里再左推 8px，整体 16px 与下方卡片 margin 对齐 */
-  margin-left: 8px;
+  display: flex; align-items: center; gap: 20px; margin-left: 8px;
 }
 .tab {
-  position: relative;
-  font-size: 18px;
-  color: var(--text-sub);
-  font-weight: 500;
-  line-height: 1.2;
-  padding: 4px 0;
+  position: relative; font-size: 19px; font-weight: 500; line-height: 1.2; color: #697386; min-height: 44px; padding: 8px 0; background: none; white-space: nowrap;
 }
 .tab.active {
   color: #000000;
   font-weight: 700;
 }
 .tab.active::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--brand, #4a6cf7);
+  content: ''; position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); width: 24px; height: 4px; border-radius: 4px; background: var(--brand);
 }
 .topacts {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: #000000;
+  display: flex; align-items: center; gap: 8px;
 }
 .act {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #000000;
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #14213b; background: #f0f5ff; border: 1px solid #e8effd; border-radius: 50%;
 }
 .act--add {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  flex: none;
 }
 .act--bell {
   width: 24px;
@@ -1284,12 +1199,7 @@ function showToast(msg) {
   color: #8E8E93;
 }
 .act--search {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #000000;
+  flex: none;
 }
 .act--search.act--on {
   color: var(--brand, #4a6cf7);
@@ -1327,16 +1237,9 @@ function showToast(msg) {
   margin-top: 10px;
   margin-bottom: 10px;
 }
-/* 通栏 banner：手机态贴屏幕左右边；分栏态因在 .leftcol 内，天然只贴左栏左右边（不跨右栏详情）。
-   去圆角/去阴影，做全宽沉浸。 */
+/* 焦点图：图片保持主体，底部渐变承载标题与轮播提示。 */
 .banner {
-  position: relative;
-  margin: 0;
-  border-radius: 0;
-  overflow: hidden;
-  aspect-ratio: 16 / 9;
-  touch-action: pan-y;
-  box-shadow: none;
+  position: relative; margin: 12px 16px 0; border-radius: 18px; overflow: hidden; aspect-ratio: 1.9; touch-action: pan-y; border: 2px solid #fff; box-shadow: 0 6px 18px rgba(33,79,155,.1);
 }
 .banner__track {
   display: flex;
@@ -1344,9 +1247,7 @@ function showToast(msg) {
   transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .banner__slide {
-  flex: 0 0 100%;
-  min-width: 100%;
-  height: 100%;
+  position: relative; flex: 0 0 100%; min-width: 100%; height: 100%;
 }
 .banner__media {
   width: 100%;
@@ -1356,58 +1257,27 @@ function showToast(msg) {
   pointer-events: none;
 }
 .banner__dots {
-  position: absolute;
-  bottom: 8px;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  z-index: 2;
+  position: absolute; bottom: 6px; left: 0; right: 0; display: flex; justify-content: center; z-index: 2;
 }
 .banner__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.55);
-  transition: all 0.3s;
+  width: 24px; height: 24px; display: grid; place-items: center; background: transparent; padding: 0;
 }
 .banner__dot.on {
-  width: 16px;
-  border-radius: 3px;
-  background: #ffffff;
+  background: transparent;
 }
 .quick {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin: 16px 16px 24px;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 16px 16px 20px; padding: 14px 4px 12px; border-radius: 18px; background: #fff; box-shadow: 0 2px 10px rgba(33,79,155,.04);
 }
 .quick__item {
-  position: relative;
-  min-width: 0; /* 葡语等长文案不会把该列撑宽，保证 4 宫格各语言等宽 */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; background: transparent; padding: 0 2px;
 }
-/* A 方案（2026-09-27）：去彩色圆底，深灰单色图标，纯功能导航，不抢焦点 */
+/* 统一浅蓝圆角容器，图标与文字居中。 */
 .quick__thumb {
-  position: relative;
-  width: 26px;
-  height: 26px;
-  background: none;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform .15s ease;
+  position: relative; width: 54px; height: 54px; border-radius: 16px; background: linear-gradient(145deg, #f4f8ff, #eaf1ff); display: flex; align-items: center; justify-content: center; transition: transform .15s ease;
 }
 .quick__item:active .quick__thumb { transform: scale(.94); }
 .quick__icon {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
+  width: 28px; height: 28px; object-fit: contain;
 }
 .quick__label {
   width: 100%;
@@ -1428,59 +1298,23 @@ function showToast(msg) {
   word-break: break-word;
 }
 .q-badge {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 1.5px solid #fff;
-  box-shadow: 0 1px 3px rgba(255, 122, 47, .35);
-  z-index: 2;
+  position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: #ff4a60; border: 2px solid #fff; z-index: 2;
 }
 .filter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 12px 12px 0;
-  gap: 8px;
+  display: flex; align-items: center; margin: 0 16px; gap: 8px;
 }
 .chips {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding: 4px 2px;
+  display: flex; gap: 10px; flex: 1; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: none;
 }
 .chips::-webkit-scrollbar { display: none; }
 /* 车型筛选 chip：统一选中/未选中逻辑（2026-09-27 诊断书修正）
    未选中 = 白底 + 浅灰边 + 深灰字；选中 = 品牌蓝实心 + 白字；
    「我的车」取消常驻蓝边，仅保留 🚗 前缀，避免视觉第三态 */
 .chip {
-  font-size: 13px;
-  color: #4B5563;
-  line-height: 1;
-  white-space: nowrap;
-  padding: 8px 16px;
-  border-radius: var(--radius-pill);
-  background: #fff;
-  border: 1px solid #E5E7EB;
-  transition: all 0.15s ease;
-  font-weight: 500;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  min-width: 56px; min-height: 40px; padding: 0 18px; border-radius: 999px; background: #fafbfe; border: 1px solid #e4e9f2; color: #566076; font-size: 13px; font-weight: 500; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
 }
 .chip.active {
-  color: #fff;
-  background: var(--brand, #4A6CF7);
-  border-color: var(--brand, #4A6CF7);
-  font-weight: 700;
-  line-height: 1;
+  color: #fff; background: var(--brand); border-color: var(--brand); font-weight: 700; box-shadow: 0 4px 10px rgba(77,124,255,.22);
 }
 .content {
   margin-top: 16px;
@@ -1502,12 +1336,7 @@ function showToast(msg) {
   font-size: 12px;
   font-weight: 700;
 }
-.load-more {
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-hint);
-  padding: 20px 0 8px;
-}
+
 .topics {
   padding: 2px 0 10px;
 }
@@ -1544,90 +1373,12 @@ function showToast(msg) {
 .topic.on em {
   color: rgba(255, 255, 255, 0.75);
 }
-/* 流内热门话题卡：与动态卡片错落排布；按 TOPIC_PALETTE 多彩色循环 */
-.topiccard {
-  background: var(--card);
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-.tc__cover {
-  height: 72px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: linear-gradient(135deg, var(--tc-cover-from, var(--brand-soft)), var(--tc-cover-to, var(--brand)));
-}
-.tc__emoji {
-  font-size: 34px;
-  line-height: 1;
-}
-.tc__cat {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  color: var(--text-sub);
-}
-.tc__body {
-  padding: 11px;
-}
-.tc__t {
-  display: flex;
-  align-items: baseline;
-  gap: 2px;
-  margin-bottom: 4px;
-}
-.tc__hash {
-  color: var(--tc-color, var(--brand));
-  font-size: 15px;
-  font-weight: 500;
-}
-.tc__name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-.tc__n {
-  font-size: 11px;
-  color: var(--text-hint);
-}
-.topiccard--on .tc__cover {
-  background: var(--brand);
-}
-.topiccard--on .tc__cat {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-}
-.topiccard--on .tc__hash,
-.topiccard--on .tc__name {
-  color: #fff;
-}
-.topiccard--on .tc__n {
-  color: rgba(255, 255, 255, 0.85);
-}
 .wf2 {
-  display: flex;
-  gap: 10px;
-  padding: 0 12px;
-  align-items: flex-start;
+  display: flex; gap: 12px; padding: 0 16px; align-items: flex-start;
 }
 .wf-col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px;
 }
-/* §3 S1：封面统一 3:4 竖图（FeedCard 已内置 aspect-ratio:3/4）。
-   2026-09-24 的「按位置轮换 4:3/1:1/3:4 乱错落」已删除——比例乱跳是反行业做法，
-   错落统一由标题 1~2 行差产生、贪心分列（§5）收敛列高差 ≤15%。
-   旧 1:1 源图 3:4 显示时 object-fit:cover 顶部裁切、视觉一致；90 张 3:4 新图就位后自然满幅。 */
 .wf-col :deep(.fcard) {
   box-shadow: var(--card-shadow, 0 1px 3px rgba(16, 24, 40, 0.06));
 }
@@ -1891,4 +1642,16 @@ function showToast(msg) {
 }
 .panel__cmname { font-size: 12px; color: var(--text-hint); margin-bottom: 3px; }
 .panel__cmttext { font-size: 13px; line-height: 1.5; color: var(--text); }
+/* 仅发现页的根导航适配窄屏及英文/葡文，不修改全站 TopBar。 */
+.banner__copy { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px 16px 36px; color: white; background: linear-gradient(180deg, transparent 10%, rgba(0,0,0,.12) 35%, rgba(0,0,0,.65)); pointer-events: none; }
+.banner__copy h2 { font-size: 23px; line-height: 1.25; font-weight: 700; margin: 0 0 6px; text-wrap: balance; }
+.banner__copy p { margin: 0; font-size: 12px; line-height: 1.5; opacity: .92; }
+.banner__dot::after { content: ''; width: 6px; height: 6px; border-radius: 6px; background: rgba(255,255,255,.7); transition: width .2s ease; }
+.banner__dot.on::after { width: 18px; background: var(--brand); }
+.locale-en .tabs, .locale-pt .tabs { gap: 12px; }
+.locale-en .tab, .locale-pt .tab { font-size: 14px; }
+.discover button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+@media(max-width: 359px) { .tabs { gap: 12px; } .tab { font-size: 17px; } .topacts { gap: 4px; } .banner__copy h2 { font-size: 20px; } }
+@media(min-width: 600px) and (max-width: 749px) { .tabs { gap: 10px; margin-left: 2px; } .tab { font-size: 16px; } .topacts { gap: 2px; } .act { width: 40px; height: 40px; } .locale-en .tab, .locale-pt .tab { font-size: 12px; } .banner__copy { padding: 12px 12px 30px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
+@media(prefers-reduced-motion: reduce) { .banner__track, .banner__dot::after, .quick__thumb { transition: none; } }
 </style>
