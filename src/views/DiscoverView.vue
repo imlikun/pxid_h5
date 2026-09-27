@@ -1325,14 +1325,16 @@ function showToast(msg) {
   opacity: 1;
   margin-top: 10px;
 }
+/* 通栏 banner：手机态贴屏幕左右边；分栏态因在 .leftcol 内，天然只贴左栏左右边（不跨右栏详情）。
+   去圆角/去阴影，做全宽沉浸。 */
 .banner {
   position: relative;
-  margin: 16px 14px 0;
-  border-radius: var(--radius-xl);
+  margin: 16px 0 0;
+  border-radius: 0;
   overflow: hidden;
   aspect-ratio: 16 / 9;
   touch-action: pan-y;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
+  box-shadow: none;
 }
 .banner__track {
   display: flex;
