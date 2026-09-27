@@ -11,7 +11,9 @@
     </div>
 
     <div class="m-title">{{ item.title }}</div>
-    <div class="m-body">{{ item.content }}</div>
+    <div class="m-body">
+      <p v-for="(p, i) in paragraphs" :key="i" class="m-p">{{ p }}</p>
+    </div>
 
     <div v-if="item.videoUrl" class="m-video" @click.stop="open">
       <img class="m-video__cover" :src="videoCoverUrl" :alt="item.title" loading="lazy" @error="onImgErr" />
@@ -124,6 +126,25 @@ const cols = computed(() => {
   return 3
 })
 
+// 正文分段：先按空行(\n\n)/换行(\n)拆块，超长块(>80字)再按句末标点切，避免长句被打断
+const paragraphs = computed(() => {
+  const text = (props.item && props.item.content) || ''
+  if (!text.trim()) return []
+  const blocks = text.split(/\n{2,}|\n/).map((s) => s.trim()).filter(Boolean)
+  const out = []
+  blocks.forEach((b) => {
+    if (b.length <= 80) { out.push(b); return }
+    const parts = b.split(/(?<=[。！？!?])/)
+    let buf = ''
+    parts.forEach((p) => {
+      if (buf && (buf + p).length > 80) { out.push(buf); buf = p }
+      else buf += p
+    })
+    if (buf) out.push(buf)
+  })
+  return out
+})
+
 function open() {
   // 先把卡片手里的这份数据交给详情页直出（省掉转场里的加载圈，见 utils/feedSnapshot.js）
   putFeedSnapshot(props.item)
@@ -225,7 +246,7 @@ async function onFollow() {
   border-radius: var(--radius-lg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   padding: 12px;
-  margin: 0 12px 12px;
+  margin: 0 12px 16px;
 }
 .m-head {
   display: flex;
@@ -274,13 +295,19 @@ async function onFollow() {
 }
 .m-body {
   font-size: 14px;
-  color: #444;
-  line-height: 1.7;
-  margin-top: 6px;
+  color: var(--text);
+  line-height: 1.8;
+  margin-top: 10px;
+}
+.m-body .m-p {
+  margin: 0 0 12px;
+}
+.m-body .m-p:last-child {
+  margin-bottom: 0;
 }
 .m-video {
   position: relative;
-  margin-top: 10px;
+  margin-top: 12px;
   border-radius: var(--radius);
   overflow: hidden;
   background: #000;
@@ -310,7 +337,7 @@ async function onFollow() {
 .m-imgs {
   display: grid;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 .m-img {
   width: 100%;

@@ -1790,6 +1790,8 @@ function showToast(msg) {
     background: var(--card);
     border-left: 1px solid var(--line);
   }
+  /* 左右栏内容起点对齐：左栏 banner 紧贴 TopBar 下沿(56px)，右栏 panel__nav 同高 56px */
+  .split .banner { margin-top: 0; }
 }
 
 /* 右栏详情面板内部（仅分栏态出现） */
@@ -1800,7 +1802,9 @@ function showToast(msg) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  height: 56px;
+  padding: 0 14px;
+  box-sizing: border-box;
   background: var(--card);
   border-bottom: 1px solid #F0F0F0;
 }
