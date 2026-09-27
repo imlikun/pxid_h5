@@ -1168,9 +1168,11 @@ function showToast(msg) {
 .hero__single {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  max-height: 520px;
-  object-fit: cover;
+  max-height: 560px;
+  height: auto;
+  object-fit: contain;
+  object-position: center top;
+  background: var(--bg);
 }
 /* 5+ 图横向轮播（原生 scroll-snap，不引依赖） */
 .hero.carousel { position: relative; background: #000; }
