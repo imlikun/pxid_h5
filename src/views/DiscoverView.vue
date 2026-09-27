@@ -113,9 +113,9 @@
 
         @click="onQuick(q)"
       >
-          <div class="quick__thumb">
+          <div class="quick__thumb" :class="'quick__thumb--' + q.key">
             <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
-            <img v-if="QUICK_ICON_SVG[q.icon]" class="quick__icon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
+            <img v-if="QUICK_IMAGES[q.key]" class="quick__icon" :src="QUICK_IMAGES[q.key]" alt="" width="54" height="54" decoding="async" />
             <IconSvg v-else class="quick__icon" :name="q.icon" :size="22" />
           </div>
           <div class="quick__label">
@@ -285,7 +285,11 @@ import DiscoverTopicCard from '../components/DiscoverTopicCard.vue'
 import MomentCard from '../components/MomentCard.vue'
 import IconSvg from '../components/IconSvg.vue'
 import TopBar from '../components/TopBar.vue'
-import { QUICK_ICON_SVG } from '../assets/icons'
+import quickCustom from '../assets/discover/quick-custom.png'
+import quickNotice from '../assets/discover/quick-notice.png'
+import quickAi from '../assets/discover/quick-ai.png'
+import quickPoints from '../assets/discover/quick-points.png'
+const QUICK_IMAGES = { custom: quickCustom, notice: quickNotice, ai: quickAi, points: quickPoints }
 import {
   discoverTabs,
   discoverQuick,
@@ -1297,12 +1301,14 @@ function showToast(msg) {
 }
 /* 统一浅蓝圆角容器，图标与文字居中。 */
 .quick__thumb {
-  position: relative; width: 54px; height: 54px; border-radius: 16px; background: #f1f5fc; display: flex; align-items: center; justify-content: center; transition: transform .15s ease;
+  position: relative; width: 54px; height: 54px; border-radius: 16px; background: transparent; overflow: hidden; display: flex; align-items: center; justify-content: center; transition: transform .15s ease;
 }
 .quick__item:active .quick__thumb { transform: scale(.94); }
 .quick__icon {
-  width: 28px; height: 28px; object-fit: contain;
+  width: 100%; height: 100%; object-fit: contain; transform: scale(1.4);
 }
+.quick__thumb--custom .quick__icon { transform: scale(1.36); }
+.quick__thumb--points .quick__icon { transform: scale(1.22); }
 .quick__label {
   width: 100%;
   overflow: hidden;
