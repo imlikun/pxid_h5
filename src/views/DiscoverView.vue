@@ -1124,7 +1124,23 @@ function showToast(msg) {
   display: flex; align-items: center; gap: 8px;
 }
 .act {
-  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #14213b; background: #f0f5ff; border: 1px solid #e8effd; border-radius: 50%;
+  position: relative;
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #14213b; background: transparent; border: 0; border-radius: 50%;
+}
+.act::before {
+  content: '';
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: #f3f6fc;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.act > svg {
+  position: relative;
 }
 .act--add {
   flex: none;
