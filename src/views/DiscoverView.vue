@@ -1329,7 +1329,7 @@ function showToast(msg) {
    去圆角/去阴影，做全宽沉浸。 */
 .banner {
   position: relative;
-  margin: 16px 0 0;
+  margin: 0;
   border-radius: 0;
   overflow: hidden;
   aspect-ratio: 16 / 9;
@@ -1790,8 +1790,6 @@ function showToast(msg) {
     background: var(--card);
     border-left: 1px solid var(--line);
   }
-  /* 左右栏内容起点对齐：左栏 banner 紧贴 TopBar 下沿(56px)，右栏 panel__nav 同高 56px */
-  .split .banner { margin-top: 0; }
 }
 
 /* 右栏详情面板内部（仅分栏态出现） */
