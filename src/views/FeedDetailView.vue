@@ -4,9 +4,9 @@
        三个根级节点，导致从发现页进出详情页时，详情页那一侧的转场完全不生效
        （表现为只有列表在动，详情是硬切）。包一层后两侧动画才对称。 -->
   <div class="fd-root" ref="fdRoot">
-  <div class="detail" v-if="item">
+  <div class="detail" v-if="item" :class="{ 'single-hero': isSingleHero }">
     <!-- 顶部：返回优先关闭原生详情 WebView（App 原生右滑路由），回退 router.back() -->
-    <TopBar sticky :back="goBack" :title="isActivity ? t('feed.detail.title.activity') : (item?.author || t('feed.detail.title.content'))">
+    <TopBar sticky :back="goBack" :title="isSingleHero ? '' : (isActivity ? t('feed.detail.title.activity') : (item?.author || t('feed.detail.title.content')))">
       <template #right>
         <span class="more press" @click="onMoreClick">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
@@ -732,6 +732,11 @@ const images = computed(() => {
     ? item.value.images
     : [item.value.cover]
 })
+// 单图沉浸态：仅当普通 feed 且为单图（非视频、非活动）时，顶栏透明浮于图上
+const isSingleHero = computed(() => {
+  if (!item.value || isActivity.value) return false
+  return !item.value.videoUrl && images.value.length === 1
+})
 const videoSrc = computed(() => mediaUrl(item.value && item.value.videoUrl))
 const generatedPoster = ref('')
 const videoPoster = computed(() => mediaUrl(item.value && item.value.videoCover) || generatedPoster.value || '')
@@ -1144,6 +1149,23 @@ function showToast(msg) {
   min-height: 100vh;
   background: var(--bg);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+/* 单图沉浸态：顶栏透明悬浮于图上，去掉白条与标题，只留返回+分享 */
+.detail.single-hero :deep(.tb-bar) {
+  background: transparent;
+  box-shadow: none;
+}
+.detail.single-hero :deep(.tb-title) { display: none; }
+.detail.single-hero .hero {
+  margin-top: -64px; /* 上移穿过 56px 顶栏 + 8px article 上间距，图片顶贴屏幕顶 */
+}
+.detail.single-hero :deep(.tb-back) {
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
+}
+.detail.single-hero .share {
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
 }
 /* 详情页返回键向左靠 8px（热区左缘 4px→0），仅作用于本页，不牵动全站 TopBar */
 :deep(.tb-back) { margin-left: -8px; }
