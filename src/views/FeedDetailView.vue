@@ -80,14 +80,20 @@
       />
     </div>
 
-    <!-- 正文富文本 -->
+    <!-- 正文富文本：按自然段/句末标点拆成 <p>，避免长文糊成一段被打断 -->
     <div class="content">
-      <span
-        v-for="(seg, i) in segments"
-        :key="i"
-        :class="segClass(seg)"
-        @click="segClick(seg)"
-      >{{ seg.v }}</span>
+      <p
+        v-for="(para, pi) in paragraphs"
+        :key="pi"
+        class="paragraph"
+      >
+        <span
+          v-for="(seg, si) in para.segs"
+          :key="si"
+          :class="segClass(seg)"
+          @click="segClick(seg)"
+        >{{ seg.v }}</span>
+      </p>
     </div>
     </div>
 
@@ -803,15 +809,16 @@ function activityDateText() {
   return it.date || ''
 }
 
-// 富文本分段：#车型# / @用户 可点
-const segments = computed(() => {
-  if (!item.value) return []
-  const text = item.value.content || ''
-  // 用昵称→deviceId 反查映射，把 @昵称 解析出可跳转的 deviceId
-  const mentionMap = {}
-  ;(item.value.mentions || []).forEach((m) => {
-    if (m && m.nickname) mentionMap[String(m.nickname)] = m.deviceId || ''
+// 富文本分段：先把正文拆成自然段，再每段内解析 #车型# / @用户 可点。
+// 避免后端\n不一致或单段过长导致整篇文字糊成一块，阅读被打断。
+function buildMentionMap(mentions) {
+  const map = {}
+  ;(mentions || []).forEach((m) => {
+    if (m && m.nickname) map[String(m.nickname)] = m.deviceId || ''
   })
+  return map
+}
+function parseInlineSegments(text, mentionMap) {
   const re = /(#[^#]+#|@[\u4e00-\u9fa5A-Za-z0-9_]+)/g
   const out = []
   let last = 0
@@ -828,6 +835,33 @@ const segments = computed(() => {
   }
   if (last < text.length) out.push({ t: 'text', v: text.slice(last) })
   return out
+}
+function splitIntoParagraphs(text) {
+  if (!text) return []
+  // 1. 优先按空行分段；2. 单换行也视为分段；3. 超长段按句末标点再切。
+  let paras = text.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean)
+  paras = paras.flatMap((p) => p.split('\n').map((s) => s.trim()).filter(Boolean))
+  const out = []
+  paras.forEach((p) => {
+    if (p.length <= 120) { out.push(p); return }
+    const parts = p.split(/([。！？]+)/)
+    let buf = ''
+    parts.forEach((part) => {
+      buf += part
+      if (/[。！？]+$/.test(part) && buf.trim().length >= 40) {
+        out.push(buf.trim())
+        buf = ''
+      }
+    })
+    if (buf.trim()) out.push(buf.trim())
+  })
+  return out
+}
+const paragraphs = computed(() => {
+  if (!item.value) return []
+  const text = item.value.content || ''
+  const mentionMap = buildMentionMap(item.value.mentions)
+  return splitIntoParagraphs(text).map((para) => ({ segs: parseInlineSegments(para, mentionMap) }))
 })
 
 // 标签：话题 + 车型
@@ -1239,13 +1273,19 @@ function showToast(msg) {
   object-fit: cover;
 }
 
-/* 正文 */
+/* 正文：按 <p> 分段，段间距清晰，中文两端对齐、长句不会溢出打断 */
 .content {
   font-size: 16px;
   color: var(--text);
   line-height: 1.85;
-  white-space: pre-line; /* 长文保留换行：content 里的 \n 渲染成段落，避免糊成一行 */
 }
+.paragraph {
+  margin: 0 0 16px;
+  text-align: justify;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+.paragraph:last-child { margin-bottom: 0; }
 .seg--car, .seg--at { color: var(--brand); }
 
 /* 标签 */

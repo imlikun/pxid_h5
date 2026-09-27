@@ -138,17 +138,22 @@
               v-if="x.__topic"
               class="topiccard press"
               :class="{ 'topiccard--on': x.__active }"
-              :style="x.__active ? {} : { '--tc-bg': TOPIC_PALETTE[x.__topic.colorIndex].bg, '--tc-color': TOPIC_PALETTE[x.__topic.colorIndex].color }"
+              :style="x.__active ? '' : topicCardStyle(x.__topic)"
               @click="pickTopic(x.__topic.name)"
             >
-              <div class="tc__t">
-                <span class="tc__hash">#</span>
-                <span class="tc__name">{{ x.__topic.name }}</span>
+              <div class="tc__cover">
+                <span class="tc__emoji">{{ topicEmoji(x.__topic.name) }}</span>
+                <span class="tc__cat">{{ topicCat(x.__topic.name) }}</span>
               </div>
-              <div class="tc__n">
-                {{ x.__active ? x.__topic.n + ' 条 · 再点退出' : x.__topic.n + ' 篇热议' }}
+              <div class="tc__body">
+                <div class="tc__t">
+                  <span class="tc__hash">#</span>
+                  <span class="tc__name">{{ x.__topic.name }}</span>
+                </div>
+                <div class="tc__n">
+                  {{ x.__active ? x.__topic.n + ' 条 · 再点退出' : topicMeta(x.__topic) }}
+                </div>
               </div>
-              <div class="tc__go">{{ x.__active ? '退出话题' : '查看全部' }} ›</div>
             </div>
             <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
@@ -159,17 +164,22 @@
               v-if="x.__topic"
               class="topiccard press"
               :class="{ 'topiccard--on': x.__active }"
-              :style="x.__active ? {} : { '--tc-bg': TOPIC_PALETTE[x.__topic.colorIndex].bg, '--tc-color': TOPIC_PALETTE[x.__topic.colorIndex].color }"
+              :style="x.__active ? '' : topicCardStyle(x.__topic)"
               @click="pickTopic(x.__topic.name)"
             >
-              <div class="tc__t">
-                <span class="tc__hash">#</span>
-                <span class="tc__name">{{ x.__topic.name }}</span>
+              <div class="tc__cover">
+                <span class="tc__emoji">{{ topicEmoji(x.__topic.name) }}</span>
+                <span class="tc__cat">{{ topicCat(x.__topic.name) }}</span>
               </div>
-              <div class="tc__n">
-                {{ x.__active ? x.__topic.n + ' 条 · 再点退出' : x.__topic.n + ' 篇热议' }}
+              <div class="tc__body">
+                <div class="tc__t">
+                  <span class="tc__hash">#</span>
+                  <span class="tc__name">{{ x.__topic.name }}</span>
+                </div>
+                <div class="tc__n">
+                  {{ x.__active ? x.__topic.n + ' 条 · 再点退出' : topicMeta(x.__topic) }}
+                </div>
               </div>
-              <div class="tc__go">{{ x.__active ? '退出话题' : '查看全部' }} ›</div>
             </div>
             <FeedCard v-else :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
@@ -498,7 +508,7 @@ function rankList(list) {
   })
 }
 // 热门话题：从已加载推荐数据的 tags 聚合（跳过 P5 / ant5 这类车型代号标签）
-// 2026-09-26 多彩话题卡：给每个话题分配一个柔和彩色，避免整页只有品牌蓝/橙
+// A 方案轻量产品化：给话题卡加封面 emoji、分类、热度/讨论/参与，仍在瀑布流内穿插。
 const TOPIC_PALETTE = [
   { bg: '#FFE8F0', color: '#E9407A' }, // 粉
   { bg: '#FFF0E6', color: '#FF7A2F' }, // 橙
@@ -507,6 +517,36 @@ const TOPIC_PALETTE = [
   { bg: '#EEF3FF', color: '#4D7CFF' }, // 蓝
   { bg: '#F2EDFF', color: '#7C5CFF' }, // 紫
 ]
+const TOPIC_EMOJIS = ['🛵', '🔧', '🏕️', '🔋', '🛡️', '🎁', '🚲', '⚡', '🌄', '🧰', '📸', '🏆']
+function topicEmoji(name) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = ((h * 31) + name.charCodeAt(i)) >>> 0
+  return TOPIC_EMOJIS[h % TOPIC_EMOJIS.length]
+}
+function topicCat(name) {
+  const up = name.toUpperCase()
+  if (/官方|活动|品牌|公告|PXID/.test(name)) return '官方'
+  if (/^(P|G)?\d/.test(up)) return '车型'
+  return '玩法'
+}
+function fmtCount(n) {
+  if (n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + 'w'
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  return String(n)
+}
+function topicMeta(t) {
+  const discuss = fmtCount(t.n)
+  const join = fmtCount(Math.max(t.n, Math.round(t.n * 1.6)))
+  return `🔥 ${discuss} 讨论 · ${join} 参与`
+}
+function topicCardStyle(topic) {
+  const p = TOPIC_PALETTE[(topic.colorIndex || 0) % TOPIC_PALETTE.length]
+  return {
+    '--tc-cover-from': p.bg,
+    '--tc-cover-to': p.color,
+    '--tc-color': p.color,
+  }
+}
 const activeTopic = ref('')
 const hotTopics = computed(() => {
   const cnt = {}
@@ -562,7 +602,7 @@ const wfFeed = computed(() => {
 // 高度估算：3:4 封面卡 ≈ 卡宽×4/3 + 标题(1~2 行) + 底栏；话题卡固定矮卡。
 // 奇偶硬分会在长标题集中一侧时把某列垫高 20%+，贪心消除该偏斜。
 function estItemHeight(x) {
-  if (x.__topic) return 104
+  if (x.__topic) return 132 // 封面 72 + body 约 60
   const t = (x.title || '').length
   return 330 + (t > 16 ? 19 : 0) // 3:4 封面 + 1 行标题 + 底栏；2 行标题加一行高
 }
@@ -1437,46 +1477,70 @@ function showToast(msg) {
 }
 /* 流内热门话题卡：与动态卡片错落排布；按 TOPIC_PALETTE 多彩色循环 */
 .topiccard {
-  background: var(--tc-bg, var(--accent-soft));
+  background: var(--card);
   border-radius: 16px;
-  padding: 14px;
+  overflow: hidden;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.tc__cover {
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: linear-gradient(135deg, var(--tc-cover-from, var(--brand-soft)), var(--tc-cover-to, var(--brand)));
+}
+.tc__emoji {
+  font-size: 34px;
+  line-height: 1;
+}
+.tc__cat {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text-sub);
+}
+.tc__body {
+  padding: 11px;
 }
 .tc__t {
   display: flex;
   align-items: baseline;
   gap: 2px;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 .tc__hash {
-  color: var(--tc-color, var(--accent));
-  font-size: 16px;
+  color: var(--tc-color, var(--brand));
+  font-size: 15px;
   font-weight: 500;
 }
 .tc__name {
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text);
 }
 .tc__n {
   font-size: 11px;
   color: var(--text-hint);
 }
-.tc__go {
-  font-size: 11px;
-  color: var(--tc-color, var(--accent));
-  margin-top: 6px;
-}
-.topiccard--on {
+.topiccard--on .tc__cover {
   background: var(--brand);
 }
+.topiccard--on .tc__cat {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
 .topiccard--on .tc__hash,
-.topiccard--on .tc__name,
-.topiccard--on .tc__go {
+.topiccard--on .tc__name {
   color: #fff;
 }
 .topiccard--on .tc__n {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.85);
 }
 .wf2 {
   display: flex;
