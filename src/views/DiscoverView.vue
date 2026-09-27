@@ -31,6 +31,9 @@
       </template>
       <template #right>
         <div class="topacts">
+          <span class="act act--search float-in press" :class="{ 'act--on': searchOpen }" @click="toggleSearch">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
+          </span>
           <span class="act act--add float-in press" @click="onAdd">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </span>
@@ -38,13 +41,16 @@
       </template>
     </TopBar>
 
-    <!-- 搜索：推荐/广场显示 -->
-    <div v-if="activeTab !== '动态'" class="search" @click="onSearch">
-      <span class="sicon">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
-      </span>
-      <input class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearchEnter" @compositionstart="isComposing = true" @compositionend="onCompositionEnd" @click.stop />
-    </div>
+    <!-- 搜索：右上角按钮触发，滑出内联搜索条（三 tab 通用） -->
+    <transition name="searchslide">
+      <div v-if="searchOpen" class="search" @click="onSearch">
+        <span class="sicon">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
+        </span>
+        <input ref="searchInputRef" class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearchEnter" @compositionstart="isComposing = true" @compositionend="onCompositionEnd" @click.stop />
+        <span v-if="keyword" class="sclose press" @click.stop="clearSearch">×</span>
+      </div>
+    </transition>
 
     <!-- 搜索结果（内联过滤，不跳页） -->
     <div v-if="showSearchResults" class="search-results">
@@ -709,6 +715,7 @@ function setTab(t, forceDefault = false) {
   // 不重置会让新 tab 同样一片空白，表现为「帖子不显示」
   showSearchResults.value = false
   keyword.value = ''
+  searchOpen.value = false // 切 tab 同步收起右上角搜索条
   if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
   ensureFilterHasContent() // 该 tab 缓存的列表若无「我的车」内容，同步退回默认筛选
 }
@@ -1091,6 +1098,22 @@ function onSearch() {
   showSearchResults.value = true
 }
 
+// 右上角搜索按钮：点击滑出 / 收起搜索条（三 tab 通用，替代原常驻搜索框）
+const searchOpen = ref(false)
+const searchInputRef = ref(null)
+function toggleSearch() {
+  searchOpen.value = !searchOpen.value
+  if (searchOpen.value) {
+    nextTick(() => searchInputRef.value && searchInputRef.value.focus())
+  }
+}
+// 输入框内 ×：清空关键词并退出结果态，保持搜索条打开方便续输
+function clearSearch() {
+  keyword.value = ''
+  showSearchResults.value = false
+  nextTick(() => searchInputRef.value && searchInputRef.value.focus())
+}
+
 // 关键词被清空（用户手动删完 / 点清除）立即退出搜索态：
 // 否则列表仍被搜索态整块隐藏，页面只剩「0 个结果」，看起来就像「帖子不显示」
 watch(keyword, (k) => {
@@ -1259,6 +1282,48 @@ function showToast(msg) {
 }
 .sinput::placeholder {
   color: #8E8E93;
+}
+.act--search {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+}
+.act--search.act--on {
+  color: var(--brand, #4a6cf7);
+}
+.sclose {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .08);
+  color: #8E8E93;
+  font-size: 16px;
+  line-height: 1;
+}
+/* 搜索条滑出 / 收起过渡 */
+.searchslide-enter-active,
+.searchslide-leave-active {
+  transition: max-height .3s ease, opacity .25s ease, margin-top .3s ease;
+  overflow: hidden;
+}
+.searchslide-enter-from,
+.searchslide-leave-to {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+.searchslide-enter-to,
+.searchslide-leave-from {
+  max-height: 60px;
+  opacity: 1;
+  margin-top: 10px;
 }
 .banner {
   position: relative;
