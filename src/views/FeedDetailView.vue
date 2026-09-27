@@ -18,27 +18,46 @@
     </TopBar>
 
   <article class="article">
-    <!-- 作者卡：点作者进个人主页（官方帖无 deviceId 不跳） -->
-    <header class="article__header">
-      <div class="author" @click="goAuthor">
-      <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.value?.author)" />
-      <div class="meta">
-        <div class="name">
-          {{ item.author || t('feed.author.official') }}
-          <span v-if="isOfficial" class="badge-official">{{ t('feed.badge.official') }}</span>
-        </div>
-        <div class="time">{{ item.time || item.date }}</div>
+    <!-- 全宽 Hero：大图/视频置顶，参考汽车之家式文章详情 -->
+    <div v-if="item && (item.videoUrl || images.length && images[0])" class="hero">
+      <div v-if="item.videoUrl" class="vd-video hero__media">
+        <video
+          class="vd-video__el"
+          :src="videoSrc"
+          :poster="videoPoster"
+          controls
+          playsinline
+          preload="metadata"
+        ></video>
       </div>
-      <button
-        v-if="!isOfficial"
-        class="follow press"
-        :class="{ followed }"
-        @click.stop="onFollow"
-      >{{ followed ? t('feed.follow.following') : t('feed.follow.follow') }}</button>
+      <div v-else class="gallery hero__gallery" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
+        <img
+          v-for="(img, i) in images"
+          :key="i"
+          class="gallery__img"
+          :class="{ single: gridCols === 1 }"
+          :src="img"
+          :alt="item.title"
+          @click="onPreview(img)"
+        />
+      </div>
     </div>
 
-    <!-- 标题 -->
-    <h1 class="title">{{ item.title }}</h1>
+    <header class="article__header">
+      <!-- 标题 -->
+      <h1 class="title">{{ item.title }}</h1>
+
+      <!-- 作者卡：点作者进个人主页（官方帖无 deviceId 不跳） -->
+      <div class="author" @click="goAuthor">
+        <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.value?.author)" />
+        <div class="meta">
+          <div class="name">
+            {{ item.author || t('feed.author.official') }}
+            <span v-if="isOfficial" class="badge-official">{{ t('feed.badge.official') }}</span>
+          </div>
+          <div class="time">{{ item.time || item.date }}</div>
+        </div>
+      </div>
     </header>
 
     <div class="article__body">
@@ -55,32 +74,7 @@
       <button class="signup__btn press" :class="{ signed: signedUp }" :disabled="signedUp" @click="onActivitySignup">{{ signedUp ? t('feed.signup.joined') : t('feed.signup.btn') }}</button>
     </div>
 
-    <!-- 视频播放器 -->
-    <div v-if="item && item.videoUrl" class="vd-video">
-      <video
-        class="vd-video__el"
-        :src="videoSrc"
-        :poster="videoPoster"
-        controls
-        playsinline
-        preload="metadata"
-      ></video>
-    </div>
-
-    <!-- 图片九宫格 -->
-    <div v-if="images.length && images[0]" class="gallery" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
-      <img
-        v-for="(img, i) in images"
-        :key="i"
-        class="gallery__img"
-        :class="{ single: gridCols === 1 }"
-        :src="img"
-        :alt="item.title"
-        @click="onPreview(img)"
-      />
-    </div>
-
-    <!-- 正文富文本：按自然段/句末标点拆成 <p>，避免长文糊成一段被打断 -->
+    <!-- 正文富文本：按自然段/句末标点拆成 <p>，避免长文糊成一段被打断
     <div class="content">
       <p
         v-for="(para, pi) in paragraphs"
@@ -189,6 +183,9 @@
   <div v-else-if="loading || showLoading" class="fd-skel">
     <TopBar sticky :back="goBack" :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')" />
     <div class="fd-skel__body">
+      <span class="sk sk--cover"></span>
+      <span class="sk sk--title"></span>
+      <span class="sk sk--title sk--title--2"></span>
       <div class="fd-skel__author">
         <span class="sk sk--avatar"></span>
         <div class="fd-skel__col">
@@ -196,9 +193,6 @@
           <span class="sk sk--time"></span>
         </div>
       </div>
-      <span class="sk sk--title"></span>
-      <span class="sk sk--title sk--title--2"></span>
-      <span class="sk sk--cover"></span>
       <span class="sk sk--line"></span>
       <span class="sk sk--line"></span>
       <span class="sk sk--line sk--line--short"></span>
@@ -276,7 +270,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
 import bridge from '../bridge'
 import { t, locale, regionFromLocale } from '../i18n'
-import { fetchFeedDetail, fetchComments, followUser, unfollowUser, checkFollow, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail, deleteFeed, getDeviceId, invalidateFeedDetail, invalidateComments } from '../api/feed'
+import { fetchFeedDetail, fetchComments, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail, deleteFeed, getDeviceId, invalidateFeedDetail, invalidateComments } from '../api/feed'
 import { mediaUrl } from '../storage'
 import { getFeedSnapshot } from '../utils/feedSnapshot'
 import TopBar from '../components/TopBar.vue'
@@ -334,7 +328,6 @@ const liked = ref(false)
 const likeCount = ref(0)
 const collected = ref(false)
 const collectCount = ref(0)
-const followed = ref(false)
 const comments = ref([])
 // 加载期间仅保留评论区标题，完成后再决定显示评论或空态。
 const commentsLoading = ref(true)
@@ -344,7 +337,6 @@ if (bootSnap) {
   likeCount.value = bootSnap.likes || 0
   collected.value = !!bootSnap.isFavorited
   collectCount.value = bootSnap.favorites || 0
-  followed.value = !!bootSnap.followed
   commentsLoading.value = true
 }
 const commentText = ref('')
@@ -561,7 +553,6 @@ async function load() {
     likeCount.value = snap.likes || 0
     collected.value = !!snap.isFavorited
     collectCount.value = snap.favorites || 0
-    followed.value = !!snap.followed
     comments.value = []
     // 等待评论响应，期间不提前显示空态。
     commentsLoading.value = true
@@ -596,15 +587,6 @@ async function load() {
         likeCount.value = data.likes || 0
         collected.value = !!data.isFavorited
         collectCount.value = data.favorites || 0
-        followed.value = !!data.followed
-        // 后端详情 followed 硬编码 false（rowToFeed:304），用 /follow/check 补真实关注态。
-        // 不再 await：此前串行等待会把评论请求整整推迟一个 RTT（实测 880ms），
-        // 评论区因此在转场结束后才姗姗来迟，看起来就像"内容一块一块冒出来"
-        if (data.deviceId) {
-          jobs.push(
-            checkFollow(data.deviceId).then((v) => { followed.value = v }).catch(() => {})
-          )
-        }
         // 记录浏览足迹（H5 自管，个人主页「足迹」Tab 用；静默失败不影响阅读）
         recordFootprint(fid)
         // 有 token 时补收藏态（公开详情默认不带 isFavorited，避免未登录被 401）
@@ -911,7 +893,7 @@ function onTopic(t) {
   console.log('tap topic:', t)
 }
 
-// 互动：点赞 / 收藏 / 关注 / 分享
+// 互动：点赞 / 收藏 / 分享
 async function onLike() {
   // 点赞不强制前置登录：直接发请求由后端 requireAuth 最终鉴权（对齐 submitComment 评论流程）。
   // 背景（2026-08-26）：requireLogin 前置在真机 getUserInfo 字段差异下误判未登录 → 已登录用户被拉去登录页；
@@ -971,29 +953,6 @@ async function onCollect() {
   } catch (e) {
     rollback()
     showToast(t('feed.toast.collectFail'))
-  }
-}
-async function onFollow() {
-  if (!item.value || !item.value.deviceId) {
-    showToast(t('feed.toast.followFail'))
-    return
-  }
-  // 关注不强制前置登录（同点赞/收藏/签到策略，2026-08-26）：直接发请求由后端 requireAuth 鉴权，
-  // 避免真机 getUserInfo 字段差异下 requireLogin 误判未登录 → 已登录用户被拉去登录页
-  const next = !followed.value
-  followed.value = next
-  try {
-    // 真正落库：调后端 /follow（POST 关注 / DELETE 取关），followeeDevice = 作者 deviceId
-    const r = next
-      ? await followUser(item.value.deviceId)
-      : await unfollowUser(item.value.deviceId)
-    if (!r || !r.ok) {
-      followed.value = !next
-      showToast(t('feed.toast.followFail'))
-    }
-  } catch (e) {
-    followed.value = !next
-    showToast(t('feed.toast.followFail'))
   }
 }
 // 海外用户无微信：点击分享直接复制链接，不再弹分享面板
@@ -1167,12 +1126,24 @@ function showToast(msg) {
 .article__body { margin-bottom: 16px; }
 .article__body > *:last-child { margin-bottom: 0; }
 
+/* 全宽 Hero：大图/视频置顶，与正文形成「头图 + 标题 + 作者 + 正文」的阅读节奏 */
+.hero {
+  margin: -8px -16px 16px;
+  background: var(--bg);
+}
+.hero__media,
+.hero .vd-video,
+.hero .gallery {
+  margin-bottom: 0;
+}
+.hero .gallery__img { border-radius: 0; }
+
 /* 作者卡 */
 .author {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-bottom: 12px;
+  margin-top: 14px;
 }
 .avatar {
   width: 40px;
@@ -1192,25 +1163,13 @@ function showToast(msg) {
   padding: 1px 7px;
 }
 .time { font-size: 12px; color: var(--text-hint); margin-top: 3px; }
-.follow {
-  flex: none;
-  font-size: 13px;
-  color: var(--brand);
-  background: var(--brand-soft);
-  border-radius: var(--radius-pill);
-  padding: 6px 14px;
-}
-.follow.followed {
-  color: var(--text-hint);
-  background: #f0f1f3;
-}
-
 /* 标题 */
 .title {
   font-size: 22px;
   font-weight: 700;
   color: var(--text);
   line-height: 1.4;
+  margin-bottom: 0;
 }
 
 /* 活动报名卡 */
@@ -1268,8 +1227,8 @@ function showToast(msg) {
   display: block;
 }
 .gallery__img.single {
-  aspect-ratio: 3 / 4;
-  max-height: 520px;
+  aspect-ratio: 16 / 9;
+  max-height: 420px;
   object-fit: cover;
 }
 

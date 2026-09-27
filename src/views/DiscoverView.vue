@@ -1227,7 +1227,7 @@ function showToast(msg) {
 }
 .act--add { transform-origin: center; }
 .search {
-  margin: 10px 16px 0;
+  margin: 10px 16px;
   height: 36px;
   background: #E5E5EA;
   border: none;
@@ -1310,7 +1310,7 @@ function showToast(msg) {
 /* 搜索条滑出 / 收起过渡 */
 .searchslide-enter-active,
 .searchslide-leave-active {
-  transition: max-height .3s ease, opacity .25s ease, margin-top .3s ease;
+  transition: max-height .3s ease, opacity .25s ease, margin-top .3s ease, margin-bottom .3s ease;
   overflow: hidden;
 }
 .searchslide-enter-from,
@@ -1318,12 +1318,14 @@ function showToast(msg) {
   max-height: 0;
   opacity: 0;
   margin-top: 0;
+  margin-bottom: 0;
 }
 .searchslide-enter-to,
 .searchslide-leave-from {
   max-height: 60px;
   opacity: 1;
   margin-top: 10px;
+  margin-bottom: 10px;
 }
 /* 通栏 banner：手机态贴屏幕左右边；分栏态因在 .leftcol 内，天然只贴左栏左右边（不跨右栏详情）。
    去圆角/去阴影，做全宽沉浸。 */
