@@ -74,7 +74,7 @@
       <button class="signup__btn press" :class="{ signed: signedUp }" :disabled="signedUp" @click="onActivitySignup">{{ signedUp ? t('feed.signup.joined') : t('feed.signup.btn') }}</button>
     </div>
 
-    <!-- 正文富文本：按自然段/句末标点拆成 <p>，避免长文糊成一段被打断
+    <!-- 正文富文本：按自然段/句末标点拆成 <p>，避免长文糊成一段被打断 -->
     <div class="content">
       <p
         v-for="(para, pi) in paragraphs"
