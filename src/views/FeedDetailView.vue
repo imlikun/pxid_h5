@@ -6,7 +6,7 @@
   <div class="fd-root" ref="fdRoot">
   <div class="detail" v-if="item">
     <!-- 顶部：返回优先关闭原生详情 WebView（App 原生右滑路由），回退 router.back() -->
-    <TopBar sticky :back="goBack" :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
+    <TopBar sticky :back="goBack" :title="isActivity ? t('feed.detail.title.activity') : (item?.author || t('feed.detail.title.content'))">
       <template #right>
         <span class="more press" @click="onMoreClick">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
@@ -18,9 +18,9 @@
     </TopBar>
 
   <article class="article">
-    <!-- 全宽 Hero：大图/视频置顶，参考汽车之家式文章详情 -->
-    <div v-if="item && (item.videoUrl || images.length && images[0])" class="hero">
-      <div v-if="item.videoUrl" class="vd-video hero__media">
+    <!-- 视频：置顶全宽 -->
+    <div v-if="item && item.videoUrl" class="hero">
+      <div class="vd-video hero__media">
         <video
           class="vd-video__el"
           :src="videoSrc"
@@ -30,16 +30,31 @@
           preload="metadata"
         ></video>
       </div>
-      <div v-else class="gallery hero__gallery" :style="{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }">
+    </div>
+    <!-- 单图：置顶全宽大图（贴顶栏、无间距，冲击感） -->
+    <div v-else-if="item && images.length === 1" class="hero">
+      <img class="hero__single" :src="images[0]" :alt="item.title" @click="onPreview(images[0])" />
+    </div>
+    <!-- 5+ 图：置顶全宽横向轮播 + 1/N 分页 + 圆点 -->
+    <div v-else-if="item && images.length >= 5" class="hero carousel">
+      <div class="car-track" ref="carTrack" @scroll.passive="onCarScroll">
         <img
           v-for="(img, i) in images"
           :key="i"
-          class="gallery__img"
-          :class="{ single: gridCols === 1 }"
+          class="car-slide"
           :src="img"
           :alt="item.title"
           @click="onPreview(img)"
         />
+      </div>
+      <div class="car-count">{{ carIndex + 1 }}/{{ images.length }}</div>
+      <div class="car-dots">
+        <span
+          v-for="(img, i) in images"
+          :key="'d' + i"
+          class="car-dot"
+          :class="{ on: i === carIndex }"
+        ></span>
       </div>
     </div>
 
@@ -89,6 +104,18 @@
         >{{ seg.v }}</span>
       </p>
     </div>
+    </div>
+
+    <!-- 2-4 张：随正文流，置于正文之后（不置顶） -->
+    <div v-if="item && images.length >= 2 && images.length <= 4" class="body-gallery">
+      <img
+        v-for="(img, i) in images"
+        :key="i"
+        class="body-gallery__img"
+        :src="img"
+        :alt="item.title"
+        @click="onPreview(img)"
+      />
     </div>
 
     <!-- 标签 / 车型 -->
@@ -748,12 +775,15 @@ watch(videoSrc, (url) => {
 }, { immediate: true })
 watch(id, () => { generatedPoster.value = '' })
 
-const gridCols = computed(() => {
-  const n = images.value.length
-  if (n <= 1) return 1
-  if (n <= 4) return 2
-  return 3
-})
+// 5+ 图横向轮播：当前页索引（驱动 1/N 分页与圆点）
+const carIndex = ref(0)
+const carTrack = ref(null)
+function onCarScroll() {
+  const el = carTrack.value
+  if (!el) return
+  const idx = Math.round(el.scrollLeft / el.clientWidth)
+  if (idx !== carIndex.value) carIndex.value = idx
+}
 
 // 相关推荐：从推荐流取同车型/同标签帖子（排除自身）
 // 地区由当前语言映射（2026-08-31 定）：zh→CN、pt→BR、en→US
@@ -1112,9 +1142,11 @@ function showToast(msg) {
 }
 .detail {
   min-height: 100vh;
-  background: var(--card);
+  background: var(--bg);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
+/* 详情页返回键向左靠 8px（热区左缘 4px→0），仅作用于本页，不牵动全站 TopBar */
+:deep(.tb-back) { margin-left: -8px; }
 .share { display: flex; color: var(--text); }
 
 /* 文章主容器：统一内边距，消除作者/标题/正文/媒体之间的断痕 */
@@ -1126,17 +1158,82 @@ function showToast(msg) {
 .article__body { margin-bottom: 16px; }
 .article__body > *:last-child { margin-bottom: 0; }
 
-/* 全宽 Hero：大图/视频置顶，与正文形成「头图 + 标题 + 作者 + 正文」的阅读节奏 */
+/* 全宽 Hero：视频/单图/5+轮播 置顶，贴顶栏、无间距（冲击感） */
 .hero {
   margin: -8px -16px 16px;
   background: var(--bg);
+  overflow: hidden;
 }
-.hero__media,
-.hero .vd-video,
-.hero .gallery {
-  margin-bottom: 0;
+.hero .vd-video { margin-bottom: 0; }
+.hero__single {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 520px;
+  object-fit: cover;
 }
-.hero .gallery__img { border-radius: 0; }
+/* 5+ 图横向轮播（原生 scroll-snap，不引依赖） */
+.hero.carousel { position: relative; background: #000; }
+.car-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.car-track::-webkit-scrollbar { display: none; }
+.car-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  scroll-snap-align: center;
+  display: block;
+}
+.car-count {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: rgba(0, 0, 0, .5);
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 9px;
+  border-radius: 11px;
+  pointer-events: none;
+}
+.car-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  pointer-events: none;
+}
+.car-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .5);
+  transition: width .2s, background .2s;
+}
+.car-dot.on { background: #fff; width: 16px; border-radius: 3px; }
+
+/* 2-4 张：随正文流，置于正文之后（不置顶） */
+.body-gallery {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 16px 0 0;
+}
+.body-gallery__img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  display: block;
+}
 
 /* 作者卡 */
 .author {
@@ -1287,7 +1384,7 @@ function showToast(msg) {
 .prod__go { font-size: 13px; color: var(--brand); flex: none; }
 
 /* 评论 */
-.comments { background: var(--card); border-top: 1px solid var(--line); padding: 16px; }
+.comments { background: var(--card); margin-top: 12px; padding: 16px; }
 .comments__head { font-size: 15px; font-weight: 600; color: var(--text); }
 
 .comments__empty { font-size: 13px; color: var(--text-hint); padding: 18px 0; text-align: center; }
@@ -1345,7 +1442,7 @@ function showToast(msg) {
 }
 
 /* 相关推荐 */
-.related { background: var(--card); border-top: 1px solid var(--line); padding: 16px; }
+.related { background: var(--card); margin-top: 12px; padding: 16px; }
 .related__head { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
 .related__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .rcard { background: var(--bg); border-radius: var(--radius-lg); overflow: hidden; }
