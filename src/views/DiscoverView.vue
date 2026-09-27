@@ -32,10 +32,10 @@
       <template #right>
         <div class="topacts">
           <button type="button" :aria-label="t('discover.search')" :aria-expanded="searchOpen" class="act act--search press" :class="{ 'act--on': searchOpen }" @click="toggleSearch">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
           </button>
           <button type="button" :aria-label="t('discover.publish')" class="act act--add press" @click="onAdd">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </button>
         </div>
       </template>
