@@ -60,17 +60,18 @@
 
     <header class="article__header">
       <!-- 标题 -->
-      <h1 class="title">{{ item.title }}</h1>
+      <h1 class="title">{{ articleTitle }}</h1>
+      <p v-if="item.subtitle" class="article__subtitle">{{ item.subtitle }}</p>
 
       <!-- 作者卡：点作者进个人主页（官方帖无 deviceId 不跳） -->
       <div class="author" @click="goAuthor">
-        <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.value?.author)" />
+        <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.author)" />
         <div class="meta">
           <div class="name">
             {{ item.author || t('feed.author.official') }}
             <span v-if="isOfficial" class="badge-official">{{ t('feed.badge.official') }}</span>
           </div>
-          <div class="time">{{ item.time || item.date }}</div>
+          <div class="time"><time>{{ formatPublishedTime(item.time || item.date) }}</time><span v-if="item.publishLocation || item.city"> · {{ item.publishLocation || item.city }}</span></div>
         </div>
       </div>
     </header>
@@ -107,16 +108,7 @@
     </div>
 
     <!-- 2-4 张：随正文流，置于正文之后（不置顶） -->
-    <div v-if="item && images.length >= 2 && images.length <= 4" class="body-gallery">
-      <img
-        v-for="(img, i) in images"
-        :key="i"
-        class="body-gallery__img"
-        :src="img"
-        :alt="item.title"
-        @click="onPreview(img)"
-      />
-    </div>
+    <FeedMediaGrid v-if="images.length >= 2 && images.length <= 4" class="body-gallery" :images="images" :alt="item.title" eager @preview="onPreview" />
 
     <!-- 标签 / 车型 -->
     <div class="tags" v-if="tagList.length">
@@ -142,12 +134,12 @@
 
     <!-- 评论区 -->
     <div class="comments" ref="commentsBox">
-      <div class="comments__head">{{ t('feed.commentsCount', { n: commentCount }) }}</div>
+      <div class="comments__head"><span>{{ t('feed.commentsCount', { n: commentCount }) }}</span><select v-model="commentSort" class="comments__sort" :aria-label="t('feed.commentSort')"><option value="latest">{{ t('feed.sort.latest') }}</option><option value="hot">{{ t('feed.sort.hot') }}</option></select></div>
       <!-- 评论数据返回后直接显示，不再渲染灰色骨架或补播淡入。 -->
       <div v-if="!commentsLoading && comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
       <div v-else-if="comments.length" class="cmt-list">
         <CommentNode
-          v-for="c in comments"
+          v-for="c in sortedComments"
           :key="c.id"
           :node="c"
           @reply="onReplyNode"
@@ -237,17 +229,17 @@
 
   <!-- 底部互动栏：左侧输入框 + 右侧点赞/收藏/评论（对齐 App 详情页习惯） -->
   <div v-if="item" class="actions" v-show="!commenting">
-    <div class="actions__input press" @click="onCommentBtn">
+    <button type="button" class="actions__input press" @click="onCommentBtn">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       <span>{{ t('feed.writeComment') }}</span>
-    </div>
+    </button>
     <div class="actions__icons">
       <button class="actions__icon pop press" :class="{ liked }" @click="onLike">
         <svg viewBox="0 0 24 24" width="22" height="22" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
         <span>{{ likeCount }}</span>
       </button>
       <button class="actions__icon pop press" :class="{ collected }" @click="onCollect">
-        <svg viewBox="0 0 24 24" width="22" height="22" :fill="collected ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        <svg viewBox="0 0 24 24" width="22" height="22" :fill="collected ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39L17.56 20 12 17.08 6.44 20l1.06-6.07L3 9.54l6.22-.91L12 3Z"/></svg>
         <span>{{ collectCount }}</span>
       </button>
       <button class="actions__icon pop press" @click="onCommentBtn">
@@ -284,6 +276,8 @@
     </transition>
   </teleport>
 
+  <FeedImagePreview v-model="previewOpen" :images="images.filter(Boolean)" :start-index="previewIndex" :alt="item?.title" />
+
   <!-- toast -->
   <transition name="fade">
     <div v-if="toast" class="toast">{{ toast }}</div>
@@ -302,10 +296,20 @@ import { mediaUrl } from '../storage'
 import { getFeedSnapshot } from '../utils/feedSnapshot'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
+import FeedMediaGrid from '../components/FeedMediaGrid.vue'
+import FeedImagePreview from '../components/FeedImagePreview.vue'
+import { formatPublishedTime } from '../utils/time'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 
 const route = useRoute()
 const router = useRouter()
+const previewOpen = ref(false), previewIndex = ref(0)
+const commentSort = ref('latest')
+const sortedComments = computed(() => comments.value.map((node, index) => ({ node, index })).sort((a, b) => {
+  if (commentSort.value === 'hot') { const diff = (Number(b.node.likes) || 0) - (Number(a.node.likes) || 0); if (diff) return diff }
+  const time = value => typeof value === 'number' ? (value < 1e12 ? value * 1000 : value) : new Date(value || '').getTime()
+  return (time(b.node.createdAt || b.node.time) - time(a.node.createdAt || a.node.time)) || a.index - b.index
+}).map(x => x.node))
 
 // 返回（2026-09-08 全屏右滑对接更新，对接说明 2026-09-07）：
 // 详情跑在 Flutter 全屏 WebView 中时，第一层（无 H5 内部历史）返回关闭原生详情页
@@ -326,10 +330,19 @@ const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://
 
 const isActivity = computed(() => route.path.startsWith('/activity'))
 const id = computed(() => Number(route.params.id))
-// 活动没有 deviceId → 视为官方，隐藏关注按钮、显示官方徽章
-const isOfficial = computed(() => !item.value || !item.value.deviceId || !!item.value.isOfficial)
+// 官方徽章以活动类型或后端明确的官方标记为准。
+const isOfficial = computed(() => isActivity.value || item.value?.kind === 'official' || item.value?.isOfficial === true)
 // 当前用户是否已报名该活动（控制报名按钮态）
 const signedUp = ref(false)
+// API 的 title 是正文前 20 字；详情优先显示不超过 60 字的完整首句。
+const articleTitle = computed(() => {
+  const post = item.value || {}, title = String(post.title || ''), content = String(post.content || '')
+  if (title && title === content.slice(0, 20)) {
+    const first = content.trim().split(/[。！？!?\n]/)[0].trim()
+    if (first.length > title.length && first.length <= 60) return first
+  }
+  return title
+})
 const authorAvatar = computed(() => resolveAvatar(item.value?.author, item.value?.avatar))
 
 // 真实数据源（从接口拉取，activity 从 mock 取）
@@ -728,9 +741,8 @@ const commentCount = computed(() => {
 // 图片九宫格
 const images = computed(() => {
   if (!item.value) return []
-  return item.value.images && item.value.images.length
-    ? item.value.images
-    : [item.value.cover]
+  const list = Array.isArray(item.value.images) ? item.value.images.filter(Boolean) : []
+  return list.length ? list : item.value.cover ? [item.value.cover] : []
 })
 // 单图沉浸态：仅当普通 feed 且为单图（非视频、非活动）时，顶栏透明浮于图上
 const isSingleHero = computed(() => {
@@ -1052,7 +1064,8 @@ function onProductCard() {
   if (p) router.push('/product/' + p.id)
 }
 function onPreview(img) {
-  console.log('preview image:', img)
+  const index = typeof img === 'number' ? img : images.value.indexOf(img)
+  previewIndex.value = Math.max(0, index); previewOpen.value = true
 }
 function onCommentBtn() {
   commenting.value = true
@@ -1176,7 +1189,9 @@ function showToast(msg) {
   padding: 8px 16px 16px;
   background: var(--card);
 }
-.article__header { margin-bottom: 16px; }
+.article__header {
+  margin-bottom: 20px;
+}
 .article__body { margin-bottom: 16px; }
 .article__body > *:last-child { margin-bottom: 0; }
 
@@ -1250,13 +1265,7 @@ function showToast(msg) {
   grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin: 16px 0 0;
-}
-.body-gallery__img {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: var(--radius-lg);
-  display: block;
+  margin-top: 18px;
 }
 
 /* 作者卡 */
@@ -1264,7 +1273,7 @@ function showToast(msg) {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 .avatar {
   width: 40px;
@@ -1274,23 +1283,39 @@ function showToast(msg) {
   flex: none;
 }
 .meta { flex: 1; min-width: 0; }
-.name { font-size: 15px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .badge-official {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   color: var(--brand);
   background: var(--brand-soft);
   border-radius: var(--radius-pill);
-  padding: 1px 7px;
+  padding: 2px 6px;
 }
-.time { font-size: 12px; color: var(--text-hint); margin-top: 3px; }
+.time {
+  font-size: 11px;
+  color: #8b919c;
+  margin-top: 3px;
+  line-height: 1.5;
+}
 /* 标题 */
 .title {
   font-size: 22px;
   font-weight: 700;
   color: var(--text);
-  line-height: 1.4;
+  line-height: 1.45;
   margin-bottom: 0;
+  margin: 0;
+  letter-spacing: -.2px;
+  overflow-wrap: anywhere;
 }
 
 /* 活动报名卡 */
@@ -1357,13 +1382,14 @@ function showToast(msg) {
 .content {
   font-size: 16px;
   color: var(--text);
-  line-height: 1.85;
+  line-height: 1.8;
 }
 .paragraph {
   margin: 0 0 16px;
-  text-align: justify;
+  text-align: start;
   word-break: break-word;
   overflow-wrap: break-word;
+  margin-bottom: 18px;
 }
 .paragraph:last-child { margin-bottom: 0; }
 .seg--car, .seg--at { color: var(--brand); }
@@ -1373,16 +1399,19 @@ function showToast(msg) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding-top: 4px;
+  padding-top: 16px;
 }
 .tag {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--brand);
   background: var(--brand-soft);
   border-radius: var(--radius-pill);
-  padding: 4px 12px;
+  padding: 5px 10px;
 }
-.tag.car { color: var(--text-sub); background: #f0f1f3; }
+.tag.car {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
 
 /* 商品卡 */
 .prod {
@@ -1408,8 +1437,22 @@ function showToast(msg) {
 .prod__go { font-size: 13px; color: var(--brand); flex: none; }
 
 /* 评论 */
-.comments { background: var(--card); margin-top: 12px; padding: 16px; }
-.comments__head { font-size: 15px; font-weight: 600; color: var(--text); }
+.comments {
+  background: var(--card);
+  margin-top: 0;
+  padding: 16px;
+  border-top: 1px solid #eef0f3;
+  padding-top: 18px;
+}
+.comments__head {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
 
 .comments__empty { font-size: 13px; color: var(--text-hint); padding: 18px 0; text-align: center; }
 .cmt { display: flex; gap: 10px; padding: 14px 0; border-bottom: 1px solid #f2f3f5; }
@@ -1528,42 +1571,44 @@ function showToast(msg) {
   max-width: 480px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  gap: 8px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
   background: var(--card);
   border-top: 1px solid var(--line);
   z-index: 50;
   box-sizing: border-box;
-  /* 互动栏转场首帧即显示（与内容同帧滑入，见上方 script 注释）；
-     无 transition——不需要任何渐入 */
 }
 .actions__input {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: 40px;
   background: var(--bg);
   border-radius: var(--radius-pill);
-  padding: 0 14px;
-  font-size: 14px;
+  padding: 0 10px;
+  font-size: 13px;
   color: var(--text-hint);
+  overflow: hidden;
 }
 .actions__icons {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 6px;
 }
 .actions__icon {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-sub);
   background: none;
-  padding: 4px 0;
+  padding: 0 2px;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
 }
 .actions__icon.liked { color: var(--price); }
 .actions__icon.collected { color: var(--brand); }
@@ -1580,6 +1625,9 @@ function showToast(msg) {
   padding: 10px 18px;
   border-radius: var(--radius);
   z-index: 100;
+  max-width: calc(100% - 40px);
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
 }
 .more { display: flex; color: var(--text); margin-right: 8px; }
 .cmt__reply { font-size: 12px; color: var(--brand); }
@@ -1612,4 +1660,17 @@ function showToast(msg) {
 
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.article__subtitle { margin: 8px 0 0; font-size: 13px; line-height: 1.6; color: #808897; }
+
+.comments__sort { min-height: 36px; max-width: 45%; font-size: 12px; color: #828b9b; background: transparent; border: 0; }
+
+.actions__input span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.actions__icon span { max-width: 36px; overflow: hidden; text-overflow: ellipsis; }
+.actions__icon svg { flex: none; width: 21px; height: 21px; }
+.actions__input:focus-visible, .actions__icon:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.more, .share { min-width: 36px; min-height: 44px; align-items: center; justify-content: center; }
+.detail.single-hero .more { color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
+
 </style>

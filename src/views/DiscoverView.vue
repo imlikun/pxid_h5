@@ -174,8 +174,8 @@
     <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 + 非搜索态 -->
     <template v-if="activeTab === '动态' && !showSearchResults">
       <div class="subtabs">
-        <span class="subtab" :class="{ active: dynamicSubtab === 'follow' }" @click="setDynamicSub('follow')">{{ t('discover.subFollow') }}</span>
-        <span class="subtab" :class="{ active: dynamicSubtab === 'near' }" @click="setDynamicSub('near')">{{ t('discover.subNear') }}</span>
+        <button type="button" class="subtab" :aria-pressed="dynamicSubtab === 'follow'" :class="{ active: dynamicSubtab === 'follow' }" @click="setDynamicSub('follow')">{{ t('discover.subFollow') }}</button>
+        <button type="button" class="subtab" :aria-pressed="dynamicSubtab === 'near'" :class="{ active: dynamicSubtab === 'near' }" @click="setDynamicSub('near')">{{ t('discover.subNear') }}</button>
       </div>
       <div class="content">
         <MomentCard
@@ -191,9 +191,9 @@
     </template>
 
     <!-- 广场：车型展示 + 热门活动 + 非搜索态 -->
-    <div v-else-if="activeTab === '广场' && !showSearchResults" class="content">
+    <div v-else-if="activeTab === '广场' && !showSearchResults" class="content plaza-content">
       <div class="grid3">
-        <div
+        <button type="button"
           v-for="(p, i) in plazaShowcase"
           :key="p.id"
           class="showcase press"
@@ -202,11 +202,11 @@
         >
           <img class="showcase__img" :src="p.cover" :alt="p.name" loading="lazy" />
           <div class="showcase__bar">{{ p.name }}</div>
-        </div>
+        </button>
       </div>
       <div class="section-head">
         <span class="section-title">{{ t('discover.hotActivities') }}</span>
-        <span class="section-more" @click="onMoreActivity">{{ t('discover.more') }} &gt;</span>
+        <button type="button" class="section-more" @click="onMoreActivity">{{ t('discover.more') }} <span aria-hidden="true">›</span></button>
       </div>
       <div class="acts">
         <div
@@ -219,9 +219,9 @@
           <img class="act__img" :src="a.cover" :alt="a.title" loading="lazy" />
           <div class="act__info">
             <div class="act__title">{{ a.title }}</div>
-            <div class="act__date">{{ fmtDate(a) }}</div>
+            <div v-if="fmtDate(a)" class="act__date"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4m8-4v4M4 10h16"/></svg>{{ fmtDate(a) }}</div>
           </div>
-          <button class="act__btn">{{ t('discover.viewNow') }}</button>
+          <button type="button" class="act__btn" @click.stop="onActivity(a)"><span>{{ t('discover.viewNow') }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button>
         </div>
       </div>
     </div>
@@ -1128,6 +1128,7 @@ function showToast(msg) {
 }
 .act--add {
   flex: none;
+  transform-origin: center;
 }
 .act--bell {
   width: 24px;
@@ -1147,7 +1148,7 @@ function showToast(msg) {
   background: var(--accent);
   z-index: 2;
 }
-.act--add { transform-origin: center; }
+
 .search {
   margin: 10px 16px;
   height: 36px;
@@ -1396,13 +1397,16 @@ function showToast(msg) {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  padding: 0 12px;
+  padding: 0 16px;
 }
 .showcase {
   background: #ffffff;
-  border-radius: var(--radius-xl);
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  box-shadow: 0 2px 8px rgba(30,50,80,.035);
+  padding: 0;
+  border: 0;
+  min-width: 0;
 }
 .showcase__img {
   width: 100%;
@@ -1411,29 +1415,39 @@ function showToast(msg) {
   display: block;
 }
 .showcase__bar {
-  background: var(--brand); /* 2026-09-08 坤哥：对齐 App 品牌蓝（原黑底 #1a1a1a） */
-  color: #ffffff;
+  background: #f9fafc;
+  color: #39445a;
   font-size: 12px;
   text-align: center;
   padding: 7px 0;
+  font-weight: 500;
 }
 .section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 24px 12px 12px;
+  margin: 22px 16px 12px;
 }
 .section-title {
   font-size: 16px;
   font-weight: 700;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 .section-more {
   font-size: 13px;
   color: var(--text-hint);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  background: transparent;
+  padding: 0;
 }
 .acts {
-  padding: 0 12px;
+  padding: 0 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1441,19 +1455,20 @@ function showToast(msg) {
 .activity {
   background: var(--card);
   border: none;
-  border-radius: var(--radius-xl);
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  border-radius: 12px;
+  box-shadow: none;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px;
 }
 .act__img {
-  width: 120px;
+  width: 88px;
   aspect-ratio: 1 / 1;
-  border-radius: var(--radius);
+  border-radius: 8px;
   object-fit: cover;
   flex: none;
+  height: 70px;
 }
 .act__info {
   flex: 1;
@@ -1462,26 +1477,36 @@ function showToast(msg) {
 .act__title {
   font-size: 14px;
   color: var(--text);
-  line-height: 1.4;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-weight: 500;
 }
 .act__date {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-hint);
   margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 .act__btn {
   flex: none;
-  background: var(--brand-gradient, linear-gradient(135deg, #4D7CFF, #6C4DFF));
+  background: var(--brand);
   color: #ffffff;
   border-radius: var(--radius-pill);
-  padding: 7px 12px;
-  font-size: 12px;
+  padding: 0 10px;
+  font-size: 11px;
   font-weight: 500;
-  box-shadow: 0 2px 8px rgba(77,124,255,.25);
+  box-shadow: 0 2px 6px rgba(37,99,235,.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 36px;
+  white-space: nowrap;
 }
 .toast {
   position: fixed;
@@ -1500,26 +1525,29 @@ function showToast(msg) {
 .subtabs {
   display: flex;
   gap: 8px;
-  padding: 10px 12px 0;
+  padding: 8px 16px 0;
 }
 .subtab {
   font-size: 13px;
-  color: var(--text-sub);
-  background: var(--surface-2);
+  color: #6d7585;
+  background: #fff;
   border-radius: 16px;
-  padding: 6px 14px;
+  padding: 0 18px;
   font-weight: 500;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  transition: background .15s ease, color .15s ease;
+  min-height: 34px;
+  border: 1px solid #e8ebf2;
 }
 .subtab.active {
   color: #fff;
   background: var(--brand);
   font-weight: 700;
   line-height: 1;
+  border-color: var(--brand);
 }
 .subtab:active { transform: scale(0.96); }
 
@@ -1658,4 +1686,15 @@ function showToast(msg) {
 @media(max-width: 359px) { .tabs { gap: 12px; } .tab { font-size: 17px; } .topacts { gap: 4px; } .banner__copy h2 { font-size: 20px; } }
 @media(min-width: 600px) and (max-width: 749px) { .tabs { gap: 10px; margin-left: 2px; } .tab { font-size: 16px; } .topacts { gap: 2px; } .act { width: 40px; height: 40px; } .locale-en .tab, .locale-pt .tab { font-size: 12px; } .banner__copy { padding: 12px 12px 30px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
 @media(prefers-reduced-motion: reduce) { .banner__track, .banner__dot::after, .quick__thumb { transition: none; } }
+/* 广场与动态：与推荐页保持同一圆角、边距和品牌色节奏。 */
+
+.section-title::before { content: ''; width: 3px; height: 14px; border-radius: 3px; background: var(--brand); }
+
+.section-more span { font-size: 20px; }
+
+@media(max-width: 359px), (min-width: 600px) and (max-width: 749px) {
+  .act__img { width: 64px; height: 64px; }
+  .activity { flex-wrap: wrap; gap: 8px; }
+  .act__btn { margin-left: auto; }
+}
 </style>

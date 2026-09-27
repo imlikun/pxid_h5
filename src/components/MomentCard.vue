@@ -3,14 +3,15 @@
     <div class="m-head" @click.stop="goUser">
       <img class="m-avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
       <div class="m-meta">
-        <div class="m-name"><span v-if="item.pinned" class="m-pin">{{ t('feed.pinned') }}</span>{{ item.author }}</div>
-        <div class="m-time">{{ formatTime(item.time) }}</div>
+        <div class="m-name">{{ item.author }}<span v-if="item.pinned" class="m-pin">{{ t('feed.pinned') }}</span></div>
+        <div class="m-time">{{ formatFeedTime(item.time, locale) }}</div>
       </div>
+      <button type="button" class="m-more" :aria-label="t('feed.moreActions')" @click.stop="showMore = true">···</button>
       <!-- 关注入口已下线（2026-09-05 坤哥拍板：全站不做社交关注）。
            原「+ 关注 / 已关注」按钮块整体移除；后端 canFollow 字段保留，后续如需恢复在此加回。 -->
     </div>
 
-    <div class="m-title">{{ item.title }}</div>
+    <div v-if="showTitle" class="m-title">{{ item.title }}</div>
     <div class="m-body">
       <p v-for="(p, i) in paragraphs" :key="i" class="m-p">{{ p }}</p>
     </div>
@@ -20,76 +21,71 @@
       <span class="m-video__play"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
     </div>
 
-    <div class="m-imgs" :style="{ gridTemplateColumns: `repeat(${cols}, 1fr)` }">
-      <img
-        v-for="(img, i) in displayImages"
-        :key="i"
-        class="m-img"
-        :class="{ single: cols === 1 }"
-        :src="img"
-        :alt="item.title"
-        loading="lazy"
-        @click.stop="onPreview(img)"
-        @error="onImgErr($event)"
-      />
-      <img v-if="!displayImages.length" class="m-img single" :src="FALLBACK" :alt="item.title" loading="lazy" @error="onImgErr($event)" />
-    </div>
+    <FeedMediaGrid v-if="!item.videoUrl && displayImages.length" class="m-media" :images="displayImages" :alt="item.title" :max-count="6" @preview="onPreview" />
 
     <div class="m-foot">
-      <span class="m-tag" @click.stop="onCar(item.carModel)">#{{ item.carModel }}</span>
+      <button v-if="item.carModel" type="button" class="m-tag" @click.stop="onCar(item.carModel)">#{{ item.carModel }}</button>
+      <span v-else-if="item.tags?.length" class="m-tag">#{{ item.tags[0] }}</span>
       <div class="m-acts">
-        <span class="m-act" :class="{ liked }" @click.stop="onLike">
+        <button type="button" class="m-act" :class="{ liked }" @click.stop="onLike">
           <svg viewBox="0 0 24 24" width="16" height="16" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
-          <span>{{ likeCount }}</span>
-        </span>
-        <span class="m-act" @click.stop="open">
+          <span>{{ likeCount }}</span></button>
+        <button type="button" class="m-act" @click.stop="open">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-          <span>{{ item.comments }}</span>
-        </span>
-        <span class="m-act" :class="{ fav: favorited }" @click.stop="onFavorite">
-          <svg viewBox="0 0 24 24" width="16" height="16" :fill="favorited ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-        </span>
-        <span class="m-act" @click.stop="onShare">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>
-        </span>
+          <span>{{ item.comments || 0 }}</span></button>
+        <button type="button" class="m-act m-act--share" @click.stop="onShare">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg><span>{{ t('feed.share') }}</span></button>
       </div>
     </div>
   </div>
+  <FeedImagePreview v-model="previewOpen" :images="displayImages" :start-index="previewIndex" :alt="item.title" />
+  <Teleport to="body"><div v-if="showMore" class="m-sheet-mask" @click="showMore = false"><div class="m-sheet" role="dialog" aria-modal="true" :aria-label="t('feed.moreActions')" @click.stop>
+    <button type="button" @click="showMore = false; open()">{{ t('feed.goView') }}</button>
+    <button type="button" @click="showMore = false; onFavorite()">{{ t(favorited ? 'feed.collect.collected' : 'feed.collect.collect') }}</button>
+    <button type="button" @click="showMore = false; onShare()">{{ t('feed.share') }}</button>
+    <button type="button" class="m-sheet-cancel" @click="showMore = false">{{ t('feed.cancel') }}</button>
+  </div></div></Teleport>
   <transition name="fade">
     <div v-if="toast" class="m-toast">{{ toast }}</div>
   </transition>
 </template>
 
 <script setup>
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onDeactivated, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import bridge from '../bridge'
-import { t } from '../i18n'
+import { t, locale } from '../i18n'
+import FeedMediaGrid from './FeedMediaGrid.vue'
+import FeedImagePreview from './FeedImagePreview.vue'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
-import { formatTime } from '../utils/time'
+import { formatFeedTime } from '../utils/time'
 import { mediaUrl } from '../storage'
 import { captureVideoPoster } from '../utils/videoPoster'
 import { requireLogin } from '../utils/auth'
-import { likeFeed, toggleFavorite, followUser, prefetchFeedDetail, prefetchComments, prewarmFeedMedia } from '../api/feed'
+import { likeFeed, toggleFavorite, prefetchFeedDetail, prefetchComments, prewarmFeedMedia } from '../api/feed'
 import { putFeedSnapshot } from '../utils/feedSnapshot'
 
 const props = defineProps({
   item: { type: Object, required: true },
 })
 const router = useRouter()
+const previewOpen = ref(false), previewIndex = ref(0), showMore = ref(false)
+const showTitle = computed(() => !!props.item.title && !(props.item.content || '').trim().startsWith(props.item.title.trim()))
 
 const liked = ref(!!props.item.isLiked)
 const likeCount = ref(props.item.likes || 0)
 const favorited = ref(!!props.item.isFavorited)
 const toast = ref('')
 let toastTimer = null
+onDeactivated(() => { showMore.value = false; previewOpen.value = false })
+onBeforeUnmount(() => clearTimeout(toastTimer))
 function showToast(m) {
   toast.value = m
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 1600)
 }
 
-// 图列表兜底：原 images 数组；空就放占位图（FALLBACK）防 m-imgs 区域空白
+// 空图片列表不插入占位图；视频封面失败时才回落本地默认封面。
 const FALLBACK = import.meta.env.BASE_URL + 'feed_default.jpg'
 // 视频封面：优先 videoCover；为空时 canvas 截首帧兜底，失败回 FALLBACK
 const videoCoverUrl = ref(FALLBACK)
@@ -108,23 +104,14 @@ function updateVideoCover() {
 updateVideoCover()
 watch(() => props.item, updateVideoCover)
 const avatarUrl = computed(() => resolveAvatar(props.item.author, props.item.avatar))
-// 关注按钮可见性：后端按 viewer 注入 canFollow（官方帖 / 自己的帖 = false）。
-// 老数据或兜底 mock 没有该字段时默认 true，保持既有行为，避免按钮大面积消失。
-const canFollow = computed(() => props.item.canFollow !== false)
 const displayImages = computed(() => {
   const imgs = props.item && props.item.images
-  return Array.isArray(imgs) ? imgs : []
+  return Array.isArray(imgs) ? imgs.filter(Boolean) : []
 })
 function onImgErr(e) {
   if (e && e.target && e.target.src !== FALLBACK) e.target.src = FALLBACK
 }
 
-const cols = computed(() => {
-  const n = props.item.images ? props.item.images.length : 0
-  if (n <= 1) return 1
-  if (n <= 4) return 2
-  return 3
-})
 
 // 正文分段：先按空行(\n\n)/换行(\n)拆块，超长块(>80字)再按句末标点切，避免长句被打断
 const paragraphs = computed(() => {
@@ -172,9 +159,7 @@ function goUser() {
     router.push(r)
   }
 }
-function onPreview(img) {
-  console.log('preview image:', img)
-}
+function onPreview(index) { previewIndex.value = index; previewOpen.value = true }
 function onCar(model) {
   bridge.openNative('vehicle/' + model)
 }
@@ -224,29 +209,15 @@ async function copyShareLink(url) {
     showToast(t('feed.toast.shareLink') + url)
   }
 }
-async function onFollow() {
-  const ok = await requireLogin()
-  if (!ok) return
-  props.item.followed = true
-  // 关注关系必须落库，否则刷新/切页后又变回「+ 关注」（此前只改本地字段 + 通知原生，等于没关注）。
-  // 后端 INSERT OR IGNORE 幂等，与原生侧重复写入不冲突。
-  const r = await followUser(props.item.deviceId, props.item.memberUserId)
-  if (!r.ok) {
-    props.item.followed = false
-    showToast(r.message || '关注失败')
-    return
-  }
-  bridge.openNative('feed/follow?id=' + props.item.id)
-}
 </script>
 
 <style scoped>
 .moment {
   background: var(--card);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  padding: 12px;
-  margin: 0 12px 16px;
+  border-radius: 12px;
+  box-shadow: none;
+  padding: 14px;
+  margin: 0 16px 12px;
 }
 .m-head {
   display: flex;
@@ -254,53 +225,57 @@ async function onFollow() {
   gap: 10px;
 }
 .m-avatar {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   object-fit: cover;
   flex: none;
 }
 .m-meta { flex: 1; min-width: 0; }
-.m-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.m-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .m-pin {
   display: inline-block;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--brand);
   background: var(--brand-soft);
   border-radius: 4px;
   padding: 1px 5px;
-  margin-right: 6px;
+  margin-right: 0;
   font-weight: 600;
 }
-.m-time { font-size: 12px; color: var(--text-hint); margin-top: 2px; }
-.m-follow {
-  flex: none;
-  font-size: 13px;
-  color: var(--brand);
-  background: var(--brand-soft);
-  border-radius: var(--radius-pill);
-  padding: 5px 12px;
-}
-.m-followed {
-  flex: none;
-  font-size: 13px;
-  color: var(--text-hint);
+.m-time {
+  font-size: 11px;
+  color: #8b919c;
+  margin-top: 2px;
 }
 .m-title {
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
-  line-height: 1.45;
-  margin-top: 10px;
+  line-height: 1.55;
+  margin-top: 12px;
 }
 .m-body {
   font-size: 14px;
   color: var(--text);
-  line-height: 1.8;
+  line-height: 1.7;
   margin-top: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .m-body .m-p {
   margin: 0 0 12px;
+  margin-bottom: 8px;
 }
 .m-body .m-p:last-child {
   margin-bottom: 0;
@@ -313,6 +288,9 @@ async function onFollow() {
   background: #000;
   aspect-ratio: 16 / 9;
   cursor: pointer;
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 .m-video__cover {
   width: 100%;
@@ -334,42 +312,40 @@ async function onFollow() {
   justify-content: center;
   pointer-events: none;
 }
-.m-imgs {
-  display: grid;
-  gap: 6px;
-  margin-top: 12px;
-}
-.m-img {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: var(--radius);
-  display: block;
-}
-.m-img.single {
-  aspect-ratio: 4 / 3;
-  max-height: 280px;
-}
 .m-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .m-tag {
-  font-size: 13px;
-  color: var(--text-sub);
-  background: #f0f1f3;
+  font-size: 11px;
+  color: var(--brand);
+  background: var(--brand-soft);
   border-radius: var(--radius-pill);
-  padding: 4px 12px;
+  padding: 5px 8px;
+  border: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.m-acts { display: flex; align-items: center; gap: 18px; }
+.m-acts {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
 .m-act {
   display: flex;
   align-items: center;
-  gap: 3px;
-  font-size: 13px;
-  color: var(--text-hint);
+  gap: 5px;
+  font-size: 12px;
+  color: #687286;
+  min-height: 36px;
+  cursor: pointer;
 }
 .m-act.liked { color: var(--price); }
 .m-act.fav { color: var(--price); }
@@ -384,10 +360,24 @@ async function onFollow() {
   padding: 8px 16px;
   border-radius: 20px;
   z-index: 9999;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: calc(100% - 40px);
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
 }
 .fade-enter-active,
 .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from,
 .fade-leave-to { opacity: 0; }
+
+.m-more { align-self: flex-start; width: 36px; height: 36px; padding: 0; margin: -5px -5px 0 0; border: 0; background: transparent; color: #667084; font-size: 24px; line-height: 1; }
+
+.m-media { margin-top: 12px; }
+
+.m-act svg { width: 18px; height: 18px; }
+
+.m-sheet-mask { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.4); display: flex; align-items: flex-end; justify-content: center; }
+.m-sheet { width: 100%; max-width: 480px; background: white; border-radius: 16px 16px 0 0; padding: 8px 16px 16px; }
+.m-sheet button { display: block; width: 100%; min-height: 48px; padding: 10px; background: transparent; border: 0; border-bottom: 1px solid #f0f1f4; font-size: 15px; color: var(--text); }
+.m-sheet .m-sheet-cancel { color: #8b919c; border-bottom: 0; }
 </style>
