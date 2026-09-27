@@ -89,8 +89,8 @@
               @ended="nextBanner"
             ></video>
             <img v-else class="banner__media" :src="b.src" :alt="b.title || 'Banner'"  :loading="i === 0 ? 'eager' : 'lazy'" />
-            <div class="banner__copy">
-              <h2>{{ i < LOCAL_BANNERS.length ? t('discover.heroTitle') : b.title }}</h2>
+            <div v-if="i < LOCAL_BANNERS.length" class="banner__copy">
+              <h2>{{ t('discover.heroTitle') }}</h2>
               <p>{{ t('discover.heroSubtitle') }}</p>
             </div>
           </div>
@@ -559,12 +559,19 @@ const wfFeed = computed(() => {
   })
   return out
 })
-// 精选两张使用图上标题；常规卡片统一横图，分页追加时保持已有排列稳定。
+// 竖图为主，视频保留横图；按当前列宽估算图片与文字高度，分页时稳定分列。
 const featuredIds = computed(() => new Set(recommendList.value.slice(0, 2).map(x => x.id)))
+const feedViewportWidth = ref(window.innerWidth)
+function updateFeedWidth() { feedViewportWidth.value = window.innerWidth }
+window.addEventListener('resize', updateFeedWidth, { passive: true })
+onUnmounted(() => window.removeEventListener('resize', updateFeedWidth))
 function estItemHeight(x) {
-  if (x.__topic) return 204
-  if (featuredIds.value.has(x.id)) return 212
-  return 192 + ((x.title || '').length > 14 ? 20 : 0)
+  if (x.__topic) return 194
+  const columnWidth = ((feedViewportWidth.value >= 600 ? feedViewportWidth.value / 2 : feedViewportWidth.value) - 44) / 2
+  const imageHeight = columnWidth * (x.videoUrl ? 3 / 4 : 4 / 3)
+  const overlay = featuredIds.value.has(x.id) && !x.videoUrl && x.kind !== 'activity'
+  if (overlay) return imageHeight + 38
+  return imageHeight + 68 + ((x.title || '').length > 14 ? 21 : 0)
 }
 const wfColumns = computed(() => {
   const columns = [[], []], heights = [0, 0]
@@ -1239,7 +1246,7 @@ function showToast(msg) {
 }
 /* 焦点图：图片保持主体，底部渐变承载标题与轮播提示。 */
 .banner {
-  position: relative; margin: 12px 16px 0; border-radius: 18px; overflow: hidden; aspect-ratio: 1.9; touch-action: pan-y; border: 2px solid #fff; box-shadow: 0 6px 18px rgba(33,79,155,.1);
+  position: relative; margin: 10px 16px 0; border-radius: 14px; overflow: hidden; aspect-ratio: 2; touch-action: pan-y;
 }
 .banner__track {
   display: flex;
@@ -1266,14 +1273,14 @@ function showToast(msg) {
   background: transparent;
 }
 .quick {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 16px 16px 20px; padding: 14px 4px 12px; border-radius: 18px; background: #fff; box-shadow: 0 2px 10px rgba(33,79,155,.04);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 12px 16px 14px; padding: 10px 4px; border-radius: 12px; background: #fff;
 }
 .quick__item {
-  position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; background: transparent; padding: 0 2px;
+  position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 7px; background: transparent; padding: 0 2px;
 }
 /* 统一浅蓝圆角容器，图标与文字居中。 */
 .quick__thumb {
-  position: relative; width: 54px; height: 54px; border-radius: 16px; background: linear-gradient(145deg, #f4f8ff, #eaf1ff); display: flex; align-items: center; justify-content: center; transition: transform .15s ease;
+  position: relative; width: 54px; height: 54px; border-radius: 16px; background: #f1f5fc; display: flex; align-items: center; justify-content: center; transition: transform .15s ease;
 }
 .quick__item:active .quick__thumb { transform: scale(.94); }
 .quick__icon {
@@ -1314,10 +1321,10 @@ function showToast(msg) {
   min-width: 56px; min-height: 40px; padding: 0 18px; border-radius: 999px; background: #fafbfe; border: 1px solid #e4e9f2; color: #566076; font-size: 13px; font-weight: 500; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
 }
 .chip.active {
-  color: #fff; background: var(--brand); border-color: var(--brand); font-weight: 700; box-shadow: 0 4px 10px rgba(77,124,255,.22);
+  color: #fff; background: var(--brand); border-color: var(--brand); font-weight: 700; box-shadow: 0 2px 6px rgba(37,99,235,.12);
 }
 .content {
-  margin-top: 16px;
+  margin-top: 12px;
   padding-bottom: 16px;
 }
 .empty-tab {
@@ -1378,9 +1385,6 @@ function showToast(msg) {
 }
 .wf-col {
   flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px;
-}
-.wf-col :deep(.fcard) {
-  box-shadow: var(--card-shadow, 0 1px 3px rgba(16, 24, 40, 0.06));
 }
 .grid2 {
   display: grid;
@@ -1643,11 +1647,11 @@ function showToast(msg) {
 .panel__cmname { font-size: 12px; color: var(--text-hint); margin-bottom: 3px; }
 .panel__cmttext { font-size: 13px; line-height: 1.5; color: var(--text); }
 /* 仅发现页的根导航适配窄屏及英文/葡文，不修改全站 TopBar。 */
-.banner__copy { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px 16px 36px; color: white; background: linear-gradient(180deg, transparent 10%, rgba(0,0,0,.12) 35%, rgba(0,0,0,.65)); pointer-events: none; }
-.banner__copy h2 { font-size: 23px; line-height: 1.25; font-weight: 700; margin: 0 0 6px; text-wrap: balance; }
+.banner__copy { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px 16px 36px; color: white; background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.6)); pointer-events: none; }
+.banner__copy h2 { font-size: 22px; line-height: 1.25; font-weight: 700; margin: 0 0 6px; text-wrap: balance; }
 .banner__copy p { margin: 0; font-size: 12px; line-height: 1.5; opacity: .92; }
-.banner__dot::after { content: ''; width: 6px; height: 6px; border-radius: 6px; background: rgba(255,255,255,.7); transition: width .2s ease; }
-.banner__dot.on::after { width: 18px; background: var(--brand); }
+.banner__dot::after { content: ''; width: 5px; height: 5px; border-radius: 5px; background: rgba(255,255,255,.7); transition: width .2s ease; }
+.banner__dot.on::after { width: 14px; background: var(--brand); }
 .locale-en .tabs, .locale-pt .tabs { gap: 12px; }
 .locale-en .tab, .locale-pt .tab { font-size: 14px; }
 .discover button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }

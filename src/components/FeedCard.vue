@@ -1,5 +1,5 @@
 <template>
-  <div :class="['fcard', 'press', { 'is-pinned': item.pinned, 'fcard--discover': appearance === 'discover', 'fcard--featured': appearance === 'discover' && featured }]" @click="go" @touchstart.passive="onWarm" @mouseenter="onWarm">
+  <div :class="['fcard', 'press', { 'is-pinned': item.pinned, 'fcard--discover': appearance === 'discover', 'fcard--featured': showOverlay, 'fcard--video': !!item.videoUrl, 'fcard--poster': item.kind === 'activity' }]" @click="go" @touchstart.passive="onWarm" @mouseenter="onWarm">
     <div class="fcard__coverwrap">
       <img class="fcard__cover" :src="coverUrl" :alt="item.title" loading="lazy" @error="onImgErr" />
       <span v-if="appearance === 'discover' && featured" class="fcard__pin fcard__selected"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m3 8 4-5h10l4 5-9 13L3 8Z M3 8h18 M7 3l5 18 5-18"/></svg>{{ t('discover.featured') }}</span>
@@ -9,9 +9,9 @@
         <span v-for="tag in coverTags" :key="tag" class="fcard__tag">{{ tag }}</span>
       </div>
       <span v-if="item.videoUrl" class="fcard__play"><svg viewBox="0 0 24 24" width="18" height="18" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
-      <div v-if="appearance === 'discover' && featured" class="fcard__overlay"><div class="fcard__title">{{ item.title }}</div></div>
+      <div v-if="showOverlay" class="fcard__overlay"><div class="fcard__title">{{ item.title }}</div></div>
     </div>
-    <div v-if="!(appearance === 'discover' && featured)" class="fcard__title">{{ item.title }}</div>
+    <div v-if="!showOverlay" class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
       <div class="author" @click.stop="goUser">
         <img class="avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
@@ -46,6 +46,8 @@ const props = defineProps({
   onSelect: { type: Function, default: null },
 })
 const router = useRouter()
+// 活动海报和视频的标题放在图片下方，避免遮住图片已有的信息。
+const showOverlay = computed(() => props.appearance === 'discover' && props.featured && !props.item.videoUrl && props.item.kind !== 'activity')
 // 封面兜底：cover → images[0] → 静态占位图（避免 src='' 出现 broken 图）
 const FALLBACK = import.meta.env.BASE_URL + 'feed_default.jpg'
 // 视频封面：优先 videoCover；为空时 canvas 截首帧兜底，失败回 FALLBACK
@@ -236,20 +238,22 @@ function goUser() {
 .like__num {
   transform: translateY(0.5px);
 }
-.fcard--discover { border: 1px solid #edf0f5; border-radius: 14px; background: #fff; box-shadow: 0 2px 6px rgba(30,60,100,.04); }
-.fcard--discover.is-pinned { border: 1px solid #e2ebff; }
-.fcard--discover .fcard__coverwrap { margin: 5px 5px 0; border-radius: 10px; overflow: hidden; }
-.fcard--discover .fcard__cover { aspect-ratio: 4 / 3; }
+.fcard--discover { border: 0; border-radius: 12px; background: #fff; box-shadow: none; }
+.fcard--discover.is-pinned { border: 0; }
+.fcard--discover .fcard__coverwrap { margin: 0; overflow: hidden; background: #f1f3f6; }
+.fcard--discover .fcard__cover { aspect-ratio: 3 / 4; }
+.fcard--discover.fcard--video .fcard__cover { aspect-ratio: 4 / 3; }
+.fcard--discover.fcard--poster .fcard__cover { object-fit: contain; }
 .fcard--discover .fcard__title { font-size: 14px; font-weight: 500; line-height: 1.5; padding: 9px 10px 0; }
-.fcard--discover .fcard__foot { gap: 6px; padding: 9px 10px 11px; }
+.fcard--discover .fcard__foot { gap: 6px; padding: 10px; min-height: 38px; box-sizing: border-box; }
 .fcard--discover .author { flex: 1; gap: 4px; overflow: hidden; }
 .fcard--discover .avatar { width: 16px; height: 16px; }
-.fcard--discover .name { font-size: 10px; }
-.fcard--discover .like { gap: 3px; font-size: 11px; color: #77849a; }
+.fcard--discover .name { font-size: 11px; color: #858b96; }
+.fcard--discover .like { gap: 4px; font-size: 11px; color: #858b96; }
 .fcard--discover .fcard__tags { top: 8px; left: 8px; right: auto; bottom: auto; max-width: calc(100% - 16px); }
 .fcard--discover .fcard__pin { top: 8px; left: 8px; border-radius: 7px; padding: 5px 7px; }
 .fcard__selected { display: flex; align-items: center; gap: 4px; font-weight: 700; }
-.fcard--featured .fcard__cover { aspect-ratio: 1 / 1; }
-.fcard__overlay { position: absolute; inset: 30% 0 0; display: flex; align-items: flex-end; padding: 10px; background: linear-gradient(transparent, rgba(0,0,0,.75)); pointer-events: none; }
+.fcard--featured .fcard__cover { aspect-ratio: 3 / 4; }
+.fcard__overlay { position: absolute; inset: 55% 0 0; display: flex; align-items: flex-end; padding: 10px; background: linear-gradient(transparent, rgba(0,0,0,.7)); pointer-events: none; }
 .fcard__overlay .fcard__title { padding: 0; color: #fff; font-weight: 700; line-height: 1.4; }
 </style>
