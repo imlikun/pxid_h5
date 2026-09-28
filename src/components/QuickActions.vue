@@ -28,20 +28,14 @@ defineEmits(['tap'])
 <style scoped>
 .quick {
   display: flex;
-  justify-content: space-around;
+  justify-content: center;
+  gap: clamp(40px, 12vw, 120px);
   align-items: flex-start;
   margin: 15px 12px 2px;
   padding: 15px 5px 14px;
   background: #fff;
   border-radius: 18px;
   box-shadow: 0 5px 18px rgba(42, 86, 156, .06);
-}
-@media (min-width: 600px) {
-  .quick {
-    max-width: 760px;
-    margin-left: auto;
-    margin-right: auto;
-  }
 }
 .qitem {
   flex: 1;
