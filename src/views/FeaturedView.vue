@@ -7,7 +7,7 @@
           <button type="button"
             v-for="t in topTabs"
             :key="t.key"
-            class="tab tab-bounce"
+            class="tab"
             :class="{ active: activeTab === t.key }"
             @click="activeTab = t.key"
             >{{ t.label }}</button
@@ -445,17 +445,20 @@ async function retry() {
 .featured :deep(.tb-right) { min-width: 0; flex: none; }
 .tabs {
   display: flex;
+  flex: 1 1 0;
   align-items: center;
   gap: clamp(13px, 4vw, 22px);
   /* TopBar 自带 padding:0 8px，这里再左推 8px，整体 16px 与下方卡片 margin 对齐 */
   margin-left: 8px;
   min-width: 0;
+  padding-right: 8px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
   position: relative;
+  flex: 0 0 auto;
   border: 0;
   background: none;
   cursor: pointer;
@@ -504,17 +507,18 @@ async function retry() {
   gap: 8px;
   margin: 12px 16px 0;
   height: 50px;
-  background: linear-gradient(115deg, #edf2fc, #f8faff);
-  border: 1px solid #fff;
+  background: #fff;
+  border: 1px solid #d4e0f3;
   border-radius: var(--radius-pill, 999px);
   padding: 0 17px;
-  box-shadow: 0 7px 16px rgba(60, 103, 170, .07), inset 0 0 0 1px rgba(82, 128, 211, .07);
+  box-shadow: 0 5px 16px rgba(47, 84, 148, .11);
 }
 .search:focus-within {
-  box-shadow: 0 0 0 2px rgba(63, 108, 248, .18), 0 7px 16px rgba(60, 103, 170, .07);
+  border-color: #6694f8;
+  box-shadow: 0 0 0 3px rgba(63, 108, 248, .13), 0 6px 18px rgba(47, 84, 148, .12);
 }
 .sicon {
-  color: #64708d;
+  color: #4d72b8;
   display: flex;
   align-items: center;
 }
@@ -526,7 +530,7 @@ async function retry() {
   border: none;
   outline: none;
 }
-.sinput::placeholder { color: var(--text-hint); }
+.sinput::placeholder { color: #7787a3; }
 .search__clear {
   color: var(--text-hint);
   font-size: 16px;
