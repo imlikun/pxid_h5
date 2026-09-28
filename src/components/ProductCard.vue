@@ -28,11 +28,14 @@ const props = defineProps({
   product: { type: Object, required: true },
   badge: { type: String, default: '' },
   actionLabel: { type: String, default: '选择规格' },
+  // 折叠屏两栏态（精选页 isSplit）下：点卡片只通知父组件在右栏渲染详情，不跳页
+  onSelect: { type: Function, default: null },
 })
 
 const router = useRouter()
 
 function go() {
+  if (props.onSelect) { props.onSelect(props.product); return }
   // PRD v2：点商品进入 H5 详情页（展示详情 + 本地购物车 + 结算跳 Shopify）
   // 白名单二级路由优先走全屏右滑通道（2026-09-11，与 FeaturedView.openSecondary 同一契约）：
   // 本组件用在精选根页（根 WebView），H5 内 push 等于把 /product 开在根 WebView 里

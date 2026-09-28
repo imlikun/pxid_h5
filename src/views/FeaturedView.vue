@@ -1,5 +1,7 @@
 <template>
-  <div class="featured" :class="{ 'featured--native': bridge.isNative() }">
+  <div class="featured" :class="{ 'featured--native': bridge.isNative(), split: isSplit }">
+    <div class="cols">
+    <div class="leftcol">
     <!-- 顶部：三 tab + 我的订单入口（右上角） -->
     <TopBar sticky :show-back="false">
       <template #left>
@@ -102,7 +104,7 @@
           v-for="(p, i) in hotProducts"
           :key="p.id"
           :product="p"
-          :action-label="t('featured.chooseOptions')"
+          :action-label="t('featured.chooseOptions')" :on-select="isSplit ? selectProduct : null"
           :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
@@ -116,7 +118,7 @@
             :key="p.id"
             :product="p"
             :badge="saleBadge(p)"
-            :action-label="t('featured.chooseOptions')"
+            :action-label="t('featured.chooseOptions')" :on-select="isSplit ? selectProduct : null"
             :class="[fadeUp(), staggerFor(i)]"
           />
         </div>
@@ -145,7 +147,7 @@
             :key="p.id"
             :product="p"
             :badge="saleBadge(p)"
-            :action-label="t('featured.chooseOptions')"
+            :action-label="t('featured.chooseOptions')" :on-select="isSplit ? selectProduct : null"
             :class="[fadeUp(), staggerFor(i)]"
           />
         </div>
@@ -160,7 +162,7 @@
           v-for="(p, i) in bikeProducts"
           :key="p.id"
           :product="p"
-          :action-label="t('featured.chooseOptions')"
+          :action-label="t('featured.chooseOptions')" :on-select="isSplit ? selectProduct : null"
           :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
@@ -174,13 +176,53 @@
             v-for="(p, i) in searchResults"
             :key="p.id"
             :product="p"
-            :action-label="t('featured.chooseOptions')"
+            :action-label="t('featured.chooseOptions')" :on-select="isSplit ? selectProduct : null"
             :class="[fadeUp(), staggerFor(i)]"
           />
         </div>
         <div v-if="!searchResults.length" class="empty-tab">{{ t('featured.searchEmpty') }}</div>
       </div>
     </template>
+    </div><!-- /leftcol -->
+
+    <!-- 折叠屏右栏商品详情面板：分栏态（≥600px）下作为 .cols 直接子节点与 .leftcol 左右并排。
+         点左栏商品卡片切换、▲▼连翻；手机态不渲染。 -->
+    <div v-if="isSplit" class="panel">
+      <div class="panel__nav">
+        <span class="panel__tag">商品详情</span>
+        <button class="panel__navbtn" @click="stepDetail(-1)" :disabled="!all.length">▲ 上一条</button>
+        <button class="panel__navbtn" @click="stepDetail(1)" :disabled="!all.length">▼ 下一条</button>
+      </div>
+      <div v-if="detailLoading || !detailItem" class="panel__loading">
+        <span v-if="!selectedProduct">选一件商品看看</span>
+        <span v-else>加载详情中…</span>
+      </div>
+      <template v-else>
+        <img v-if="panelImage" class="panel__img" :src="panelImage" :alt="detailItem.name || ''" />
+        <div class="panel__body">
+          <div class="panel__name">{{ detailItem.name }}</div>
+          <div class="panel__price">
+            <span class="price">{{ sym(detailItem.currency) }}{{ detailItem.price }}</span>
+            <span v-if="detailItem.origin" class="origin">{{ sym(detailItem.currency) }}{{ detailItem.origin }}</span>
+          </div>
+          <div v-if="detailItem.vendor" class="panel__vendor">{{ detailItem.vendor }}</div>
+          <p v-if="plainDescription" class="panel__desc">{{ plainDescription }}</p>
+          <div v-if="detailItem.specs && detailItem.specs.length" class="panel__specs">
+            <h4>规格参数</h4>
+            <ul>
+              <li v-for="(s, i) in detailItem.specs" :key="i">{{ s }}</li>
+            </ul>
+          </div>
+          <div v-if="detailItem.sellingPoints && detailItem.sellingPoints.length" class="panel__points">
+            <h4>产品卖点</h4>
+            <ul>
+              <li v-for="(p, i) in detailItem.sellingPoints" :key="i">{{ p }}</li>
+            </ul>
+          </div>
+          <button class="panel__buy" @click="openDetail">{{ t('featured.viewNow') }}</button>
+        </div>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -194,7 +236,7 @@ import ProductCard from '../components/ProductCard.vue'
 import TopBar from '../components/TopBar.vue'
 import IconSvg from '../components/IconSvg.vue'
 import { featuredQuick } from '../data/mock'
-import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym, API_BASE } from '../api/shop'
+import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym, API_BASE, fetchProductDetail } from '../api/shop'
 import { bridge } from '../bridge'
 import { t, initLocale, locale } from '../i18n'
 
@@ -321,6 +363,7 @@ function goBanner(i) {
   startBanner()
 }
 function goProduct(p) {
+  if (isSplit.value) { selectProduct(p); return }
   openSecondary(productRoute(p))
 }
 
@@ -417,6 +460,66 @@ function onQuick(q) {
     openSecondary('/points')
   }
 }
+
+// ---- 折叠屏两栏（≥600px）：右栏商品详情面板 ----
+// 手机（<600px）isSplit=false，右栏不渲染、不拉详情，零影响。
+// 854 / 1337 都 ≥600 → 两栏；H5 只做「左商品列表 + 右详情」两栏，自动等分吃满宽度。
+const SPLIT_MQ = window.matchMedia('(min-width: 600px)')
+const isSplit = ref(SPLIT_MQ.matches)
+function onSplitChange(e) { isSplit.value = e.matches }
+if (SPLIT_MQ.addEventListener) SPLIT_MQ.addEventListener('change', onSplitChange)
+else SPLIT_MQ.addListener(onSplitChange)
+onUnmounted(() => {
+  if (SPLIT_MQ.removeEventListener) SPLIT_MQ.removeEventListener('change', onSplitChange)
+  else SPLIT_MQ.removeListener(onSplitChange)
+})
+
+// 右栏选中项 + 全量详情（分栏态点左栏卡片只切右栏，不跳页）
+const selectedProduct = ref(null)
+const detailLoading = ref(false)
+const detailItem = ref(null)      // fetchProductDetail 全量（含描述/规格/卖点/图集）
+async function loadPanel(product) {
+  selectedProduct.value = product
+  if (!product) return
+  detailLoading.value = true
+  const detail = await fetchProductDetail(product.handle || product.id)
+  // 快速连点/翻页时，旧请求返回不得覆盖当前选中
+  if (selectedProduct.value && (selectedProduct.value.handle || String(selectedProduct.value.id)) === (product.handle || String(product.id))) {
+    detailItem.value = detail || product
+  }
+  detailLoading.value = false
+}
+function selectProduct(product) {
+  if (product && product.id != null) loadPanel(product)
+}
+function openDetail() {
+  if (selectedProduct.value) openSecondary(productRoute(selectedProduct.value))
+}
+// ▲ 上一条 / ▼ 下一条：在全部商品流里循环翻
+function stepDetail(delta) {
+  const list = all.value
+  if (!list.length) return
+  const cur = selectedProduct.value && (selectedProduct.value.handle || String(selectedProduct.value.id))
+  const i = list.findIndex((x) => (x.handle || String(x.id)) === cur)
+  const n = i < 0 ? 0 : (i + delta + list.length) % list.length
+  selectProduct(list[n])
+}
+const panelImage = computed(() => {
+  if (detailItem.value && detailItem.value.images && detailItem.value.images.length) return detailItem.value.images[0]
+  return selectedProduct.value?.cover || ''
+})
+const plainDescription = computed(() => {
+  const d = (detailItem.value && detailItem.value.description) || ''
+  if (!d) return ''
+  return String(d).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+})
+// 分栏首屏：商品数据回来后默认选中第一件，右栏不留白
+watch(all, (l) => {
+  if (isSplit.value && l.length && !selectedProduct.value) selectProduct(l[0])
+})
+watch(isSplit, (v) => {
+  if (v && !selectedProduct.value && all.value.length) selectProduct(all.value[0])
+})
 
 async function retry() {
   loading.value = true
@@ -802,5 +905,135 @@ async function retry() {
   color: #e53e3e;
   margin-top: 4px;
   font-size: 12px;
+}
+
+/* ===== 折叠屏两栏（≥600px）：左商品列表 + 右详情面板 =====
+   手机 <600px：.cols 塌成单栏（.leftcol 无约束、.panel 不渲染），与现状一致。
+   两栏各自 100vh 独立滚动（iPad 双 pane 范式）。 */
+@media (min-width: 600px) {
+  .featured { padding-bottom: 0; }
+  .cols {
+    display: flex;
+    align-items: flex-start;
+  }
+  .leftcol {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .panel {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--card);
+    border-left: 1px solid var(--line, #eee);
+  }
+}
+
+/* 右栏商品详情面板内部（仅分栏态出现） */
+.panel__nav {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  background: var(--card);
+  border-bottom: 1px solid #F0F0F0;
+}
+.panel__tag {
+  background: var(--brand-soft, rgba(74, 108, 247, .1));
+  color: var(--brand, #4a6cf7);
+  border-radius: 9px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.panel__navbtn {
+  margin-left: auto;
+  background: var(--card);
+  border: 1px solid var(--line, #eee);
+  border-radius: 9px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-sub);
+}
+.panel__navbtn + .panel__navbtn { margin-left: 6px; }
+.panel__navbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.panel__loading {
+  padding: 40px 16px;
+  color: var(--text-hint);
+  font-size: 13px;
+  text-align: center;
+}
+.panel__img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  display: block;
+  background: #f5f8fd;
+}
+.panel__body { padding: 16px; }
+.panel__name {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+.panel__price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.panel__price .price {
+  color: #ee3d48;
+  font-weight: 700;
+  font-size: 22px;
+}
+.panel__price .origin {
+  color: #98a3ba;
+  font-size: 13px;
+  text-decoration: line-through;
+}
+.panel__vendor {
+  font-size: 12px;
+  color: var(--text-hint);
+  margin-bottom: 12px;
+}
+.panel__desc {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  margin: 0 0 16px;
+  white-space: pre-line;
+}
+.panel__specs,
+.panel__points { margin-bottom: 16px; }
+.panel__specs h4,
+.panel__points h4 { font-size: 13px; color: var(--text-sub); margin: 0 0 8px; }
+.panel__specs ul,
+.panel__points ul { margin: 0; padding-left: 18px; }
+.panel__specs li,
+.panel__points li { font-size: 13px; line-height: 1.6; color: var(--text); margin-bottom: 4px; }
+.panel__buy {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--brand, #4a6cf7);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
 }
 </style>
