@@ -510,32 +510,12 @@ async function onBuy() {
   background: var(--bg);
   padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
-/* 折叠屏左右分栏：左主图常驻 + 右信息滚动（纯 CSS，不动路由/Flutter） */
-.pd-split { display: block; }
-@media (min-width: 600px) {
-  .pd-split {
-    display: grid;
-    grid-template-columns: 44% 1fr;
-    align-items: start;
-  }
-  .pd-split .gallery-frame {
-    position: sticky;
-    top: 56px;
-    height: calc(100vh - 56px - 60px);
-    align-self: start;
-    background: #fff;
-  }
-  .pd-split .gallery { height: 100%; }
-  .pd-split .slide { height: 100%; }
-  .pd-split .product-content { padding: 0 12px; }
-}
-@media (min-width: 1040px) {
-  .pd-split {
-    grid-template-columns: 480px 1fr;
-    max-width: 1280px;
-    margin: 0 auto;
-  }
-  .pd-split .product-content { max-width: 760px; }
+/* 详情页：单列卡片流（淘宝详情页形式 + 发现栏目卡片风格），居中限宽复用手机规格，不分栏 */
+.pd-split {
+  display: block;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 12px;
 }
 .cart {
   position: relative;
@@ -561,13 +541,13 @@ async function onBuy() {
   box-sizing: border-box;
 }
 /* 固定图廊，导航叠在图片内，数据补齐不改变后续内容位置。 */
-.gallery-frame { position: relative; height: 360px; background: #fff; }
+.gallery-frame { position: relative; height: clamp(360px, 48vw, 520px); background: #fff; }
 .gallery {
   display: flex;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  background: #000;
+  background: #fff;
 }
 .gallery::-webkit-scrollbar {
   display: none;
@@ -575,8 +555,9 @@ async function onBuy() {
 .slide {
   flex: 0 0 100%;
   width: 100%;
-  height: 360px;
-  object-fit: cover;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
   scroll-snap-align: center;
 }
 .empty-slide {
