@@ -11,6 +11,8 @@
       </template>
     </TopBar>
 
+    <!-- 折叠屏左右分栏容器：左主图常驻 + 右信息滚动 -->
+    <div class="pd-split">
     <!-- 当前颜色图廊：首帧沿用列表封面，切色才加载对应图片 -->
     <div class="gallery-frame">
     <div class="gallery" ref="gallery" @scroll="onGalleryScroll">
@@ -139,6 +141,7 @@
     <div v-else class="content-placeholder" aria-label="正在加载商品信息"><span></span><span></span><span></span></div>
     <div v-if="error" class="detail-error">{{ error }} <button @click="reload">重新加载</button></div>
     <div class="gap"></div>
+    </div> <!-- /pd-split -->
 
     <!-- 底部吸底操作 -->
     <div class="actions">
@@ -506,6 +509,33 @@ async function onBuy() {
   min-height: 100vh;
   background: var(--bg);
   padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+/* 折叠屏左右分栏：左主图常驻 + 右信息滚动（纯 CSS，不动路由/Flutter） */
+.pd-split { display: block; }
+@media (min-width: 600px) {
+  .pd-split {
+    display: grid;
+    grid-template-columns: 44% 1fr;
+    align-items: start;
+  }
+  .pd-split .gallery-frame {
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px - 60px);
+    align-self: start;
+    background: #fff;
+  }
+  .pd-split .gallery { height: 100%; }
+  .pd-split .slide { height: 100%; }
+  .pd-split .product-content { padding: 0 12px; }
+}
+@media (min-width: 1040px) {
+  .pd-split {
+    grid-template-columns: 480px 1fr;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .pd-split .product-content { max-width: 760px; }
 }
 .cart {
   position: relative;
