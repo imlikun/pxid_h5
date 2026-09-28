@@ -210,7 +210,7 @@
           <div v-if="detailItem.specs && detailItem.specs.length" class="panel__specs">
             <h4>规格参数</h4>
             <ul>
-              <li v-for="(s, i) in detailItem.specs" :key="i">{{ s }}</li>
+              <li v-for="(s, i) in detailItem.specs" :key="i">{{ (s && typeof s === 'object') ? (s.label ? s.label + '：' + s.value : s.value) : s }}</li>
             </ul>
           </div>
           <div v-if="detailItem.sellingPoints && detailItem.sellingPoints.length" class="panel__points">
@@ -222,6 +222,7 @@
           <button class="panel__buy" @click="openDetail">{{ t('featured.viewNow') }}</button>
         </div>
       </template>
+    </div>
     </div>
   </div>
 </template>
@@ -505,7 +506,12 @@ function stepDetail(delta) {
   selectProduct(list[n])
 }
 const panelImage = computed(() => {
-  if (detailItem.value && detailItem.value.images && detailItem.value.images.length) return detailItem.value.images[0]
+  const imgs = detailItem.value && detailItem.value.images
+  if (imgs && imgs.length) {
+    const first = imgs[0]
+    // 详情 images 是对象数组 {src,...}（列表 cover 是字符串），两种形态都兼容
+    return typeof first === 'string' ? first : (first && first.src) || ''
+  }
   return selectedProduct.value?.cover || ''
 })
 const plainDescription = computed(() => {
