@@ -61,7 +61,7 @@ function go() {
   left: 7px;
   border-radius: 7px;
   padding: 3px 6px;
-  background: linear-gradient(110deg, #6a9cff, #3970f9);
+  background: linear-gradient(110deg, #ff7b83, #f04453);
   color: #fff;
   font-size: 10px;
   font-weight: 700;

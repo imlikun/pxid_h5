@@ -62,10 +62,13 @@
             :aria-label="p.name"
             @click="goProduct(p)"
           >
+            <span class="banner__wordmark" aria-hidden="true">PXID</span>
+            <span class="banner__handwriting" aria-hidden="true">Better Ride<br />A Brighter Tomorrow</span>
             <img class="banner__img" :src="p.cover" alt="" :loading="i < 2 ? 'eager' : 'lazy'" :fetchpriority="i === 0 ? 'high' : undefined" />
             <div class="banner__mask">
-              <div class="banner__eyebrow">PXID <span>SHOP</span></div>
+              <div class="banner__eyebrow">PXID <span>RIDE A BRIGHTER TOMORROW</span></div>
               <div class="banner__name">{{ p.name }}</div>
+              <div v-if="p.handle === HERO_HANDLE" class="banner__tagline">{{ t('featured.bannerTagline') }}</div>
               <div class="banner__price">
                 {{ sym(p.currency) }}{{ p.price }}<span v-if="p.origin" class="banner__origin">{{ sym(p.currency) }}{{ p.origin }}</span>
               </div>
@@ -105,26 +108,28 @@
       </div>
 
       <!-- 踏春装备 | 限时直降 -->
-      <SectionHeader :title="t('featured.springTitle')" :sub="t('featured.springSub')" :more="t('featured.more')" @more="activeTab = 'spring'" />
-      <div class="grid2">
-        <ProductCard
-          v-for="(p, i) in springProducts"
-          :key="p.id"
-          :product="p"
-          :badge="saleBadge(p)"
-          :action-label="t('featured.chooseOptions')"
-          :class="[fadeUp(), staggerFor(i)]"
-        />
-      </div>
+      <section class="spring-panel">
+        <SectionHeader :title="t('featured.springTitle')" :sub="t('featured.springSub')" :description="t('featured.springDescription')" promo :more="t('featured.more')" @more="activeTab = 'spring'" />
+        <div class="grid2">
+          <ProductCard
+            v-for="(p, i) in springProducts"
+            :key="p.id"
+            :product="p"
+            :badge="saleBadge(p)"
+            :action-label="t('featured.chooseOptions')"
+            :class="[fadeUp(), staggerFor(i)]"
+          />
+        </div>
+      </section>
 
       <div class="store-footer">
         <button class="enter-store press" @click="enterStore" :disabled="!store">
           <span>{{ t('featured.enterStore') }}</span><span class="enter-store__arrow" aria-hidden="true">→</span>
         </button>
         <div class="store-trust">
-          <span><IconSvg name="shield-check" :size="17" />{{ t('featured.trustOfficial') }}</span>
-          <span><IconSvg name="shopping-cart" :size="17" />{{ t('featured.trustCheckout') }}</span>
-          <span><IconSvg name="clipboard-list" :size="17" />{{ t('featured.trustOrders') }}</span>
+          <div class="store-trust__item"><span class="store-trust__icon"><IconSvg name="shield-check" :size="23" /></span><span class="store-trust__copy"><strong>{{ t('featured.trustOfficial') }}</strong><small>{{ t('featured.trustOfficialSub') }}</small></span></div>
+          <div class="store-trust__item"><span class="store-trust__icon"><IconSvg name="shopping-cart" :size="23" /></span><span class="store-trust__copy"><strong>{{ t('featured.trustCheckout') }}</strong><small>{{ t('featured.trustCheckoutSub') }}</small></span></div>
+          <div class="store-trust__item"><span class="store-trust__icon"><IconSvg name="clipboard-list" :size="23" /></span><span class="store-trust__copy"><strong>{{ t('featured.trustOrders') }}</strong><small>{{ t('featured.trustOrdersSub') }}</small></span></div>
         </div>
       </div>
       </template><!-- /v-else 有数据 -->
@@ -132,17 +137,19 @@
 
     <!-- 踏春装备 -->
     <template v-else-if="activeTab === 'spring' && !showSearch">
-      <SectionHeader :title="t('featured.springTitle')" :sub="t('featured.springSub')" :more="t('featured.more')" />
-      <div class="grid2">
-        <ProductCard
-          v-for="(p, i) in springProducts"
-          :key="p.id"
-          :product="p"
-          :badge="saleBadge(p)"
-          :action-label="t('featured.chooseOptions')"
-          :class="[fadeUp(), staggerFor(i)]"
-        />
-      </div>
+      <section class="spring-panel">
+        <SectionHeader :title="t('featured.springTitle')" :sub="t('featured.springSub')" :description="t('featured.springDescription')" promo :more="t('featured.more')" />
+        <div class="grid2">
+          <ProductCard
+            v-for="(p, i) in springProducts"
+            :key="p.id"
+            :product="p"
+            :badge="saleBadge(p)"
+            :action-label="t('featured.chooseOptions')"
+            :class="[fadeUp(), staggerFor(i)]"
+          />
+        </div>
+      </section>
     </template>
 
     <!-- Bikes -->
@@ -189,7 +196,7 @@ import IconSvg from '../components/IconSvg.vue'
 import { featuredQuick } from '../data/mock'
 import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym, API_BASE } from '../api/shop'
 import { bridge } from '../bridge'
-import { t, initLocale } from '../i18n'
+import { t, initLocale, locale } from '../i18n'
 
 const router = useRouter()
 const hotSectionRef = ref(null)
@@ -284,11 +291,11 @@ function enterStore() {
 // ---- 顶部 Banner 产品轮播（展示后台配置的车型 handles）----
 const current = ref(0)
 let _bannerTimer = null
-const bannerList = computed(() =>
-  all.value.filter(
-    (p) => cfg.value.bannerHandles.includes(p.handle) || cfg.value.bannerHandles.includes(String(p.id))
-  )
-)
+const HERO_HANDLE = '500w-48v-city-folding-electric-scooter-with-app'
+const bannerList = computed(() => {
+  const handles = [HERO_HANDLE, ...cfg.value.bannerHandles.filter((h) => h !== HERO_HANDLE)]
+  return handles.map((handle) => all.value.find((p) => p.handle === handle || String(p.id) === handle)).filter(Boolean)
+})
 
 function startBanner() {
   stopBanner()
@@ -378,7 +385,13 @@ const featuredQuickI18n = computed(() =>
 )
 
 const all = computed(() => getProducts())
-const saleBadge = (p) => Number(p.origin) > Number(p.price) ? t('featured.sale') : ''
+const saleBadge = (p) => {
+  const price = Number(p.price)
+  const origin = Number(p.origin)
+  if (!origin || !price || price >= origin) return ''
+  if (locale.value === 'zh') return `${(price / origin * 10).toFixed(1)}折`
+  return `${Math.round((1 - price / origin) * 100)}% OFF`
+}
 const hotProducts = computed(() => all.value.slice(0, cfg.value.hotCount))
 const springProducts = computed(() => {
   const list = all.value
@@ -528,7 +541,7 @@ async function retry() {
   border-radius: 20px;
   overflow: hidden;
   height: clamp(216px, 59vw, 310px);
-  background: radial-gradient(circle at 80% 35%, #fff 0, #eff4ff 58%, #e6efff 100%);
+  background: radial-gradient(ellipse at 83% 76%, rgba(219, 234, 255, .85), transparent 49%), linear-gradient(143deg, #eef5ff 0%, #f8fbff 43%, #dfebff 100%);
   border: 1px solid #fff;
   box-shadow: 0 9px 25px rgba(49, 91, 158, .09);
 }
@@ -549,27 +562,64 @@ async function retry() {
   font: inherit;
   background: transparent;
 }
+.banner__slide::before {
+  content: '';
+  position: absolute;
+  width: 120%;
+  height: 85%;
+  right: -34%;
+  top: -37%;
+  border-radius: 0 0 0 90%;
+  transform: rotate(-11deg);
+  background: rgba(255, 255, 255, .46);
+}
+.banner__wordmark {
+  position: absolute;
+  right: 1%;
+  top: 5%;
+  font-size: clamp(74px, 25vw, 160px);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -.09em;
+  font-style: italic;
+  color: rgba(101, 150, 237, .10);
+  pointer-events: none;
+}
+.banner__handwriting {
+  position: absolute;
+  right: 5%;
+  top: 37%;
+  transform: rotate(-9deg);
+  color: rgba(81, 131, 230, .6);
+  font-family: cursive;
+  font-size: clamp(11px, 3vw, 17px);
+  font-style: italic;
+  line-height: 1.15;
+  text-align: right;
+  pointer-events: none;
+}
 .banner__img {
   position: absolute;
-  right: -4%;
-  bottom: 3%;
-  width: 80%;
+  right: -5%;
+  bottom: -9%;
+  width: 78%;
   height: 100%;
   object-fit: contain;
   object-position: right center;
   display: block;
+  mix-blend-mode: multiply;
 }
 .banner__mask {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: min(61%, 370px);
+  width: min(59%, 370px);
   padding: 18px 0 22px 18px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  background: linear-gradient(to right, #f4f8ff 45%, rgba(244, 248, 255, .92) 70%, rgba(244, 248, 255, 0));
+  background: linear-gradient(to right, rgba(241, 247, 255, .98) 35%, rgba(241, 247, 255, .87) 68%, rgba(241, 247, 255, 0));
   color: #101d43;
   pointer-events: none;
 }
@@ -581,8 +631,8 @@ async function retry() {
 }
 .banner__eyebrow span {
   display: block;
-  font-size: 8px;
-  letter-spacing: .38em;
+  font-size: 6px;
+  letter-spacing: .27em;
   margin-top: 5px;
   color: #647ba7;
 }
@@ -590,13 +640,14 @@ async function retry() {
   font-size: clamp(15px, 4.2vw, 23px);
   font-weight: 750;
   line-height: 1.17;
-  margin-top: 17px;
+  margin-top: 14px;
   max-width: 100%;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.banner__tagline { margin-top: 7px; color: #6a80a9; font-size: 10px; line-height: 1.25; }
 .banner__price {
   font-size: clamp(19px, 5vw, 27px);
   font-weight: 800;
@@ -689,20 +740,27 @@ async function retry() {
 .store-trust {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  margin-top: 15px;
+  margin-top: 16px;
   color: #475879;
   font-size: 11px;
 }
-.store-trust span {
+.store-trust__item {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   align-items: center;
   justify-content: center;
   min-width: 0;
-  white-space: nowrap;
 }
-.store-trust span + span { border-left: 1px solid #e4eafb; }
+.store-trust__item + .store-trust__item { border-left: 1px solid #e4eafb; }
+.store-trust__icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 50%; background: #eff5ff; box-shadow: inset 0 0 0 1px #e0eaff; }
+.store-trust__copy { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.store-trust__copy strong { font-size: 10px; color: #172b51; white-space: nowrap; }
+.store-trust__copy small { margin-top: 3px; font-size: 8px; color: #8999b3; white-space: nowrap; }
 .store-trust svg { color: #4077fb; flex-shrink: 0; }
+.spring-panel { margin: 7px 12px 10px; padding-top: 1px; border-radius: 19px; background: linear-gradient(145deg, #eef5ff, #f5f9ff 55%, #eaf3ff); border: 1px solid #e8f0ff; }
+.spring-panel :deep(.sheader) { padding: 14px 11px 11px; }
+.spring-panel .grid2 { padding: 0 9px 12px; gap: 8px; }
+.spring-panel :deep(.pcard) { border-color: #f2f5fb; box-shadow: 0 3px 10px rgba(64, 104, 174, .045); }
 .hot-section { scroll-margin-top: 58px; }
 @media (max-width: 350px) {
   .my-order-btn__txt { display: none; }
