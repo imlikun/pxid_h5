@@ -529,6 +529,19 @@ export const bridge = {
     return false
   },
 
+  // 详情正文已完成首帧渲染：供 Flutter 关闭新 WebView 的原生 loading 层。
+  // 旧版 App 未注入该 channel 时静默跳过，不改变 H5 自身导航。
+  notifyPageReady: (route) => {
+    try {
+      const ch = window.ToFlutter_H5PageReady
+      if (ch && typeof ch.postMessage === 'function') {
+        ch.postMessage(JSON.stringify({ route, ms: Math.round(performance.now()) }))
+        return true
+      }
+    } catch (e) { /* 旧版 App 不支持时静默 */ }
+    return false
+  },
+
   // 发现/精选二级页全屏右滑通道（2026-09-08，对接说明 2026-09-07）：
   // 根 WebView 内打开白名单二级路由时，交 Flutter 以标准右进左出全屏 WebView 打开
   // （完整遮住根页与主导航栏，导航栏无隐藏/下移/淡出动画），转场与 H5 slide-forward 一致。

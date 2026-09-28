@@ -1,10 +1,18 @@
 <template>
   <div class="pcard press" @click="go">
-    <img class="pcard__cover" :src="product.cover" :alt="product.name" loading="lazy" />
+    <div class="pcard__media">
+      <img class="pcard__cover" :src="product.cover" :alt="product.name" loading="lazy" />
+      <span v-if="badge" class="pcard__badge">{{ badge }}</span>
+    </div>
     <div class="pcard__name">{{ product.name }}</div>
     <div class="pcard__price">
-      <span class="price">{{ sym(product.currency) }}{{ product.price }}</span>
-      <span v-if="product.origin" class="origin">{{ sym(product.currency) }}{{ product.origin }}</span>
+      <div class="pcard__prices">
+        <span class="price">{{ sym(product.currency) }}{{ product.price }}</span>
+        <span v-if="product.origin" class="origin">{{ sym(product.currency) }}{{ product.origin }}</span>
+      </div>
+      <button type="button" class="pcard__action" :aria-label="`${product.name} · ${actionLabel}`" @click.stop="go">
+        <IconSvg name="shopping-cart" :size="18" :stroke="1.9" aria-hidden="true" />
+      </button>
     </div>
   </div>
 </template>
@@ -14,9 +22,12 @@ import { useRouter } from 'vue-router'
 import { sym } from '../api/shop'
 import bridge from '../bridge'
 import { productRoute } from '../utils/productNavigation'
+import IconSvg from './IconSvg.vue'
 
 const props = defineProps({
   product: { type: Object, required: true },
+  badge: { type: String, default: '' },
+  actionLabel: { type: String, default: '选择规格' },
 })
 
 const router = useRouter()
@@ -36,37 +47,76 @@ function go() {
 
 <style scoped>
 .pcard {
-  background: var(--card);
-  border-radius: var(--radius);
+  background: #fff;
+  border-radius: 15px;
   overflow: hidden;
+  box-shadow: 0 5px 15px rgba(42, 86, 156, .06);
+  border: 1px solid #eef2fa;
+  min-width: 0;
+}
+.pcard__media { position: relative; background: #fff; }
+.pcard__badge {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  border-radius: 7px;
+  padding: 3px 6px;
+  background: linear-gradient(110deg, #6a9cff, #3970f9);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
 }
 .pcard__cover {
   width: 100%;
-  height: 140px;
-  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
   display: block;
 }
 .pcard__name {
-  padding: 10px 10px 4px;
+  padding: 8px 9px 0;
   font-size: 13px;
-  line-height: 1.3;
-  min-height: 34px;
+  line-height: 1.35;
+  min-height: 43px;
   color: var(--text);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .pcard__price {
-  padding: 4px 10px 12px;
+  padding: 6px 9px 10px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2px;
+}
+.pcard__prices {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 4px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 .price {
-  color: var(--price);
+  color: #ee3d48;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 17px;
 }
 .origin {
-  color: var(--text-sub);
+  color: #98a3ba;
   font-size: 11px;
   text-decoration: line-through;
 }
+.pcard__action {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: #4479fb;
+  cursor: pointer;
+}
+.pcard__action:focus-visible { outline: 2px solid #1d53d8; outline-offset: 2px; }
 </style>

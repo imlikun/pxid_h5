@@ -358,6 +358,23 @@ const bootSnap = (() => {
 })()
 const item = ref(bootSnap)
 const loading = ref(!bootSnap)
+// 新 WebView 中列表快照可同步直出；正文真正画出后回报 Flutter，避免原生 loading
+// 继续盖在 H5 上。图片和评论可随后加载，不阻塞正文就绪。
+let detailMounted = false
+let readySeq = 0
+let lastReadyRoute = ''
+function schedulePageReady() {
+  const seq = ++readySeq
+  const pageRoute = route.fullPath
+  if (!detailMounted || (!item.value && loading.value) || lastReadyRoute === pageRoute) return
+  nextTick(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (seq !== readySeq || route.fullPath !== pageRoute || (!item.value && loading.value)) return
+    lastReadyRoute = pageRoute
+    bridge.notifyPageReady(route.path)
+  })))
+}
+onMounted(() => { detailMounted = true; schedulePageReady() })
+watch(() => [route.fullPath, !!item.value, loading.value], schedulePageReady, { flush: 'post' })
 // 真正决定要不要亮「加载中」的是这个：接口 200ms 内没回来才显示。
 // 有列表快照时根本走不到这里（内容已直出），见 utils/feedSnapshot.js。
 const showLoading = ref(false)

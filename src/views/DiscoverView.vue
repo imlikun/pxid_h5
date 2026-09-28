@@ -115,7 +115,7 @@
       >
           <div class="quick__thumb" :class="'quick__thumb--' + q.key">
             <span v-if="q.key === 'notice' && noticeUnread > 0" class="q-badge"></span>
-            <img v-if="QUICK_IMAGES[q.key]" class="quick__icon" :src="QUICK_IMAGES[q.key]" alt="" width="54" height="54" decoding="async" />
+            <img v-if="QUICK_IMAGES[q.key]" class="quick__icon" :src="QUICK_IMAGES[q.key].small" :srcset="`${QUICK_IMAGES[q.key].small} 2x, ${QUICK_IMAGES[q.key].large} 3x`" alt="" width="54" height="54" decoding="async" />
             <IconSvg v-else class="quick__icon" :name="q.icon" :size="22" />
           </div>
           <div class="quick__label">
@@ -285,11 +285,16 @@ import DiscoverTopicCard from '../components/DiscoverTopicCard.vue'
 import MomentCard from '../components/MomentCard.vue'
 import IconSvg from '../components/IconSvg.vue'
 import TopBar from '../components/TopBar.vue'
-import quickCustom from '../assets/discover/quick-custom.png'
-import quickNotice from '../assets/discover/quick-notice.png'
-import quickAi from '../assets/discover/quick-ai.png'
-import quickPoints from '../assets/discover/quick-points.png'
-const QUICK_IMAGES = { custom: quickCustom, notice: quickNotice, ai: quickAi, points: quickPoints }
+const quickImage = (key) => ({
+  small: import.meta.env.BASE_URL + `discover/quick-${key}-2x.webp`,
+  large: import.meta.env.BASE_URL + `discover/quick-${key}-3x.webp`,
+})
+const QUICK_IMAGES = {
+  custom: quickImage('custom'),
+  notice: quickImage('notice'),
+  ai: quickImage('ai'),
+  points: quickImage('points'),
+}
 import {
   discoverTabs,
   discoverQuick,
@@ -833,6 +838,8 @@ onMounted(async () => {
   // 原生 WebView/浏览器刷新后不得恢复上次停留的列表中段；详情返回仍由路由器恢复位置。
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
   resetDiscoverScroll()
+  // 账户信息和语言桥接互不依赖；同时请求，避免两个原生往返串行阻塞首屏列表。
+  const userInfoPromise = bridge.getUserInfo().catch(() => null)
   await initLocale() // 先按系统语言初始化（URL ?lang= 优先级最高，见 i18n/initLocale）
   // 地区由当前语言自动映射：zh→CN、pt→BR、en→US，见 regionFromLocale
   // 取登录用户绑定车型（用于「我的车」快捷筛选 chip）
@@ -842,7 +849,7 @@ onMounted(async () => {
   try {
     // ⚠️ 区分两种「取不到」：getUserInfo 失败（null）= 桥不通，保留本地缓存；
     //    桥通但 carModel 为空 = 用户没绑/已解绑 → 清缓存，避免默认筛一个不存在的车型。
-    const u = await bridge.getUserInfo().catch(() => null)
+    const u = await userInfoPromise
     let car = u ? normalizeCarModel(u.carModel) : ''
     if (u && !car) { try { localStorage.removeItem('pxid_my_car_model') } catch (e) {} }
     if (!car) car = normalizeCarModel(localStorage.getItem('pxid_my_car_model'))

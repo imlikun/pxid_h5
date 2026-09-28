@@ -4,27 +4,27 @@
     <TopBar sticky :show-back="false">
       <template #left>
         <div class="tabs">
-          <span
+          <button type="button"
             v-for="t in topTabs"
             :key="t.key"
             class="tab tab-bounce"
             :class="{ active: activeTab === t.key }"
             @click="activeTab = t.key"
-            >{{ t.label }}</span
+            >{{ t.label }}</button
           >
         </div>
       </template>
       <template #right>
-        <span class="my-order-btn" @click="openSecondary('/order/list')">
+        <button type="button" class="my-order-btn" @click="openSecondary('/order/list')">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
           <span class="my-order-btn__txt">{{ t('featured.myOrder') }}</span>
-        </span>
+        </button>
       </template>
     </TopBar>
 
     <!-- 精选搜索（常驻搜索条，按商品名本地过滤，与发现栏目一致） -->
     <div class="search">
-      <span class="sicon">
+      <span class="sicon" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </span>
       <input
@@ -36,7 +36,7 @@
         @compositionend="onCompositionEnd"
         @click.stop
       />
-      <span v-if="showSearch" class="search__clear" @click="clearSearch">✕</span>
+      <button v-if="kw" type="button" class="search__clear" :aria-label="t('featured.clearSearch')" @click="clearSearch">✕</button>
     </div>
 
     <!-- 推荐 -->
@@ -55,29 +55,34 @@
       <!-- Banner 产品轮播 -->
       <div v-if="bannerList.length" class="banner" @touchstart="onTouchStart" @touchend="onTouchEnd">
         <div class="banner__track" :style="{ transform: `translateX(-${current * 100}%)` }">
-          <div
+          <button type="button"
             v-for="(p, i) in bannerList"
             :key="p.id"
             class="banner__slide press"
+            :aria-label="p.name"
             @click="goProduct(p)"
           >
-            <img class="banner__img" :src="p.cover" :alt="p.name" />
+            <img class="banner__img" :src="p.cover" alt="" :loading="i < 2 ? 'eager' : 'lazy'" :fetchpriority="i === 0 ? 'high' : undefined" />
             <div class="banner__mask">
+              <div class="banner__eyebrow">PXID <span>SHOP</span></div>
               <div class="banner__name">{{ p.name }}</div>
               <div class="banner__price">
                 {{ sym(p.currency) }}{{ p.price }}<span v-if="p.origin" class="banner__origin">{{ sym(p.currency) }}{{ p.origin }}</span>
               </div>
+              <span class="banner__cta">{{ t('featured.viewNow') }} <span aria-hidden="true">→</span></span>
             </div>
-          </div>
+          </button>
         </div>
         <div v-if="bannerList.length > 1" class="banner__dots">
-          <span
+          <button type="button"
             v-for="(p, i) in bannerList"
             :key="'dot-' + p.id"
             class="dot"
             :class="{ active: current === i }"
+            :aria-label="`${i + 1} / ${bannerList.length}`"
+            :aria-current="current === i ? 'true' : undefined"
             @click.stop="goBanner(i)"
-          ></span>
+          ></button>
         </div>
       </div>
       <div v-else class="banner">
@@ -88,12 +93,13 @@
       <QuickActions :items="featuredQuickI18n" @tap="onQuick" />
 
       <!-- 热购榜单 -->
-      <SectionHeader :title="t('featured.hotTitle')" />
+      <div ref="hotSectionRef" class="hot-section"><SectionHeader :title="t('featured.hotTitle')" /></div>
       <div class="grid2">
         <ProductCard
           v-for="(p, i) in hotProducts"
           :key="p.id"
           :product="p"
+          :action-label="t('featured.chooseOptions')"
           :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
@@ -105,11 +111,22 @@
           v-for="(p, i) in springProducts"
           :key="p.id"
           :product="p"
+          :badge="saleBadge(p)"
+          :action-label="t('featured.chooseOptions')"
           :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
 
-      <button class="enter-store press" @click="enterStore">{{ t('featured.enterStore') }}</button>
+      <div class="store-footer">
+        <button class="enter-store press" @click="enterStore" :disabled="!store">
+          <span>{{ t('featured.enterStore') }}</span><span class="enter-store__arrow" aria-hidden="true">→</span>
+        </button>
+        <div class="store-trust">
+          <span><IconSvg name="shield-check" :size="17" />{{ t('featured.trustOfficial') }}</span>
+          <span><IconSvg name="shopping-cart" :size="17" />{{ t('featured.trustCheckout') }}</span>
+          <span><IconSvg name="clipboard-list" :size="17" />{{ t('featured.trustOrders') }}</span>
+        </div>
+      </div>
       </template><!-- /v-else 有数据 -->
     </template>
 
@@ -121,6 +138,8 @@
           v-for="(p, i) in springProducts"
           :key="p.id"
           :product="p"
+          :badge="saleBadge(p)"
+          :action-label="t('featured.chooseOptions')"
           :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
@@ -134,6 +153,7 @@
           v-for="(p, i) in bikeProducts"
           :key="p.id"
           :product="p"
+          :action-label="t('featured.chooseOptions')"
           :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
@@ -147,6 +167,7 @@
             v-for="(p, i) in searchResults"
             :key="p.id"
             :product="p"
+            :action-label="t('featured.chooseOptions')"
             :class="[fadeUp(), staggerFor(i)]"
           />
         </div>
@@ -164,12 +185,14 @@ import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
 import TopBar from '../components/TopBar.vue'
+import IconSvg from '../components/IconSvg.vue'
 import { featuredQuick } from '../data/mock'
 import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym, API_BASE } from '../api/shop'
 import { bridge } from '../bridge'
 import { t, initLocale } from '../i18n'
 
 const router = useRouter()
+const hotSectionRef = ref(null)
 const bannerImg = import.meta.env.BASE_URL + 'discover-banner.jpg'
 const store = ref('')
 const loading = ref(true)
@@ -351,10 +374,11 @@ watch(kw, (k) => {
 
 // 精选快捷入口：label 走 i18n（key 不变，展示文案随语言切换）
 const featuredQuickI18n = computed(() =>
-  featuredQuick.map((q) => ({ ...q, label: t('featured.quick.' + q.key) }))
+  featuredQuick.map((q) => ({ ...q, icon: q.key === 'points' ? 'coins' : q.icon, label: t('featured.quick.' + q.key) }))
 )
 
 const all = computed(() => getProducts())
+const saleBadge = (p) => Number(p.origin) > Number(p.price) ? t('featured.sale') : ''
 const hotProducts = computed(() => all.value.slice(0, cfg.value.hotCount))
 const springProducts = computed(() => {
   const list = all.value
@@ -373,7 +397,7 @@ const bikeProducts = computed(() => {
 
 function onQuick(q) {
   if (q.key === 'hot') {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    hotSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } else if (q.key === 'new') {
     activeTab.value = 'spring'
   } else if (q.key === 'points') {
@@ -397,23 +421,33 @@ async function retry() {
 <style scoped>
 .featured {
   min-height: 100vh;
-  background: var(--bg);
+  background: #f5f8fd;
   padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
 }
 /* 原生底栏可能覆盖 WebView：安全区不代表底栏高度，末项需要可滚入可见区域。 */
 .featured--native {
   padding-bottom: calc(var(--tab-h, 56px) + max(16px, env(safe-area-inset-bottom, 0px)));
 }
+.featured :deep(.tb-left) { min-width: 0; flex: 1; overflow: hidden; }
+.featured :deep(.tb-right) { min-width: 0; flex: none; }
 .tabs {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: clamp(13px, 4vw, 22px);
   /* TopBar 自带 padding:0 8px，这里再左推 8px，整体 16px 与下方卡片 margin 对齐 */
   margin-left: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.tabs::-webkit-scrollbar { display: none; }
 .tab {
   position: relative;
-  font-size: 18px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: clamp(16px, 4.3vw, 19px);
   font-weight: 500;
   color: var(--text-sub);
   line-height: 1.2;
@@ -429,7 +463,7 @@ async function retry() {
   left: 50%;
   bottom: 0;
   transform: translateX(-50%);
-  width: 20px;
+  width: 28px;
   height: 3px;
   border-radius: 2px;
   background: var(--brand, #4a6cf7);
@@ -438,8 +472,14 @@ async function retry() {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #000000;
-  font-size: 14px;
+  color: #18264b;
+  background: #fff;
+  border: 1px solid #e2eafb;
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgba(39, 83, 163, .08);
+  min-height: 35px;
+  padding: 0 9px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -449,21 +489,25 @@ async function retry() {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 10px 16px 0;
-  height: 40px;
-  background: var(--surface-2, #f0f1f3);
+  margin: 12px 16px 0;
+  height: 50px;
+  background: linear-gradient(115deg, #edf2fc, #f8faff);
+  border: 1px solid #fff;
   border-radius: var(--radius-pill, 999px);
-  padding: 0 14px;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 0 17px;
+  box-shadow: 0 7px 16px rgba(60, 103, 170, .07), inset 0 0 0 1px rgba(82, 128, 211, .07);
+}
+.search:focus-within {
+  box-shadow: 0 0 0 2px rgba(63, 108, 248, .18), 0 7px 16px rgba(60, 103, 170, .07);
 }
 .sicon {
-  color: var(--text-hint);
+  color: #64708d;
   display: flex;
   align-items: center;
 }
 .sinput {
   flex: 1;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text);
   background: transparent;
   border: none;
@@ -475,14 +519,18 @@ async function retry() {
   font-size: 16px;
   padding: 4px;
   cursor: pointer;
+  border: 0;
+  background: transparent;
 }
 .banner {
   position: relative;
-  margin: 12px 12px 0;
-  border-radius: var(--radius-lg);
+  margin: 15px 12px 0;
+  border-radius: 20px;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
-  background: var(--card);
+  height: clamp(216px, 59vw, 310px);
+  background: radial-gradient(circle at 80% 35%, #fff 0, #eff4ff 58%, #e6efff 100%);
+  border: 1px solid #fff;
+  box-shadow: 0 9px 25px rgba(49, 91, 158, .09);
 }
 .banner__track {
   display: flex;
@@ -495,77 +543,177 @@ async function retry() {
   width: 100%;
   height: 100%;
   cursor: pointer;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  background: transparent;
 }
 .banner__img {
-  width: 100%;
+  position: absolute;
+  right: -4%;
+  bottom: 3%;
+  width: 80%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: right center;
   display: block;
 }
 .banner__mask {
   position: absolute;
   left: 0;
-  right: 0;
+  top: 0;
   bottom: 0;
-  padding: 18px 14px 14px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
-  color: #fff;
+  width: min(61%, 370px);
+  padding: 18px 0 22px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: linear-gradient(to right, #f4f8ff 45%, rgba(244, 248, 255, .92) 70%, rgba(244, 248, 255, 0));
+  color: #101d43;
+  pointer-events: none;
+}
+.banner__eyebrow {
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: .11em;
+  line-height: 1;
+}
+.banner__eyebrow span {
+  display: block;
+  font-size: 8px;
+  letter-spacing: .38em;
+  margin-top: 5px;
+  color: #647ba7;
 }
 .banner__name {
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 4px;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  font-size: clamp(15px, 4.2vw, 23px);
+  font-weight: 750;
+  line-height: 1.17;
+  margin-top: 17px;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .banner__price {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: clamp(19px, 5vw, 27px);
+  font-weight: 800;
+  color: #356bfb;
+  margin-top: auto;
 }
 .banner__origin {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 400;
   text-decoration: line-through;
-  opacity: 0.85;
+  color: #8c9ab0;
   margin-left: 6px;
+}
+.banner__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #5a96ff, #3869f7);
+  box-shadow: 0 5px 12px rgba(56, 105, 247, .24);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 13px;
+  margin-top: 7px;
 }
 .banner__dots {
   position: absolute;
   right: 12px;
-  bottom: 10px;
+  bottom: 11px;
   display: flex;
-  gap: 6px;
+  gap: 5px;
   z-index: 2;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, .86);
+  border-radius: 999px;
 }
 .dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
+  border: 0;
+  padding: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
+  background: #c7d7f9;
   transition: all 0.25s;
 }
 .dot.active {
-  width: 16px;
-  background: #fff;
+  width: 20px;
+  background: #4275fa;
   border-radius: 3px;
 }
+.store-footer {
+  margin: 8px 12px 18px;
+  padding: 12px 12px 14px;
+  background: #fff;
+  border-radius: 19px;
+  box-shadow: 0 5px 18px rgba(42, 86, 156, .06);
+}
 .enter-store {
-  display: block;
-  margin: 12px 12px 16px;
-  width: calc(100% - 24px);
-  padding: 12px 0;
-  border-radius: var(--radius-lg);
-  background: var(--brand);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 52px 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(110deg, #68a8ff, #4077fb 60%, #3766f4);
   color: #fff;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   text-align: center;
   border: none;
+  box-shadow: 0 7px 15px rgba(52, 100, 239, .24);
+}
+.enter-store:disabled { opacity: .55; }
+.enter-store__arrow {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  right: 6px;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: #fff;
+  color: #3766f4;
+  font-size: 24px;
+  font-weight: 400;
+}
+.store-trust {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 15px;
+  color: #475879;
+  font-size: 11px;
+}
+.store-trust span {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+.store-trust span + span { border-left: 1px solid #e4eafb; }
+.store-trust svg { color: #4077fb; flex-shrink: 0; }
+.hot-section { scroll-margin-top: 58px; }
+@media (max-width: 350px) {
+  .my-order-btn__txt { display: none; }
+  .banner__mask { width: 66%; }
+  .banner__name { font-size: 14px; }
 }
 .grid2 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  padding: 0 12px 16px;
+  gap: 10px;
+  padding: 0 12px 18px;
 }
 .load-tip,
 .err-tip {

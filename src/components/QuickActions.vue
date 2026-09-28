@@ -1,23 +1,21 @@
 <template>
   <div class="quick">
-    <div
+    <button type="button"
       v-for="(q, idx) in items"
       :key="q.key"
       class="qitem press"
       @click="$emit('tap', q)"
     >
-      <div class="gicon" :class="'g'+(idx+1)">
-        <img v-if="QUICK_ICON_SVG[q.icon]" class="qicon" :src="QUICK_ICON_SVG[q.icon]" :alt="q.label" />
-        <IconSvg v-else class="qicon" :name="q.icon" :size="22" />
+      <div class="gicon">
+        <IconSvg class="qicon" :name="q.icon" :size="30" :stroke="1.9" aria-hidden="true" />
       </div>
       <span class="qlabel">{{ q.label }}</span>
-    </div>
+    </button>
   </div>
 </template>
 
 <script setup>
 import IconSvg from './IconSvg.vue'
-import { QUICK_ICON_SVG } from '../assets/icons'
 defineProps({
   items: { type: Array, required: true },
 })
@@ -29,41 +27,45 @@ defineEmits(['tap'])
   display: flex;
   justify-content: space-around;
   align-items: flex-start;
-  margin: 14px 8px 0;
+  margin: 15px 12px 2px;
+  padding: 13px 5px 12px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 5px 18px rgba(42, 86, 156, .06);
 }
 .qitem {
   flex: 1;
   background: transparent;
   border: none;
-  border-radius: 0;
+  border-radius: 12px;
   box-shadow: none;
-  padding: 6px 0;
+  padding: 1px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  cursor: pointer;
 }
+.qitem:focus-visible { outline: 2px solid #4b7fff; outline-offset: 1px; }
 .gicon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 58px;
+  height: 58px;
+  border-radius: 17px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  border: 1.5px solid rgba(0, 0, 0, 0.18);
+  color: #4278fa;
+  background: linear-gradient(145deg, #f5f8ff, #eaf1ff);
+  box-shadow: inset 0 0 0 1px #e9effd;
 }
-.g1 { background: linear-gradient(135deg, #7DA2FF, #4D7CFF); }
-.g2 { background: linear-gradient(135deg, #FF9F59, #FF7A2F); }
-.g3 { background: linear-gradient(135deg, #50E3A3, #18B566); }
-.g4 { background: linear-gradient(135deg, #A18CFF, #7C5CFF); }
 .qicon {
-  width: 24px;
-  height: 24px;
-  color: #fff;
+  width: 30px;
+  height: 30px;
 }
 .qlabel {
-  font-size: 12px;
-  color: #333;
+  font-size: 13px;
+  font-weight: 600;
+  color: #263655;
+  white-space: nowrap;
 }
 </style>

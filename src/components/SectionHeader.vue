@@ -4,7 +4,7 @@
       <span class="title">{{ title }}</span>
       <span v-if="sub" class="sub">{{ sub }}</span>
     </div>
-    <div v-if="more" class="more" @click="$emit('more')">{{ more }} &gt;</div>
+    <button v-if="more" type="button" class="more" @click="$emit('more')">{{ more }} <span aria-hidden="true">›</span></button>
   </div>
 </template>
 
@@ -22,24 +22,36 @@ defineEmits(['more'])
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 12px 10px;
+  padding: 22px 14px 11px;
 }
 .left {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
 }
 .title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text);
 }
 .sub {
-  font-size: 12px;
-  color: var(--price);
+  font-size: 10px;
+  color: #f05b60;
+  background: #fff0f0;
+  border: 1px solid #ffd6d8;
+  padding: 3px 5px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 .more {
-  font-size: 13px;
-  color: var(--text-hint);
+  font-size: 12px;
+  color: #65758f;
+  background: #fff;
+  border: 1px solid #edf1fa;
+  border-radius: 999px;
+  padding: 5px 8px;
+  white-space: nowrap;
+  cursor: pointer;
 }
 </style>

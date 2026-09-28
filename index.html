@@ -14,6 +14,17 @@
          实测首次 TTFB 235ms vs 复用连接后 40ms → 预连接可省 ~150-200ms。 -->
     <link rel="preconnect" href="https://pxid-api.appin.site" crossorigin />
     <link rel="dns-prefetch" href="https://pxid-api.appin.site" />
+    <script>
+      // 仅发现页需要首帧焦点图；在路由 JS 加载前让浏览器发现这张图片。
+      if (!location.hash || location.hash === '#/' || /^#\/discover(?:$|[/?])/.test(location.hash)) {
+        const poster = document.createElement('link')
+        poster.rel = 'preload'
+        poster.as = 'image'
+        poster.href = new URL('./banner/banner-hero-poster.jpg', document.baseURI).href
+        poster.fetchPriority = 'high'
+        document.head.appendChild(poster)
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

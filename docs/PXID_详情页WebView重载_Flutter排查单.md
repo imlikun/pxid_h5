@@ -111,7 +111,7 @@ nginx 访问日志（`/www/wwwlogs/appin.site.log`）实测，多个 IP 出现�
 - 更关键：**一旦收到 `onPageFinished` / `onLoadStop`，就立即取消 loading，不要再用固定时长轮询去判定失败**；
 - **不要**用「DOM 是否为空」「URL 是否变化」这类判据（见上方 hash 路由提示）。
 
-### 方案 B（更稳，推荐；H5 侧可配合实现）
+### 方案 B（H5 已实现，Flutter 侧待接入）
 
 新增一个「H5 页面就绪」桥消息，沿用现有 channel 风格：
 
@@ -124,7 +124,7 @@ nginx 访问日志（`/www/wwwlogs/appin.site.log`）实测，多个 IP 出现�
 | 兜底 | 若 8 秒仍未收到，再按超时逻辑处理（避免 H5 异常时永久转圈） |
 | 覆盖范围 | 详情页 `/feed/:id` + 其余全屏白名单页（可分批） |
 
-> 这个 H5 侧实现量很小（半天内可交付并上线）。你们确认要，我们就直接做。
+H5 已在动态详情正文首帧渲染后发送 `ToFlutter_H5PageReady`，payload 为 `{"route":"/feed/228","ms":1058}`；列表快照命中时无需等待详情、图片或评论接口。旧版 App 未注入 channel 时静默跳过。Flutter 侧仍需注入 channel 并在收到消息时关闭原生加载占位，且以 `onPageFinished` / `onLoadStop` 和超时作为兜底；H5 单独上线不会移除当前 App 的旋转圈。
 
 ### 顺带两个小问题（方便的话一起看）
 
