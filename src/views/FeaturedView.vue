@@ -541,10 +541,10 @@ async function retry() {
 }
 .banner {
   position: relative;
-  margin: 15px 12px 0;
+  margin: 15px clamp(12px, 3vw, 40px) 0;
   border-radius: 20px;
   overflow: hidden;
-  height: clamp(216px, 59vw, 310px);
+  height: clamp(216px, 44vw, 460px);
   background: radial-gradient(ellipse at 83% 76%, rgba(219, 234, 255, .85), transparent 49%), linear-gradient(143deg, #eef5ff 0%, #f8fbff 43%, #dfebff 100%);
   border: 1px solid #fff;
   box-shadow: 0 9px 25px rgba(49, 91, 158, .09);
@@ -776,6 +776,19 @@ async function retry() {
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   padding: 0 12px 18px;
+}
+@media (min-width: 600px) {
+  .grid2 {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 0 clamp(16px, 3vw, 40px) 24px;
+  }
+}
+@media (min-width: 1040px) {
+  .grid2 {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
 }
 .load-tip,
 .err-tip {

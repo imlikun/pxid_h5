@@ -36,6 +36,13 @@ defineEmits(['tap'])
   border-radius: 18px;
   box-shadow: 0 5px 18px rgba(42, 86, 156, .06);
 }
+@media (min-width: 600px) {
+  .quick {
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
 .qitem {
   flex: 1;
   background: transparent;
