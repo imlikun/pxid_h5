@@ -168,7 +168,7 @@
           @click="pickFilter('全部')"
         >{{ t('discover.clearFilter') }}</span>
       </div>
-      <FeedLoadState v-if="currentFeedKey && recommendList.length" :loading="loadingMore" :finished="!feedPage[currentFeedKey].hasMore" />
+      <FeedLoadState v-if="currentFeedKey && recommendList.length" :loading="loadingMore[currentFeedKey]" :finished="!feedPage[currentFeedKey].hasMore" />
     </div>
 
     <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 + 非搜索态 -->
@@ -186,7 +186,7 @@
         />
         <div v-if="nearLoading" class="empty-tab">{{ t('discover.nearLoading') }}</div>
         <div v-else-if="dynamicList.length === 0" class="empty-tab">{{ t('discover.emptyDynamic') }}</div>
-        <FeedLoadState v-if="currentFeedKey && dynamicList.length" :loading="loadingMore" :finished="!feedPage[currentFeedKey].hasMore" />
+        <FeedLoadState v-if="currentFeedKey && dynamicList.length" :loading="loadingMore[currentFeedKey]" :finished="!feedPage[currentFeedKey].hasMore" />
       </div>
     </template>
 
@@ -516,7 +516,8 @@ function topicCardStyle(topic) {
 const activeTopic = ref('')
 const hotTopics = computed(() => {
   const cnt = {}
-  recommendData.value.forEach((x) =>
+  // 后续页只追加内容，不让新标签重排已显示的话题卡。
+  recommendData.value.slice(0, PAGE_SIZE).forEach((x) =>
     (x.tags || []).forEach((t) => {
       if (!t) return
       if (/^(P|G)?\d+$/i.test(t)) return
@@ -536,7 +537,8 @@ const recommendList = computed(() => {
   const f = activeFilter.value
   let list = f === '全部' ? recommendData.value : recommendData.value.filter((i) => i.carModel === f)
   if (activeTopic.value) list = list.filter((i) => (i.tags || []).includes(activeTopic.value))
-  return rankList(list)
+  // 每页入库时已排序；这里保持分页前缀顺序，避免续载时旧卡片换列。
+  return list
 })
 // 瀑布流混合流：动态卡片 + 热门话题卡（插在第 3、8、13 位，与动态错落排布）
 const wfFeed = computed(() => {
@@ -649,7 +651,7 @@ const dynamicList = computed(() => {
   const src = dynamicSubtab.value === 'near' ? nearList.value : dynamicData.value
   const f = activeFilter.value
   const list = f === '最新' || f === '全部' ? src : src.filter((i) => i.carModel === f)
-  return rankList(list)
+  return dynamicSubtab.value === 'near' ? rankList(list) : list
 })
 
 // 官方公告未读数 noticeUnread 见顶部 import（noticeStore）：进入详情即写已读，返回后红点自动消失
@@ -679,7 +681,7 @@ const feedPage = {
   recommend: { page: 1, hasMore: true },
   dynamic: { page: 1, hasMore: true },
 }
-const loadingMore = ref(false)
+const loadingMore = ref({ recommend: false, dynamic: false })
 let lastListLoadTs = 0 // 列表最近一次加载时间（keep-alive 返回时防频繁重拉）
 
 // 入场动画只播一次（2026-09-06）：
@@ -704,8 +706,8 @@ const fadeUp = () => (enterAnim.value ? 'fade-up' : '')
 // append=false 拉第一页（重置 page/hasMore）；append=true 触底追加下一页
 async function loadFeed(tabKey, { append = false } = {}) {
   const st = feedPage[tabKey]
-  if (!st || st.hasMore === false || (append && loadingMore.value)) return
-  if (append) loadingMore.value = true
+  if (!st || (append && (st.hasMore === false || loadingMore.value[tabKey]))) return
+  if (append) loadingMore.value[tabKey] = true
   try {
     const page = append ? st.page + 1 : 1
     const res = await fetchFeeds(tabKey, {
@@ -713,7 +715,7 @@ async function loadFeed(tabKey, { append = false } = {}) {
       page,
       pageSize: PAGE_SIZE,
     })
-    const list = res.list || []
+    const list = rankList(res.list || [])
     st.page = page
     st.hasMore = list.length >= PAGE_SIZE && (page * PAGE_SIZE) < (res.total || Infinity)
     if (append) {
@@ -728,14 +730,16 @@ async function loadFeed(tabKey, { append = false } = {}) {
   } catch (e) {
     loadErr.value = t('discover.loadFail')
   } finally {
-    if (append) loadingMore.value = false
+    if (append) loadingMore.value[tabKey] = false
   }
 }
 
-// 滚动触底加载：距底部 300px 时拉当前 tab 的下一页（推荐/动态；广场活动量小不触发）
+// 提前约一屏预取下一页，让新增卡片在用户看到列表底部前就绪。
+let discoverActive = true
 function onScroll() {
+  if (!discoverActive || isSplit.value) return
   const doc = document.documentElement
-  if (doc.scrollHeight - window.scrollY - window.innerHeight < 300) {
+  if (doc.scrollHeight - window.scrollY - window.innerHeight < Math.max(640, window.innerHeight * 0.8)) {
     const key = activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
     if (key) loadFeed(key, { append: true })
   }
@@ -745,10 +749,11 @@ function onScroll() {
 // 文档 window 不再滚 → 单独监听 .leftcol 的 scroll 做触底分页。非分栏态 .leftcol 非滚动容器、监听永不触发，无害。
 const leftcolRef = ref(null)
 function onLeftcolScroll() {
+  if (!discoverActive || !isSplit.value) return
   const el = leftcolRef.value
   if (!el) return
   const key = activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
-  if (key && el.scrollHeight - el.scrollTop - el.clientHeight < 300) loadFeed(key, { append: true })
+  if (key && el.scrollHeight - el.scrollTop - el.clientHeight < Math.max(640, el.clientHeight * 0.8)) loadFeed(key, { append: true })
 }
 
 // 广场热门活动（随地区切换，走统一数据层）
@@ -819,7 +824,15 @@ function onBanner() {
 }
 
 // 发布后自动切到「动态」tab 展示新内容
+function resetDiscoverScroll() {
+  window.scrollTo(0, 0)
+  if (leftcolRef.value) leftcolRef.value.scrollTop = 0
+}
+
 onMounted(async () => {
+  // 原生 WebView/浏览器刷新后不得恢复上次停留的列表中段；详情返回仍由路由器恢复位置。
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
+  resetDiscoverScroll()
   await initLocale() // 先按系统语言初始化（URL ?lang= 优先级最高，见 i18n/initLocale）
   // 地区由当前语言自动映射：zh→CN、pt→BR、en→US，见 regionFromLocale
   // 取登录用户绑定车型（用于「我的车」快捷筛选 chip）
@@ -844,6 +857,8 @@ onMounted(async () => {
   loading.value = true
   await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities(), fetchBanners()])
   loading.value = false
+  await nextTick()
+  resetDiscoverScroll()
   lastListLoadTs = Date.now()
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab, true)
@@ -864,6 +879,7 @@ onMounted(async () => {
   enterAnimTimer = setTimeout(() => { enterAnim.value = false }, 900)
 })
 onDeactivated(() => {
+  discoverActive = false
   // 切到别的 Tab（Flutter IndexedStack 隐藏本 WebView）时停掉，避免隐藏期间持续制造合成层
   stopBannerLoop()
 })
@@ -885,6 +901,7 @@ onUnmounted(() => {
 //      ② 距上次拉取超过 5 分钟
 //      ③ 用户手动下拉刷新（见下方 onPtrStart/Move/End）
 onActivated(() => {
+  discoverActive = true
   startBannerLoop() // 回到本 Tab 恢复轮播
   if (pendingListRefresh || Date.now() - lastListLoadTs > STALE_MS) {
     pendingListRefresh = false
@@ -910,7 +927,7 @@ let ptrStartY = 0
 let ptrActive = false
 const PTR_TRIGGER = 56
 function onPtrStart(e) {
-  if (ptrBusy.value || showSearchResults.value || window.scrollY > 0) return
+  if (ptrBusy.value || showSearchResults.value || window.scrollY > 0 || (isSplit.value && leftcolRef.value?.scrollTop > 0)) return
   ptrStartY = e.touches[0].clientY
   ptrActive = true
 }
@@ -929,6 +946,8 @@ async function onPtrEnd() {
   ptrBusy.value = true
   try {
     await refreshCurrentTab()
+    await nextTick()
+    resetDiscoverScroll()
   } finally {
     ptrBusy.value = false
   }
@@ -1267,17 +1286,8 @@ function showToast(msg) {
 }
 /* 焦点图：图片保持主体，底部渐变承载标题与轮播提示。 */
 .banner {
-  position: relative; margin: 10px 16px 0; border-radius: 14px; overflow: hidden; aspect-ratio: 2; touch-action: pan-y;
-}
-.banner::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: 2px solid #fff;
-  border-radius: inherit;
+  position: relative; margin: 10px 16px 0; border: 2px solid #fff; border-radius: 14px; overflow: hidden; aspect-ratio: 2; touch-action: pan-y; background: #fff;
   box-sizing: border-box;
-  pointer-events: none;
-  z-index: 3;
 }
 .banner__track {
   display: flex;
