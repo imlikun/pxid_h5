@@ -292,15 +292,11 @@ async function onToggleFollow() {
   }
 }
 
-// ---- 他人主页动作（发消息 / 编辑 / 举报 / 拉黑）----
-// 私信、举报、拉黑为二期能力：本期先桥接原生入口，无原生时给出占位提示，不阻断浏览
+// ---- 他人主页动作（编辑 / 举报 / 拉黑）----
+// 举报、拉黑为二期能力：本期先桥接原生入口，无原生时给出占位提示，不阻断浏览
 function onEdit() {
   // 编辑资料改为 H5 自管页（可控、即时生效），不再依赖原生跳转
   router.push('/profile/edit')
-}
-function onMessage() {
-  try { bridge.openNative('message/user?deviceId=' + encodeURIComponent(targetDevice.value)) }
-  catch (e) { showToast('私信功能即将上线') }
 }
 function onReport() {
   menuOpen.value = false
