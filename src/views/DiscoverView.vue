@@ -1269,6 +1269,16 @@ function showToast(msg) {
 .banner {
   position: relative; margin: 10px 16px 0; border-radius: 14px; overflow: hidden; aspect-ratio: 2; touch-action: pan-y;
 }
+.banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid #fff;
+  border-radius: inherit;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 3;
+}
 .banner__track {
   display: flex;
   height: 100%;
@@ -1285,7 +1295,7 @@ function showToast(msg) {
   pointer-events: none;
 }
 .banner__dots {
-  position: absolute; bottom: 6px; left: 0; right: 0; display: flex; justify-content: center; z-index: 2;
+  position: absolute; bottom: 5px; right: 10px; display: flex; justify-content: flex-end; z-index: 2;
 }
 .banner__dot {
   width: 24px; height: 24px; display: grid; place-items: center; background: transparent; padding: 0;
@@ -1697,7 +1707,8 @@ function showToast(msg) {
 .panel__cmname { font-size: 12px; color: var(--text-hint); margin-bottom: 3px; }
 .panel__cmttext { font-size: 13px; line-height: 1.5; color: var(--text); }
 /* 仅发现页的根导航适配窄屏及英文/葡文，不修改全站 TopBar。 */
-.banner__copy { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px 16px 36px; color: white; background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.6)); pointer-events: none; }
+.banner__copy { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px 16px 14px; color: white; background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.6)); pointer-events: none; }
+.banner__copy h2, .banner__copy p { max-width: calc(100% - 120px); }
 .banner__copy h2 { font-size: 22px; line-height: 1.25; font-weight: 700; margin: 0 0 6px; text-wrap: balance; }
 .banner__copy p { margin: 0; font-size: 12px; line-height: 1.5; opacity: .92; }
 .banner__dot::after { content: ''; width: 5px; height: 5px; border-radius: 5px; background: rgba(255,255,255,.7); transition: width .2s ease; }
@@ -1706,7 +1717,7 @@ function showToast(msg) {
 .locale-en .tab, .locale-pt .tab { font-size: 14px; }
 .discover button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 @media(max-width: 359px) { .tabs { gap: 12px; } .tab { font-size: 17px; } .topacts { gap: 4px; } .banner__copy h2 { font-size: 20px; } }
-@media(min-width: 600px) and (max-width: 749px) { .tabs { gap: 10px; margin-left: 2px; } .tab { font-size: 16px; } .topacts { gap: 2px; } .act { width: 40px; height: 40px; } .locale-en .tab, .locale-pt .tab { font-size: 12px; } .banner__copy { padding: 12px 12px 30px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
+@media(min-width: 600px) and (max-width: 749px) { .tabs { gap: 10px; margin-left: 2px; } .tab { font-size: 16px; } .topacts { gap: 2px; } .act { width: 40px; height: 40px; } .locale-en .tab, .locale-pt .tab { font-size: 12px; } .banner__copy { padding: 12px 12px 12px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
 @media(prefers-reduced-motion: reduce) { .banner__track, .banner__dot::after, .quick__thumb { transition: none; } }
 /* 广场与动态：与推荐页保持同一圆角、边距和品牌色节奏。 */
 
