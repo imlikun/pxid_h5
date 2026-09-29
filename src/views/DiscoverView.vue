@@ -125,7 +125,7 @@
       </div>
     </template>
 
-    <!-- 车型筛选：仅推荐/动态显示（推荐=全部、动态=最新；广场无筛选条，与设计稿一致）+ 非搜索态 -->
+    <!-- 车型筛选：动态页右侧固定范围菜单，车型仍在左侧横向滚动 -->
     <div v-if="activeTab !== '广场' && !showSearchResults" class="filter">
       <div class="chips">
         <button type="button" :aria-pressed="activeFilter === f.value"
@@ -136,6 +136,16 @@
           @click="pickFilter(f.value)"
           >{{ f.label }}</button
         >
+      </div>
+      <div v-if="activeTab === '动态'" ref="scopeMenuRef" class="scope">
+        <button type="button" class="scope__trigger" aria-haspopup="listbox" :aria-expanded="scopeMenuOpen" aria-controls="dynamic-scope-menu" @click="scopeMenuOpen = !scopeMenuOpen">
+          {{ scopeTriggerLabel }}<svg viewBox="0 0 12 12" aria-hidden="true" :class="{ 'scope__chevron--open': scopeMenuOpen }"><path d="m2.5 4.5 3.5 3 3.5-3" /></svg>
+        </button>
+        <div v-if="scopeMenuOpen" id="dynamic-scope-menu" class="scope__menu" role="listbox" :aria-label="t('discover.scope.label')">
+          <button v-for="option in scopeOptions" :key="option.value" type="button" class="scope__option" role="option" :aria-selected="dynamicScope === option.value" @click="setDynamicScope(option.value)">
+            <span>{{ option.label }}</span><span v-if="dynamicScope === option.value" class="scope__check" aria-hidden="true">✓</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -171,12 +181,8 @@
       <FeedLoadState v-if="currentFeedKey && recommendList.length" :loading="loadingMore[currentFeedKey]" :finished="!feedPage[currentFeedKey].hasMore" />
     </div>
 
-    <!-- 动态：独立 UGC 流（单列卡片）+ 关注/附近 子栏 + 非搜索态 -->
+    <!-- 动态：独立 UGC 流（单列卡片） -->
     <template v-if="activeTab === '动态' && !showSearchResults">
-      <div class="subtabs">
-        <button type="button" class="subtab" :aria-pressed="dynamicSubtab === 'follow'" :class="{ active: dynamicSubtab === 'follow' }" @click="setDynamicSub('follow')">{{ t('discover.subFollow') }}</button>
-        <button type="button" class="subtab" :aria-pressed="dynamicSubtab === 'near'" :class="{ active: dynamicSubtab === 'near' }" @click="setDynamicSub('near')">{{ t('discover.subNear') }}</button>
-      </div>
       <div class="content">
         <MomentCard
           v-for="(it, i) in dynamicList"
@@ -184,8 +190,8 @@
           :item="it"
           :class="[fadeUp(), staggerFor(i)]"
         />
-        <div v-if="nearLoading" class="empty-tab">{{ t('discover.nearLoading') }}</div>
-        <div v-else-if="dynamicList.length === 0" class="empty-tab">{{ t('discover.emptyDynamic') }}</div>
+        <div v-if="(nearLoading || dynamicLoading) && dynamicList.length === 0" class="empty-tab">{{ nearLoading ? t('discover.nearLoading') : t('discover.loadingMore') }}</div>
+        <div v-else-if="dynamicList.length === 0" class="empty-tab">{{ dynamicError || t('discover.emptyDynamic') }}</div>
         <FeedLoadState v-if="currentFeedKey && dynamicList.length" :loading="loadingMore[currentFeedKey]" :finished="!feedPage[currentFeedKey].hasMore" />
       </div>
     </template>
@@ -405,8 +411,10 @@ function defaultFilter(tab) {
 }
 // 筛选 chip 点击统一入口：置「用户已操作」标记，避免被迟到的 getUserInfo 回包覆盖
 function pickFilter(v) {
+  if (activeFilter.value === v) return
   filterTouched = true
   activeFilter.value = v
+  if (activeTab.value === '动态') reloadDynamicFeed()
 }
 // 默认选中「我的车」后的兜底：该车型在库里一条内容都没有时，静默退回「全部/最新」，
 // 否则用户一进发现页就是一片空白（chip 仍在第一位，想筛随时点）。
@@ -442,10 +450,37 @@ function filterLabel(f) {
 // 真实数据源（从 /feed 接口拉取）
 const recommendData = ref([])
 const dynamicData = ref([])
-// 动态「附近」子栏：LBS 坐标流 + 加载态
-const dynamicSubtab = ref('follow')
+// 动态范围与车型是两个独立筛选维度；默认展示全部动态。
+const dynamicScope = ref('all')
+const scopeMenuOpen = ref(false)
+const scopeMenuRef = ref(null)
+const scopeOptions = computed(() => [
+  { value: 'all', label: t('discover.scope.all') },
+  { value: 'follow', label: t('discover.scope.follow') },
+  { value: 'near', label: t('discover.scope.near') },
+])
+const scopeTriggerLabel = computed(() =>
+  t(`discover.scope.${dynamicScope.value === 'follow' ? 'followShort' : dynamicScope.value}`)
+)
+function onScopeOutside(e) {
+  if (scopeMenuOpen.value && !scopeMenuRef.value?.contains(e.target)) scopeMenuOpen.value = false
+}
+function onScopeEscape(e) {
+  if (e.key === 'Escape') scopeMenuOpen.value = false
+}
+onMounted(() => {
+  document.addEventListener('pointerdown', onScopeOutside)
+  document.addEventListener('keydown', onScopeEscape)
+})
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onScopeOutside)
+  document.removeEventListener('keydown', onScopeEscape)
+})
+const nearCoords = ref(null)
 const nearList = ref([])
 const nearLoading = ref(false)
+const dynamicLoading = ref(false)
+const dynamicError = ref('')
 // 广场热门活动（从 /activities 接口拉取，随地区切换）
 const actList = ref([])
 const loading = ref(false)
@@ -653,10 +688,10 @@ const recommendEmptyText = computed(() =>
 )
 // 动态：按车型筛选，最新=全部 + 置顶优先 + 排序；附近子栏用 nearList
 const dynamicList = computed(() => {
-  const src = dynamicSubtab.value === 'near' ? nearList.value : dynamicData.value
+  const src = dynamicScope.value === 'near' ? nearList.value : dynamicData.value
   const f = activeFilter.value
   const list = f === '最新' || f === '全部' ? src : src.filter((i) => i.carModel === f)
-  return dynamicSubtab.value === 'near' ? rankList(list) : list
+  return dynamicScope.value === 'near' ? rankList(list) : list
 })
 
 // 官方公告未读数 noticeUnread 见顶部 import（noticeStore）：进入详情即写已读，返回后红点自动消失
@@ -667,6 +702,7 @@ const currentFeedKey = computed(() =>
 )
 
 function setTab(t, forceDefault = false) {
+  scopeMenuOpen.value = false
   activeTab.value = t
   // 常规切 tab：有绑定车型就带着它走（两 tab 的筛选条都含车型 chip，语义一致）；
   // forceDefault=true 用于「刚发完帖回来」，强制看最新/全部，避免默认车型把新帖筛掉
@@ -678,6 +714,7 @@ function setTab(t, forceDefault = false) {
   searchOpen.value = false // 切 tab 同步收起右上角搜索条
   if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
   ensureFilterHasContent() // 该 tab 缓存的列表若无「我的车」内容，同步退回默认筛选
+  if (t === '动态' && dynamicLoadedModel !== selectedDynamicModel()) reloadDynamicFeed()
 }
 
 // 触底分页状态（推荐/动态各自维护 page + hasMore；广场活动量小不分页）
@@ -688,6 +725,22 @@ const feedPage = {
 }
 const loadingMore = ref({ recommend: false, dynamic: false })
 let lastListLoadTs = 0 // 列表最近一次加载时间（keep-alive 返回时防频繁重拉）
+let dynamicGeneration = 0
+let dynamicLoadedModel = ''
+function selectedDynamicModel() {
+  return activeFilter.value === '全部' || activeFilter.value === '最新' ? '' : activeFilter.value
+}
+function reloadDynamicFeed() {
+  // 换范围或车型时让旧请求失效，并从新条件的第一页重新开始。
+  dynamicGeneration++
+  feedPage.dynamic.page = 1
+  feedPage.dynamic.hasMore = true
+  loadingMore.value.dynamic = false
+  dynamicData.value = []
+  nearList.value = []
+  dynamicError.value = ''
+  return loadFeed('dynamic')
+}
 
 // 入场动画只播一次（2026-09-06）：
 // .fade-up 是 CSS animation，keep-alive 返回时组件 DOM 被重新插入 → 动画整体重播一遍，
@@ -711,31 +764,64 @@ const fadeUp = () => (enterAnim.value ? 'fade-up' : '')
 // append=false 拉第一页（重置 page/hasMore）；append=true 触底追加下一页
 async function loadFeed(tabKey, { append = false } = {}) {
   const st = feedPage[tabKey]
-  if (!st || (append && (st.hasMore === false || loadingMore.value[tabKey]))) return
+  if (!st || (append && (st.hasMore === false || loadingMore.value[tabKey] || (tabKey === 'dynamic' && dynamicLoading.value)))) return
+  if (tabKey === 'dynamic' && !append) dynamicGeneration++
+  const generation = dynamicGeneration
   if (append) loadingMore.value[tabKey] = true
+  if (tabKey === 'dynamic' && !append) {
+    dynamicLoading.value = true
+    dynamicError.value = ''
+  }
   try {
     const page = append ? st.page + 1 : 1
-    const res = await fetchFeeds(tabKey, {
+    const params = {
       region: currentRegion.value,
       page,
       pageSize: PAGE_SIZE,
-    })
+    }
+    if (tabKey === 'dynamic') {
+      dynamicLoadedModel = selectedDynamicModel()
+      params.carModel = dynamicLoadedModel
+      params.allowMockFallback = false // 范围筛选失败不能拿 mock 冒充真实结果
+      if (dynamicScope.value === 'follow') {
+        // fetchFeeds 沿用现有设备号逻辑，由后端返回官方＋已关注。
+      } else {
+        params.followerDevice = ''
+      }
+      if (dynamicScope.value === 'near') {
+        if (!nearCoords.value) throw new Error('Location unavailable')
+        params.near = `${nearCoords.value.lat},${nearCoords.value.lng}`
+        params.radius = 50
+      }
+    }
+    const res = await fetchFeeds(tabKey, params)
+    if (tabKey === 'dynamic' && generation !== dynamicGeneration) return
     const list = rankList(res.list || [])
     st.page = page
     st.hasMore = list.length >= PAGE_SIZE && (page * PAGE_SIZE) < (res.total || Infinity)
     if (append) {
       if (tabKey === 'recommend') recommendData.value = recommendData.value.concat(list)
+      else if (dynamicScope.value === 'near') nearList.value = nearList.value.concat(list)
       else dynamicData.value = dynamicData.value.concat(list)
     } else {
       if (tabKey === 'recommend') recommendData.value = list
+      else if (dynamicScope.value === 'near') nearList.value = list
       else dynamicData.value = list
       // 首屏数据到位后校正一次筛选：避免默认选中的「我的车」在库里没内容时留一片空白
       ensureFilterHasContent()
     }
   } catch (e) {
-    loadErr.value = t('discover.loadFail')
+    if (tabKey === 'dynamic') {
+      if (generation === dynamicGeneration) dynamicError.value = t('discover.loadFail')
+    } else loadErr.value = t('discover.loadFail')
   } finally {
-    if (append) loadingMore.value[tabKey] = false
+    if (tabKey !== 'dynamic' || generation === dynamicGeneration) {
+      if (append) loadingMore.value[tabKey] = false
+      if (tabKey === 'dynamic' && !append) {
+        dynamicLoading.value = false
+        nearLoading.value = false
+      }
+    }
   }
 }
 
@@ -779,11 +865,7 @@ function fmtDate(a) {
 
 // 当语言（从而地区）变化时，重拉当前列表并清理「附近」子栏旧数据
 async function onRegionChanged() {
-  await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities()])
-  if (dynamicSubtab.value === 'near') {
-    dynamicSubtab.value = 'follow'
-    nearList.value = []
-  }
+  await Promise.all([loadFeed('recommend'), reloadDynamicFeed(), loadActivities()])
 }
 watch(currentRegion, (newRegion, oldRegion) => {
   if (oldRegion && newRegion !== oldRegion) onRegionChanged()
@@ -887,6 +969,7 @@ onMounted(async () => {
 })
 onDeactivated(() => {
   discoverActive = false
+  scopeMenuOpen.value = false
   // 切到别的 Tab（Flutter IndexedStack 隐藏本 WebView）时停掉，避免隐藏期间持续制造合成层
   stopBannerLoop()
 })
@@ -1007,33 +1090,31 @@ async function getLocation() {
   })
 }
 
-// 动态子栏切换：关注（默认关注流）/ 附近（LBS 距离流）
-async function setDynamicSub(sub) {
-  if (dynamicSubtab.value === sub) return
-  dynamicSubtab.value = sub
-  if (sub === 'near') {
+// 沿用原来的设备关注流与定位机制；只有选中「附近」才申请位置。
+let scopeSelectionVersion = 0
+async function setDynamicScope(scope) {
+  scopeMenuOpen.value = false
+  const version = ++scopeSelectionVersion
+  if (dynamicScope.value === scope) {
+    nearLoading.value = false
+    return
+  }
+  if (scope === 'near') {
     nearLoading.value = true
     const loc = await getLocation()
+    if (version !== scopeSelectionVersion) return
     if (!loc) {
       nearLoading.value = false
       showToast(t('discover.nearFail'))
-      dynamicSubtab.value = 'follow'
       return
     }
-    try {
-      const res = await fetchFeeds('dynamic', {
-        near: loc.lat + ',' + loc.lng,
-        radius: 50,
-        followerDevice: '',
-        region: currentRegion.value,
-        pageSize: 30,
-      })
-      nearList.value = res.list || []
-    } catch (e) {
-      nearList.value = []
-    }
+    nearCoords.value = loc
+  } else {
+    nearCoords.value = null
     nearLoading.value = false
   }
+  dynamicScope.value = scope
+  await reloadDynamicFeed()
 }
 
 function onShowcase(p) {
@@ -1081,6 +1162,7 @@ function onSearch() {
 const searchOpen = ref(false)
 const searchInputRef = ref(null)
 function toggleSearch() {
+  scopeMenuOpen.value = false
   searchOpen.value = !searchOpen.value
   if (searchOpen.value) {
     nextTick(() => searchInputRef.value && searchInputRef.value.focus())
@@ -1358,12 +1440,31 @@ function showToast(msg) {
   position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: #ff4a60; border: 2px solid #fff; z-index: 2;
 }
 .filter {
-  display: flex; align-items: center; margin: 0 16px; gap: 8px;
+  display: flex; align-items: center; margin: 0 16px; gap: 8px; position: relative; z-index: 5;
 }
 .chips {
-  display: flex; gap: 10px; flex: 1; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: none;
+  display: flex; gap: 10px; flex: 1; min-width: 0; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: none;
 }
 .chips::-webkit-scrollbar { display: none; }
+.scope { position: relative; flex: 0 0 auto; align-self: stretch; display: flex; align-items: center; }
+.scope__trigger {
+  min-height: 44px; padding: 0 2px 0 8px; display: inline-flex; align-items: center; gap: 4px;
+  color: #34405a; background: transparent; font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.scope__trigger svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+.scope__chevron--open { transform: rotate(180deg); }
+.scope__menu {
+  position: absolute; z-index: 10; right: 0; top: calc(100% - 2px); min-width: 132px;
+  padding: 4px; background: #fff; border: 1px solid #e4e9f2; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(29, 43, 77, .10);
+}
+.scope__option {
+  width: 100%; min-height: 42px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; background: transparent; border-radius: 7px; color: #34405a; font-size: 13px; text-align: left; white-space: nowrap;
+}
+.scope__option:hover, .scope__option[aria-selected="true"] { background: #f2f5ff; }
+.scope__check { color: var(--brand); font-size: 16px; }
+.scope__trigger:focus-visible, .scope__option:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 /* 车型筛选 chip：统一选中/未选中逻辑（2026-09-27 诊断书修正）
    未选中 = 白底 + 浅灰边 + 深灰字；选中 = 品牌蓝实心 + 白字；
    「我的车」取消常驻蓝边，仅保留 🚗 前缀，避免视觉第三态 */
@@ -1571,35 +1672,6 @@ function showToast(msg) {
 }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
-.subtabs {
-  display: flex;
-  gap: 8px;
-  padding: 8px 16px 0;
-}
-.subtab {
-  font-size: 13px;
-  color: #6d7585;
-  background: #fff;
-  border-radius: 16px;
-  padding: 0 18px;
-  font-weight: 500;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background .15s ease, color .15s ease;
-  min-height: 34px;
-  border: 1px solid #e8ebf2;
-}
-.subtab.active {
-  color: #fff;
-  background: var(--brand);
-  font-weight: 700;
-  line-height: 1;
-  border-color: var(--brand);
-}
-.subtab:active { transform: scale(0.96); }
-
 /* ===== 折叠屏两栏（≥600px）：左瀑布流错落 + 右详情面板 =====
    手机 <600px：.cols 塌成单栏（.leftcol 无 width 约束、.panel 不渲染），与现状一致。
    两栏各自 100vh 独立滚动（iPad 双 pane 范式）：左栏整列滚、右栏整列滚。 */

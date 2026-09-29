@@ -59,19 +59,22 @@ function normalize(item) {
 // 返回 { list, total }：分页触底加载（page/pageSize 由调用方传，后端返回 total 判断是否还有更多）
 // ⚠️ 2026-08-25 起返回值从「数组」改为「{ list, total }」，调用方需解构（DiscoverView.loadFeed / near 已适配）
 export async function fetchFeeds(tab = 'dynamic', params = {}) {
+  const { allowMockFallback = true, ...queryParams } = params
   if (FEED_API) {
     try {
-      const qsParams = { tab, ...params }
+      const qsParams = { tab, ...queryParams }
       // 动态：关注流，传当前设备 ID 让后端按「关注 + 官方」过滤；near 模式显式传 followerDevice='' 则不过滤
-      if (tab === 'dynamic' && params.followerDevice === undefined) qsParams.followerDevice = await getDeviceId()
+      if (tab === 'dynamic' && queryParams.followerDevice === undefined) qsParams.followerDevice = await getDeviceId()
       const qs = new URLSearchParams(qsParams).toString()
       const data = await request('/feed?' + qs, { auth: 'peek' })
       return { list: (data.list || []).map(normalize), total: data.total || 0 }
     } catch (e) {
       console.warn('[fetchFeeds] API error:', e.message || e)
+      if (!allowMockFallback) throw e
       /* 接口失败回落 mock */
     }
   }
+  if (!allowMockFallback) throw new Error('Feed API unavailable')
   // 兜底：我的发布（localStorage 持久化）+ 官方 mock moments，最新在前
   // 先按账号分区重载，避免切号后读到上一个账号的本地发布（2026-09-01）
   await ensurePublishScope()
