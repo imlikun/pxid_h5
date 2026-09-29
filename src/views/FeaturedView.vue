@@ -198,28 +198,78 @@
         <span v-else>加载详情中…</span>
       </div>
       <template v-else>
-        <img v-if="panelImage" class="panel__img" :src="panelImage" :alt="detailItem.name || ''" />
-        <div class="panel__body">
-          <div class="panel__name">{{ detailItem.name }}</div>
-          <div class="panel__price">
-            <span class="price">{{ sym(detailItem.currency) }}{{ detailItem.price }}</span>
-            <span v-if="detailItem.origin" class="origin">{{ sym(detailItem.currency) }}{{ detailItem.origin }}</span>
+        <div class="panel__scroll">
+          <!-- 图廊（同 ProductDetailView） -->
+          <div class="panel__gallery-frame">
+            <div ref="panelGallery" class="panel__gallery" @scroll="onGalleryScroll">
+              <img
+                v-for="(src, i) in galleryImages"
+                :key="src + i"
+                class="panel__slide"
+                :src="src"
+                :alt="detailItem.name || ''"
+                :loading="i === 0 ? 'eager' : 'lazy'"
+              />
+              <div v-if="!galleryImages.length" class="panel__slide panel__slide--empty">无图</div>
+            </div>
+            <div v-if="galleryImages.length > 1" class="panel__dots">
+              <span
+                v-for="(_, i) in galleryImages"
+                :key="i"
+                class="panel__dot"
+                :class="{ active: i === activeIdx }"
+                @click="jumpTo(i)"
+              ></span>
+            </div>
           </div>
-          <div v-if="detailItem.vendor" class="panel__vendor">{{ detailItem.vendor }}</div>
-          <p v-if="plainDescription" class="panel__desc">{{ plainDescription }}</p>
-          <div v-if="detailItem.specs && detailItem.specs.length" class="panel__specs">
-            <h4>规格参数</h4>
-            <ul>
-              <li v-for="(s, i) in detailItem.specs" :key="i">{{ (s && typeof s === 'object') ? (s.label ? s.label + '：' + s.value : s.value) : s }}</li>
-            </ul>
+
+          <!-- 信息卡 -->
+          <div class="panel__card panel__info">
+            <div class="panel__name">{{ detailItem.name }}</div>
+            <div v-if="detailItem.tagline" class="panel__tagline">{{ detailItem.tagline }}</div>
+            <div class="panel__meta">
+              <span v-if="detailItem.vendor" class="panel__pill">{{ detailItem.vendor }}</span>
+              <span v-if="detailItem.tag" class="panel__pill panel__pill--brand">{{ detailItem.tag }}</span>
+            </div>
+            <div class="panel__price-row">
+              <span class="panel__price-main">{{ sym(detailItem.currency) }}{{ detailItem.price }}</span>
+              <span v-if="detailItem.origin" class="panel__price-origin">{{ sym(detailItem.currency) }}{{ detailItem.origin }}</span>
+            </div>
           </div>
-          <div v-if="detailItem.sellingPoints && detailItem.sellingPoints.length" class="panel__points">
-            <h4>产品卖点</h4>
-            <ul>
+
+          <!-- 描述 -->
+          <div v-if="detailItem.description" class="panel__card panel__desc">
+            <div class="panel__block-title">商品详情</div>
+            <div class="panel__prose" v-html="descriptionHtml"></div>
+            <div v-if="detailItem.shopUrl" class="panel__more-link press" @click="openOrigin">前往 Shopify 查看完整详情 ↗</div>
+          </div>
+
+          <!-- 规格参数 -->
+          <div v-if="detailItem.specs && detailItem.specs.length" class="panel__card">
+            <div class="panel__block-title">规格参数</div>
+            <div class="panel__spec-table">
+              <div class="panel__spec-row" v-for="(s, i) in detailItem.specs" :key="i">
+                <span class="panel__spec-k">{{ (s && typeof s === 'object') ? (s.label || '—') : '—' }}</span>
+                <span class="panel__spec-v">{{ (s && typeof s === 'object') ? (s.value || '—') : s }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 核心卖点 -->
+          <div v-if="detailItem.sellingPoints && detailItem.sellingPoints.length" class="panel__card">
+            <div class="panel__block-title">核心卖点</div>
+            <ul class="panel__points-list">
               <li v-for="(p, i) in detailItem.sellingPoints" :key="i">{{ p }}</li>
             </ul>
           </div>
-          <button class="panel__buy" @click="openDetail">{{ t('featured.viewNow') }}</button>
+
+          <div class="panel__gap"></div>
+        </div>
+
+        <!-- 操作区（同 ProductDetailView 底部按钮风格） -->
+        <div class="panel__actions">
+          <button class="panel__btn panel__btn--cart press" @click="openDetail">加入购物车</button>
+          <button class="panel__btn panel__btn--buy press" @click="openDetail">立即购买</button>
         </div>
       </template>
     </div>
@@ -229,7 +279,7 @@
 
 <script setup>
 import { productRoute } from '../utils/productNavigation'
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
@@ -505,20 +555,44 @@ function stepDetail(delta) {
   const n = i < 0 ? 0 : (i + delta + list.length) % list.length
   selectProduct(list[n])
 }
-const panelImage = computed(() => {
-  const imgs = detailItem.value && detailItem.value.images
-  if (imgs && imgs.length) {
-    const first = imgs[0]
-    // 详情 images 是对象数组 {src,...}（列表 cover 是字符串），两种形态都兼容
-    return typeof first === 'string' ? first : (first && first.src) || ''
-  }
-  return selectedProduct.value?.cover || ''
+const panelGallery = ref(null)
+const activeIdx = ref(0)
+const galleryImages = computed(() => {
+  const imgs = detailItem.value?.images || []
+  return imgs
+    .map((im) => (typeof im === 'string' ? im : im?.src))
+    .filter(Boolean)
 })
-const plainDescription = computed(() => {
-  const d = (detailItem.value && detailItem.value.description) || ''
+function onGalleryScroll() {
+  const el = panelGallery.value
+  if (!el) return
+  activeIdx.value = Math.round(el.scrollLeft / el.clientWidth)
+}
+function jumpTo(i) {
+  const el = panelGallery.value
+  if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+  activeIdx.value = i
+}
+// 切商品时图廊回到第一张
+watch(selectedProduct, () => {
+  activeIdx.value = 0
+  nextTick(() => { if (panelGallery.value) panelGallery.value.scrollLeft = 0 })
+})
+
+const descriptionHtml = computed(() => {
+  const d = detailItem.value?.description || ''
   if (!d) return ''
-  return String(d).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+  const s = String(d).trim()
+  // 已经是 HTML 就直接用；纯文本按段落包 <p>
+  if (/<[^>]+>/.test(s)) return s
+  return s
+    .split(/\n{2,}/)
+    .map((p) => `<p>${p.replace(/\n/g, '<br/>')}</p>`)
+    .join('')
 })
+function openOrigin() {
+  if (detailItem.value?.shopUrl) bridge.openShopify(detailItem.value.shopUrl)
+}
 // 分栏首屏：商品数据回来后默认选中第一件，右栏不留白
 watch(all, (l) => {
   if (isSplit.value && l.length && !selectedProduct.value) selectProduct(l[0])
@@ -940,7 +1014,8 @@ async function retry() {
   }
 }
 
-/* 右栏商品详情面板内部（仅分栏态出现） */
+/* 右栏商品详情面板内部（仅分栏态出现） —— 视觉对齐 ProductDetailView */
+.panel { background: var(--bg); }
 .panel__nav {
   position: sticky;
   top: 0;
@@ -951,8 +1026,8 @@ async function retry() {
   height: 56px;
   padding: 0 14px;
   box-sizing: border-box;
-  background: var(--card);
-  border-bottom: 1px solid #F0F0F0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
 }
 .panel__tag {
   background: var(--brand-soft, rgba(74, 108, 247, .1));
@@ -979,67 +1054,276 @@ async function retry() {
   font-size: 13px;
   text-align: center;
 }
-.panel__img {
+
+/* 图廊 */
+.panel__gallery-frame {
+  position: relative;
+  height: clamp(300px, 50vw, 460px);
+  background: #fff;
+}
+.panel__gallery {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  background: #fff;
+}
+.panel__gallery::-webkit-scrollbar { display: none; }
+.panel__slide {
+  flex: 0 0 100%;
   width: 100%;
-  aspect-ratio: 1 / 1;
+  height: 100%;
   object-fit: contain;
-  display: block;
-  background: #f5f8fd;
+  background: #fff;
+  scroll-snap-align: center;
 }
-.panel__body { padding: 16px; }
-.panel__name {
-  font-size: 18px;
+.panel__slide--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+}
+.panel__dots {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 8px 0;
+  background: transparent;
+}
+.panel__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.panel__dot.active {
+  background: var(--brand);
+  width: 16px;
+  border-radius: 3px;
+}
+
+/* 卡片块（同 ProductDetailView .card） */
+.panel__card {
+  background: #fff;
+  margin: 10px 16px 0;
+  padding: 14px;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+.panel__block-title {
+  font-size: 14px;
   font-weight: 600;
-  line-height: 1.4;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  padding-left: 10px;
+  position: relative;
+  color: var(--text);
 }
-.panel__price {
+.panel__block-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+.panel__info .panel__name {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.panel__tagline {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.panel__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.panel__pill {
+  font-size: 12px;
+  color: var(--text-sub);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+.panel__pill--brand {
+  color: var(--brand);
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+.panel__price-row {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-top: 12px;
 }
-.panel__price .price {
-  color: #ee3d48;
+.panel__price-main {
+  color: var(--price, #ee3d48);
   font-weight: 700;
-  font-size: 22px;
+  font-size: 24px;
 }
-.panel__price .origin {
-  color: #98a3ba;
+.panel__price-origin {
+  color: var(--text-sub);
   font-size: 13px;
   text-decoration: line-through;
 }
-.panel__vendor {
-  font-size: 12px;
-  color: var(--text-hint);
-  margin-bottom: 12px;
-}
-.panel__desc {
+
+/* 描述富文本 */
+.panel__prose {
   font-size: 14px;
   line-height: 1.7;
   color: var(--text);
-  margin: 0 0 16px;
-  white-space: pre-line;
+  word-break: break-word;
 }
-.panel__specs,
-.panel__points { margin-bottom: 16px; }
-.panel__specs h4,
-.panel__points h4 { font-size: 13px; color: var(--text-sub); margin: 0 0 8px; }
-.panel__specs ul,
-.panel__points ul { margin: 0; padding-left: 18px; }
-.panel__specs li,
-.panel__points li { font-size: 13px; line-height: 1.6; color: var(--text); margin-bottom: 4px; }
-.panel__buy {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  min-height: 44px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--brand, #4a6cf7);
-  color: #fff;
+.panel__prose :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  margin: 10px 0;
+}
+.panel__prose :deep(p) {
+  margin: 0 0 14px;
+  line-height: 1.8;
+}
+.panel__prose :deep(h1),
+.panel__prose :deep(h2),
+.panel__prose :deep(h3) {
+  font-size: 16px;
+  margin: 18px 0 10px;
+  padding-left: 10px;
+  position: relative;
+  color: var(--text);
+}
+.panel__prose :deep(h1)::before,
+.panel__prose :deep(h2)::before,
+.panel__prose :deep(h3)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+.panel__prose :deep(a) { color: var(--brand); }
+.panel__prose :deep(ul),
+.panel__prose :deep(ol) { padding-left: 20px; margin: 0 0 10px; }
+.panel__more-link {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-sub);
+  cursor: pointer;
+}
+
+/* 规格参数表 */
+.panel__spec-table {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 0.5px solid var(--line);
+}
+.panel__spec-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  font-size: 14px;
+  background: #fff;
+}
+.panel__spec-row:nth-child(even) { background: var(--brand-soft); }
+.panel__spec-k { color: var(--text-sub); flex: none; }
+.panel__spec-v { color: var(--text); text-align: right; font-weight: 500; }
+
+/* 核心卖点 */
+.panel__points-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.panel__points-list li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 12px 14px 12px 40px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--brand-soft);
+  border-radius: 10px;
+}
+.panel__points-list li::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.panel__points-list li::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-65%) rotate(45deg);
+}
+.panel__gap { height: 12px; }
+
+/* 底部操作区 */
+.panel__actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: #fff;
+  border-top: 1px solid var(--line);
+}
+.panel__btn {
+  flex: 1;
+  border-radius: 22px;
+  padding: 12px 0;
   font-size: 15px;
   font-weight: 600;
+  border: 0;
   cursor: pointer;
+}
+.panel__btn--cart {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.panel__btn--buy {
+  background: var(--brand);
+  color: #fff;
 }
 </style>
