@@ -80,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import MomentCard from '../components/MomentCard.vue'
@@ -332,9 +332,7 @@ watch(() => route.params.id, async () => {
   await loadContent(true)
 })
 
-onMounted(async () => {
-  applyQuery()
-  await resolveMyDevice()
+onMounted(() => {
   // 预填 Flutter 主端资料，消除「?」闪现（App「我的」入口 deviceId 即本人，getUserInfo 走本地桥远快于网络 fetchMyProfile）
   if (isSelf.value) {
     bridge.getUserInfo().then((p) => {
@@ -349,9 +347,17 @@ onMounted(async () => {
       }
     }).catch(() => {})
   }
+  window.addEventListener('scroll', onScroll, { passive: true })
+})
+// 返回本页（keep-alive 下从发布/详情等页 back）重新拉资料+列表：
+// 否则四宫格计数（发布/收藏/关注/粉丝）与发布列表停留在首次进入时的旧值，
+// 发布新帖后回到「我的」计数不刷新（与 DiscoverView onActivated 同因同修）。
+// onActivated 在首次挂载也会触发，故资料加载只放这里，避免 onMounted 重复拉。
+onActivated(async () => {
+  applyQuery()
+  await resolveMyDevice()
   await loadProfile()
   await loadContent(true)
-  window.addEventListener('scroll', onScroll, { passive: true })
 })
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
