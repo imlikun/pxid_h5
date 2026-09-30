@@ -69,6 +69,9 @@ export const publishState = reactive({
   list: loadLocal(),
   // 发布后让发现页自动切到「动态」tab 展示新内容
   pendingTab: null,
+  // 任何发布完成都置 true，发现页 onActivated 消费后刷新列表（覆盖真机原生发布器路径：
+  // 原生发布器无法走 addMoment，需 Flutter 发布完成关闭时调用 window.__pxidOnPublished() 置位）
+  needsRefresh: false,
 })
 
 // 预置本地图库（dist 内已存在、可直接引用，避免无后端上传）

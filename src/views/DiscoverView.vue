@@ -958,6 +958,9 @@ onMounted(async () => {
   // Banner 轮播自动播放：统一 4s/张，视频 slide 也定时切走（不再等 @ended，避免视频 loop 卡在第一张）
   startBannerLoop()
   document.addEventListener('visibilitychange', onDocVisibility)
+  // 暴露给原生发布器：Flutter 发布完成关闭发布页时调用，通知发现页刷新列表。
+  // 真机发布走 openNative('discover/publish')，H5 收不到 addMoment，必须靠这一回调补信号。
+  window.__pxidOnPublished = () => { publishState.needsRefresh = true }
   // 视频懒加载：首屏图片先渲染，视频延迟播放
   lazyPlayHeroVideo()
   // 触底分页：滚动加载更多（推荐/动态）
@@ -979,6 +982,7 @@ onUnmounted(() => {
   stopBannerLoop()
   document.removeEventListener('visibilitychange', onDocVisibility)
   window.removeEventListener('scroll', onScroll)
+  delete window.__pxidOnPublished
   if (videoPlayTimer) { clearTimeout(videoPlayTimer); videoPlayTimer = null }
 })
 
@@ -990,12 +994,22 @@ onUnmounted(() => {
 //      ① 明确请求过刷新（发完帖 / 语言或地区切换）
 //      ② 距上次拉取超过 5 分钟
 //      ③ 用户手动下拉刷新（见下方 onPtrStart/Move/End）
-onActivated(() => {
+onActivated(async () => {
   discoverActive = true
   startBannerLoop() // 回到本 Tab 恢复轮播
-  if (pendingListRefresh || Date.now() - lastListLoadTs > STALE_MS) {
-    pendingListRefresh = false
-    refreshCurrentTab()
+  const stale = Date.now() - lastListLoadTs > STALE_MS
+  const justPublished = pendingListRefresh || publishState.needsRefresh || !!publishState.pendingTab
+  if (!stale && !justPublished) return
+  pendingListRefresh = false
+  publishState.needsRefresh = false
+  const tab = publishState.pendingTab
+  publishState.pendingTab = null
+  if (tab) {
+    // 发完帖回到发现页：先切到目标 tab 并强制「最新/全部」（避免默认「我的车」把新帖筛掉），再重拉
+    setTab(tab, true)
+    await refreshCurrentTab()
+  } else {
+    await refreshCurrentTab()
   }
 })
 
