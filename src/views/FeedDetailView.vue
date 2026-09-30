@@ -1403,7 +1403,9 @@ function showToast(msg) {
 }
 .paragraph {
   margin: 0 0 16px;
-  text-align: start;
+  text-align: justify;
+  text-align-last: left;
+  text-justify: inter-character;
   word-break: break-word;
   overflow-wrap: break-word;
   margin-bottom: 18px;
