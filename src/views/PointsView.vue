@@ -125,6 +125,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { bridge } from '../bridge'
+import { requireLogin } from '../utils/auth'
 import { t, locale } from '../i18n'
 import { fetchGrowthProfile, doSignin, fetchMedals } from '../api/growth'
 import { pointsProducts } from '../data/mock'
@@ -191,8 +192,11 @@ async function load() {
 }
 async function onSignin() {
   if (profile.value.signedToday) return
-  // 签到不强制前置登录（同点赞/收藏策略，2026-08-26）：匿名/未登录也能按 deviceId 维度签到攒积分，
-  // 后端 /growth/signin requireAuth 已兼容匿名 token；真机登录用户走登录 token 正常签。
+  // 签到需登录（坤哥 2026-10-07 拍板，反转 2026-08-26 的「匿名可签」策略）：
+  // 未登录先过登录 Gate——requireLogin 内部已拉起原生登录页（openNative('login')），
+  // 登录成功返回后用户再点签到即正常签（同 MomentCard 点赞/收藏交互模式）。
+  const ok = await requireLogin()
+  if (!ok) return
   try {
     const r = await doSignin()
     lastGain.value = r.todayPoints || 0
