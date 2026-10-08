@@ -18,7 +18,7 @@
 import flame from '../assets/icons/shop-flame.svg'
 import star from '../assets/icons/shop-star.svg'
 import coins from '../assets/icons/shop-coins.svg'
-const icons = { hot: flame, new: star, points: coins }
+const icons = { hot: flame, new: star, vehicles: star, points: coins }
 defineProps({
   items: { type: Array, required: true },
 })
