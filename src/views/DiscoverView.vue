@@ -1351,11 +1351,14 @@ function showToast(msg) {
     transform: rotate(360deg);
   }
 }
+.discover :deep(.tb-left) { min-width: 0; flex: 1; overflow: hidden; }
 .tabs {
-  display: flex; align-items: center; gap: 20px; margin-left: 8px;
+  display: flex; flex: 1 1 0; align-items: center; gap: 20px; margin-left: 8px;
+  min-width: 0; padding-right: 8px; overflow-x: auto; scrollbar-width: none;
 }
+.tabs::-webkit-scrollbar { display: none; }
 .tab {
-  position: relative; font-size: 19px; font-weight: 500; line-height: 1.2; color: #697386; min-height: 44px; padding: 8px 0; background: none; white-space: nowrap;
+  position: relative; flex: 0 0 auto; font-size: clamp(16px, 4.3vw, 19px); font-weight: 500; line-height: 1.2; color: #697386; min-height: 44px; padding: 8px 0; background: none; white-space: nowrap;
 }
 .tab.active {
   color: #000000;
@@ -2027,10 +2030,9 @@ function showToast(msg) {
 .banner__dot::after { content: ''; width: 5px; height: 5px; border-radius: 5px; background: rgba(255,255,255,.7); transition: width .2s ease; }
 .banner__dot.on::after { width: 14px; background: var(--brand); }
 .locale-en .tabs, .locale-pt .tabs { gap: 12px; }
-.locale-en .tab, .locale-pt .tab { font-size: 14px; }
 .discover button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
-@media(max-width: 359px) { .tabs { gap: 12px; } .tab { font-size: 17px; } .topacts { gap: 4px; } .banner__copy h2 { font-size: 20px; } }
-@media(min-width: 600px) and (max-width: 749px) { .tabs { gap: 10px; margin-left: 2px; } .tab { font-size: 16px; } .topacts { gap: 2px; } .act { width: 40px; height: 40px; } .locale-en .tab, .locale-pt .tab { font-size: 12px; } .banner__copy { padding: 12px 12px 12px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
+@media(max-width: 359px) { .tabs { gap: 12px; } .topacts { gap: 4px; } .banner__copy h2 { font-size: 20px; } }
+@media(min-width: 600px) and (max-width: 749px) { .tabs { gap: 10px; margin-left: 2px; } .topacts { gap: 2px; } .act { width: 40px; height: 40px; } .banner__copy { padding: 12px 12px 12px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
 @media(prefers-reduced-motion: reduce) { .banner__track, .banner__dot::after, .quick__thumb { transition: none; } }
 /* 广场与动态：与推荐页保持同一圆角、边距和品牌色节奏。 */
 
