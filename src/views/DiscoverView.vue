@@ -246,7 +246,36 @@
         <span v-else>加载详情中…</span>
       </div>
       <template v-else>
-        <img v-if="detailItem.images && detailItem.images.length" class="panel__img" :src="detailItem.images[0]" :alt="detailItem.title || ''" />
+        <!-- 视频：置顶全宽 -->
+        <div v-if="detailItem.videoUrl" class="panel__hero">
+          <video class="panel__hero-video" :src="detailItem.videoUrl" controls playsinline preload="metadata"></video>
+        </div>
+        <!-- 单图：置顶全宽大图 -->
+        <div v-else-if="detailItem.images && detailItem.images.length === 1" class="panel__hero">
+          <img class="panel__img" :src="detailItem.images[0]" :alt="detailItem.title || ''" />
+        </div>
+        <!-- 5+ 图：置顶全宽横向轮播 + 1/N 分页 + 圆点 -->
+        <div v-else-if="detailItem.images && detailItem.images.length >= 5" class="panel__hero panel__carousel">
+          <div class="panel__car-track" ref="panelCarTrack" @scroll.passive="onPanelCarScroll">
+            <img
+              v-for="(img, i) in detailItem.images"
+              :key="i"
+              class="panel__car-slide"
+              :src="img"
+              :alt="detailItem.title || ''"
+            />
+          </div>
+          <div class="panel__car-count">{{ panelCarIndex + 1 }}/{{ detailItem.images.length }}</div>
+          <div class="panel__car-dots">
+            <span
+              v-for="(img, i) in detailItem.images"
+              :key="'d' + i"
+              class="panel__car-dot"
+              :class="{ on: i === panelCarIndex }"
+            ></span>
+          </div>
+        </div>
+
         <div class="panel__body">
           <div class="panel__title">{{ detailItem.title || (detailItem.content || '').slice(0, 30) }}</div>
           <div class="panel__author">
@@ -257,6 +286,16 @@
             </div>
           </div>
           <div class="panel__text">{{ detailItem.content }}</div>
+          <!-- 2-4 张：不置顶，随正文流双列网格 -->
+          <div v-if="detailItem.images && detailItem.images.length >= 2 && detailItem.images.length <= 4" class="panel__grid">
+            <img
+              v-for="(img, i) in detailItem.images"
+              :key="i"
+              class="panel__grid-img"
+              :src="img"
+              :alt="detailItem.title || ''"
+            />
+          </div>
           <div class="panel__stat">
             <span><b>{{ detailItem.likes }}</b> 赞</span>
             <span>{{ detailItem.comments || 0 }} 评论</span>
@@ -650,6 +689,16 @@ const selectedFeed = ref(null)
 const detailLoading = ref(false)
 const detailItem = ref(null)      // fetchFeedDetail 全量（含正文长文 / 图片）
 const detailComments = ref([])    // fetchComments 前 6 条
+// 5+ 图横向轮播：当前页索引（驱动 1/N 分页与圆点）
+const panelCarIndex = ref(0)
+const panelCarTrack = ref(null)
+function onPanelCarScroll() {
+  const el = panelCarTrack.value
+  if (!el) return
+  const idx = Math.round(el.scrollLeft / el.clientWidth)
+  if (idx !== panelCarIndex.value) panelCarIndex.value = idx
+}
+watch(detailItem, () => { panelCarIndex.value = 0 })
 async function loadPanel(id) {
   selectedFeed.value = recommendList.value.find((x) => String(x.id) === String(id)) || null
   if (!selectedFeed.value) return
@@ -1751,12 +1800,85 @@ function showToast(msg) {
   font-size: 13px;
   text-align: center;
 }
+/* 右栏媒体区：视频/单图/5+轮播 置顶，与直板机详情页规则一致 */
+.panel__hero {
+  width: 100%;
+  background: var(--bg);
+  overflow: hidden;
+}
+.panel__hero-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
 .panel__img {
   width: 100%;
   aspect-ratio: 16 / 10;
   object-fit: cover;
   display: block;
   background: #eee;
+}
+.panel__carousel { position: relative; background: #000; }
+.panel__car-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.panel__car-track::-webkit-scrollbar { display: none; }
+.panel__car-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  scroll-snap-align: center;
+  display: block;
+}
+.panel__car-count {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: rgba(0, 0, 0, .5);
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 9px;
+  border-radius: 11px;
+  pointer-events: none;
+}
+.panel__car-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  pointer-events: none;
+}
+.panel__car-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .5);
+  transition: width .2s, background .2s;
+}
+.panel__car-dot.on { background: #fff; width: 16px; border-radius: 3px; }
+
+/* 2-4 张：不置顶，随正文流双列网格 */
+.panel__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 14px;
+}
+.panel__grid-img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
 }
 .panel__body { padding: 14px; }
 .panel__title {
