@@ -44,11 +44,11 @@
     <!-- 搜索：右上角按钮触发，滑出内联搜索条（三 tab 通用） -->
     <transition name="searchslide">
       <div v-if="searchOpen" class="search" @click="onSearch">
-        <span class="sicon">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
+        <span class="sicon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         </span>
         <input ref="searchInputRef" class="sinput" v-model="keyword" :placeholder="t('discover.searchPlaceholder')" @keyup.enter="onSearchEnter" @compositionstart="isComposing = true" @compositionend="onCompositionEnd" @click.stop />
-        <span v-if="keyword" class="sclose press" @click.stop="clearSearch">×</span>
+        <button v-if="keyword" type="button" class="sclose press" :aria-label="t('search.clear')" @click.stop="clearSearch">✕</button>
       </div>
     </transition>
 
@@ -1325,7 +1325,7 @@ function showToast(msg) {
 <style scoped>
 .discover {
   min-height: 100vh;
-  background: var(--bg);
+  background: #f5f8fd;
   padding-bottom: env(safe-area-inset-bottom);
 }
 /* 下拉刷新：容器高度跟手，内容自然下推；转圈只在真正请求时出现 */
@@ -1410,15 +1410,20 @@ function showToast(msg) {
 }
 
 .search {
-  margin: 10px 16px;
-  height: 36px;
-  background: #E5E5EA;
-  border: none;
-  border-radius: 12px;
+  margin: 12px 16px 0;
+  height: 50px;
+  background: #fff;
+  border: 1px solid #d4e0f3;
+  border-radius: var(--radius-pill, 999px);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 0 17px;
+  box-shadow: 0 5px 16px rgba(47, 84, 148, .11);
+}
+.search:focus-within {
+  border-color: #6694f8;
+  box-shadow: 0 0 0 3px rgba(63, 108, 248, .13), 0 6px 18px rgba(47, 84, 148, .12);
 }
 /* 搜索结果（内联） */
 .search-results {
@@ -1452,19 +1457,20 @@ function showToast(msg) {
   border-radius: var(--radius-pill);
 }
 .sicon {
-  color: #8E8E93;
+  color: #4d72b8;
   display: flex;
   align-items: center;
 }
 .sinput {
   flex: 1;
   font-size: 15px;
-  color: #1C1C1E;
+  color: var(--text);
   background: transparent;
-  caret-color: #007AFF;
+  border: none;
+  outline: none;
 }
 .sinput::placeholder {
-  color: #8E8E93;
+  color: #7787a3;
 }
 .act--search {
   flex: none;
@@ -1474,16 +1480,12 @@ function showToast(msg) {
 }
 .sclose {
   flex: none;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, .08);
-  color: #8E8E93;
+  color: var(--text-hint);
   font-size: 16px;
-  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
 }
 /* 搜索条滑出 / 收起过渡 */
 .searchslide-enter-active,
@@ -1500,10 +1502,10 @@ function showToast(msg) {
 }
 .searchslide-enter-to,
 .searchslide-leave-from {
-  max-height: 60px;
+  max-height: 62px;
   opacity: 1;
-  margin-top: 10px;
-  margin-bottom: 10px;
+  margin-top: 12px;
+  margin-bottom: 0;
 }
 /* 焦点图：图片保持主体，底部渐变承载标题与轮播提示。 */
 .banner {
