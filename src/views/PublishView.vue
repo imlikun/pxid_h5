@@ -138,6 +138,7 @@ import { getDeviceId } from '../utils/device'
 import { t, locale, regionFromLocale } from '../i18n'
 import { fetchFeedUsers } from '../api/feed'
 import { uploadMedia } from '../storage'
+import { publishState } from '../store/publish'
 import TopBar from '../components/TopBar.vue'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
@@ -443,6 +444,8 @@ async function onPublish() {
     const j = await r.json()
     uploading.value = false
     if (j.code === 0) {
+      publishState.pendingTab = '动态'
+      publishState.needsRefresh = true
       showToast(t('publish.success'))
       setTimeout(() => router.push('/discover'), 600)
     } else {

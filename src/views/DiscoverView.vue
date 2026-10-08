@@ -125,6 +125,15 @@
       </div>
     </template>
 
+    <!-- 动态沿用原发布入口，用骑行与用车场景说明参与价值。 -->
+    <div v-if="activeTab === '动态' && !showSearchResults" class="dynamic-intro">
+      <div class="dynamic-intro__copy">
+        <p class="dynamic-intro__title">{{ t('discover.dynamic.title') }}</p>
+        <p class="dynamic-intro__hint">{{ t('discover.dynamic.hint') }}</p>
+      </div>
+      <button type="button" class="dynamic-intro__publish press" @click="onAdd">{{ t('discover.dynamic.share') }}</button>
+    </div>
+
     <!-- 车型筛选：动态页右侧固定范围菜单，车型仍在左侧横向滚动 -->
     <div v-if="activeTab !== '广场' && !showSearchResults" class="filter">
       <div class="chips">
@@ -191,7 +200,15 @@
           :class="[fadeUp(), staggerFor(i)]"
         />
         <div v-if="(nearLoading || dynamicLoading) && dynamicList.length === 0" class="empty-tab">{{ nearLoading ? t('discover.nearLoading') : t('discover.loadingMore') }}</div>
-        <div v-else-if="dynamicList.length === 0" class="empty-tab">{{ dynamicError || t('discover.emptyDynamic') }}</div>
+        <div v-else-if="dynamicList.length === 0" class="empty-tab dynamic-empty" role="status">
+          <p class="dynamic-empty__title">{{ dynamicEmptyText }}</p>
+          <p class="dynamic-empty__hint">{{ dynamicError ? t('discover.dynamic.errorHint') : dynamicEmptyHint }}</p>
+          <div class="dynamic-empty__actions">
+            <button v-if="dynamicError" type="button" class="dynamic-empty__action press" @click="reloadDynamicFeed">{{ t('discover.dynamic.retry') }}</button>
+            <button v-if="hasDynamicFilter" type="button" class="dynamic-empty__action press" @click="clearDynamicFilters">{{ t('discover.dynamic.viewAll') }}</button>
+            <button v-if="!dynamicError" type="button" class="dynamic-empty__action press" @click="onAdd">{{ t('discover.dynamic.share') }}</button>
+          </div>
+        </div>
         <FeedLoadState v-if="currentFeedKey && dynamicList.length" :loading="loadingMore[currentFeedKey]" :finished="!feedPage[currentFeedKey].hasMore" />
       </div>
     </template>
@@ -440,10 +457,11 @@ const myCarModel = ref('')
 // 用户是否手动点过筛选 chip：getUserInfo 是异步桥接（真机 300~800ms），
 // 期间用户完全可能已点了某个 chip，回包后不可再覆盖他的选择（2026-09-11）
 let filterTouched = false
+let recommendationFilterTouched = false
 
-// 各 tab 的默认筛选：有绑定车型 → 默认筛该车型（坤哥 2026-09-11：进页面就该是自己的车）；
-// 无绑定车型 → 维持原行为（推荐=全部、动态=最新）
+// 推荐保留绑定车型默认值；动态默认看所有车型，绑定车型仅作为辅助筛选。
 function defaultFilter(tab) {
+  if (tab === '动态') return '最新'
   const mine = myCarModel.value
   if (mine && CAR_MODEL_LABELS.includes(mine)) return mine
   return tab === '推荐' ? '全部' : '最新'
@@ -452,6 +470,7 @@ function defaultFilter(tab) {
 function pickFilter(v) {
   if (activeFilter.value === v) return
   filterTouched = true
+  if (activeTab.value === '推荐') recommendationFilterTouched = true
   activeFilter.value = v
   if (activeTab.value === '动态') reloadDynamicFeed()
 }
@@ -459,6 +478,8 @@ function pickFilter(v) {
 // 否则用户一进发现页就是一片空白（chip 仍在第一位，想筛随时点）。
 // ⚠️ 只在「当前选中项就是我的车」且「该 tab 数据已回来」时才动，绝不干扰用户手动选择。
 function ensureFilterHasContent() {
+  // 动态车型已由服务端筛选；手动选中的车型无结果应显示空态，不静默改选。
+  if (activeTab.value !== '推荐' || recommendationFilterTouched) return
   const f = activeFilter.value
   if (!f || f === '全部' || f === '最新' || f !== myCarModel.value) return
   const src = activeTab.value === '推荐' ? recommendData.value : dynamicData.value
@@ -735,6 +756,29 @@ watch(isSplit, (v) => {
 const recommendEmptyText = computed(() =>
   activeFilter.value === '全部' ? t('discover.emptyAll') : t('discover.emptyDynamic')
 )
+const hasDynamicModel = computed(() => activeFilter.value !== '最新' && activeFilter.value !== '全部')
+const hasDynamicFilter = computed(() => hasDynamicModel.value || dynamicScope.value !== 'all')
+const dynamicEmptyText = computed(() => {
+  if (dynamicError.value) return dynamicError.value
+  if (hasDynamicModel.value) return t('discover.dynamic.emptyModel', { model: activeFilter.value })
+  return t(`discover.dynamic.empty.${dynamicScope.value}`)
+})
+const dynamicEmptyHint = computed(() =>
+  hasDynamicModel.value
+    ? t('discover.dynamic.emptyModelHint', { scope: scopeTriggerLabel.value })
+    : t(`discover.dynamic.emptyHint.${dynamicScope.value}`)
+)
+function clearDynamicFilters() {
+  scopeSelectionVersion++ // 取消尚未完成的附近定位，避免回包重新切走。
+  scopeMenuOpen.value = false
+  dynamicScope.value = 'all'
+  nearCoords.value = null
+  nearLoading.value = false
+  filterTouched = true
+  activeFilter.value = '最新'
+  return reloadDynamicFeed()
+}
+
 // 动态：按车型筛选，最新=全部 + 置顶优先 + 排序；附近子栏用 nearList
 const dynamicList = computed(() => {
   const src = dynamicScope.value === 'near' ? nearList.value : dynamicData.value
@@ -753,8 +797,16 @@ const currentFeedKey = computed(() =>
 function setTab(t, forceDefault = false) {
   scopeMenuOpen.value = false
   activeTab.value = t
-  // 常规切 tab：有绑定车型就带着它走（两 tab 的筛选条都含车型 chip，语义一致）；
-  // forceDefault=true 用于「刚发完帖回来」，强制看最新/全部，避免默认车型把新帖筛掉
+  if (t === '推荐') recommendationFilterTouched = false
+  // 切 tab 后使用该栏默认值；发布返回同时清除范围与车型，保证自己的新帖可见。
+  // 保留用户已手动筛选标记，防止迟到的 getUserInfo 回包再次覆盖选择。
+  if (forceDefault) filterTouched = true
+  if (forceDefault && t === '动态') {
+    scopeSelectionVersion++
+    dynamicScope.value = 'all'
+    nearCoords.value = null
+    nearLoading.value = false
+  }
   activeFilter.value = forceDefault ? (t === '推荐' ? '全部' : '最新') : defaultFilter(t)
   // 切 tab 必须退出搜索态：搜索态会整块隐藏列表（Banner/快捷入口/筛选/帖子），
   // 不重置会让新 tab 同样一片空白，表现为「帖子不显示」
@@ -763,7 +815,8 @@ function setTab(t, forceDefault = false) {
   searchOpen.value = false // 切 tab 同步收起右上角搜索条
   if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
   ensureFilterHasContent() // 该 tab 缓存的列表若无「我的车」内容，同步退回默认筛选
-  if (t === '动态' && dynamicLoadedModel !== selectedDynamicModel()) reloadDynamicFeed()
+  // 发布返回由调用方刷新，避免重复请求第一页。
+  if (t === '动态' && !forceDefault && dynamicLoadedModel !== selectedDynamicModel()) reloadDynamicFeed()
 }
 
 // 触底分页状态（推荐/动态各自维护 page + hasMore；广场活动量小不分页）
@@ -777,7 +830,8 @@ let lastListLoadTs = 0 // 列表最近一次加载时间（keep-alive 返回时�
 let dynamicGeneration = 0
 let dynamicLoadedModel = ''
 function selectedDynamicModel() {
-  return activeFilter.value === '全部' || activeFilter.value === '最新' ? '' : activeFilter.value
+  // 推荐的默认车型不应污染提前加载的动态列表。
+  return activeTab.value === '动态' && hasDynamicModel.value ? activeFilter.value : ''
 }
 function reloadDynamicFeed() {
   // 换范围或车型时让旧请求失效，并从新条件的第一页重新开始。
@@ -805,7 +859,7 @@ const staggerFor = (i) => (enterAnim.value && i < 6 ? 'stagger-' + (i + 1) : '')
 const fadeUp = () => (enterAnim.value ? 'fade-up' : '')
 
 // 从 /feed 接口拉取真实数据（带地区过滤 + 分页）。改用统一数据层 api/feed.js：
-// 动态 tab 自动带 followerDevice → 后端返回「官方+已关注」关注流（修 H1 关注流非全局流）；
+// 动态默认取全部；选中关注范围时才带 followerDevice，由后端返回「官方+已关注」。
 // 归一化/错误回落统一，消除 api/feed.js 死代码（修 H2）
 // ⚠️ 调用方（onMounted / switchRegion）统一传英文 key（'recommend'/'dynamic'），
 //    内部必须按 key 比对，勿用中文——曾因 'recommend' !== '推荐' 导致
@@ -988,7 +1042,7 @@ onMounted(async () => {
       myCarModel.value = car
       // 双向同步：本地存一份，保证 Flutter 接上前后表现一致
       try { localStorage.setItem('pxid_my_car_model', car) } catch (e) {}
-      // 有绑定车型 → 进页面默认就筛自己的车（用户已点过 chip 则不覆盖）
+      // 推荐默认筛自己的车，动态仍看所有车型；用户已点过 chip 则不覆盖。
       if (!filterTouched) activeFilter.value = defaultFilter(activeTab.value)
     }
   } catch (e) { /* getUserInfo 失败则无「我的车」chip */ }
@@ -1001,6 +1055,7 @@ onMounted(async () => {
   if (publishState.pendingTab) {
     setTab(publishState.pendingTab, true)
     publishState.pendingTab = null
+    publishState.needsRefresh = false
     // 刚发完帖：切到目标 tab 后补拉一次，保证新帖可见
     await refreshCurrentTab()
   }
@@ -1009,7 +1064,19 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', onDocVisibility)
   // 暴露给原生发布器：Flutter 发布完成关闭发布页时调用，通知发现页刷新列表。
   // 真机发布走 openNative('discover/publish')，H5 收不到 addMoment，必须靠这一回调补信号。
-  window.__pxidOnPublished = () => { publishState.needsRefresh = true }
+  window.__pxidOnPublished = async () => {
+    publishState.needsRefresh = true
+    publishState.pendingTab = '动态'
+    // 原生发布器关闭时根 WebView 可能没有重新触发 onActivated，直接刷新可见列表。
+    if (discoverActive) {
+      publishState.needsRefresh = false
+      publishState.pendingTab = null
+      setTab('动态', true)
+      await refreshCurrentTab()
+      await nextTick()
+      resetDiscoverScroll()
+    }
+  }
   // 视频懒加载：首屏图片先渲染，视频延迟播放
   lazyPlayHeroVideo()
   // 触底分页：滚动加载更多（推荐/动态）
@@ -1054,9 +1121,11 @@ onActivated(async () => {
   const tab = publishState.pendingTab
   publishState.pendingTab = null
   if (tab) {
-    // 发完帖回到发现页：先切到目标 tab 并强制「最新/全部」（避免默认「我的车」把新帖筛掉），再重拉
+    // 发完帖回到发现页：清除范围与车型，再重拉目标列表。
     setTab(tab, true)
     await refreshCurrentTab()
+    await nextTick()
+    resetDiscoverScroll()
   } else {
     await refreshCurrentTab()
   }
@@ -1502,6 +1571,23 @@ function showToast(msg) {
 .q-badge {
   position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: #ff4a60; border: 2px solid #fff; z-index: 2;
 }
+.dynamic-intro {
+  display: flex; align-items: center; gap: 12px; margin: 4px 16px 12px; padding: 14px;
+  background: var(--card, #fff); border-radius: 12px;
+}
+.dynamic-intro__copy { flex: 1; min-width: 0; }
+.dynamic-intro__title { margin: 0; color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.5; }
+.dynamic-intro__hint { margin: 4px 0 0; color: var(--text-hint); font-size: 12px; line-height: 1.6; }
+.dynamic-intro__publish {
+  flex: 0 0 auto; min-height: 40px; padding: 0 12px; border: 1px solid #dbe5ff; border-radius: 999px;
+  background: #f5f8ff; color: var(--brand); font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.dynamic-empty { padding: 40px 24px; }
+.dynamic-empty__title { margin: 0; color: var(--text); font-size: 15px; font-weight: 500; }
+.dynamic-empty__hint { margin: 10px 0 0; line-height: 1.7; }
+.dynamic-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
+.dynamic-empty__action { min-height: 40px; padding: 0 16px; border-radius: 999px; background: #f1f5ff; color: var(--brand); font-size: 13px; }
+.dynamic-intro__publish:focus-visible, .dynamic-empty__action:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .filter {
   display: flex; align-items: center; margin: 0 16px; gap: 8px; position: relative; z-index: 5;
 }
