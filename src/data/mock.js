@@ -304,7 +304,7 @@ export const featuredBanner = {
 
 export const featuredQuick = [
   { key: 'hot', label: '热购榜单', icon: 'flame' },
-  { key: 'new', label: '近期上新', icon: 'sparkles' },
+  { key: 'vehicles', label: '查看整车', icon: 'sparkles' },
   { key: 'points', label: '玩转积分', icon: 'award' },
 ]
 

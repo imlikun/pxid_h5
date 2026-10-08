@@ -109,12 +109,12 @@
         />
       </div>
 
-      <!-- 踏春装备 | 限时直降 -->
-      <section class="spring-panel">
-        <SectionHeader :title="t('featured.springTitle')" :sub="t('featured.springSub')" :description="t('featured.springDescription')" promo :more="t('featured.more')" @more="activeTab = 'spring'" />
+      <!-- 整车精选：沿用现有陈列样式，商品仍来自真实商城 -->
+      <section class="vehicle-panel">
+        <SectionHeader :title="t('featured.vehiclesTitle')" :sub="t('featured.vehiclesSub')" :description="t('featured.vehiclesDescription')" :more="t('featured.more')" @more="activeTab = 'vehicles'" />
         <div class="grid2">
           <ProductCard
-            v-for="(p, i) in springProducts"
+            v-for="(p, i) in vehicleProducts"
             :key="p.id"
             :product="p"
             :badge="saleBadge(p)"
@@ -137,13 +137,13 @@
       </template><!-- /v-else 有数据 -->
     </template>
 
-    <!-- 踏春装备 -->
-    <template v-else-if="activeTab === 'spring' && !showSearch">
-      <section class="spring-panel">
-        <SectionHeader :title="t('featured.springTitle')" :sub="t('featured.springSub')" :description="t('featured.springDescription')" promo :more="t('featured.more')" />
+    <!-- 整车 -->
+    <template v-else-if="activeTab === 'vehicles' && !showSearch">
+      <section class="vehicle-panel">
+        <SectionHeader :title="t('featured.vehiclesTitle')" :sub="t('featured.vehiclesSub')" :description="t('featured.vehiclesDescription')" />
         <div class="grid2">
           <ProductCard
-            v-for="(p, i) in springProducts"
+            v-for="(p, i) in vehicleProducts"
             :key="p.id"
             :product="p"
             :badge="saleBadge(p)"
@@ -151,21 +151,23 @@
             :class="[fadeUp(), staggerFor(i)]"
           />
         </div>
+        <div v-if="!loading && !vehicleProducts.length" class="empty-tab">{{ t('featured.noVehicles') }}</div>
       </section>
     </template>
 
-    <!-- Bikes -->
+    <!-- 原厂配件 -->
     <template v-else-if="!showSearch">
-      <SectionHeader :title="t('featured.bikesTitle')" :sub="t('featured.bikesSub')" />
+      <SectionHeader :title="t('featured.partsTitle')" :sub="t('featured.partsSub')" />
       <div class="grid2">
         <ProductCard
-          v-for="(p, i) in bikeProducts"
+          v-for="(p, i) in partProducts"
           :key="p.id"
           :product="p"
           :action-label="t('featured.chooseOptions')" :on-select="isSplit ? selectProduct : null"
           :class="[fadeUp(), staggerFor(i)]"
         />
       </div>
+      <div v-if="!loading && !partProducts.length" class="empty-tab">{{ t('featured.noParts') }}</div>
     </template>
 
     <!-- 搜索结果（内联过滤当前已加载商品，按名称匹配） -->
@@ -303,7 +305,6 @@ const cfg = ref({
   bannerHandles: ['p4', '500w-48v-city-folding-electric-scooter-with-app', 'ant5'],
   hotCount: 4,
   springCollection: 'spring',
-  bikesCollection: 'bikes',
 })
 async function fetchFeaturedConfig() {
   try {
@@ -314,7 +315,6 @@ async function fetchFeaturedConfig() {
     if (Array.isArray(d.bannerHandles) && d.bannerHandles.length) cfg.value.bannerHandles = d.bannerHandles
     if (typeof d.hotCount === 'number') cfg.value.hotCount = d.hotCount
     if (d.springCollection) cfg.value.springCollection = d.springCollection
-    if (d.bikesCollection) cfg.value.bikesCollection = d.bikesCollection
   } catch (e) {
     console.warn('[featured] 读取精选配置失败，使用默认值:', e.message || e)
   }
@@ -438,8 +438,8 @@ function onTouchEnd(e) {
 
 const topTabs = computed(() => [
   { key: 'rec', label: t('featured.tab.rec') },
-  { key: 'spring', label: t('featured.tab.spring') },
-  { key: 'bikes', label: t('featured.tab.bikes') },
+  { key: 'vehicles', label: t('featured.tab.vehicles') },
+  { key: 'parts', label: t('featured.tab.parts') },
 ])
 const activeTab = ref('rec')
 
@@ -487,26 +487,23 @@ const saleBadge = (p) => {
   return `${Math.round((1 - price / origin) * 100)}% OFF`
 }
 const hotProducts = computed(() => all.value.slice(0, cfg.value.hotCount))
-const springProducts = computed(() => {
-  const list = all.value
-  const f = list.filter(
+// 商城目前仍把整车归在 spring collection；待商品源改名后由精选配置切换。
+const vehicleProducts = computed(() =>
+  all.value.filter(
     (p) => p.collection === cfg.value.springCollection || (p.tags || []).includes(cfg.value.springCollection)
   )
-  return f.length ? f : list
-})
-const bikeProducts = computed(() => {
-  const list = all.value
-  const f = list.filter(
-    (p) => p.collection === cfg.value.bikesCollection || (p.tags || []).includes(cfg.value.bikesCollection)
+)
+const partProducts = computed(() =>
+  all.value.filter(
+    (p) => p.collection === 'p1parts' || (p.tags || []).includes('p1parts')
   )
-  return f.length ? f : list
-})
+)
 
 function onQuick(q) {
   if (q.key === 'hot') {
     hotSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  } else if (q.key === 'new') {
-    activeTab.value = 'spring'
+  } else if (q.key === 'vehicles') {
+    activeTab.value = 'vehicles'
   } else if (q.key === 'points') {
     openSecondary('/points')
   }
@@ -944,10 +941,10 @@ async function retry() {
 .store-trust__copy strong { font-size: 10px; color: #172b51; white-space: nowrap; }
 .store-trust__copy small { margin-top: 3px; font-size: 8px; color: #8999b3; white-space: nowrap; }
 .store-trust svg { color: #4077fb; flex-shrink: 0; }
-.spring-panel { margin: 7px 12px 10px; padding-top: 1px; border-radius: 19px; background: linear-gradient(145deg, #eef5ff, #f5f9ff 55%, #eaf3ff); border: 1px solid #e8f0ff; }
-.spring-panel :deep(.sheader) { padding: 14px 11px 11px; }
-.spring-panel .grid2 { padding: 0 9px 12px; gap: 8px; }
-.spring-panel :deep(.pcard) { border-color: #f2f5fb; box-shadow: 0 3px 10px rgba(64, 104, 174, .045); }
+.vehicle-panel { margin: 7px 12px 10px; padding-top: 1px; border-radius: 19px; background: linear-gradient(145deg, #eef5ff, #f5f9ff 55%, #eaf3ff); border: 1px solid #e8f0ff; }
+.vehicle-panel :deep(.sheader) { padding: 14px 11px 11px; }
+.vehicle-panel .grid2 { padding: 0 9px 12px; gap: 8px; }
+.vehicle-panel :deep(.pcard) { border-color: #f2f5fb; box-shadow: 0 3px 10px rgba(64, 104, 174, .045); }
 .hot-section { scroll-margin-top: 58px; }
 @media (max-width: 350px) {
   .my-order-btn__txt { display: none; }
