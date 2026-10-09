@@ -3036,6 +3036,7 @@ function normalizeProduct(p, store, currency) {
   const tags = tagsArr.join(' ').toLowerCase()
   const collection = /bike|ebike|scooter|electric/.test(type + ' ' + tags) ? 'spring' : 'p1parts'
   const desc = stripUnsafe(p.body_html || '')
+  const hasMerchantDescription = desc.replace(/<[^>]+>/g, '').trim().length > 30
   var _fbDesc = (desc && desc.length > 30) ? desc : generateFallbackDescription(p);
   // tagline：取描述首句（去标签后截断）
   const tagline = desc
@@ -3057,6 +3058,7 @@ function normalizeProduct(p, store, currency) {
     collection,
     shopUrl: `https://${store}/products/${p.handle}`,
     description: _fbDesc,
+    hasMerchantDescription,
     tagline,
     sellingPoints: extractSellingPoints(p),
     specs: extractSpecs(p),
@@ -3070,6 +3072,7 @@ function normalizeProduct(p, store, currency) {
         id: String(v.id),
         title: v.title,
         price: Number(v.price) || 0,
+        compareAtPrice: v.compare_at_price ? Number(v.compare_at_price) : null,
         available: v.available !== false,
         sku: v.sku || '',
         selectedOptions,
@@ -3204,11 +3207,14 @@ function normalizeProductDetail(p, store, currency) {
   const tagsArr = toTags(p)
   const tags = tagsArr.join(' ').toLowerCase()
   const collection = /bike|ebike|scooter|electric/.test(type + ' ' + tags) ? 'spring' : 'p1parts'
+  const merchantDescription = stripUnsafe(p.body_html || '')
+  const hasMerchantDescription = merchantDescription.replace(/<[^>]+>/g, '').trim().length > 30
   return {
     id: String(p.id),
     handle: p.handle,
     name: p.title,
     description: (function(){var d=stripUnsafe(p.body_html||'');return(d&&d.length>30)?d:generateFallbackDescription(p);})(),
+    hasMerchantDescription,
     vendor: p.vendor || '',
     price: Number(v0.price) || 0,
     origin: v0.compare_at_price ? Number(v0.compare_at_price) : null,
@@ -3229,6 +3235,7 @@ function normalizeProductDetail(p, store, currency) {
         id: String(v.id),
         title: v.title,
         price: Number(v.price) || 0,
+        compareAtPrice: v.compare_at_price ? Number(v.compare_at_price) : null,
         available: v.available !== false,
         sku: v.sku || '',
         selectedOptions,

@@ -19,7 +19,8 @@ export function productRoute(product) {
   const snap = { id: product.id, handle, name: product.name, price: product.price, currency: product.currency, cover,
     images, options: product.options || [], variants: product.variants || [], shopUrl: product.shopUrl || '',
     origin: product.origin, vendor: product.vendor || '', tag: product.tag || '', tagline: product.tagline || '',
-    description: product.description || '', specs: product.specs || [], sellingPoints: product.sellingPoints || [],
+    description: product.description || '', hasMerchantDescription: product.hasMerchantDescription === true,
+    collection: product.collection || '', specs: product.specs || [], sellingPoints: product.sellingPoints || [],
     presentationComplete: true }
 
   try {

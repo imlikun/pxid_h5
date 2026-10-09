@@ -2,7 +2,7 @@
   <div class="product-page">
   <div class="detail" v-if="product">
     <!-- 顶栏 -->
-    <TopBar sticky :title="product.name" :back="goBack">
+    <TopBar sticky :title="isPart ? '原厂配件' : isVehicle ? '整车详情' : '商品详情'" :back="goBack">
       <template #right>
         <span class="cart press" @click="goCart">
           <IconSvg name="shopping-cart" :size="24" />
@@ -26,36 +26,53 @@
       />
       <div v-if="!galleryImages.length" class="slide empty-slide">无图</div>
     </div>
-    <div class="dots" v-if="galleryImages.length > 1">
-      <span
-        v-for="(src, i) in galleryImages"
-        :key="i"
-        class="dot"
-        :class="{ active: i === activeIdx }"
-        @click="jumpTo(i)"
-      ></span>
-    </div>
+    <span class="gallery-brand" :class="{ 'gallery-brand--plain': isVehicle }">{{ isPart ? (product.vendor || '配件') : 'PXID' }}</span>
+    <span v-if="galleryImages.length" class="gallery-count">{{ activeIdx + 1 }}/{{ galleryImages.length }}</span>
 
     </div>
 
     <div class="product-content" v-if="product.name">
     <!-- 信息卡 -->
     <div class="card info">
+      <div class="price-row">
+        <span class="price">{{ sym(product.currency) }}{{ displayPrice }}</span>
+        <span v-if="displayOrigin" class="origin">{{ sym(product.currency) }}{{ displayOrigin }}</span>
+      </div>
       <div class="name">{{ product.name }}</div>
-      <div class="tagline" v-if="product.tagline">{{ product.tagline }}</div>
-      <div class="meta">
+      <div class="tagline">{{ isPart ? '配件 · 请先核对适配车型' : isVehicle ? '选择颜色与版本，查看对应图片和价格' : '商品信息以当前选项为准' }}</div>
+      <div class="meta" v-if="product.vendor || product.tag">
         <span v-if="product.vendor" class="pill">{{ product.vendor }}</span>
         <span v-if="product.tag" class="pill pill--brand">{{ product.tag }}</span>
       </div>
-      <div class="price-row">
-        <span class="price">{{ sym(product.currency) }}{{ displayPrice }}</span>
-        <span v-if="product.origin" class="origin">{{ sym(product.currency) }}{{ product.origin }}</span>
+    </div>
+
+    <div class="card fit-card" v-if="isPart">
+      <div class="fit-heading"><span aria-hidden="true">＋</span><strong>先确认适配车型</strong></div>
+      <label class="fit-picker">
+        <span>{{ fitModel || '选择我的车型' }}</span>
+        <select v-model="fitModel" aria-label="选择车型以核对配件适配信息">
+          <option value="">选择我的车型</option>
+          <option v-for="model in CAR_MODEL_LABELS" :key="model" :value="model">{{ model }}</option>
+        </select>
+        <span aria-hidden="true">⌄</span>
+      </label>
+      <p class="fit-note">{{ fitModel ? `已选 ${fitModel}。暂无可自动验证的适配信息，请核对商品描述或咨询商家。` : '暂无可自动验证的适配信息，请核对商品描述或咨询商家。' }}</p>
+    </div>
+
+    <div class="card core-card" v-if="isVehicle && coreSpecs.length">
+      <div class="block__title">核心配置</div>
+      <div class="core-grid">
+        <div class="core-item" v-for="spec in coreSpecs" :key="spec.label">
+          <strong>{{ spec.value }}</strong><span>{{ spec.label }}</span>
+        </div>
       </div>
     </div>
 
+    <div class="card selection-card">
+      <div class="block__title">选择配置</div>
     <!-- 颜色选择（有颜色选项时显示，联动轮播图与规格） -->
-    <div class="card color-card" v-if="hasColor">
-      <div class="block__title">选择颜色</div>
+    <div class="color-card" v-if="hasColor">
+      <div class="selection-label">颜色</div>
       <p v-if="detailReady && !activeColor" class="color-hint">请选择颜色以查看对应图片</p>
       <div class="colors">
         <button
@@ -76,8 +93,7 @@
     </div>
 
     <!-- 规格（仅展示颜色之外的维度；颜色已由上方颜色卡选择） -->
-    <div class="card spec-card" v-if="specDims.length">
-      <div class="block__title">选择规格</div>
+    <div class="spec-card" v-if="specDims.length">
       <div class="spec-dim" v-for="dim in specDims" :key="dim.name">
         <div class="spec-dim__label">{{ specLabel(dim.name) }}</div>
         <div class="opts">
@@ -94,13 +110,14 @@
     </div>
 
     <!-- 数量（紧跟规格，决策区） -->
-    <div class="card card--inline">
-      <div class="block__title">数量</div>
+    <div class="card--inline">
+      <div class="selection-label">数量</div>
       <div class="qty">
         <button class="press" @click="changeQty(-1)">－</button>
         <span>{{ qty }}</span>
         <button class="press" @click="changeQty(1)">＋</button>
       </div>
+    </div>
     </div>
 
     <!-- 规格参数 -->
@@ -114,16 +131,8 @@
       </div>
     </div>
 
-    <!-- 核心卖点（参数之后，强化购买理由） -->
-    <div class="card" v-if="product.sellingPoints && product.sellingPoints.length">
-      <div class="block__title">核心卖点</div>
-      <ul class="points">
-        <li v-for="(s, i) in product.sellingPoints" :key="i">{{ s }}</li>
-      </ul>
-    </div>
-
     <!-- 商品描述（Shopify body_html 富文本） -->
-    <div class="card desc" v-if="product.description">
+    <div class="card desc" v-if="product.hasMerchantDescription && product.description">
       <div class="block__title">商品详情</div>
       <div class="prose" v-html="descriptionHtml"></div>
       <div class="more-link press" @click="openOrigin" v-if="product.shopUrl">
@@ -180,6 +189,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { fetchProductDetail, getStore, sym, API_BASE, getRegion } from '../api/shop'
 import { initLocale } from '../i18n'
 import { productEntry } from '../utils/productNavigation'
+import { CAR_MODEL_LABELS } from '../data/carModels'
 import { variantForCover, colorOf, imagesForColor, sameImage, colorPreview } from '../utils/productPresentation'
 import { addToCart, cartCount } from '../store/cart'
 import { bridge } from '../bridge'
@@ -198,8 +208,22 @@ const error = ref('')
 const activeIdx = ref(0)
 const activeVariant = ref(-1)
 const qty = ref(1)
+const fitModel = ref('')
 const toast = ref('')
 const gallery = ref(null)
+const isPart = computed(() => product.value?.collection === 'p1parts')
+const isVehicle = computed(() => product.value?.collection === 'spring')
+const coreSpecs = computed(() => {
+  const specs = product.value?.specs || []
+  const selected = currentVariant.value?.selectedOptions || []
+  return specs.filter((spec) => /range|续航|motor|电机|weight|重量/i.test(spec.label || ''))
+    .map((spec) => ({
+      label: spec.label,
+      value: selected.find((option) => option.name === spec.label)?.value || spec.value,
+    }))
+    .filter((spec) => spec.value && !String(spec.value).includes(' / '))
+    .slice(0, 3)
+})
 
 const currentVariant = computed(() => {
   const vs = product.value && product.value.variants
@@ -209,6 +233,10 @@ const currentVariant = computed(() => {
 const displayPrice = computed(() => {
   if (currentVariant.value && currentVariant.value.price) return currentVariant.value.price
   return product.value ? product.value.price : 0
+})
+const displayOrigin = computed(() => {
+  if (currentVariant.value) return currentVariant.value.compareAtPrice || null
+  return variantList.value.length ? null : product.value?.origin
 })
 
 // —— 颜色主图联动（精选商品详情）——
@@ -371,6 +399,7 @@ async function load() {
   error.value = ''
   activeVariant.value = -1
   activeColor.value = ''
+  fitModel.value = ''
   Object.keys(specPick).forEach((k) => delete specPick[k])
   qty.value = 1
   resetGallery()
@@ -386,7 +415,9 @@ async function load() {
     if (detail) {
       // 展示文案采用本次点击快照，避免接口返回后整块插入/改行高；价格库存仍用实时变体。
       const display = snapshot?.presentationComplete ? Object.fromEntries(
-        ['name', 'vendor', 'tag', 'tagline', 'origin', 'description', 'specs', 'sellingPoints'].map((key) => [key, snapshot[key]])
+        ['name', 'vendor', 'tag', 'tagline', 'origin', 'description', 'specs', 'sellingPoints', 'collection']
+          .filter((key) => snapshot[key] !== undefined)
+          .map((key) => [key, snapshot[key]])
       ) : {}
       product.value = { ...detail, ...display }
       if (!entryCover.value) entryCover.value = detail.cover || ''
@@ -411,11 +442,6 @@ function onGalleryScroll() {
   if (!el) return
   const w = el.clientWidth
   activeIdx.value = Math.round(el.scrollLeft / w)
-}
-function jumpTo(i) {
-  const el = gallery.value
-  if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
-  activeIdx.value = i
 }
 function showToast(msg) {
   toast.value = msg
@@ -540,10 +566,20 @@ async function onBuy() {
   text-align: center;
   box-sizing: border-box;
 }
-/* 固定图廊，导航叠在图片内，数据补齐不改变后续内容位置。 */
-.gallery-frame { position: relative; height: clamp(360px, 48vw, 520px); background: #fff; }
+/* 保留图片占位，轮播只呈现商品实图。 */
+.gallery-frame {
+  position: relative;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  max-height: 520px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #fff;
+}
 .gallery {
   display: flex;
+  height: 100%;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
@@ -566,27 +602,30 @@ async function onBuy() {
   justify-content: center;
   color: #888;
 }
-.dots {
+.gallery-brand {
   position: absolute;
-  bottom: 10px;
-  left: 0;
-  right: 0;
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  padding: 8px 0;
-  background: transparent;
+  top: 14px;
+  left: 14px;
+  z-index: 1;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(238, 243, 255, 0.94);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
 }
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--line);
-}
-.dot.active {
-  background: var(--brand);
-  width: 16px;
-  border-radius: 3px;
+.gallery-brand--plain { background: transparent; padding-left: 2px; font-size: 15px; letter-spacing: 0.12em; }
+.gallery-count {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(238, 243, 255, 0.94);
+  color: #7b8cae;
+  font-size: 12px;
+  pointer-events: none;
 }
 /* 卡片 */
 .card {
@@ -601,6 +640,7 @@ async function onBuy() {
   font-size: 18px;
   font-weight: 700;
   line-height: 1.4;
+  margin-top: 8px;
 }
 .meta {
   display: flex;
@@ -625,12 +665,12 @@ async function onBuy() {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
 }
 .price {
   color: var(--price);
   font-weight: 700;
-  font-size: 24px;
+  font-size: 28px;
 }
 .origin {
   color: var(--text-sub);
@@ -656,6 +696,32 @@ async function onBuy() {
   border-radius: 2px;
   background: var(--brand);
 }
+.fit-card { border-color: rgba(77, 124, 255, 0.16); }
+.fit-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 14px; }
+.fit-heading span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-size: 20px; font-weight: 400; }
+.fit-picker {
+  position: relative;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--brand-soft);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.fit-picker select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.fit-note { margin: 10px 0 0; color: var(--text-sub); font-size: 12px; line-height: 1.5; }
+.core-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.core-item { display: flex; flex-direction: column; justify-content: center; gap: 5px; min-height: 70px; padding: 10px; border-radius: 12px; background: var(--brand-soft); text-align: center; }
+.core-item strong { color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
+.core-item span { color: var(--text-sub); font-size: 11px; }
+.selection-label { color: var(--text-sub); font-size: 13px; margin-bottom: 10px; }
+.selection-card .color-card, .selection-card .spec-card { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .opts {
   display: flex;
   flex-wrap: wrap;
@@ -710,14 +776,9 @@ async function onBuy() {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px 14px;
+  padding: 0;
 }
-.card--inline .block__title {
-  margin-bottom: 0;
-  font-size: 13px;
-  color: var(--text-sub);
-  flex-shrink: 0;
-}
+.card--inline .selection-label { margin-bottom: 0; }
 .card--inline .qty {
   margin-left: auto;
   display: flex;
@@ -815,47 +876,6 @@ async function onBuy() {
   margin-top: 6px;
   line-height: 1.5;
 }
-.points {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.points li {
-  position: relative;
-  display: flex;
-  align-items: center;
-  padding: 12px 14px 12px 40px;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text);
-  background: var(--brand-soft);
-  border-radius: 10px;
-}
-.points li::before {
-  content: '';
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--brand);
-}
-.points li::after {
-  content: '';
-  position: absolute;
-  left: 18px;
-  top: 50%;
-  width: 5px;
-  height: 9px;
-  border: solid #fff;
-  border-width: 0 2px 2px 0;
-  transform: translateY(-65%) rotate(45deg);
-}
 .specs {
   display: flex;
   flex-direction: column;
@@ -890,7 +910,7 @@ async function onBuy() {
   transform: translateX(-50%);
   bottom: 0;
   width: 100%;
-  max-width: 420px;
+  max-width: 760px;
   display: flex;
   gap: 10px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
@@ -909,7 +929,7 @@ async function onBuy() {
   color: var(--brand);
 }
 .btn--buy {
-  background: var(--brand);
+  background: linear-gradient(110deg, #5f98ff, var(--brand));
   color: #fff;
 }
 .toast {
