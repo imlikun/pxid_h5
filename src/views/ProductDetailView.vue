@@ -46,14 +46,14 @@
       </div>
     </div>
 
-    <div class="card fit-card" v-if="isPart" :class="{ 'fit-card--note': !fitDimension }">
-      <div class="fit-heading"><span aria-hidden="true">{{ fitDimension ? '＋' : 'i' }}</span><strong>{{ fitDimension ? '确认适配车型' : '适配信息' }}</strong></div>
-      <button v-if="fitDimension" ref="fitTrigger" class="fit-picker press" type="button" :disabled="!detailReady"
+    <div class="card fit-card" v-if="isPart">
+      <div class="fit-heading"><span aria-hidden="true">＋</span><strong>选择我的车型</strong></div>
+      <button ref="fitTrigger" class="fit-picker press" type="button" :disabled="!detailReady"
         aria-haspopup="dialog" :aria-expanded="fitOpen" @click="fitOpen = true">
-        <span class="fit-picker__text"><small>商品车型规格</small><strong>{{ selectedFit || '请选择车型' }}</strong></span>
+        <span class="fit-picker__text"><small>{{ fitDimension ? '商品车型规格' : '我的车型' }}</small><strong>{{ selectedFit || '请选择车型' }}</strong></span>
         <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
-      <p class="fit-note">{{ fitDimension ? '仅显示此商品提供的车型选项；具体适配请核对商品说明。' : '商家未提供可选车型规格，请核对商品描述或咨询商家。' }}</p>
+      <p class="fit-note">{{ fitDimension ? '所选车型对应商品规格；具体适配请核对商品说明。' : selectedFit ? `已选 ${selectedFit}，仅用于核对，不改变商品规格或订单；请向商家确认适配。` : '选择车型便于核对；商品暂无可自动验证的适配数据，请向商家确认。' }}</p>
     </div>
 
     <div class="card core-card" v-if="isVehicle && coreSpecs.length">
@@ -160,22 +160,22 @@
     </transition>
     <Teleport to="body">
       <transition name="fit-sheet">
-        <div v-if="fitOpen && fitDimension" class="fit-overlay" @click.self="closeFit">
+        <div v-if="fitOpen && isPart" class="fit-overlay" @click.self="closeFit">
           <div ref="fitPanel" class="fit-panel" role="dialog" aria-modal="true" aria-labelledby="fit-panel-title" tabindex="-1" @keydown.esc.stop="closeFit">
             <div class="fit-panel__handle" aria-hidden="true"></div>
             <div class="fit-panel__head">
-              <div><h2 id="fit-panel-title">选择车型</h2><p>仅显示当前商品提供的车型规格</p></div>
+              <div><h2 id="fit-panel-title">选择车型</h2><p>{{ fitDimension ? '当前商品可选的车型规格' : '选择我的车型，用于购买前核对' }}</p></div>
               <button type="button" class="fit-panel__close" aria-label="关闭车型选择" @click="closeFit">×</button>
             </div>
             <div class="fit-panel__options">
-              <button v-for="model in fitDimension.values" :key="model" type="button" class="fit-option"
+              <button v-for="model in fitOptions" :key="model" type="button" class="fit-option"
                 :class="{ 'fit-option--selected': selectedFit === model }"
                 :disabled="!fitAvailable(model)" :aria-pressed="selectedFit === model" @click="selectFit(model)">
                 <span>{{ model }}</span><span v-if="selectedFit === model" class="fit-option__check" aria-hidden="true">✓</span>
                 <small v-else-if="!fitAvailable(model)">缺货</small>
               </button>
             </div>
-            <p class="fit-panel__note">选项来自 Shopify 商品规格；具体适配请核对商品说明。</p>
+            <p class="fit-panel__note">{{ fitDimension ? '选项来自 Shopify 商品规格；具体适配请核对商品说明。' : '选择仅用于核对，不代表商品适配该车型，也不会改变订单规格。' }}</p>
           </div>
         </div>
       </transition>
@@ -208,6 +208,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { fetchProductDetail, getStore, sym, API_BASE, getRegion } from '../api/shop'
 import { initLocale } from '../i18n'
 import { productEntry } from '../utils/productNavigation'
+import { CAR_MODEL_LABELS } from '../data/carModels'
 import { variantForCover, colorOf, imagesForColor, sameImage, colorPreview } from '../utils/productPresentation'
 import { addToCart, cartCount } from '../store/cart'
 import { bridge } from '../bridge'
@@ -226,6 +227,7 @@ const error = ref('')
 const activeIdx = ref(0)
 const activeVariant = ref(-1)
 const qty = ref(1)
+const personalFitModel = ref('')
 const fitOpen = ref(false)
 const fitTrigger = ref(null)
 const fitPanel = ref(null)
@@ -321,7 +323,8 @@ const fitDimension = computed(() => specDims.value.find((d) =>
   variantList.value.some((v) => (v.selectedOptions || []).some((o) => o.name === d.name))
 ) || null)
 const purchaseSpecDims = computed(() => specDims.value.filter((d) => d.name !== fitDimension.value?.name))
-const selectedFit = computed(() => fitDimension.value ? specPick[fitDimension.value.name] || '' : '')
+const fitOptions = computed(() => fitDimension.value?.values || CAR_MODEL_LABELS)
+const selectedFit = computed(() => fitDimension.value ? specPick[fitDimension.value.name] || '' : personalFitModel.value)
 
 let priorBodyOverflow = ''
 watch(fitOpen, (open) => {
@@ -339,12 +342,18 @@ function closeFit() {
   nextTick(() => fitTrigger.value?.focus())
 }
 function fitAvailable(model) {
+  if (!fitDimension.value) return CAR_MODEL_LABELS.includes(model)
   const name = fitDimension.value?.name
   return !!name && variantList.value.some((v) => v.available !== false &&
     (v.selectedOptions || []).some((o) => o.name === name && o.value === model))
 }
 function selectFit(model) {
   if (!detailReady.value || !fitAvailable(model)) return
+  if (!fitDimension.value) {
+    personalFitModel.value = model
+    closeFit()
+    return
+  }
   const name = fitDimension.value.name
   const matching = (v) => v.available !== false &&
     (v.selectedOptions || []).some((o) => o.name === name && o.value === model)
@@ -464,6 +473,7 @@ async function load() {
   error.value = ''
   activeVariant.value = -1
   activeColor.value = ''
+  personalFitModel.value = ''
   fitOpen.value = false
   Object.keys(specPick).forEach((k) => delete specPick[k])
   qty.value = 1
@@ -762,11 +772,8 @@ async function onBuy() {
   background: var(--brand);
 }
 .fit-card { border-color: rgba(77, 124, 255, 0.16); }
-.fit-card--note { border-color: rgba(0, 0, 0, 0.03); }
 .fit-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 14px; }
 .fit-heading span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-size: 20px; font-weight: 400; }
-.fit-card--note .fit-heading { margin-bottom: 0; }
-.fit-card--note .fit-heading span { background: #f2f4f8; color: var(--text-sub); font-size: 15px; font-weight: 700; }
 .fit-picker {
   width: 100%;
   min-height: 58px;
@@ -790,7 +797,6 @@ async function onBuy() {
 .fit-picker__text strong { color: var(--text); font-size: 15px; }
 .fit-picker svg { flex: none; color: var(--brand); }
 .fit-note { margin: 10px 0 0; color: var(--text-sub); font-size: 12px; line-height: 1.5; }
-.fit-card--note .fit-note { margin-top: 8px; }
 .fit-overlay { position: fixed; inset: 0; z-index: 110; display: flex; align-items: flex-end; justify-content: center; background: rgba(17, 27, 50, 0.38); }
 .fit-panel { box-sizing: border-box; width: 100%; max-width: 560px; max-height: min(72vh, 620px); display: flex; flex-direction: column; padding: 8px 16px calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: #fff; box-shadow: 0 -12px 36px rgba(20, 37, 73, 0.12); outline: none; }
 .fit-panel__handle { flex: none; width: 36px; height: 4px; margin: 2px auto 16px; border-radius: 99px; background: #d8deeb; }
