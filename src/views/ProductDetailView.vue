@@ -46,17 +46,14 @@
       </div>
     </div>
 
-    <div class="card fit-card" v-if="isPart">
-      <div class="fit-heading"><span aria-hidden="true">＋</span><strong>先确认适配车型</strong></div>
-      <label class="fit-picker">
-        <span>{{ fitModel || '选择我的车型' }}</span>
-        <select v-model="fitModel" aria-label="选择车型以核对配件适配信息">
-          <option value="">选择我的车型</option>
-          <option v-for="model in CAR_MODEL_LABELS" :key="model" :value="model">{{ model }}</option>
-        </select>
-        <span aria-hidden="true">⌄</span>
-      </label>
-      <p class="fit-note">{{ fitModel ? `已选 ${fitModel}。暂无可自动验证的适配信息，请核对商品描述或咨询商家。` : '暂无可自动验证的适配信息，请核对商品描述或咨询商家。' }}</p>
+    <div class="card fit-card" v-if="isPart" :class="{ 'fit-card--note': !fitDimension }">
+      <div class="fit-heading"><span aria-hidden="true">{{ fitDimension ? '＋' : 'i' }}</span><strong>{{ fitDimension ? '确认适配车型' : '适配信息' }}</strong></div>
+      <button v-if="fitDimension" ref="fitTrigger" class="fit-picker press" type="button" :disabled="!detailReady"
+        aria-haspopup="dialog" :aria-expanded="fitOpen" @click="fitOpen = true">
+        <span class="fit-picker__text"><small>商品车型规格</small><strong>{{ selectedFit || '请选择车型' }}</strong></span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <p class="fit-note">{{ fitDimension ? '仅显示此商品提供的车型选项；具体适配请核对商品说明。' : '商家未提供可选车型规格，请核对商品描述或咨询商家。' }}</p>
     </div>
 
     <div class="card core-card" v-if="isVehicle && coreSpecs.length">
@@ -93,8 +90,8 @@
     </div>
 
     <!-- 规格（仅展示颜色之外的维度；颜色已由上方颜色卡选择） -->
-    <div class="spec-card" v-if="specDims.length">
-      <div class="spec-dim" v-for="dim in specDims" :key="dim.name">
+    <div class="spec-card" v-if="purchaseSpecDims.length">
+      <div class="spec-dim" v-for="dim in purchaseSpecDims" :key="dim.name">
         <div class="spec-dim__label">{{ specLabel(dim.name) }}</div>
         <div class="opts">
           <span
@@ -154,13 +151,35 @@
 
     <!-- 底部吸底操作 -->
     <div class="actions">
-      <button class="btn btn--cart pop press" @click="onAddCart" :disabled="!detailReady || (variantList.length > 0 && !currentVariant)">加入购物车</button>
-      <button class="btn btn--buy pop press" @click="onBuy" :disabled="!detailReady || (variantList.length > 0 && !currentVariant)">立即购买</button>
+      <button class="btn btn--cart pop press" @click="onAddCart" :disabled="!canPurchase">加入购物车</button>
+      <button class="btn btn--buy pop press" @click="onBuy" :disabled="!canPurchase">立即购买</button>
     </div>
 
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
     </transition>
+    <Teleport to="body">
+      <transition name="fit-sheet">
+        <div v-if="fitOpen && fitDimension" class="fit-overlay" @click.self="closeFit">
+          <div ref="fitPanel" class="fit-panel" role="dialog" aria-modal="true" aria-labelledby="fit-panel-title" tabindex="-1" @keydown.esc.stop="closeFit">
+            <div class="fit-panel__handle" aria-hidden="true"></div>
+            <div class="fit-panel__head">
+              <div><h2 id="fit-panel-title">选择车型</h2><p>仅显示当前商品提供的车型规格</p></div>
+              <button type="button" class="fit-panel__close" aria-label="关闭车型选择" @click="closeFit">×</button>
+            </div>
+            <div class="fit-panel__options">
+              <button v-for="model in fitDimension.values" :key="model" type="button" class="fit-option"
+                :class="{ 'fit-option--selected': selectedFit === model }"
+                :disabled="!fitAvailable(model)" :aria-pressed="selectedFit === model" @click="selectFit(model)">
+                <span>{{ model }}</span><span v-if="selectedFit === model" class="fit-option__check" aria-hidden="true">✓</span>
+                <small v-else-if="!fitAvailable(model)">缺货</small>
+              </button>
+            </div>
+            <p class="fit-panel__note">选项来自 Shopify 商品规格；具体适配请核对商品说明。</p>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
   </div>
 
   <!-- 无点击快照的冷启动也保留详情结构，不再切到整页加载文案。 -->
@@ -184,12 +203,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchProductDetail, getStore, sym, API_BASE, getRegion } from '../api/shop'
 import { initLocale } from '../i18n'
 import { productEntry } from '../utils/productNavigation'
-import { CAR_MODEL_LABELS } from '../data/carModels'
 import { variantForCover, colorOf, imagesForColor, sameImage, colorPreview } from '../utils/productPresentation'
 import { addToCart, cartCount } from '../store/cart'
 import { bridge } from '../bridge'
@@ -208,7 +226,9 @@ const error = ref('')
 const activeIdx = ref(0)
 const activeVariant = ref(-1)
 const qty = ref(1)
-const fitModel = ref('')
+const fitOpen = ref(false)
+const fitTrigger = ref(null)
+const fitPanel = ref(null)
 const toast = ref('')
 const gallery = ref(null)
 const isPart = computed(() => product.value?.collection === 'p1parts')
@@ -253,6 +273,8 @@ const descriptionHtml = computed(() => {
   return doc.body.innerHTML
 })
 const variantList = computed(() => product.value?.variants || [])
+const canPurchase = computed(() => detailReady.value &&
+  (!variantList.value.length || (currentVariant.value && currentVariant.value.available !== false)))
 const colorOption = computed(() =>
   (product.value?.options || []).find((o) => /color|colour|颜色/i.test(o.name)) || null
 )
@@ -294,6 +316,49 @@ const specDims = computed(() => {
     })
     .filter((d) => d.values.length)
 })
+const fitDimension = computed(() => specDims.value.find((d) =>
+  /^(model|vehicle model|compatible model|车型|适配车型|适用车型)$/i.test(d.name.trim()) &&
+  variantList.value.some((v) => (v.selectedOptions || []).some((o) => o.name === d.name))
+) || null)
+const purchaseSpecDims = computed(() => specDims.value.filter((d) => d.name !== fitDimension.value?.name))
+const selectedFit = computed(() => fitDimension.value ? specPick[fitDimension.value.name] || '' : '')
+
+let priorBodyOverflow = ''
+watch(fitOpen, (open) => {
+  if (open) {
+    priorBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    nextTick(() => fitPanel.value?.focus())
+  } else {
+    document.body.style.overflow = priorBodyOverflow
+  }
+})
+onUnmounted(() => { if (fitOpen.value) document.body.style.overflow = priorBodyOverflow })
+function closeFit() {
+  fitOpen.value = false
+  nextTick(() => fitTrigger.value?.focus())
+}
+function fitAvailable(model) {
+  const name = fitDimension.value?.name
+  return !!name && variantList.value.some((v) => v.available !== false &&
+    (v.selectedOptions || []).some((o) => o.name === name && o.value === model))
+}
+function selectFit(model) {
+  if (!detailReady.value || !fitAvailable(model)) return
+  const name = fitDimension.value.name
+  const matching = (v) => v.available !== false &&
+    (v.selectedOptions || []).some((o) => o.name === name && o.value === model)
+  const variants = variantList.value
+  let index = variants.findIndex((v) => matching(v) && matchVariant(v, { [name]: model }))
+  if (index < 0) index = variants.findIndex(matching)
+  if (index < 0) return
+  const previousColor = activeColor.value
+  activeVariant.value = index
+  activeColor.value = colorOf(variants[index])
+  syncSpecFromVariant()
+  if (previousColor !== activeColor.value) { entryCover.value = ''; resetGallery() }
+  closeFit()
+}
 
 // 维度名汉化（英文店铺选项名 → 中文界面展示）
 const SPEC_LABEL = { Battery: '电池容量', Size: '尺寸', Voltage: '电压', Capacity: '容量', Model: '型号', Color: '颜色' }
@@ -399,7 +464,7 @@ async function load() {
   error.value = ''
   activeVariant.value = -1
   activeColor.value = ''
-  fitModel.value = ''
+  fitOpen.value = false
   Object.keys(specPick).forEach((k) => delete specPick[k])
   qty.value = 1
   resetGallery()
@@ -474,7 +539,7 @@ function productStore() {
   try { return new URL(product.value.shopUrl).hostname } catch { return getStore() }
 }
 function onAddCart() {
-  if (!product.value || !detailReady.value || (variantList.value.length && !currentVariant.value)) return
+  if (!product.value || !canPurchase.value) return
   addToCart(product.value, {
     variantId: currentVariant.value ? currentVariant.value.id : 'def',
     variantTitle: currentVariant.value ? currentVariant.value.title : '',
@@ -486,7 +551,7 @@ function onAddCart() {
   showToast('已加入购物车')
 }
 async function onBuy() {
-  if (!product.value || !detailReady.value) return
+  if (!product.value || !canPurchase.value) return
   const vid = currentVariant.value ? currentVariant.value.id : 'def'
   // 走后端 checkout-v2 建 Shopify 购物车并预填邮箱/地址（region + Multipass 收敛在后端）
   try {
@@ -697,25 +762,54 @@ async function onBuy() {
   background: var(--brand);
 }
 .fit-card { border-color: rgba(77, 124, 255, 0.16); }
+.fit-card--note { border-color: rgba(0, 0, 0, 0.03); }
 .fit-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 14px; }
 .fit-heading span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-size: 20px; font-weight: 400; }
+.fit-card--note .fit-heading { margin-bottom: 0; }
+.fit-card--note .fit-heading span { background: #f2f4f8; color: var(--text-sub); font-size: 15px; font-weight: 700; }
 .fit-picker {
-  position: relative;
-  min-height: 46px;
+  width: 100%;
+  min-height: 58px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 14px;
+  padding: 8px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--brand-soft);
   color: var(--text);
   font-size: 14px;
-  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
-.fit-picker select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.fit-picker:disabled { cursor: wait; opacity: 0.65; }
+.fit-picker:focus-visible, .fit-panel button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.fit-picker__text { display: flex; flex-direction: column; gap: 3px; }
+.fit-picker__text small { color: var(--text-sub); font-size: 11px; }
+.fit-picker__text strong { color: var(--text); font-size: 15px; }
+.fit-picker svg { flex: none; color: var(--brand); }
 .fit-note { margin: 10px 0 0; color: var(--text-sub); font-size: 12px; line-height: 1.5; }
+.fit-card--note .fit-note { margin-top: 8px; }
+.fit-overlay { position: fixed; inset: 0; z-index: 110; display: flex; align-items: flex-end; justify-content: center; background: rgba(17, 27, 50, 0.38); }
+.fit-panel { box-sizing: border-box; width: 100%; max-width: 560px; max-height: min(72vh, 620px); display: flex; flex-direction: column; padding: 8px 16px calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: #fff; box-shadow: 0 -12px 36px rgba(20, 37, 73, 0.12); outline: none; }
+.fit-panel__handle { flex: none; width: 36px; height: 4px; margin: 2px auto 16px; border-radius: 99px; background: #d8deeb; }
+.fit-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex: none; }
+.fit-panel__head h2 { margin: 0; color: var(--text); font-size: 18px; line-height: 1.4; }
+.fit-panel__head p { margin: 5px 0 0; color: var(--text-sub); font-size: 12px; }
+.fit-panel__close { flex: none; width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--brand-soft); color: var(--text-sub); font-size: 24px; line-height: 1; }
+.fit-panel__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 22px; overflow-y: auto; overscroll-behavior: contain; }
+.fit-option { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; min-height: 52px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--text); font-size: 15px; font-weight: 600; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.fit-option--selected { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
+.fit-option:disabled { opacity: 0.48; cursor: not-allowed; }
+.fit-option__check { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 12px; }
+.fit-option small { color: var(--text-sub); font-size: 11px; }
+.fit-panel__note { flex: none; margin: 16px 0 0; color: var(--text-sub); font-size: 12px; line-height: 1.5; }
+.fit-sheet-enter-active, .fit-sheet-leave-active { transition: opacity 0.2s ease; }
+.fit-sheet-enter-active .fit-panel, .fit-sheet-leave-active .fit-panel { transition: transform 0.24s ease; }
+.fit-sheet-enter-from, .fit-sheet-leave-to { opacity: 0; }
+.fit-sheet-enter-from .fit-panel, .fit-sheet-leave-to .fit-panel { transform: translateY(100%); }
+@media (prefers-reduced-motion: reduce) { .fit-sheet-enter-active, .fit-sheet-leave-active, .fit-sheet-enter-active .fit-panel, .fit-sheet-leave-active .fit-panel { transition: none; } }
 .core-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .core-item { display: flex; flex-direction: column; justify-content: center; gap: 5px; min-height: 70px; padding: 10px; border-radius: 12px; background: var(--brand-soft); text-align: center; }
 .core-item strong { color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
