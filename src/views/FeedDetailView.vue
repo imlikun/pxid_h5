@@ -35,8 +35,8 @@
     <div v-else-if="item && images.length === 1" class="hero">
       <img class="hero__single" :src="images[0]" :alt="item.title" @click="onPreview(images[0])" />
     </div>
-    <!-- 5+ 图：置顶全宽横向轮播 + 1/N 分页 + 圆点 -->
-    <div v-else-if="item && images.length >= 5" class="hero carousel">
+    <!-- 5、8、10+ 图：置顶全宽横向轮播；6/7 图走 Bento，9 图走九宫格 -->
+    <div v-else-if="item && usesImageCarousel" class="hero carousel">
       <div class="car-track" ref="carTrack" @scroll.passive="onCarScroll">
         <img
           v-for="(img, i) in images"
@@ -107,8 +107,8 @@
     </div>
     </div>
 
-    <!-- 2-4 张：随正文流，置于正文之后（不置顶） -->
-    <FeedMediaGrid v-if="images.length >= 2 && images.length <= 4" class="body-gallery" :images="images" :alt="item.title" eager @preview="onPreview" />
+    <!-- 2/3/4/6/7/9 张：随正文流；3/6/7 张 Bento，9 张九宫格 -->
+    <FeedMediaGrid v-if="detailGalleryLayout" class="body-gallery" :layout="detailGalleryLayout" :images="images" :alt="item.title" eager @preview="onPreview" />
 
     <!-- 标签 / 车型 -->
     <div class="tags" v-if="tagList.length">
@@ -761,6 +761,14 @@ const images = computed(() => {
   const list = Array.isArray(item.value.images) ? item.value.images.filter(Boolean) : []
   return list.length ? list : item.value.cover ? [item.value.cover] : []
 })
+// 张数决定稳定的详情布局；不随机切换，避免返回或刷新后同一动态改变样式。
+const detailGalleryLayout = computed(() => ({
+  2: 'pair', 3: 'bento-3', 4: 'quad', 6: 'bento-6', 7: 'bento-7', 9: 'nine',
+})[images.value.length] || '')
+const usesImageCarousel = computed(() => {
+  const count = images.value.length
+  return count === 5 || count === 8 || count >= 10
+})
 // 单图沉浸态：仅当普通 feed 且为单图（非视频、非活动）时，顶栏透明浮于图上
 const isSingleHero = computed(() => {
   if (!item.value || isActivity.value) return false
@@ -809,9 +817,10 @@ watch(videoSrc, (url) => {
 }, { immediate: true })
 watch(id, () => { generatedPoster.value = '' })
 
-// 5+ 图横向轮播：当前页索引（驱动 1/N 分页与圆点）
+// 多图横向轮播：当前页索引（驱动 1/N 分页与圆点）
 const carIndex = ref(0)
 const carTrack = ref(null)
+watch(() => route.fullPath, () => { carIndex.value = 0 })
 function onCarScroll() {
   const el = carTrack.value
   if (!el) return
@@ -1212,7 +1221,7 @@ function showToast(msg) {
 .article__body { margin-bottom: 16px; }
 .article__body > *:last-child { margin-bottom: 0; }
 
-/* 全宽 Hero：视频/单图/5+轮播 置顶，贴顶栏、无间距（冲击感） */
+/* 全宽 Hero：视频/单图/轮播置顶，贴顶栏、无间距（冲击感） */
 .hero {
   margin: -8px -16px 16px;
   background: var(--bg);
@@ -1228,7 +1237,7 @@ function showToast(msg) {
   object-position: center top;
   background: var(--bg);
 }
-/* 5+ 图横向轮播（原生 scroll-snap，不引依赖） */
+/* 多图横向轮播（原生 scroll-snap，不引依赖） */
 .hero.carousel { position: relative; background: #000; }
 .car-track {
   display: flex;
@@ -1276,13 +1285,9 @@ function showToast(msg) {
 }
 .car-dot.on { background: #fff; width: 16px; border-radius: 3px; }
 
-/* 2-4 张：随正文流，置于正文之后（不置顶） */
+/* 拼图布局：随正文流，置于正文之后（不置顶） */
 .body-gallery {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin: 16px 0 0;
-  margin-top: 18px;
+  margin: 18px 0 0;
 }
 
 /* 作者卡 */
