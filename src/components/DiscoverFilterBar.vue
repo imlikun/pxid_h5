@@ -53,16 +53,19 @@ onDeactivated(() => { open.value = false })
 <style scoped>
 .discussion-filter { position: relative; z-index: 6; display: flex; align-items: center; gap: 8px; min-height: 56px; margin: 0 16px; }
 .scope-tabs { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-.scope-tabs button { flex: 0 0 auto; min-height: 44px; padding: 0 12px; border-radius: 12px; color: var(--text-sub); font-size: 14px; white-space: nowrap; }
+.scope-tabs button { flex: 0 0 auto; min-height: 44px; padding: 0 12px; border-radius: 12px; color: var(--text-sub); font-size: 14px; white-space: nowrap; transition: background-color 160ms ease, color 160ms ease, opacity 100ms ease; }
+.scope-tabs button:active { opacity: .75; }
 .scope-tabs button.active { color: var(--brand-ink); background: var(--brand-soft); font-weight: 700; }
 .model-menu { flex: 0 0 auto; margin-left: auto; }
 .model-trigger { min-height: 44px; display: flex; align-items: center; gap: 5px; padding: 0 0 0 7px; color: var(--text-sub); font-size: 13px; white-space: nowrap; }
-.model-trigger svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.model-trigger svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: transform 160ms cubic-bezier(.2, .8, .2, 1); }
 .model-trigger svg.expanded { transform: rotate(180deg); }
-.model-options { position: absolute; right: 0; top: 100%; width: 232px; max-width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: 0 6px 18px rgba(25, 40, 64, .08); }
+.model-options { position: absolute; right: 0; top: 100%; width: 232px; max-width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: 0 6px 18px rgba(25, 40, 64, .08); animation: model-open 160ms cubic-bezier(.2, .8, .2, 1); }
+@keyframes model-open { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
 .model-options button { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 10px; border-radius: 8px; color: var(--text-sub); font-size: 13px; }
 .model-all { width: 100%; margin-bottom: 4px; }.model-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
 .model-options button[aria-selected="true"] { color: var(--brand-ink); background: var(--brand-soft); }.model-options span { font-size: 11px; }
 button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 @media (max-width: 359px), (min-width: 600px) and (max-width: 749px) { .scope-tabs button { padding: 0 8px; font-size: 13px; }.model-trigger { font-size: 12px; } }
+@media (prefers-reduced-motion: reduce) { .scope-tabs button, .model-trigger svg { transition: none; }.model-options { animation: none; } }
 </style>

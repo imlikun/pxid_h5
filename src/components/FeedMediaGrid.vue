@@ -1,7 +1,7 @@
 <template>
   <div v-if="visibleImages.length" class="media-grid" :class="layout ? `media-grid--${layout}` : ''" :style="layout ? undefined : { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }">
     <button v-for="(src, i) in visibleImages" :key="i" type="button" class="media-cell" :class="{ 'media-cell--single': columns === 1 }" :aria-label="t('feed.imageView', { n: i + 1 })" @click.stop="$emit('preview', i)">
-      <img :src="src" :alt="alt" :loading="eager ? 'eager' : 'lazy'" @error="onError" />
+      <img :src="src" :alt="alt" :loading="eager ? 'eager' : 'lazy'" @load="!eager && revealLoadedImage($event)" @error="onError" />
       <span v-if="i === visibleImages.length - 1 && images.length > visibleImages.length" class="media-more">+{{ images.length - visibleImages.length }}</span>
     </button>
   </div>
@@ -9,6 +9,7 @@
 <script setup>
 import { computed } from 'vue'
 import { t } from '../i18n'
+import { revealLoadedImage } from '../utils/motion'
 const props = defineProps({ images: { type: Array, default: () => [] }, alt: { type: String, default: '' }, maxCount: { type: Number, default: Infinity }, eager: Boolean, layout: { type: String, default: '' } })
 defineEmits(['preview'])
 const visibleImages = computed(() => props.images.filter(Boolean).slice(0, props.maxCount))

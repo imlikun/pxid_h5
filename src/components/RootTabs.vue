@@ -36,9 +36,13 @@ function onKey(event) {
 .tabs::-webkit-scrollbar { display: none; }
 .tab { position: relative; display: grid; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 44px; height: 44px; padding: 0 8px; background: none; border: 0; white-space: nowrap; font-size: var(--root-nav-size); font-weight: 500; line-height: 24px; letter-spacing: 0; color: var(--text-sub); }
 .tab__label, .tab__measure { grid-area: 1 / 1; }
+.tab__label { transition: color 160ms ease, opacity 100ms ease; }
+.tab:active .tab__label { opacity: .7; }
 .tab__measure { font-weight: 700; visibility: hidden; pointer-events: none; }
 .tab__measure::before { content: attr(data-label); }
 .tab.active { color: var(--text); font-weight: 700; }
-.tab.active::after { content: ''; position: absolute; left: 50%; bottom: var(--root-nav-indicator-bottom); transform: translateX(-50%); width: var(--root-nav-indicator-width); height: var(--root-nav-indicator-height); border-radius: 2px; background: var(--brand); }
+.tab::after { content: ''; position: absolute; left: 50%; bottom: var(--root-nav-indicator-bottom); transform: translateX(-50%) scaleX(.7); opacity: 0; width: var(--root-nav-indicator-width); height: var(--root-nav-indicator-height); border-radius: 2px; background: var(--brand); transition: opacity 160ms ease, transform 160ms cubic-bezier(.2, .8, .2, 1); }
+.tab.active::after { opacity: 1; transform: translateX(-50%) scaleX(1); }
 .tab:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { .tab__label, .tab::after { transition: none; } }
 </style>

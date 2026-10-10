@@ -1,7 +1,7 @@
 <template>
   <div :class="['fcard', 'press', { 'is-reading': selected, 'is-pinned': item.pinned, 'fcard--discover': appearance === 'discover', 'fcard--featured': showOverlay, 'fcard--video': !!item.videoUrl, 'fcard--poster': item.kind === 'activity' }]" :data-feed-id="item.id" :aria-current="selected ? 'true' : undefined" tabindex="0" @keydown.enter.self="go" @click="go" @touchstart.passive="onWarm" @mouseenter="onWarm">
     <div class="fcard__coverwrap">
-      <img class="fcard__cover" :src="coverUrl" :alt="item.title" loading="lazy" @error="onImgErr" />
+      <img class="fcard__cover" :src="coverUrl" :alt="item.title" loading="lazy" @load="appearance === 'discover' && revealLoadedImage($event)" @error="onImgErr" />
       <span v-if="appearance === 'discover' && featured" class="fcard__pin fcard__selected"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m3 8 4-5h10l4 5-9 13L3 8Z M3 8h18 M7 3l5 18 5-18"/></svg>{{ t('discover.featured') }}</span>
       <span v-else-if="item.pinned" class="fcard__pin">{{ t('feed.pinned') }}</span>
       <!-- §3 S1：封面内右下标签 chip（≤2 个，半透明黑底白字，图上零描边零阴影） -->
@@ -39,6 +39,7 @@ import { putFeedSnapshot } from '../utils/feedSnapshot'
 import { GENERATED_COVERS } from '../constants/feedCovers'
 import { discussionRoute } from '../utils/discussion'
 import { normalizeCarModel } from '../data/carModels'
+import { revealLoadedImage } from '../utils/motion'
 
 const props = defineProps({
   item: { type: Object, required: true },

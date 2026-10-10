@@ -1565,7 +1565,12 @@ watch(() => route.fullPath, () => {
 .discover button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 @media(max-width: 359px) { .topacts { gap: 4px; } .banner__copy h2 { font-size: 20px; } }
 @media(min-width: 600px) and (max-width: 749px) { .topacts { gap: 2px; } .act { width: 44px; height: 44px; } .banner__copy { padding: 12px 12px 12px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
-@media(prefers-reduced-motion: reduce) { .banner__track, .banner__dot::after, .quick__thumb { transition: none; } }
+@media(prefers-reduced-motion: reduce) {
+  .banner__track, .banner__dot::after, .quick__thumb,
+  .searchslide-enter-active, .searchslide-leave-active { transition: none; }
+  .press { transition: none; }
+  .press:active { transform: none; }
+}
 /* 广场与动态：与推荐页保持同一圆角、边距和品牌色节奏。 */
 
 .section-title::before { content: ''; width: 3px; height: 14px; border-radius: 3px; background: var(--brand); }
