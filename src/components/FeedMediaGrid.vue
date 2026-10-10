@@ -28,6 +28,9 @@ function onError(e) { if (e.target.dataset.fallback) return; e.target.dataset.fa
 .media-grid--pair, .media-grid--quad { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .media-grid--nine { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .media-grid--quad .media-cell, .media-grid--nine .media-cell { aspect-ratio: 1; }
+.media-grid--pair, .media-grid--quad, .media-grid--nine, .media-grid--bento-3, .media-grid--bento-6, .media-grid--bento-7 { gap: 8px; }
+.media-grid[class*="media-grid--"] .media-cell { min-width: 0; min-height: 0; }
+.media-grid[class*="media-grid--"] img { object-position: center; }
 .media-grid--bento-3, .media-grid--bento-6, .media-grid--bento-7 {
   width: 100%;
   aspect-ratio: 1;

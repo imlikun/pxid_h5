@@ -1,14 +1,14 @@
 <template>
-  <div class="moment press" @click="open" @touchstart.passive="onWarm" @mouseenter="onWarm">
+  <div class="moment press" :class="{ 'is-reading': selected }" :data-feed-id="item.id" :aria-current="selected ? 'true' : undefined" tabindex="0" @keydown.enter.self="open" @click="open" @touchstart.passive="onWarm" @mouseenter="onWarm">
     <div class="m-head" @click.stop="goUser">
       <img class="m-avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
       <div class="m-meta">
         <div class="m-name">{{ item.author }}<span v-if="item.pinned" class="m-pin">{{ t('feed.pinned') }}</span></div>
         <div class="m-time">{{ formatFeedTime(item.time, locale) }}</div>
       </div>
+      <button v-if="showFollow && item.canFollow !== false && item.deviceId" type="button" class="m-follow" :class="{ 'm-follow--on': followed }" :disabled="followBusy" @click.stop="onFollow">{{ t(followed ? 'feed.follow.following' : 'feed.follow.follow') }}</button>
       <button type="button" class="m-more" :aria-label="t('feed.moreActions')" @click.stop="showMore = true">···</button>
-      <!-- 关注入口已下线（2026-09-05 坤哥拍板：全站不做社交关注）。
-           原「+ 关注 / 已关注」按钮块整体移除；后端 canFollow 字段保留，后续如需恢复在此加回。 -->
+
     </div>
 
     <div v-if="showTitle" class="m-title">{{ item.title }}</div>
@@ -25,7 +25,7 @@
 
     <div class="m-foot">
       <button v-if="item.carModel" type="button" class="m-tag" @click.stop="onCar(item.carModel)">#{{ item.carModel }}</button>
-      <span v-else-if="item.tags?.length" class="m-tag">#{{ item.tags[0] }}</span>
+      <button v-if="topicTag" type="button" class="m-tag m-tag--topic" @click.stop="onTopic(topicTag)">#{{ topicTag }}</button>
       <div class="m-acts">
         <button type="button" class="m-act" :class="{ liked }" @click.stop="onLike">
           <svg viewBox="0 0 24 24" width="16" height="16" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
@@ -52,7 +52,7 @@
 
 <script setup>
 import { computed, ref, watch, nextTick, onDeactivated, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import bridge from '../bridge'
 import { t, locale } from '../i18n'
 import FeedMediaGrid from './FeedMediaGrid.vue'
@@ -62,19 +62,43 @@ import { formatFeedTime } from '../utils/time'
 import { mediaUrl } from '../storage'
 import { captureVideoPoster } from '../utils/videoPoster'
 import { requireLogin } from '../utils/auth'
-import { likeFeed, toggleFavorite, prefetchFeedDetail, prefetchComments, prewarmFeedMedia } from '../api/feed'
+import { likeFeed, toggleFavorite, prefetchFeedDetail, prefetchComments, prewarmFeedMedia, followUser, unfollowUser } from '../api/feed'
+import { discussionRoute } from '../utils/discussion'
+import { normalizeCarModel } from '../data/carModels'
 import { putFeedSnapshot } from '../utils/feedSnapshot'
 
 const props = defineProps({
   item: { type: Object, required: true },
+  onSelect: { type: Function, default: null },
+  showFollow: Boolean,
+  selected: Boolean,
 })
+const emit = defineEmits(['follow-change', 'change'])
+const followed = ref(!!props.item.followed), followBusy = ref(false)
+watch(() => props.item.followed, value => { followed.value = !!value })
+const topicTag = computed(() => (props.item.tags || []).find(tag => !normalizeCarModel(tag) && !/^act\{/.test(tag)))
+async function onFollow() {
+  if (followBusy.value || !await requireLogin()) return
+  followBusy.value = true
+  const next = !followed.value
+  try {
+    const result = next ? await followUser(props.item.deviceId, props.item.memberUserId) : await unfollowUser(props.item.memberUserId || props.item.deviceId)
+    if (!result.ok) { showToast(result.message); return }
+    followed.value = next
+    emit('follow-change', { deviceId: props.item.deviceId, memberUserId: props.item.memberUserId, followed: next })
+  } finally { followBusy.value = false }
+}
 const router = useRouter()
+const route = useRoute()
 const previewOpen = ref(false), previewIndex = ref(0), showMore = ref(false)
 const showTitle = computed(() => !!props.item.title && !(props.item.content || '').trim().startsWith(props.item.title.trim()))
 
 const liked = ref(!!props.item.isLiked)
 const likeCount = ref(props.item.likes || 0)
 const favorited = ref(!!props.item.isFavorited)
+watch(() => props.item.isLiked, value => { liked.value = !!value })
+watch(() => props.item.likes, value => { likeCount.value = Number(value) || 0 })
+watch(() => props.item.isFavorited, value => { favorited.value = !!value })
 const toast = ref('')
 let toastTimer = null
 onDeactivated(() => { showMore.value = false; previewOpen.value = false })
@@ -133,6 +157,7 @@ const paragraphs = computed(() => {
 })
 
 function open() {
+  if (props.onSelect) { props.onSelect(props.item); return }
   // 先把卡片手里的这份数据交给详情页直出（省掉转场里的加载圈，见 utils/feedSnapshot.js）
   putFeedSnapshot(props.item)
   // App 环境：交 Flutter 原生右进左出路由全屏打开（根页与底栏原样保留），
@@ -161,8 +186,9 @@ function goUser() {
 }
 function onPreview(index) { previewIndex.value = index; previewOpen.value = true }
 function onCar(model) {
-  bridge.openNative('vehicle/' + model)
+  router.push(discussionRoute({ carModel: model, from: route.path === '/discover' ? 'dynamic' : 'detail' }))
 }
+function onTopic(topic) { router.push(discussionRoute({ topic, from: route.path === '/discover' ? 'dynamic' : 'detail' })) }
 async function onLike() {
   const ok = await requireLogin()
   if (!ok) return
@@ -179,6 +205,7 @@ async function onLike() {
   } else {
     liked.value = !!r.isLiked
     if (typeof r.likes === 'number') likeCount.value = r.likes
+    emit('change', { ...props.item, isLiked: liked.value, likes: likeCount.value })
   }
 }
 async function onFavorite() {
@@ -192,6 +219,7 @@ async function onFavorite() {
     showToast('收藏失败，请重试')
   } else {
     favorited.value = !!r.favorited
+    emit('change', { ...props.item, isFavorited: favorited.value })
     showToast(favorited.value ? '已收藏' : '已取消收藏')
   }
 }
@@ -212,9 +240,12 @@ async function copyShareLink(url) {
 </script>
 
 <style scoped>
+.m-follow { flex: 0 0 auto; min-height: 44px; padding: 0 10px; color: var(--brand); border: 1px solid var(--brand-soft); border-radius: 8px; font-size: 12px; }
+.m-follow--on { color: var(--text-hint); border-color: var(--line); }.m-follow:disabled { opacity: .5; }
+.m-tag--topic { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .moment {
   background: var(--card);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: none;
   padding: 14px;
   margin: 0 16px 12px;
@@ -375,6 +406,9 @@ async function copyShareLink(url) {
 .m-media { margin-top: 12px; }
 
 .m-act svg { width: 18px; height: 18px; }
+.m-act, .m-tag, .m-more { min-height: 44px; min-width: 44px; }
+.m-more { margin: -5px -5px 0 0; }.m-name, .m-title, .m-pin { font-weight: 500; }
+.moment:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 .m-sheet-mask { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.4); display: flex; align-items: flex-end; justify-content: center; }
 .m-sheet { width: 100%; max-width: 480px; background: white; border-radius: 16px 16px 0 0; padding: 8px 16px 16px; }

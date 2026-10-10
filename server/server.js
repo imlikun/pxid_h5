@@ -962,7 +962,7 @@ app.post('/auth/token', (req, res) => {
 
 // ---- 动态流 ----
 app.get('/feed', async (req, res) => {
-  const { tab = 'dynamic', carModel, page = 1, pageSize = 20, offset, followerDevice, region, near, radius = 50, deviceId, memberUserId } = req.query
+  const { tab = 'dynamic', scope, topic, carModel, page = 1, pageSize = 20, offset, followerDevice, region, near, radius = 50, deviceId, memberUserId } = req.query
   // viewer 关注态：按 token 身份一次查全量 follows 注入每条 followed / canFollow
   // （公开读接口，解析失败静默降级为匿名，不 401 —— 否则未登录浏览发现页会直接报错）
   const v = await resolveViewer(req).catch(() => ({ user: null, errMsg: '' }))
@@ -973,7 +973,20 @@ app.get('/feed', async (req, res) => {
   const regFiltered = ['CN', 'BR', 'US'].includes(reg) ? reg : ''
   const nowT = now()
   let w, args
-  if (tab === 'dynamic' && followerDevice) {
+  if (tab === 'dynamic' && scope === 'follow') {
+    if (!fctx) return res.status(401).json(err(401, '请先登录'))
+    // 新关注入口只返回真实关注关系。会员身份优先，避免同设备切号后串数据。
+    const identity = fctx.memberUserId && !fctx.deviceId
+      ? { clause: 'follower_member_user_id=?', args: [fctx.memberUserId] }
+      : followRelMatch('follower_member_user_id', 'follower_device', fctx.memberUserId, fctx.deviceId)
+    w = `WHERE status='published' AND (scheduled_at IS NULL OR scheduled_at <= ?) AND EXISTS (
+      SELECT 1 FROM follows WHERE ${identity.clause} AND (
+        (length(followee_member_user_id)>0 AND followee_member_user_id=feeds.member_user_id)
+        OR (length(followee_member_user_id)=0 AND length(followee_device)>0 AND followee_device=feeds.device_id)
+      ))`
+    args = [nowT, ...identity.args]
+    if (cm) { w += ' AND car_model = ?'; args.push(cm) }
+  } else if (tab === 'dynamic' && !scope && followerDevice) {
     // 关注流：官方帖 + 我关注的人的帖子（kind='official' 始终可见）
     w = `WHERE status='published' AND (scheduled_at IS NULL OR scheduled_at <= ?) AND (kind='official' OR device_id IN (SELECT followee_device FROM follows WHERE follower_device=?))`
     args = [nowT, String(followerDevice)]
@@ -984,6 +997,11 @@ app.get('/feed', async (req, res) => {
     if (cm) { w += ' AND car_model = ?'; args.push(cm) }
   }
   if (regFiltered) { w += " AND region_code IN (?, 'US')"; args.push(regFiltered) }
+  if (topic) {
+    const tag = String(topic).trim().replace(/^#+\s*/, '').trim().slice(0, 80)
+    w += ` AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(feeds.tags) THEN feeds.tags ELSE '[]' END) WHERE trim(ltrim(trim(value), '#'))=?)`
+    args.push(tag)
+  }
   // 个人主页动态流：按作者身份过滤。
   // ⚠️ T040：member 非空时【只按 member 单条件】。此前用 OR，同设备两个 member（17/24）共享
   //   同一个 device_id 时，看 24 的主页会把 17 的帖子全捞进来（实测 8 条 vs 正确的 2 条）。
@@ -998,6 +1016,9 @@ app.get('/feed', async (req, res) => {
   if (near && /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(near))) {
     const p = String(near).split(',').map(Number)
     nearLat = p[0]; nearLng = p[1]
+  }
+  if (scope === 'near' && (nearLat == null || !Number.isFinite(nearLat) || !Number.isFinite(nearLng) || Math.abs(nearLat) > 90 || Math.abs(nearLng) > 180)) {
+    return res.status(400).json(err(400, '附近动态需要有效定位'))
   }
   if (nearLat != null) {
     const cand = db.prepare(`SELECT * FROM feeds ${w}`).all(...args)
@@ -1028,6 +1049,20 @@ app.get('/feed', async (req, res) => {
     .prepare(`SELECT * FROM feeds ${w} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
     .all(...args, ps, off)
   res.json(ok({ total, list: rows.map((r) => rowToFeed(r, fctx)), tab }))
+})
+
+// 公开话题目录：与列表保持地区、发布状态、定时发布条件一致。
+// 必须放在 /feed/:id 前，避免把 topics 当成详情 ID。
+app.get('/feed/topics', (req, res) => {
+  const reg = String(req.query.region || '').toUpperCase()
+  const args = [now()]
+  let where = "f.status='published' AND (f.scheduled_at IS NULL OR f.scheduled_at<=?)"
+  if (['CN', 'BR', 'US'].includes(reg)) { where += " AND f.region_code IN (?, 'US')"; args.push(reg) }
+  const rows = db.prepare(`SELECT trim(ltrim(trim(j.value), '#')) AS name, COUNT(DISTINCT f.id) AS count
+    FROM feeds f, json_each(CASE WHEN json_valid(f.tags) THEN f.tags ELSE '[]' END) j
+    WHERE ${where} AND j.type='text' GROUP BY name ORDER BY count DESC, name`).all(...args)
+  const list = rows.filter(x => x.name && !/^(?:P|F|G)\d+$/i.test(x.name) && !/^act\{/.test(x.name)).slice(0, 60)
+  res.json(ok({ list }))
 })
 
 // ---- 我的发布（token 双身份，/user/me 专用；不依赖 getDeviceId()，彻底解决 App「我的」页数量与列表不一致）----

@@ -18,7 +18,7 @@ import { getDeviceId } from '../utils/device'
 import bridge, { authTokenReady } from '../bridge'
 
 // 后端就绪后改为真实地址（2026-08-18 已上线 pxid-api.appin.site）
-const FEED_API = 'https://pxid-api.appin.site'
+const FEED_API = import.meta.env.VITE_API_BASE || 'https://pxid-api.appin.site'
 
 // 取受限 token（后端 requireAuth 校验用）；取不到也不阻塞公开读请求
 async function getAuthTokenSafe() {
@@ -64,9 +64,9 @@ export async function fetchFeeds(tab = 'dynamic', params = {}) {
     try {
       const qsParams = { tab, ...queryParams }
       // 动态：关注流，传当前设备 ID 让后端按「关注 + 官方」过滤；near 模式显式传 followerDevice='' 则不过滤
-      if (tab === 'dynamic' && queryParams.followerDevice === undefined) qsParams.followerDevice = await getDeviceId()
+      if (tab === 'dynamic' && !queryParams.scope && queryParams.followerDevice === undefined) qsParams.followerDevice = await getDeviceId()
       const qs = new URLSearchParams(qsParams).toString()
-      const data = await request('/feed?' + qs, { auth: 'peek' })
+      const data = await request('/feed?' + qs, { auth: queryParams.scope === 'follow' ? 'wait' : 'peek' })
       return { list: (data.list || []).map(normalize), total: data.total || 0 }
     } catch (e) {
       console.warn('[fetchFeeds] API error:', e.message || e)
@@ -154,12 +154,14 @@ export async function fetchFeedDetail(id) {
   if (!p) {
     p = fetchFeedDetailRaw(id)
       .then((data) => {
-        detailCache.set(key, { ts: Date.now(), data })
+        // An interaction may have invalidated this request while it was in
+        // flight. Such a response must not refill the cache with old counts.
+        if (detailInflight.get(key) === p) detailCache.set(key, { ts: Date.now(), data })
         // 简易 LRU：超出上限淘汰最早的一条
         if (detailCache.size > 30) detailCache.delete(detailCache.keys().next().value)
         return data
       })
-      .finally(() => detailInflight.delete(key))
+      .finally(() => { if (detailInflight.get(key) === p) detailInflight.delete(key) })
     detailInflight.set(key, p)
   }
   const data = await p
@@ -205,6 +207,7 @@ export function prewarmFeedMedia(item) {
 export function invalidateFeedDetail(id) {
   if (id == null) return
   detailCache.delete(String(id))
+  detailInflight.delete(String(id))
 }
 
 // ---- 删除（仅作者，后端校验身份；软删 status='deleted'）----
@@ -314,13 +317,13 @@ export async function fetchComments(id) {
   if (!p) {
     p = fetchCommentsRaw(key)
       .then((list) => {
-        if (list) {
+        if (list && commentsInflight.get(key) === p) {
           commentsCache.set(key, { ts: Date.now(), list })
           if (commentsCache.size > 40) commentsCache.delete(commentsCache.keys().next().value)
         }
         return list
       })
-      .finally(() => commentsInflight.delete(key))
+      .finally(() => { if (commentsInflight.get(key) === p) commentsInflight.delete(key) })
     commentsInflight.set(key, p)
   }
   const list = await p
@@ -340,21 +343,33 @@ export function prefetchComments(id) {
 export function invalidateComments(id) {
   if (id == null) return
   commentsCache.delete(String(id))
+  commentsInflight.delete(String(id))
 }
 
 // ---- 广场热门活动（只读；运营后台可配基础活动；接口空/异常时前端兜底 mock）----
 import { activities as MOCK_ACTIVITIES } from '../data/mock'
 export async function fetchActivities(params = {}) {
-  if (!FEED_API) return MOCK_ACTIVITIES
-  try {
-    const qs = new URLSearchParams(params).toString()
-    const url = '/activities' + (qs ? '?' + qs : '')
-    const data = await request(url)
-    const list = data.list || []
-    return list.length ? list : MOCK_ACTIVITIES
-  } catch (e) {
+  const { allowMockFallback = true, ...query } = params
+  if (!FEED_API) {
+    if (!allowMockFallback) throw new Error('Activity API unavailable')
     return MOCK_ACTIVITIES
   }
+  try {
+    const qs = new URLSearchParams(query).toString()
+    const url = '/activities' + (qs ? '?' + qs : '')
+    const data = await request(url, { auth: 'peek' })
+    const list = data.list || []
+    return list.length || !allowMockFallback ? list : MOCK_ACTIVITIES
+  } catch (e) {
+    if (!allowMockFallback) throw e
+    return MOCK_ACTIVITIES
+  }
+}
+
+// 全量公开话题统计，不以已下载的第一页冒充总讨论数。
+export async function fetchTopics(region = '') {
+  const data = await request('/feed/topics?' + new URLSearchParams({ region }), { auth: 'peek' })
+  return data.list || []
 }
 
 // ---- 活动详情：优先真实 /activities/:id，404/异常回退本地 mock ----
@@ -559,6 +574,7 @@ export async function toggleFavorite(feedId, favorited) {
   if (!FEED_API) return { ok: false }
   try {
     const data = await request('/feed/' + feedId + '/favorite', { method: 'POST', body: { favorited } })
+    invalidateFeedDetail(feedId)
     return { ok: true, favorited: !!(data && data.favorited), favorites: data && data.favorites }
   } catch (e) {
     return { ok: false, message: e.message || '操作失败' }

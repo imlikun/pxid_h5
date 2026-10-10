@@ -1,5 +1,5 @@
 <template>
-  <div :class="['fcard', 'press', { 'is-pinned': item.pinned, 'fcard--discover': appearance === 'discover', 'fcard--featured': showOverlay, 'fcard--video': !!item.videoUrl, 'fcard--poster': item.kind === 'activity' }]" @click="go" @touchstart.passive="onWarm" @mouseenter="onWarm">
+  <div :class="['fcard', 'press', { 'is-reading': selected, 'is-pinned': item.pinned, 'fcard--discover': appearance === 'discover', 'fcard--featured': showOverlay, 'fcard--video': !!item.videoUrl, 'fcard--poster': item.kind === 'activity' }]" :data-feed-id="item.id" :aria-current="selected ? 'true' : undefined" tabindex="0" @keydown.enter.self="go" @click="go" @touchstart.passive="onWarm" @mouseenter="onWarm">
     <div class="fcard__coverwrap">
       <img class="fcard__cover" :src="coverUrl" :alt="item.title" loading="lazy" @error="onImgErr" />
       <span v-if="appearance === 'discover' && featured" class="fcard__pin fcard__selected"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m3 8 4-5h10l4 5-9 13L3 8Z M3 8h18 M7 3l5 18 5-18"/></svg>{{ t('discover.featured') }}</span>
@@ -12,6 +12,7 @@
       <div v-if="showOverlay" class="fcard__overlay"><div class="fcard__title">{{ item.title }}</div></div>
     </div>
     <div v-if="!showOverlay" class="fcard__title">{{ item.title }}</div>
+    <div v-if="appearance === 'discover' && discussionTag" class="fcard__discussion"><button type="button" @click.stop="goDiscussion">#{{ discussionTag }}</button></div>
     <div class="fcard__foot">
       <div class="author" @click.stop="goUser">
         <img class="avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
@@ -36,16 +37,21 @@ import bridge from '../bridge'
 import { prefetchFeedDetail, prefetchComments, prewarmFeedMedia } from '../api/feed'
 import { putFeedSnapshot } from '../utils/feedSnapshot'
 import { GENERATED_COVERS } from '../constants/feedCovers'
+import { discussionRoute } from '../utils/discussion'
+import { normalizeCarModel } from '../data/carModels'
 
 const props = defineProps({
   item: { type: Object, required: true },
   appearance: { type: String, default: 'standard' },
   featured: { type: Boolean, default: false },
+  selected: Boolean,
   // 可选回调：发现页分栏态（≥600px）下点卡片不跳页，改为通知父级在右栏选中详情。
   // 传了它则点击只触发 onSelect、不再走原生全屏/H5 路由；不传则维持原 go() 行为（其他页不受影响）。
   onSelect: { type: Function, default: null },
 })
 const router = useRouter()
+const discussionTag = computed(() => props.item.carModel || (props.item.tags || []).find(tag => !normalizeCarModel(tag) && !/^act\{/.test(tag)))
+function goDiscussion() { router.push(discussionRoute({ carModel: props.item.carModel, topic: props.item.carModel ? '' : discussionTag.value, from: 'recommend' })) }
 // 活动海报和视频的标题放在图片下方，避免遮住图片已有的信息。
 const showOverlay = computed(() => props.appearance === 'discover' && props.featured && !props.item.videoUrl && props.item.kind !== 'activity')
 // 封面兜底：cover → images[0] → 静态占位图（避免 src='' 出现 broken 图）
@@ -113,6 +119,7 @@ function goUser() {
 </script>
 
 <style scoped>
+.fcard__discussion { padding: 0 10px; }.fcard__discussion button { max-width: 100%; min-height: 32px; color: var(--brand); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .fcard {
   /* 白底卡片（2026-09-21 坤哥反馈：发现页推荐列表每条改白色背景）。
      对齐 MomentCard 的既有白卡规范：--card 底 + 卡片档圆角 + 极轻阴影，

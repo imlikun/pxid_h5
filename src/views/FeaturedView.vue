@@ -614,7 +614,7 @@ async function retry() {
 <style scoped>
 .featured {
   min-height: 100vh;
-  background: #f5f8fd;
+  background: var(--root-page-bg);
   padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
 }
 /* 原生底栏可能覆盖 WebView：安全区不代表底栏高度，末项需要可滚入可见区域。 */
@@ -643,11 +643,12 @@ async function retry() {
   background: none;
   cursor: pointer;
   white-space: nowrap;
-  font-size: clamp(16px, 4.3vw, 19px);
+  font-size: var(--root-nav-size);
   font-weight: 500;
   color: var(--text-sub);
   line-height: 1.2;
   padding: 4px 0;
+  min-height: 44px;
 }
 .tab.active {
   color: var(--text);
@@ -659,8 +660,8 @@ async function retry() {
   left: 50%;
   bottom: 0;
   transform: translateX(-50%);
-  width: 28px;
-  height: 3px;
+  width: var(--root-nav-indicator-width);
+  height: var(--root-nav-indicator-height);
   border-radius: 2px;
   background: var(--brand, #4a6cf7);
 }

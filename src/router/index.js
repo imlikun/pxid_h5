@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { bridge } from '../bridge'
+import { takeDiscoverReturnAnchor } from '../utils/feedReading'
 
 // 路由级懒加载：全部页面动态 import，Vite 按路由拆 chunk，
 // 首屏只加载当前页面代码，大幅减小首包体积（原 30+ 页面全打一个 bundle）
@@ -135,6 +136,28 @@ const router = createRouter({
   // 实测（600px 处点卡片）转场开始帧 scrollY 600→0 硬跳，列表先跳回顶部再滑出 —— 「抖一下」的真凶。
   scrollBehavior(to, from, savedPosition) {
     const TABS = ['/discover', '/featured', '/service']
+    // A split reader can become a phone detail after a posture change. Its
+    // previous window position is zero; return to the post instead of that
+    // obsolete position. Ordinary detail returns keep their existing behavior.
+    if (to.path === '/discover' && /^\/feed\/\d+$/.test(from.path)) {
+      const id = takeDiscoverReturnAnchor()
+      const column = document.querySelector('.discover .leftcol')
+      const card = id && column?.querySelector(`[data-feed-id="${id}"]`)
+      if (card) {
+        const split = window.matchMedia('(min-width: 600px)').matches
+        const top = Math.max(0, split
+          ? column.scrollTop + card.getBoundingClientRect().top - column.getBoundingClientRect().top - 112
+          : window.scrollY + card.getBoundingClientRect().top - 112)
+        const restore = () => {
+          if (router.currentRoute.value.fullPath !== to.fullPath) return
+          if (split) column.scrollTop = top
+          else window.scrollTo(0, top)
+        }
+        restore()
+        setTimeout(restore, 120)
+        return false
+      }
+    }
     // tab 之间浏览器前进/后退：无转场动画，让路由器直接恢复即可
     if (savedPosition && TABS.includes(to.path) && TABS.includes(from.path)) return savedPosition
     if (savedPosition) {

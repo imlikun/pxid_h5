@@ -8,7 +8,7 @@
   >
     <!-- 两栏容器：≥600px 分栏态 .leftcol(左：Tab/搜索/banner/瀑布流错落，独立滚动) + .panel(右：详情)；
          <600px 手机态 .cols 塌成单栏、.panel 不渲染，与现状一致。 -->
-    <div class="cols"><div class="leftcol" ref="leftcolRef" @scroll="onLeftcolScroll">
+    <div class="cols"><div class="leftcol" :class="{ 'leftcol--narrow': isSplit && leftPaneWidth < 340 }" ref="leftcolRef" @scroll="onLeftcolScroll">
     <!-- 下拉刷新指示器：从详情返回不再自动重拉列表（避免返回时闪一下），
          这里保留一个手动刷新入口 -->
     <div class="ptr" :style="{ height: (ptrBusy ? 44 : ptrDist) + 'px' }">
@@ -18,11 +18,12 @@
     <!-- 顶部：三 tab + 操作 -->
     <TopBar sticky :show-back="false">
       <template #left>
-        <div class="tabs" role="tablist" :aria-label="t('discover.sections')">
+        <button v-if="inDiscussion" class="discussion-back" type="button" @click="leaveDiscussion"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 5-7 7 7 7" /></svg><span>{{ discussionTitle }}</span></button>
+        <div v-else class="tabs" role="tablist" :aria-label="t('discover.sections')" @keydown="onTabKey">
           <button type="button" role="tab"
             v-for="t in tabs"
             :key="t"
-            class="tab" :aria-selected="activeTab === t"
+            class="tab" :aria-selected="activeTab === t" :tabindex="activeTab === t ? 0 : -1"
             :class="{ active: activeTab === t }"
             @click="setTab(t)"
             >{{ tabLabel(t) }}</button
@@ -54,12 +55,12 @@
 
     <!-- 搜索结果（内联过滤，不跳页） -->
     <div v-if="showSearchResults" class="search-results">
-      <div class="search-results__head">「{{ keyword }}」{{ searchResults.length }} 个结果</div>
+      <div class="search-results__head">{{ t('discover.searchResults', { q: keyword, n: searchResults.length }) }}</div>
       <div v-if="searchResults.length === 0" class="search-results__empty">{{ t('search.empty', { q: keyword }) }}</div>
       <FeedCard
         v-for="it in searchResults"
         :key="'sr-' + it.id"
-        :item="it" appearance="discover"
+        :item="it" appearance="discover" :selected="isSplit && selectedFeed?.id === it.id" :on-select="isSplit ? selectDetail : null"
         :class="fadeUp()"
       />
       <button class="search-results__clear press" @click="showSearchResults = false; keyword = ''">{{ t('search.clear') || '清除' }}</button>
@@ -125,38 +126,12 @@
       </div>
     </template>
 
-    <!-- 动态沿用原发布入口，用骑行与用车场景说明参与价值。 -->
-    <div v-if="activeTab === '动态' && !showSearchResults" class="dynamic-intro">
-      <div class="dynamic-intro__copy">
-        <p class="dynamic-intro__title">{{ t('discover.dynamic.title') }}</p>
-        <p class="dynamic-intro__hint">{{ t('discover.dynamic.hint') }}</p>
-      </div>
-      <button type="button" class="dynamic-intro__publish press" @click="onAdd">{{ t('discover.dynamic.share') }}</button>
-    </div>
-
-    <!-- 车型筛选：动态页右侧固定范围菜单，车型仍在左侧横向滚动 -->
-    <div v-if="activeTab !== '广场' && !showSearchResults" class="filter">
-      <div class="chips">
-        <button type="button" :aria-pressed="activeFilter === f.value"
-          v-for="f in currentFilters"
-          :key="f.value"
-          class="chip"
-          :class="{ active: activeFilter === f.value, mine: f.mine }"
-          @click="pickFilter(f.value)"
-          >{{ f.label }}</button
-        >
-      </div>
-      <div v-if="activeTab === '动态'" ref="scopeMenuRef" class="scope">
-        <button type="button" class="scope__trigger" aria-haspopup="listbox" :aria-expanded="scopeMenuOpen" aria-controls="dynamic-scope-menu" @click="scopeMenuOpen = !scopeMenuOpen">
-          {{ scopeTriggerLabel }}<svg viewBox="0 0 12 12" aria-hidden="true" :class="{ 'scope__chevron--open': scopeMenuOpen }"><path d="m2.5 4.5 3.5 3 3.5-3" /></svg>
-        </button>
-        <div v-if="scopeMenuOpen" id="dynamic-scope-menu" class="scope__menu" role="listbox" :aria-label="t('discover.scope.label')">
-          <button v-for="option in scopeOptions" :key="option.value" type="button" class="scope__option" role="option" :aria-selected="dynamicScope === option.value" @click="setDynamicScope(option.value)">
-            <span>{{ option.label }}</span><span v-if="dynamicScope === option.value" class="scope__check" aria-hidden="true">✓</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    <section v-if="inDiscussion && !showSearchResults" class="discussion-head">
+      <p>{{ t(discussionTopic ? 'discover.discussion.topicHint' : 'discover.discussion.modelHint') }}</p>
+      <div><span v-if="dynamicTotal > 0">{{ t('discover.topicCount', { n: dynamicTotal }) }}</span><button type="button" @click="onAdd">{{ t('discover.discussion.publish') }} <span aria-hidden="true">＋</span></button></div>
+    </section>
+    <DiscoverFilterBar v-if="activeTab === '动态' && !showSearchResults" :scope="dynamicScope" :model="selectedDynamicModel()" :mine="myCarModel" @scope="setDynamicScope" @model="pickFilter($event || '最新')" />
+    <header v-if="activeTab === '推荐' && !showSearchResults" class="recommend-heading"><h2>{{ t('discover.recommend.heading') }}</h2><button v-if="myCarModel" type="button" @click="openDiscussion(myCarModel)">{{ myCarModel }} {{ t('discover.viewDiscussion') }} ›</button><button v-else type="button" @click="setTab('广场')">{{ t('discover.plaza.topics') }} ›</button></header>
 
     <!-- 推荐：瀑布流（两列错落，热门话题卡穿插在流内） -->
     <div v-if="activeTab === '推荐' && !showSearchResults" class="content">
@@ -164,22 +139,24 @@
         <div class="wf-col">
           <template v-for="(x, i) in wfColA" :key="x.__key || x.id">
             <DiscoverTopicCard v-if="x.__topic" :name="x.__topic.name" :count="x.__topic.n" :active="!!x.__active"
-              :emoji="topicEmoji(x.__topic.name)" :category="topicCat(x.__topic.name)" :style="topicCardStyle(x.__topic)"
+              :category="topicCat(x.__topic.name)"
               @click="pickTopic(x.__topic.name)" />
-            <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
+            <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :selected="isSplit && selectedFeed?.id === x.id" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
         </div>
-        <div class="wf-col">
+        <div v-if="wfColB.length" class="wf-col">
           <template v-for="(x, i) in wfColB" :key="x.__key || x.id">
             <DiscoverTopicCard v-if="x.__topic" :name="x.__topic.name" :count="x.__topic.n" :active="!!x.__active"
-              :emoji="topicEmoji(x.__topic.name)" :category="topicCat(x.__topic.name)" :style="topicCardStyle(x.__topic)"
+              :category="topicCat(x.__topic.name)"
               @click="pickTopic(x.__topic.name)" />
-            <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
+            <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :selected="isSplit && selectedFeed?.id === x.id" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
         </div>
       </div>
       <!-- 空态：此前筛选无结果/无数据时整片空白，容易被误认为「帖子不显示」 -->
-      <div v-if="!recommendList.length && !loading" class="empty-tab">
+      <div v-if="feedLoading.recommend && !recommendList.length" class="empty-tab" role="status">{{ t('discover.loadingMore') }}</div>
+      <div v-else-if="loadErr" class="empty-tab" role="status"><p>{{ loadErr }}</p><button type="button" class="dynamic-empty__action" @click="loadFeed('recommend')">{{ t('discover.dynamic.retry') }}</button></div>
+      <div v-else-if="!recommendList.length && !loading" class="empty-tab">
         {{ recommendEmptyText }}
         <span
           v-if="activeFilter !== '全部'"
@@ -197,7 +174,7 @@
           v-for="(it, i) in dynamicList"
           :key="it.id"
           :item="it"
-          :class="[fadeUp(), staggerFor(i)]"
+          show-follow :selected="isSplit && selectedFeed?.id === it.id" :on-select="isSplit ? selectDetail : null" @follow-change="onFollowChanged" @change="syncFeedChange"
         />
         <div v-if="(nearLoading || dynamicLoading) && dynamicList.length === 0" class="empty-tab">{{ nearLoading ? t('discover.nearLoading') : t('discover.loadingMore') }}</div>
         <div v-else-if="dynamicList.length === 0" class="empty-tab dynamic-empty" role="status">
@@ -213,124 +190,18 @@
       </div>
     </template>
 
-    <!-- 广场：车型展示 + 热门活动 + 非搜索态 -->
-    <div v-else-if="activeTab === '广场' && !showSearchResults" class="content plaza-content">
-      <div class="grid3">
-        <button type="button"
-          v-for="(p, i) in plazaShowcase"
-          :key="p.id"
-          class="showcase press"
-          :class="[fadeUp(), 'stagger-' + (i + 1)]"
-          @click="onShowcase(p)"
-        >
-          <img class="showcase__img" :src="p.cover" :alt="p.name" loading="lazy" />
-          <div class="showcase__bar">{{ p.name }}</div>
-        </button>
-      </div>
-      <div class="section-head">
-        <span class="section-title">{{ t('discover.hotActivities') }}</span>
-        <button type="button" class="section-more" @click="onMoreActivity">{{ t('discover.more') }} <span aria-hidden="true">›</span></button>
-      </div>
-      <div class="acts">
-        <div
-          v-for="(a, i) in actList"
-          :key="a.id"
-          class="activity press"
-          :class="[fadeUp(), 'stagger-' + (i + 1)]"
-          @click="onActivity(a)"
-        >
-          <img class="act__img" :src="a.cover" :alt="a.title" loading="lazy" />
-          <div class="act__info">
-            <div class="act__title">{{ a.title }}</div>
-            <div v-if="fmtDate(a)" class="act__date"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4m8-4v4M4 10h16"/></svg>{{ fmtDate(a) }}</div>
-          </div>
-          <button type="button" class="act__btn" @click.stop="onActivity(a)"><span>{{ t('discover.viewNow') }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button>
-        </div>
-      </div>
-    </div>
+    <DiscoverPlaza v-else-if="activeTab === '广场' && !showSearchResults" :mine="myCarModel" :topics="topicCatalog" :topics-error="topicsError" :activities="actList" :loading-activities="activitiesLoading" :activities-error="activitiesError" @model="openDiscussion($event)" @topic="openDiscussion('', $event)" @activities="onMoreActivity" @activity="onActivity" @retry-topics="loadTopics" />
     </div><!-- /leftcol -->
 
-    <!-- 折叠屏右栏详情面板：分栏态（≥600px）下作为 .cols 直接子节点与 .leftcol 左右并排。
-         仅推荐 tab + 分栏态渲染；点左栏卡片切换、▲▼连翻、默认置顶条。手机态不渲染。 -->
-    <div v-if="activeTab === '推荐' && !showSearchResults && isSplit" class="panel">
-      <div class="panel__nav">
-        <span class="panel__tag" v-if="selectedFeed && selectedFeed.pinned">置顶推荐</span>
-        <button class="panel__navbtn" @click="stepDetail(-1)" :disabled="!recommendList.length">▲ 上一条</button>
-        <button class="panel__navbtn" @click="stepDetail(1)" :disabled="!recommendList.length">▼ 下一条</button>
-      </div>
-      <div v-if="detailLoading || !detailItem" class="panel__loading">
-        <span v-if="!selectedFeed">选一条动态看看</span>
-        <span v-else>加载详情中…</span>
-      </div>
-      <template v-else>
-        <!-- 视频：置顶全宽 -->
-        <div v-if="detailItem.videoUrl" class="panel__hero">
-          <video class="panel__hero-video" :src="detailItem.videoUrl" controls playsinline preload="metadata"></video>
-        </div>
-        <!-- 单图：置顶全宽大图 -->
-        <div v-else-if="detailItem.images && detailItem.images.length === 1" class="panel__hero">
-          <img class="panel__img" :src="detailItem.images[0]" :alt="detailItem.title || ''" />
-        </div>
-        <!-- 5+ 图：置顶全宽横向轮播 + 1/N 分页 + 圆点 -->
-        <div v-else-if="detailItem.images && detailItem.images.length >= 5" class="panel__hero panel__carousel">
-          <div class="panel__car-track" ref="panelCarTrack" @scroll.passive="onPanelCarScroll">
-            <img
-              v-for="(img, i) in detailItem.images"
-              :key="i"
-              class="panel__car-slide"
-              :src="img"
-              :alt="detailItem.title || ''"
-            />
-          </div>
-          <div class="panel__car-count">{{ panelCarIndex + 1 }}/{{ detailItem.images.length }}</div>
-          <div class="panel__car-dots">
-            <span
-              v-for="(img, i) in detailItem.images"
-              :key="'d' + i"
-              class="panel__car-dot"
-              :class="{ on: i === panelCarIndex }"
-            ></span>
-          </div>
-        </div>
-
-        <div class="panel__body">
-          <div class="panel__title">{{ detailItem.title || (detailItem.content || '').slice(0, 30) }}</div>
-          <div class="panel__author">
-            <img v-if="detailItem.avatar" :src="detailItem.avatar" :alt="detailItem.author" />
-            <div class="panel__authinfo">
-              <span>{{ detailItem.author }}</span>
-              <em>{{ detailItem.kind === 'official' ? '官方' : '车主' }}</em>
-            </div>
-          </div>
-          <div class="panel__text">{{ detailItem.content }}</div>
-          <!-- 2-4 张：不置顶，随正文流双列网格 -->
-          <div v-if="detailItem.images && detailItem.images.length >= 2 && detailItem.images.length <= 4" class="panel__grid">
-            <img
-              v-for="(img, i) in detailItem.images"
-              :key="i"
-              class="panel__grid-img"
-              :src="img"
-              :alt="detailItem.title || ''"
-            />
-          </div>
-          <div class="panel__stat">
-            <span><b>{{ detailItem.likes }}</b> 赞</span>
-            <span>{{ detailItem.comments || 0 }} 评论</span>
-          </div>
-        </div>
-        <div v-if="detailComments.length" class="panel__cmt">
-          <h4>评论</h4>
-          <div v-for="cm in detailComments" :key="cm.id" class="panel__cmtitem">
-            <img v-if="cm.avatar" :src="cm.avatar" :alt="cm.author" />
-            <div>
-              <div class="panel__cmname">{{ cm.author }}</div>
-              <div class="panel__cmttext">{{ cm.content }}</div>
-            </div>
-          </div>
-        </div>
-      </template>
-    </div>
+    <!-- Folded screens reuse the complete phone reader, including real interactions. -->
+    <aside v-if="(activeTab !== '广场' || showSearchResults) && isSplit" class="panel" :aria-label="t('feed.detail.title.content')" @pointerdown="panelTouched = true" @keydown="panelTouched = true" @wheel.passive="panelTouched = true">
+      <FeedDetailReader v-if="selectedFeed" :key="selectedFeed.id" ref="readerRef" embedded :feed-id="selectedFeed.id" :initial-item="selectedFeed" @expand="openPanelDetail" @change="syncFeedChange" @removed="removePanelFeed">
+        <template #navigation><nav class="reader-paging" :aria-label="t('discover.reader.navigation')"><button type="button" :disabled="selectedIndex <= 0" @click="stepDetail(-1)">‹ {{ t('discover.reader.previous') }}</button><span>{{ selectedIndex + 1 }} / {{ visibleFeed.length }}</span><button type="button" :disabled="selectedIndex >= visibleFeed.length - 1" @click="stepDetail(1)">{{ t('discover.reader.next') }} ›</button></nav></template>
+      </FeedDetailReader>
+      <div v-else class="panel__loading" role="status">{{ t('discover.reader.empty') }}</div>
+    </aside>
     </div><!-- /cols -->
+
 
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
@@ -339,12 +210,19 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onActivated, onDeactivated, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, defineAsyncComponent, watch, onMounted, onActivated, onDeactivated, onUnmounted, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import FeedLoadState from '../components/FeedLoadState.vue'
 import DiscoverTopicCard from '../components/DiscoverTopicCard.vue'
 import MomentCard from '../components/MomentCard.vue'
+import DiscoverFilterBar from '../components/DiscoverFilterBar.vue'
+import DiscoverPlaza from '../components/DiscoverPlaza.vue'
+const FeedDetailReader = defineAsyncComponent(() => import('./FeedDetailView.vue'))
+import { discussionRoute, normalizeTopic } from '../utils/discussion'
+import { requireLogin } from '../utils/auth'
+import { putFeedSnapshot } from '../utils/feedSnapshot'
+import { handoffFeedReading, setDiscoverReturnAnchor } from '../utils/feedReading'
 import IconSvg from '../components/IconSvg.vue'
 import TopBar from '../components/TopBar.vue'
 const quickImage = (key) => ({
@@ -360,10 +238,6 @@ const QUICK_IMAGES = {
 import {
   discoverTabs,
   discoverQuick,
-  plazaFilters,
-  plazaShowcase,
-  recommendFilters,
-  dynamicFilters,
 } from '../data/mock'
 import { CAR_MODEL_LABELS, normalizeCarModel } from '../data/carModels'
 import { clearNewMoment } from '../store/ui'
@@ -373,11 +247,25 @@ import { t, locale, initLocale, regionFromLocale } from '../i18n'
 // 官方公告未读数（驱动发现页快捷区红点）：必须走响应式 store
 // 直接读 mock.notices 的 isRead 不会触发更新 —— mock 是普通数组，属性变化不会被 computed 追踪
 import { noticeUnread } from '../store/noticeStore'
-import { fetchFeeds, fetchActivities, fetchFeedDetail, fetchComments } from '../api/feed'
+import { fetchFeeds, fetchActivities, fetchTopics } from '../api/feed'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
 const router = useRouter()
+const route = useRoute()
+const discussionModel = computed(() => route.path === '/discover' && route.query.discussion ? normalizeCarModel(route.query.carModel) : '')
+const discussionTopic = computed(() => route.path === '/discover' && route.query.discussion ? normalizeTopic(route.query.topic) : '')
+const inDiscussion = computed(() => !!(discussionModel.value || discussionTopic.value))
+const discussionTitle = computed(() => discussionTopic.value ? '#' + discussionTopic.value : t('discover.modelDiscussion', { model: discussionModel.value }))
+function openDiscussion(carModel = '', topic = '', from = TAB_KEY[activeTab.value]) {
+  router.push(discussionRoute({ carModel, topic, from }))
+}
+function leaveDiscussion() {
+  const previous = history.state?.back
+  if (route.query.from === 'detail' && typeof previous === 'string' && previous.startsWith('/') && !previous.startsWith('/discover')) { router.back(); return }
+  const tab = ['recommend', 'dynamic', 'plaza'].includes(route.query.from) ? route.query.from : 'plaza'
+  router.push({ path: '/discover', query: { tab } })
+}
 // Banner 轮播：视频 + 实拍 + 不同车型渲染图混排，后端运营 banner 追加
 const LOCAL_BANNERS = [
   { type: 'video', src: import.meta.env.BASE_URL + 'banner/banner-hero.mp4', poster: import.meta.env.BASE_URL + 'banner/banner-hero-poster.jpg', title: 'PXID 实拍', url: '/featured' },
@@ -459,20 +347,22 @@ const myCarModel = ref('')
 let filterTouched = false
 let recommendationFilterTouched = false
 
-// 推荐保留绑定车型默认值；动态默认看所有车型，绑定车型仅作为辅助筛选。
-function defaultFilter(tab) {
-  if (tab === '动态') return '最新'
-  const mine = myCarModel.value
-  if (mine && CAR_MODEL_LABELS.includes(mine)) return mine
-  return tab === '推荐' ? '全部' : '最新'
-}
+// 推荐浏览精选内容，动态独立记忆车型，不随切换栏目清空。
+const dynamicModel = ref('')
+function defaultFilter(tab) { return tab === '推荐' ? '全部' : dynamicModel.value || '最新' }
 // 筛选 chip 点击统一入口：置「用户已操作」标记，避免被迟到的 getUserInfo 回包覆盖
 function pickFilter(v) {
+  // 保留原车型筛选的汉字标签护栏，避免非车型标签进入车型请求。
+  if (v !== '全部' && v !== '最新' && /[\u4e00-\u9fff]/.test(String(v || ''))) return
   if (activeFilter.value === v) return
   filterTouched = true
+  if (inDiscussion.value) {
+    router.replace({ path: '/discover', query: { ...route.query, carModel: normalizeCarModel(v) || undefined } })
+    return
+  }
   if (activeTab.value === '推荐') recommendationFilterTouched = true
   activeFilter.value = v
-  if (activeTab.value === '动态') reloadDynamicFeed()
+  if (activeTab.value === '动态') { dynamicModel.value = normalizeCarModel(v); reloadDynamicFeed() }
 }
 // 默认选中「我的车」后的兜底：该车型在库里一条内容都没有时，静默退回「全部/最新」，
 // 否则用户一进发现页就是一片空白（chip 仍在第一位，想筛随时点）。
@@ -512,30 +402,7 @@ const recommendData = ref([])
 const dynamicData = ref([])
 // 动态范围与车型是两个独立筛选维度；默认展示全部动态。
 const dynamicScope = ref('all')
-const scopeMenuOpen = ref(false)
-const scopeMenuRef = ref(null)
-const scopeOptions = computed(() => [
-  { value: 'all', label: t('discover.scope.all') },
-  { value: 'follow', label: t('discover.scope.follow') },
-  { value: 'near', label: t('discover.scope.near') },
-])
-const scopeTriggerLabel = computed(() =>
-  t(`discover.scope.${dynamicScope.value === 'follow' ? 'followShort' : dynamicScope.value}`)
-)
-function onScopeOutside(e) {
-  if (scopeMenuOpen.value && !scopeMenuRef.value?.contains(e.target)) scopeMenuOpen.value = false
-}
-function onScopeEscape(e) {
-  if (e.key === 'Escape') scopeMenuOpen.value = false
-}
-onMounted(() => {
-  document.addEventListener('pointerdown', onScopeOutside)
-  document.addEventListener('keydown', onScopeEscape)
-})
-onUnmounted(() => {
-  document.removeEventListener('pointerdown', onScopeOutside)
-  document.removeEventListener('keydown', onScopeEscape)
-})
+const scopeTriggerLabel = computed(() => t(`discover.scope.${dynamicScope.value === 'follow' ? 'followShort' : dynamicScope.value}`))
 const nearCoords = ref(null)
 const nearList = ref([])
 const nearLoading = ref(false)
@@ -543,28 +410,13 @@ const dynamicLoading = ref(false)
 const dynamicError = ref('')
 // 广场热门活动（从 /activities 接口拉取，随地区切换）
 const actList = ref([])
+const activitiesLoading = ref(false), activitiesError = ref(false)
+const topicCatalog = ref([]), topicsError = ref(false)
+const dynamicTotal = ref(0)
+let catalogGeneration = 0, activityGeneration = 0
+let plazaLoaded = false
 const loading = ref(false)
 const loadErr = ref('')
-
-// 车型筛选 chip：与广场一致，使用固定的 12 个在售车型列表（不再从动态接口动态提取）
-// 防御性过滤：车型代号均为纯字母数字，若异常数据混入中文标签则剔除
-// 「我的车」：若当前用户绑定车型且在售列表中，则在首位（全部/最新之后）插入一个带车图标的专属 chip
-const currentFilters = computed(() => {
-  const isRec = activeTab.value === '推荐'
-  const lead = isRec ? '全部' : '最新'
-  const mine = myCarModel.value
-  const mineValid = !!mine && CAR_MODEL_LABELS.includes(mine)
-  const rest = (isRec ? recommendFilters : dynamicFilters)
-    .slice(1)
-    .filter((c) => c === '全部' || c === '最新' || !/[\u4e00-\u9fff]/.test(c))
-  const chips = [{ value: lead, label: filterLabel(lead) }]
-  if (mineValid) chips.push({ value: mine, label: '🚗 ' + mine, mine: true })
-  rest.forEach((c) => {
-    if (mineValid && c === mine) return // 已作为「我的车」前置，避免重复
-    chips.push({ value: c, label: filterLabel(c) })
-  })
-  return chips
-})
 
 // 置顶优先 + 排序（最新/最热）：pinned 始终在前，组内按模式排序
 function tsOf(i) {
@@ -581,22 +433,7 @@ function rankList(list) {
     return tsOf(b) - tsOf(a)
   })
 }
-// 热门话题：从已加载推荐数据的 tags 聚合（跳过 P5 / ant5 这类车型代号标签）
-// A 方案轻量产品化：给话题卡加封面 emoji、分类、热度/讨论/参与，仍在瀑布流内穿插。
-const TOPIC_PALETTE = [
-  { bg: '#FFE8F0', color: '#E9407A' }, // 粉
-  { bg: '#FFF0E6', color: '#FF7A2F' }, // 橙
-  { bg: '#FFF8E0', color: '#E6A700' }, // 黄
-  { bg: '#E8F9F1', color: '#18B566' }, // 绿
-  { bg: '#EEF3FF', color: '#4D7CFF' }, // 蓝
-  { bg: '#F2EDFF', color: '#7C5CFF' }, // 紫
-]
-const TOPIC_EMOJIS = ['🛵', '🔧', '🏕️', '🔋', '🛡️', '🎁', '🚲', '⚡', '🌄', '🧰', '📸', '🏆']
-function topicEmoji(name) {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = ((h * 31) + name.charCodeAt(i)) >>> 0
-  return TOPIC_EMOJIS[h % TOPIC_EMOJIS.length]
-}
+// 推荐与广场复用话题分类和图标语义。
 function topicCat(name) {
   const up = name.toUpperCase()
   if (/官方|活动|品牌|公告|PXID/.test(name)) return t('discover.topicOfficial')
@@ -605,51 +442,18 @@ function topicCat(name) {
 }
 
 
-function topicCardStyle(topic) {
-  const p = TOPIC_PALETTE[(topic.colorIndex || 0) % TOPIC_PALETTE.length]
-  return {
-    '--tc-cover-from': p.bg,
-    '--tc-cover-to': p.color,
-    '--tc-color': p.color,
-  }
-}
-const activeTopic = ref('')
-const hotTopics = computed(() => {
-  const cnt = {}
-  // 后续页只追加内容，不让新标签重排已显示的话题卡。
-  recommendData.value.slice(0, PAGE_SIZE).forEach((x) =>
-    (x.tags || []).forEach((t) => {
-      if (!t) return
-      if (/^(P|G)?\d+$/i.test(t)) return
-      cnt[t] = (cnt[t] || 0) + 1
-    })
-  )
-  return Object.entries(cnt)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 9)
-    .map(([name, n], i) => ({ name, n, colorIndex: i % TOPIC_PALETTE.length }))
-})
-const pickTopic = (t) => {
-  activeTopic.value = activeTopic.value === t ? '' : t
-}
+const hotTopics = computed(() => topicCatalog.value.slice(0, 9).map(x => ({ name: x.name, n: x.count })))
+const pickTopic = name => openDiscussion('', name, 'recommend')
 // 推荐：按车型筛选 + 话题筛选 + 置顶优先 + 排序
 const recommendList = computed(() => {
   const f = activeFilter.value
   let list = f === '全部' ? recommendData.value : recommendData.value.filter((i) => i.carModel === f)
-  if (activeTopic.value) list = list.filter((i) => (i.tags || []).includes(activeTopic.value))
   // 每页入库时已排序；这里保持分页前缀顺序，避免续载时旧卡片换列。
   return list
 })
 // 瀑布流混合流：动态卡片 + 热门话题卡（插在第 3、8、13 位，与动态错落排布）
 const wfFeed = computed(() => {
   const arr = recommendList.value
-  // 话题筛选态：流首放一张“当前话题卡”，点它退出筛选
-  if (activeTopic.value) {
-    return [
-      { __active: true, __topic: { name: activeTopic.value, n: arr.length }, __key: 'tp-active' },
-      ...arr
-    ]
-  }
   const tops = hotTopics.value.slice(0, 3)
   if (!tops.length) return arr
   // 插入位取偶数索引，使话题卡落点变成 左(p=2) / 右(p=9) / 左(p=16) 交替，不挤在同一列
@@ -666,7 +470,7 @@ const wfFeed = computed(() => {
   return out
 })
 // 竖图为主，视频保留横图；按当前列宽估算图片与文字高度，分页时稳定分列。
-const featuredIds = computed(() => new Set(recommendList.value.slice(0, 2).map(x => x.id)))
+const featuredIds = computed(() => new Set(recommendList.value.filter(x => x.pinned).map(x => x.id)))
 const feedViewportWidth = ref(window.innerWidth)
 function updateFeedWidth() { feedViewportWidth.value = window.innerWidth }
 window.addEventListener('resize', updateFeedWidth, { passive: true })
@@ -676,10 +480,13 @@ function estItemHeight(x) {
   const columnWidth = ((feedViewportWidth.value >= 600 ? feedViewportWidth.value / 2 : feedViewportWidth.value) - 44) / 2
   const imageHeight = columnWidth * (x.videoUrl ? 3 / 4 : 4 / 3)
   const overlay = featuredIds.value.has(x.id) && !x.videoUrl && x.kind !== 'activity'
-  if (overlay) return imageHeight + 38
-  return imageHeight + 68 + ((x.title || '').length > 14 ? 21 : 0)
+  if (overlay) return imageHeight + 70
+  return imageHeight + 100 + ((x.title || '').length > 14 ? 21 : 0)
 }
+const leftPaneWidth = ref(window.innerWidth >= 600 ? window.innerWidth / 2 : window.innerWidth)
+let paneObserver = null
 const wfColumns = computed(() => {
+  if (isSplit.value && leftPaneWidth.value < 340) return [wfFeed.value, []]
   const columns = [[], []], heights = [0, 0]
   for (const x of wfFeed.value) {
     const i = heights[0] <= heights[1] ? 0 : 1
@@ -697,7 +504,11 @@ const wfColB = computed(() => wfColumns.value[1])
 // H5 只做「左瀑布流 + 右详情」两栏，自动等分吃满 H5 拿到的宽度。
 const SPLIT_MQ = window.matchMedia('(min-width: 600px)')
 const isSplit = ref(SPLIT_MQ.matches)
-function onSplitChange(e) { isSplit.value = e.matches }
+function onSplitChange(e) {
+  // A passive default preview does not navigate; an actively read post stays open.
+  if (!e.matches && panelTouched && discoverActive && route.path === '/discover' && readerRef.value) openPanelDetail()
+  isSplit.value = e.matches
+}
 if (SPLIT_MQ.addEventListener) SPLIT_MQ.addEventListener('change', onSplitChange)
 else SPLIT_MQ.addListener(onSplitChange)
 onUnmounted(() => {
@@ -705,62 +516,60 @@ onUnmounted(() => {
   else SPLIT_MQ.removeListener(onSplitChange)
 })
 
-// 右栏选中项 + 全量详情 + 评论（分栏态点左栏卡片只切右栏，不跳页）
-const selectedFeed = ref(null)
-const detailLoading = ref(false)
-const detailItem = ref(null)      // fetchFeedDetail 全量（含正文长文 / 图片）
-const detailComments = ref([])    // fetchComments 前 6 条
-// 5+ 图横向轮播：当前页索引（驱动 1/N 分页与圆点）
-const panelCarIndex = ref(0)
-const panelCarTrack = ref(null)
-function onPanelCarScroll() {
-  const el = panelCarTrack.value
-  if (!el) return
-  const idx = Math.round(el.scrollLeft / el.clientWidth)
-  if (idx !== panelCarIndex.value) panelCarIndex.value = idx
-}
-watch(detailItem, () => { panelCarIndex.value = 0 })
-async function loadPanel(id) {
-  selectedFeed.value = recommendList.value.find((x) => String(x.id) === String(id)) || null
+// The selected post is shared with the list; the reader owns detail and comments.
+const selectedFeed = ref(null), readerRef = ref(null)
+let panelTouched = false
+let returnToFeed = null
+const selectedIndex = computed(() => visibleFeed.value.findIndex(x => String(x.id) === String(selectedFeed.value?.id)))
+function openPanelDetail() {
   if (!selectedFeed.value) return
-  detailLoading.value = true
-  const [d, c] = await Promise.all([
-    fetchFeedDetail(id),
-    fetchComments(id).catch(() => []),
-  ])
-  // 快速连点/翻页时，旧请求返回不得覆盖当前选中
-  if (String(selectedFeed.value && selectedFeed.value.id) !== String(id)) return
-  detailItem.value = d
-  detailComments.value = (c || []).slice(0, 6)
-  detailLoading.value = false
+  const item = readerRef.value?.getItem() || selectedFeed.value
+  returnToFeed = item.id
+  setDiscoverReturnAnchor(item.id)
+  putFeedSnapshot(item)
+  handoffFeedReading(item.id, readerRef.value?.getReadingState() || {})
+  if (!bridge.openFeedDetailNative(item.id)) router.push('/feed/' + item.id)
 }
-function selectDetail(item) {
-  if (item && item.id != null) loadPanel(item.id)
+function selectDetail(item, automatic = false) {
+  if (!item || item.id == null) return
+  panelTouched = !automatic
+  putFeedSnapshot(item)
+  selectedFeed.value = item
 }
-// ▲ 上一条 / ▼ 下一条：在推荐流（置顶优先排序）里循环翻
 function stepDetail(delta) {
-  const list = recommendList.value
-  if (!list.length) return
-  const i = list.findIndex((x) => String(x.id) === String(selectedFeed.value && selectedFeed.value.id))
-  const n = i < 0 ? 0 : (i + delta + list.length) % list.length
-  selectDetail(list[n])
+  const next = selectedIndex.value + delta
+  if (next >= 0 && next < visibleFeed.value.length) {
+    selectDetail(visibleFeed.value[next])
+    nextTick(() => {
+      const current = leftcolRef.value?.querySelector('[aria-current="true"]')
+      if (!current) return
+      const parent = leftcolRef.value, rect = current.getBoundingClientRect(), bounds = parent.getBoundingClientRect()
+      if (rect.top < bounds.top + 112 || rect.bottom > bounds.bottom) parent.scrollTop += rect.top - bounds.top - 112
+    })
+  }
 }
-// 分栏首屏：列表数据回来后默认选中置顶那条（list[0]），右栏不留白
-watch(recommendList, (l) => {
-  if (isSplit.value && l.length && !selectedFeed.value) selectDetail(l[0])
-})
-watch(isSplit, (v) => {
-  if (v && !selectedFeed.value && recommendList.value.length) selectDetail(recommendList.value[0])
-})
+function syncFeedChange(updated) {
+  if (!updated) return
+  const fields = ['likes', 'isLiked', 'favorites', 'isFavorited', 'comments']
+  for (const item of [...recommendData.value, ...dynamicData.value, ...nearList.value]) {
+    if (String(item.id) !== String(updated.id)) continue
+    for (const key of fields) if (updated[key] !== undefined) item[key] = updated[key]
+  }
+  putFeedSnapshot(updated)
+}
+function removePanelFeed(id) {
+  for (const list of [recommendData, dynamicData, nearList]) list.value = list.value.filter(x => String(x.id) !== String(id))
+}
 // 推荐区空态文案：车型筛选无结果 vs 全部无数据，语义分开给，避免白屏无解释
 const recommendEmptyText = computed(() =>
   activeFilter.value === '全部' ? t('discover.emptyAll') : t('discover.emptyDynamic')
 )
-const hasDynamicModel = computed(() => activeFilter.value !== '最新' && activeFilter.value !== '全部')
-const hasDynamicFilter = computed(() => hasDynamicModel.value || dynamicScope.value !== 'all')
+const hasDynamicModel = computed(() => !!dynamicModel.value)
+const hasDynamicFilter = computed(() => hasDynamicModel.value || !!discussionTopic.value || dynamicScope.value !== 'all')
 const dynamicEmptyText = computed(() => {
   if (dynamicError.value) return dynamicError.value
-  if (hasDynamicModel.value) return t('discover.dynamic.emptyModel', { model: activeFilter.value })
+  if (discussionTopic.value) return t('discover.discussion.emptyTopic', { topic: discussionTopic.value })
+  if (hasDynamicModel.value) return t('discover.dynamic.emptyModel', { model: dynamicModel.value })
   return t(`discover.dynamic.empty.${dynamicScope.value}`)
 })
 const dynamicEmptyHint = computed(() =>
@@ -770,22 +579,20 @@ const dynamicEmptyHint = computed(() =>
 )
 function clearDynamicFilters() {
   scopeSelectionVersion++ // 取消尚未完成的附近定位，避免回包重新切走。
-  scopeMenuOpen.value = false
   dynamicScope.value = 'all'
   nearCoords.value = null
   nearLoading.value = false
   filterTouched = true
   activeFilter.value = '最新'
+  dynamicModel.value = ''
+  if (inDiscussion.value) return router.push({ path: '/discover', query: { tab: 'dynamic' } })
   return reloadDynamicFeed()
 }
 
-// 动态：按车型筛选，最新=全部 + 置顶优先 + 排序；附近子栏用 nearList
-const dynamicList = computed(() => {
-  const src = dynamicScope.value === 'near' ? nearList.value : dynamicData.value
-  const f = activeFilter.value
-  const list = f === '最新' || f === '全部' ? src : src.filter((i) => i.carModel === f)
-  return dynamicScope.value === 'near' ? rankList(list) : list
-})
+// 保持服务端分页顺序；附近按距离，普通动态按发布时间，不被置顶二次打乱。
+const dynamicList = computed(() => dynamicScope.value === 'near' ? nearList.value : dynamicData.value)
+const visibleFeed = computed(() => showSearchResults.value ? searchResults.value : activeTab.value === '动态' ? dynamicList.value : recommendList.value)
+
 
 // 官方公告未读数 noticeUnread 见顶部 import（noticeStore）：进入详情即写已读，返回后红点自动消失
 
@@ -794,9 +601,22 @@ const currentFeedKey = computed(() =>
   activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
 )
 
+function onTabKey(event) {
+  const current = tabs.indexOf(activeTab.value)
+  let next
+  if (event.key === 'ArrowRight') next = (current + 1) % tabs.length
+  else if (event.key === 'ArrowLeft') next = (current + tabs.length - 1) % tabs.length
+  else if (event.key === 'Home') next = 0
+  else if (event.key === 'End') next = tabs.length - 1
+  else return
+  event.preventDefault()
+  setTab(tabs[next])
+  event.currentTarget.querySelectorAll('[role="tab"]')[next]?.focus()
+}
 function setTab(t, forceDefault = false) {
-  scopeMenuOpen.value = false
+  if (inDiscussion.value) { router.push({ path: '/discover', query: { tab: TAB_KEY[t] } }); return }
   activeTab.value = t
+  if (mountedReady && !forceDefault && route.query.tab !== TAB_KEY[t]) router.replace({ path: '/discover', query: { tab: TAB_KEY[t] } })
   if (t === '推荐') recommendationFilterTouched = false
   // 切 tab 后使用该栏默认值；发布返回同时清除范围与车型，保证自己的新帖可见。
   // 保留用户已手动筛选标记，防止迟到的 getUserInfo 回包再次覆盖选择。
@@ -806,6 +626,7 @@ function setTab(t, forceDefault = false) {
     dynamicScope.value = 'all'
     nearCoords.value = null
     nearLoading.value = false
+    dynamicModel.value = ''
   }
   activeFilter.value = forceDefault ? (t === '推荐' ? '全部' : '最新') : defaultFilter(t)
   // 切 tab 必须退出搜索态：搜索态会整块隐藏列表（Banner/快捷入口/筛选/帖子），
@@ -816,7 +637,11 @@ function setTab(t, forceDefault = false) {
   if (t === '动态') clearNewMoment() // 进入动态 tab，清除动态红点
   ensureFilterHasContent() // 该 tab 缓存的列表若无「我的车」内容，同步退回默认筛选
   // 发布返回由调用方刷新，避免重复请求第一页。
-  if (t === '动态' && !forceDefault && dynamicLoadedModel !== selectedDynamicModel()) reloadDynamicFeed()
+  if (mountedReady) {
+    if (t === '动态' && !forceDefault && dynamicLoadedKey !== dynamicRequestKey()) reloadDynamicFeed()
+    if (t === '推荐' && !forceDefault && recommendLoadedRegion !== currentRegion.value) loadFeed('recommend')
+    if (t === '广场' && !plazaLoaded) { plazaLoaded = true; loadActivities(); loadTopics() }
+  }
 }
 
 // 触底分页状态（推荐/动态各自维护 page + hasMore；广场活动量小不分页）
@@ -826,13 +651,14 @@ const feedPage = {
   dynamic: { page: 1, hasMore: true },
 }
 const loadingMore = ref({ recommend: false, dynamic: false })
+const feedLoading = ref({ recommend: false, dynamic: false })
 let lastListLoadTs = 0 // 列表最近一次加载时间（keep-alive 返回时防频繁重拉）
 let dynamicGeneration = 0
-let dynamicLoadedModel = ''
-function selectedDynamicModel() {
-  // 推荐的默认车型不应污染提前加载的动态列表。
-  return activeTab.value === '动态' && hasDynamicModel.value ? activeFilter.value : ''
-}
+let recommendGeneration = 0
+let recommendLoadedRegion = ''
+let dynamicLoadedKey = ''
+function selectedDynamicModel() { return dynamicModel.value }
+function dynamicRequestKey() { return [dynamicModel.value, discussionTopic.value, dynamicScope.value, currentRegion.value].join('|') }
 function reloadDynamicFeed() {
   // 换范围或车型时让旧请求失效，并从新条件的第一页重新开始。
   dynamicGeneration++
@@ -842,15 +668,16 @@ function reloadDynamicFeed() {
   dynamicData.value = []
   nearList.value = []
   dynamicError.value = ''
+  dynamicTotal.value = 0
   return loadFeed('dynamic')
 }
 
-// 入场动画只播一次（2026-09-06）：
+// 首屏与分页直接显示，避免 stagger 让卡片延迟冒出。历史动画入口保留兼容：
 // .fade-up 是 CSS animation，keep-alive 返回时组件 DOM 被重新插入 → 动画整体重播一遍，
 // 表现就是「从详情返回，发现页又像重新加载一样卡片一张张浮上来」（实测返回瞬间 22 个动画在跑、
 // 卡片 opacity 依次 0 → 0.30 → 0.54 → 1）。
 // 做法：首屏播完后把 class 摘掉，之后（返回/切 tab）DOM 再插入也没有动画可播。
-const enterAnim = ref(true)
+const enterAnim = ref(false)
 let enterAnimTimer = null
 // 只给首屏前 6 张做错开，且错开上限 6 档：
 //   原来用 i % 10 → 第 11 张又从头错开，双列网格里看着就是随机的；
@@ -859,7 +686,7 @@ const staggerFor = (i) => (enterAnim.value && i < 6 ? 'stagger-' + (i + 1) : '')
 const fadeUp = () => (enterAnim.value ? 'fade-up' : '')
 
 // 从 /feed 接口拉取真实数据（带地区过滤 + 分页）。改用统一数据层 api/feed.js：
-// 动态默认取全部；选中关注范围时才带 followerDevice，由后端返回「官方+已关注」。
+// 动态显式携带独立的 scope / carModel / topic；关注按 token 的真实关系筛选。
 // 归一化/错误回落统一，消除 api/feed.js 死代码（修 H2）
 // ⚠️ 调用方（onMounted / switchRegion）统一传英文 key（'recommend'/'dynamic'），
 //    内部必须按 key 比对，勿用中文——曾因 'recommend' !== '推荐' 导致
@@ -867,9 +694,12 @@ const fadeUp = () => (enterAnim.value ? 'fade-up' : '')
 // append=false 拉第一页（重置 page/hasMore）；append=true 触底追加下一页
 async function loadFeed(tabKey, { append = false } = {}) {
   const st = feedPage[tabKey]
-  if (!st || (append && (st.hasMore === false || loadingMore.value[tabKey] || (tabKey === 'dynamic' && dynamicLoading.value)))) return
+  if (!st || (append && (st.hasMore === false || loadingMore.value[tabKey] || feedLoading.value[tabKey]))) return
   if (tabKey === 'dynamic' && !append) dynamicGeneration++
-  const generation = dynamicGeneration
+  if (tabKey === 'recommend' && !append) recommendGeneration++
+  const generation = tabKey === 'dynamic' ? dynamicGeneration : recommendGeneration
+  const current = () => generation === (tabKey === 'dynamic' ? dynamicGeneration : recommendGeneration)
+  if (!append) { feedLoading.value[tabKey] = true; loadingMore.value[tabKey] = false }
   if (append) loadingMore.value[tabKey] = true
   if (tabKey === 'dynamic' && !append) {
     dynamicLoading.value = true
@@ -882,15 +712,14 @@ async function loadFeed(tabKey, { append = false } = {}) {
       page,
       pageSize: PAGE_SIZE,
     }
+    params.allowMockFallback = false
+    if (tabKey === 'recommend' && !append) loadErr.value = ''
     if (tabKey === 'dynamic') {
-      dynamicLoadedModel = selectedDynamicModel()
-      params.carModel = dynamicLoadedModel
+      params.carModel = selectedDynamicModel()
+      params.scope = dynamicScope.value
+      if (discussionTopic.value) params.topic = discussionTopic.value
       params.allowMockFallback = false // 范围筛选失败不能拿 mock 冒充真实结果
-      if (dynamicScope.value === 'follow') {
-        // fetchFeeds 沿用现有设备号逻辑，由后端返回官方＋已关注。
-      } else {
-        params.followerDevice = ''
-      }
+      params.followerDevice = ''
       if (dynamicScope.value === 'near') {
         if (!nearCoords.value) throw new Error('Location unavailable')
         params.near = `${nearCoords.value.lat},${nearCoords.value.lng}`
@@ -898,10 +727,12 @@ async function loadFeed(tabKey, { append = false } = {}) {
       }
     }
     const res = await fetchFeeds(tabKey, params)
-    if (tabKey === 'dynamic' && generation !== dynamicGeneration) return
-    const list = rankList(res.list || [])
+    if (!current()) return
+    const list = res.list || []
+    if (tabKey === 'recommend') recommendLoadedRegion = params.region
+    if (tabKey === 'dynamic') { dynamicLoadedKey = dynamicRequestKey(); dynamicTotal.value = res.total }
     st.page = page
-    st.hasMore = list.length >= PAGE_SIZE && (page * PAGE_SIZE) < (res.total || Infinity)
+    st.hasMore = list.length >= PAGE_SIZE && (page * PAGE_SIZE) < res.total
     if (append) {
       if (tabKey === 'recommend') recommendData.value = recommendData.value.concat(list)
       else if (dynamicScope.value === 'near') nearList.value = nearList.value.concat(list)
@@ -914,11 +745,13 @@ async function loadFeed(tabKey, { append = false } = {}) {
       ensureFilterHasContent()
     }
   } catch (e) {
+    if (!current()) return
     if (tabKey === 'dynamic') {
-      if (generation === dynamicGeneration) dynamicError.value = t('discover.loadFail')
+      dynamicError.value = t('discover.loadFail')
     } else loadErr.value = t('discover.loadFail')
   } finally {
-    if (tabKey !== 'dynamic' || generation === dynamicGeneration) {
+    if (current()) {
+      if (!append) feedLoading.value[tabKey] = false
       if (append) loadingMore.value[tabKey] = false
       if (tabKey === 'dynamic' && !append) {
         dynamicLoading.value = false
@@ -942,6 +775,11 @@ function onScroll() {
 // 分栏态（≥600px）左栏是独立滚动容器（.leftcol height:100vh overflow-y:auto），
 // 文档 window 不再滚 → 单独监听 .leftcol 的 scroll 做触底分页。非分栏态 .leftcol 非滚动容器、监听永不触发，无害。
 const leftcolRef = ref(null)
+onMounted(() => {
+  paneObserver = new ResizeObserver(entries => { leftPaneWidth.value = entries[0].contentRect.width })
+  if (leftcolRef.value) paneObserver.observe(leftcolRef.value)
+})
+onUnmounted(() => paneObserver?.disconnect())
 function onLeftcolScroll() {
   if (!discoverActive || !isSplit.value) return
   const el = leftcolRef.value
@@ -950,28 +788,31 @@ function onLeftcolScroll() {
   if (key && el.scrollHeight - el.scrollTop - el.clientHeight < Math.max(640, el.clientHeight * 0.8)) loadFeed(key, { append: true })
 }
 
-// 广场热门活动（随地区切换，走统一数据层）
 async function loadActivities() {
+  const generation = ++activityGeneration
+  activitiesLoading.value = true; activitiesError.value = false
   try {
-    actList.value = await fetchActivities({ region: currentRegion.value })
-  } catch (e) {
-    actList.value = []
-  }
+    const list = await fetchActivities({ region: currentRegion.value, allowMockFallback: false })
+    if (generation === activityGeneration) actList.value = list
+  } catch (e) { if (generation === activityGeneration) { actList.value = []; activitiesError.value = true } }
+  finally { if (generation === activityGeneration) activitiesLoading.value = false }
 }
-
-// 活动日期展示：优先 startDate，取 MM-DD；无则空
-function fmtDate(a) {
-  const s = a.startDate || a.start_date || ''
-  const m = String(s).match(/^\d{4}-(\d{2})-(\d{2})/)
-  return m ? m[1] + '-' + m[2] : (a.date || '')
+async function loadTopics() {
+  const generation = ++catalogGeneration
+  topicsError.value = false
+  try {
+    const list = await fetchTopics(currentRegion.value)
+    if (generation === catalogGeneration) topicCatalog.value = list
+  } catch (e) { if (generation === catalogGeneration) { topicCatalog.value = []; topicsError.value = true } }
 }
 
 // 当语言（从而地区）变化时，重拉当前列表并清理「附近」子栏旧数据
 async function onRegionChanged() {
-  await Promise.all([loadFeed('recommend'), reloadDynamicFeed(), loadActivities()])
+  dynamicLoadedKey = ''; plazaLoaded = false
+  await Promise.all([loadTopics(), activeTab.value === '广场' ? loadActivities() : activeTab.value === '动态' ? reloadDynamicFeed() : loadFeed('recommend')])
 }
 watch(currentRegion, (newRegion, oldRegion) => {
-  if (oldRegion && newRegion !== oldRegion) onRegionChanged()
+  if (mountedReady && oldRegion && newRegion !== oldRegion) onRegionChanged()
 })
 // 注：此前语言切换后要重新测量宫格文案宽度（驱动 marquee），改省略号后不再需要
 
@@ -1031,10 +872,10 @@ onMounted(async () => {
   // 第一方案：Flutter getUserInfo().carModel；回退方案：H5 localStorage 记忆（Flutter 未返回时使用）
   // ⚠️ 必须过 normalizeCarModel：Flutter 回传值可能是 'p2' / 'scooter-P2' / 带空格，
   //    直接 includes() 会判死 → chip 静默不出现（线上实测踩过，2026-09-11）。
+  userInfoPromise.then(u => {
   try {
     // ⚠️ 区分两种「取不到」：getUserInfo 失败（null）= 桥不通，保留本地缓存；
     //    桥通但 carModel 为空 = 用户没绑/已解绑 → 清缓存，避免默认筛一个不存在的车型。
-    const u = await userInfoPromise
     let car = u ? normalizeCarModel(u.carModel) : ''
     if (u && !car) { try { localStorage.removeItem('pxid_my_car_model') } catch (e) {} }
     if (!car) car = normalizeCarModel(localStorage.getItem('pxid_my_car_model'))
@@ -1043,17 +884,23 @@ onMounted(async () => {
       // 双向同步：本地存一份，保证 Flutter 接上前后表现一致
       try { localStorage.setItem('pxid_my_car_model', car) } catch (e) {}
       // 推荐默认筛自己的车，动态仍看所有车型；用户已点过 chip 则不覆盖。
-      if (!filterTouched) activeFilter.value = defaultFilter(activeTab.value)
+      if (!filterTouched && !inDiscussion.value) activeFilter.value = defaultFilter(activeTab.value)
     }
   } catch (e) { /* getUserInfo 失败则无「我的车」chip */ }
+  })
   loading.value = true
-  await Promise.all([loadFeed('recommend'), loadFeed('dynamic'), loadActivities(), fetchBanners()])
+  applyDiscussionRoute(false)
+  await Promise.all([loadTopics(), activeTab.value === '广场' ? loadActivities() : loadFeed(currentFeedKey.value || 'recommend'), fetchBanners()])
+  if (activeTab.value === '广场') plazaLoaded = true
   loading.value = false
+  mountedReady = true
+  lastDiscussionRoute = JSON.stringify([route.query.tab, route.query.discussion, route.query.carModel, route.query.topic])
   await nextTick()
   resetDiscoverScroll()
   lastListLoadTs = Date.now()
   if (publishState.pendingTab) {
-    setTab(publishState.pendingTab, true)
+    if (!inDiscussion.value) setTab(publishState.pendingTab, true)
+    else dynamicScope.value = 'all'
     publishState.pendingTab = null
     publishState.needsRefresh = false
     // 刚发完帖：切到目标 tab 后补拉一次，保证新帖可见
@@ -1071,7 +918,8 @@ onMounted(async () => {
     if (discoverActive) {
       publishState.needsRefresh = false
       publishState.pendingTab = null
-      setTab('动态', true)
+      if (!inDiscussion.value) setTab('动态', true)
+      else dynamicScope.value = 'all'
       await refreshCurrentTab()
       await nextTick()
       resetDiscoverScroll()
@@ -1088,7 +936,6 @@ onMounted(async () => {
 })
 onDeactivated(() => {
   discoverActive = false
-  scopeMenuOpen.value = false
   // 切到别的 Tab（Flutter IndexedStack 隐藏本 WebView）时停掉，避免隐藏期间持续制造合成层
   stopBannerLoop()
 })
@@ -1113,6 +960,17 @@ onUnmounted(() => {
 onActivated(async () => {
   discoverActive = true
   startBannerLoop() // 回到本 Tab 恢复轮播
+  if (!mountedReady) return
+  if (returnToFeed != null) {
+    const fid = returnToFeed
+    returnToFeed = null
+    nextTick(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+      const card = leftcolRef.value?.querySelector(`[data-feed-id="${fid}"]`)
+      if (!card || route.path !== '/discover') return
+      if (isSplit.value) leftcolRef.value.scrollTop += card.getBoundingClientRect().top - leftcolRef.value.getBoundingClientRect().top - 112
+      else window.scrollTo(0, window.scrollY + card.getBoundingClientRect().top - 112)
+    })))
+  }
   const stale = Date.now() - lastListLoadTs > STALE_MS
   const justPublished = pendingListRefresh || publishState.needsRefresh || !!publishState.pendingTab
   if (!stale && !justPublished) return
@@ -1122,7 +980,8 @@ onActivated(async () => {
   publishState.pendingTab = null
   if (tab) {
     // 发完帖回到发现页：清除范围与车型，再重拉目标列表。
-    setTab(tab, true)
+    if (!inDiscussion.value) setTab(tab, true)
+    else dynamicScope.value = 'all'
     await refreshCurrentTab()
     await nextTick()
     resetDiscoverScroll()
@@ -1133,9 +992,8 @@ onActivated(async () => {
 
 // 刷新当前 tab（下拉刷新 / 发完帖 / 数据过旧时调用）
 async function refreshCurrentTab() {
-  const key = activeTab.value === '动态' ? 'dynamic' : 'recommend'
-  const jobs = [loadFeed(key)]
-  if (activeTab.value === '推荐') jobs.push(loadActivities(), fetchBanners())
+  const jobs = activeTab.value === '广场' ? [loadActivities(), loadTopics()] : [activeTab.value === '动态' ? reloadDynamicFeed() : loadFeed('recommend')]
+  if (activeTab.value === '推荐') jobs.push(loadTopics(), fetchBanners())
   await Promise.all(jobs)
   lastListLoadTs = Date.now()
 }
@@ -1149,7 +1007,7 @@ let ptrStartY = 0
 let ptrActive = false
 const PTR_TRIGGER = 56
 function onPtrStart(e) {
-  if (ptrBusy.value || showSearchResults.value || window.scrollY > 0 || (isSplit.value && leftcolRef.value?.scrollTop > 0)) return
+  if (ptrBusy.value || showSearchResults.value || e.target.closest('button, input, textarea, .media-grid, .banner, .panel, .discussion-filter') || window.scrollY > 0 || (isSplit.value && leftcolRef.value?.scrollTop > 0)) return
   ptrStartY = e.touches[0].clientY
   ptrActive = true
 }
@@ -1176,6 +1034,13 @@ async function onPtrEnd() {
 }
 
 function onAdd() {
+  if (inDiscussion.value || dynamicModel.value) {
+    const target = router.resolve({ path: '/publish', query: { carModel: dynamicModel.value || discussionModel.value || undefined, topic: discussionTopic.value || undefined, returnTo: route.fullPath } }).fullPath
+    // 复用原车型发布入口的 query 透传，不新增 Flutter 全屏路由。
+    if (bridge.isNative()) bridge.openNative('discover/publish' + target.slice('/publish'.length))
+    else router.push(target)
+    return
+  }
   // 原生环境：拉起原生发布器（契约 openNative('discover/publish')）
   if (bridge.isNative()) {
     bridge.openNative('discover/publish')
@@ -1210,27 +1075,34 @@ function onQuick(q) {
 async function getLocation() {
   try {
     const loc = await bridge.getLocation()
-    if (loc && loc.lat != null && loc.lng != null) return loc
+    const valid = validLocation(loc)
+    if (valid) return valid
   } catch (e) {}
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null)
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (pos) => resolve(validLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })),
       () => resolve(null),
       { enableHighAccuracy: false, timeout: 8000 }
     )
   })
 }
+function validLocation(value) {
+  if (value?.lat == null || value?.lng == null) return null
+  const lat = Number(value.lat), lng = Number(value.lng)
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null
+}
 
 // 沿用原来的设备关注流与定位机制；只有选中「附近」才申请位置。
 let scopeSelectionVersion = 0
 async function setDynamicScope(scope) {
-  scopeMenuOpen.value = false
   const version = ++scopeSelectionVersion
   if (dynamicScope.value === scope) {
     nearLoading.value = false
     return
   }
+  if (scope === 'follow' && !await requireLogin()) return
+  if (version !== scopeSelectionVersion) return
   if (scope === 'near') {
     nearLoading.value = true
     const loc = await getLocation()
@@ -1249,16 +1121,6 @@ async function setDynamicScope(scope) {
   await reloadDynamicFeed()
 }
 
-function onShowcase(p) {
-  // 广场车型卡是「发动态关联选车」车型库，点击直接进发布页并预选该车型
-  // 不跳车型详情/精选（精选仅单店且当前与发布无关）
-  const q = '?carModel=' + encodeURIComponent(p.name)
-  if (bridge.isNative()) {
-    bridge.openNative('discover/publish' + q)
-  } else {
-    router.push('/publish' + q)
-  }
-}
 function onMoreActivity() { openSecondary('/activity-center') }
 function onActivity(a) { openSecondary('/activity/' + a.id) }
 
@@ -1276,13 +1138,18 @@ const showSearchResults = ref(false)
 const searchResults = computed(() => {
   const k = (keyword.value || '').trim().toLowerCase()
   if (!k || !showSearchResults.value) return []
-  const src = activeTab.value === '推荐' ? recommendData.value : dynamicList.value
+  const src = activeTab.value === '动态' ? dynamicList.value : recommendData.value
   return src.filter((it) => {
     const t = (it.title || '').toLowerCase()
     const c = (it.content || '').toLowerCase()
     const a = (it.author || '').toLowerCase()
     return t.includes(k) || c.includes(k) || a.includes(k)
   })
+})
+watch([visibleFeed, isSplit], ([list, split]) => {
+  if (!split || (activeTab.value === '广场' && !showSearchResults.value)) return
+  if (!list.length) { selectedFeed.value = null; panelTouched = false; return }
+  if (!list.some(x => String(x.id) === String(selectedFeed.value?.id))) selectDetail(list[0], true)
 })
 function onSearch() {
   const k = keyword.value.trim()
@@ -1294,9 +1161,9 @@ function onSearch() {
 const searchOpen = ref(false)
 const searchInputRef = ref(null)
 function toggleSearch() {
-  scopeMenuOpen.value = false
   searchOpen.value = !searchOpen.value
   if (searchOpen.value) {
+    if (activeTab.value === '广场' && !recommendData.value.length) loadFeed('recommend')
     nextTick(() => searchInputRef.value && searchInputRef.value.focus())
   }
 }
@@ -1320,12 +1187,49 @@ function showToast(msg) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 1600)
 }
+
+function onFollowChanged({ deviceId, memberUserId, followed }) {
+  for (const item of [...dynamicData.value, ...nearList.value, ...recommendData.value]) {
+    if (memberUserId ? String(item.memberUserId) === String(memberUserId) : item.deviceId === deviceId) item.followed = followed
+  }
+  if (dynamicScope.value === 'follow' && !followed) reloadDynamicFeed()
+}
+function applyDiscussionRoute(load = true) {
+  const tab = Object.keys(TAB_KEY).find(key => TAB_KEY[key] === route.query.tab)
+  if (inDiscussion.value) {
+    if (!lastDiscussion || lastDiscussionTopic !== discussionTopic.value) { scopeSelectionVersion++; dynamicScope.value = 'all'; nearCoords.value = null; nearLoading.value = false }
+    activeTab.value = '动态'
+    dynamicModel.value = discussionModel.value
+    activeFilter.value = dynamicModel.value || '最新'
+    filterTouched = true
+    showSearchResults.value = false; searchOpen.value = false
+    if (load) reloadDynamicFeed()
+  } else if (tab) {
+    // 退出主题页回到原栏目，避免上个讨论条件污染普通动态。
+    if (route.query.discussion === undefined && lastDiscussion) { dynamicModel.value = ''; dynamicLoadedKey = '' }
+    if (activeTab.value !== tab || lastDiscussion) setTab(tab)
+  }
+  lastDiscussion = inDiscussion.value
+  lastDiscussionTopic = discussionTopic.value
+  if (load) nextTick(resetDiscoverScroll)
+}
+let lastDiscussion = false
+let lastDiscussionTopic = ''
+let mountedReady = false
+let lastDiscussionRoute = ''
+watch(() => route.fullPath, () => {
+  if (route.path !== '/discover' || !mountedReady) return
+  const key = JSON.stringify([route.query.tab, route.query.discussion, route.query.carModel, route.query.topic])
+  if (key === lastDiscussionRoute) return
+  lastDiscussionRoute = key
+  applyDiscussionRoute()
+})
 </script>
 
 <style scoped>
 .discover {
   min-height: 100vh;
-  background: #f5f8fd;
+  background: var(--root-page-bg);
   padding-bottom: env(safe-area-inset-bottom);
 }
 /* 下拉刷新：容器高度跟手，内容自然下推；转圈只在真正请求时出现 */
@@ -1358,14 +1262,14 @@ function showToast(msg) {
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
-  position: relative; flex: 0 0 auto; font-size: clamp(16px, 4.3vw, 19px); font-weight: 500; line-height: 1.2; color: #697386; min-height: 44px; padding: 8px 0; background: none; white-space: nowrap;
+  position: relative; flex: 0 0 auto; font-size: var(--root-nav-size); font-weight: 500; line-height: 1.2; color: var(--text-sub); min-height: 44px; padding: 8px 0; background: none; white-space: nowrap;
 }
 .tab.active {
   color: #000000;
   font-weight: 700;
 }
 .tab.active::after {
-  content: ''; position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); width: 24px; height: 4px; border-radius: 4px; background: var(--brand);
+  content: ''; position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); width: var(--root-nav-indicator-width); height: var(--root-nav-indicator-height); border-radius: 2px; background: var(--brand);
 }
 .topacts {
   display: flex; align-items: center; gap: 8px;
@@ -1540,7 +1444,7 @@ function showToast(msg) {
   background: transparent;
 }
 .quick {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 12px 16px 14px; padding: 10px 4px; border-radius: 12px; background: #fff;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 12px 16px 14px; padding: 10px 4px; border-radius: var(--radius-lg); background: var(--card);
 }
 .quick__item {
   position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 7px; background: transparent; padding: 0 2px;
@@ -1575,58 +1479,6 @@ function showToast(msg) {
 }
 .q-badge {
   position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: #ff4a60; border: 2px solid #fff; z-index: 2;
-}
-.dynamic-intro {
-  display: flex; align-items: center; gap: 12px; margin: 4px 16px 12px; padding: 14px;
-  background: var(--card, #fff); border-radius: 12px;
-}
-.dynamic-intro__copy { flex: 1; min-width: 0; }
-.dynamic-intro__title { margin: 0; color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.5; }
-.dynamic-intro__hint { margin: 4px 0 0; color: var(--text-hint); font-size: 12px; line-height: 1.6; }
-.dynamic-intro__publish {
-  flex: 0 0 auto; min-height: 40px; padding: 0 12px; border: 1px solid #dbe5ff; border-radius: 999px;
-  background: #f5f8ff; color: var(--brand); font-size: 13px; font-weight: 600; white-space: nowrap;
-}
-.dynamic-empty { padding: 40px 24px; }
-.dynamic-empty__title { margin: 0; color: var(--text); font-size: 15px; font-weight: 500; }
-.dynamic-empty__hint { margin: 10px 0 0; line-height: 1.7; }
-.dynamic-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
-.dynamic-empty__action { min-height: 40px; padding: 0 16px; border-radius: 999px; background: #f1f5ff; color: var(--brand); font-size: 13px; }
-.dynamic-intro__publish:focus-visible, .dynamic-empty__action:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.filter {
-  display: flex; align-items: center; margin: 0 16px; gap: 8px; position: relative; z-index: 5;
-}
-.chips {
-  display: flex; gap: 10px; flex: 1; min-width: 0; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: none;
-}
-.chips::-webkit-scrollbar { display: none; }
-.scope { position: relative; flex: 0 0 auto; align-self: stretch; display: flex; align-items: center; }
-.scope__trigger {
-  min-height: 44px; padding: 0 2px 0 8px; display: inline-flex; align-items: center; gap: 4px;
-  color: #34405a; background: transparent; font-size: 13px; font-weight: 600; white-space: nowrap;
-}
-.scope__trigger svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
-.scope__chevron--open { transform: rotate(180deg); }
-.scope__menu {
-  position: absolute; z-index: 10; right: 0; top: calc(100% - 2px); min-width: 132px;
-  padding: 4px; background: #fff; border: 1px solid #e4e9f2; border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(29, 43, 77, .10);
-}
-.scope__option {
-  width: 100%; min-height: 42px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; background: transparent; border-radius: 7px; color: #34405a; font-size: 13px; text-align: left; white-space: nowrap;
-}
-.scope__option:hover, .scope__option[aria-selected="true"] { background: #f2f5ff; }
-.scope__check { color: var(--brand); font-size: 16px; }
-.scope__trigger:focus-visible, .scope__option:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-/* 车型筛选 chip：统一选中/未选中逻辑（2026-09-27 诊断书修正）
-   未选中 = 白底 + 浅灰边 + 深灰字；选中 = 品牌蓝实心 + 白字；
-   「我的车」取消常驻蓝边，仅保留 🚗 前缀，避免视觉第三态 */
-.chip {
-  min-width: 56px; min-height: 40px; padding: 0 18px; border-radius: 999px; background: #fafbfe; border: 1px solid #e4e9f2; color: #566076; font-size: 13px; font-weight: 500; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
-}
-.chip.active {
-  color: #fff; background: var(--brand); border-color: var(--brand); font-weight: 700; box-shadow: 0 2px 6px rgba(37,99,235,.12);
 }
 .content {
   margin-top: 12px;
@@ -1697,121 +1549,6 @@ function showToast(msg) {
   gap: 10px;
   padding: 0 12px;
 }
-.grid3 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  padding: 0 16px;
-}
-.showcase {
-  background: #ffffff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(30,50,80,.035);
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
-.showcase__img {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  display: block;
-}
-.showcase__bar {
-  background: #f9fafc;
-  color: #39445a;
-  font-size: 12px;
-  text-align: center;
-  padding: 7px 0;
-  font-weight: 500;
-}
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 22px 16px 12px;
-}
-.section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.section-more {
-  font-size: 13px;
-  color: var(--text-hint);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 36px;
-  background: transparent;
-  padding: 0;
-}
-.acts {
-  padding: 0 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.activity {
-  background: var(--card);
-  border: none;
-  border-radius: 12px;
-  box-shadow: none;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-}
-.act__img {
-  width: 88px;
-  aspect-ratio: 1 / 1;
-  border-radius: 8px;
-  object-fit: cover;
-  flex: none;
-  height: 70px;
-}
-.act__info {
-  flex: 1;
-  min-width: 0;
-}
-.act__title {
-  font-size: 14px;
-  color: var(--text);
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-weight: 500;
-}
-.act__date {
-  font-size: 11px;
-  color: var(--text-hint);
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.act__btn {
-  flex: none;
-  background: var(--brand);
-  color: #ffffff;
-  border-radius: var(--radius-pill);
-  padding: 0 10px;
-  font-size: 11px;
-  font-weight: 500;
-  box-shadow: 0 2px 6px rgba(37,99,235,.12);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 36px;
-  white-space: nowrap;
-}
 .toast {
   position: fixed;
   left: 50%;
@@ -1852,176 +1589,9 @@ function showToast(msg) {
   }
 }
 
-/* 右栏详情面板内部（仅分栏态出现） */
-.panel__nav {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 56px;
-  padding: 0 14px;
-  box-sizing: border-box;
-  background: var(--card);
-  border-bottom: 1px solid #F0F0F0;
-}
-.panel__tag {
-  background: var(--brand-soft);
-  color: var(--brand);
-  border-radius: 9px;
-  padding: 4px 9px;
-  font-size: 11px;
-  font-weight: 500;
-}
-.panel__navbtn {
-  margin-left: auto;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 4px 10px;
-  font-size: 11px;
-  color: var(--text-sub);
-}
-.panel__navbtn + .panel__navbtn { margin-left: 6px; }
-.panel__navbtn:disabled { opacity: 0.4; cursor: not-allowed; }
-.panel__loading {
-  padding: 40px 16px;
-  color: var(--text-hint);
-  font-size: 13px;
-  text-align: center;
-}
-/* 右栏媒体区：视频/单图/5+轮播 置顶，与直板机详情页规则一致 */
-.panel__hero {
-  width: 100%;
-  background: var(--bg);
-  overflow: hidden;
-}
-.panel__hero-video {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  display: block;
-}
-.panel__img {
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
-  display: block;
-  background: #eee;
-}
-.panel__carousel { position: relative; background: #000; }
-.panel__car-track {
-  display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.panel__car-track::-webkit-scrollbar { display: none; }
-.panel__car-slide {
-  flex: 0 0 100%;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  scroll-snap-align: center;
-  display: block;
-}
-.panel__car-count {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  background: rgba(0, 0, 0, .5);
-  color: #fff;
-  font-size: 12px;
-  padding: 2px 9px;
-  border-radius: 11px;
-  pointer-events: none;
-}
-.panel__car-dots {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 12px;
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  pointer-events: none;
-}
-.panel__car-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, .5);
-  transition: width .2s, background .2s;
-}
-.panel__car-dot.on { background: #fff; width: 16px; border-radius: 3px; }
-
-/* 2-4 张：不置顶，随正文流双列网格 */
-.panel__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 14px;
-}
-.panel__grid-img {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: 10px;
-  display: block;
-}
-.panel__body { padding: 14px; }
-.panel__title {
-  font-size: 17px;
-  font-weight: 500;
-  line-height: 1.4;
-  margin-bottom: 12px;
-}
-.panel__author {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.panel__author img {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #eee;
-  object-fit: cover;
-}
-.panel__authinfo span { font-size: 13px; color: var(--text); display: block; }
-.panel__authinfo em { font-style: normal; font-size: 11px; color: var(--text-hint); }
-.panel__text {
-  font-size: 14px;
-  line-height: 1.75;
-  color: var(--text);
-  margin-bottom: 16px;
-  white-space: pre-line;
-}
-.panel__stat {
-  display: flex;
-  gap: 16px;
-  font-size: 12px;
-  color: var(--text-hint);
-  padding-bottom: 14px;
-  border-bottom: 1px solid #F0F0F0;
-}
-.panel__stat b { color: var(--price); font-weight: 500; }
-.panel__cmt { padding: 14px; }
-.panel__cmt h4 { font-size: 13px; color: var(--text-sub); margin: 0 0 12px; }
-.panel__cmtitem { display: flex; gap: 9px; margin-bottom: 14px; }
-.panel__cmtitem img {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #eee;
-  flex: none;
-  object-fit: cover;
-}
-.panel__cmname { font-size: 12px; color: var(--text-hint); margin-bottom: 3px; }
-.panel__cmttext { font-size: 13px; line-height: 1.5; color: var(--text); }
+.panel__loading { display: grid; place-items: center; min-height: 200px; padding: 24px; font-size: 14px; color: var(--text-sub); }
+.reader-paging { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px 16px; background: var(--card); border-top: 1px solid var(--line); }
+.reader-paging button { min-height: 44px; color: var(--text-sub); font-size: 13px; }.reader-paging button:disabled { opacity: .4; }.reader-paging span { font-size: 12px; color: var(--text-hint); white-space: nowrap; }
 /* 仅发现页的根导航适配窄屏及英文/葡文，不修改全站 TopBar。 */
 .banner__copy { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px 16px 14px; color: white; background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.6)); pointer-events: none; }
 .banner__copy h2, .banner__copy p { max-width: calc(100% - 120px); }
@@ -2032,7 +1602,7 @@ function showToast(msg) {
 .locale-en .tabs, .locale-pt .tabs { gap: 12px; }
 .discover button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 @media(max-width: 359px) { .tabs { gap: 12px; } .topacts { gap: 4px; } .banner__copy h2 { font-size: 20px; } }
-@media(min-width: 600px) and (max-width: 749px) { .tabs { gap: 10px; margin-left: 2px; } .topacts { gap: 2px; } .act { width: 40px; height: 40px; } .banner__copy { padding: 12px 12px 12px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
+@media(min-width: 600px) and (max-width: 749px) { .tabs { gap: 10px; margin-left: 2px; } .topacts { gap: 2px; } .act { width: 44px; height: 44px; } .banner__copy { padding: 12px 12px 12px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
 @media(prefers-reduced-motion: reduce) { .banner__track, .banner__dot::after, .quick__thumb { transition: none; } }
 /* 广场与动态：与推荐页保持同一圆角、边距和品牌色节奏。 */
 
@@ -2045,4 +1615,18 @@ function showToast(msg) {
   .activity { flex-wrap: wrap; gap: 8px; }
   .act__btn { margin-left: auto; }
 }
+
+.discussion-back { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; padding: 0 8px; text-align: left; }
+.discussion-back span { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.discussion-head { padding: 14px 16px 8px; }.discussion-head p { font-size: 13px; color: var(--text-sub); line-height: 1.6; margin: 0 0 8px; }.discussion-head > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; }.discussion-head > div > span { font-size: 12px; color: var(--text-hint); }.discussion-head button { color: var(--brand-ink); font-size: 13px; min-height: 44px; margin-left: auto; }
+.recommend-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px 14px; }.recommend-heading h2 { margin: 0; font-size: 17px; font-weight: 700; }.recommend-heading button { min-height: 40px; color: var(--text-hint); font-size: 12px; }
+@media (min-width: 600px) { .leftcol, .panel { height: 100dvh; overscroll-behavior-y: contain; } .panel { overflow: hidden; } }
+.discover :deep(.is-reading) { box-shadow: 0 0 0 2px var(--brand); }
+.discover :deep(.fcard:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
+.leftcol--narrow .banner { aspect-ratio: 1.7; }
+.leftcol--narrow .banner__copy { padding-bottom: 32px; }
+.leftcol--narrow .banner__copy h2, .leftcol--narrow .banner__copy p { max-width: 100%; }
+.leftcol--narrow .banner__copy h2 { font-size: 18px; }
+.search-results { padding: 12px 16px 16px; gap: 12px; }
+
 </style>

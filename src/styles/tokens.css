@@ -4,6 +4,11 @@
   --brand-light: #7DA2FF;                 /* 主色浅一档（渐变用） */
   --brand-gradient: linear-gradient(90deg, #7DA2FF, #4D7CFF);
   --brand-soft: #EEF3FF;                  /* 主色浅底（选中/标签底） */
+  --brand-ink: #315FCC;                   /* 小字号蓝色文字，区别于按钮填充色 */
+  --root-page-bg: #F5F8FD;                /* 发现/精选共用的页面底色 */
+  --root-nav-size: clamp(16px, 4.3vw, 19px);
+  --root-nav-indicator-width: 28px;
+  --root-nav-indicator-height: 3px;
   --accent: #FF7A2F;                      /* 活力橙：与品牌蓝搭配的第二强调色（未读点/话题卡/四宫格点缀） */
   --accent-soft: #FFF1E8;                /* 橙浅底（话题卡底/四宫格图标底） */
   --price: #e53935;                       /* 价格红 */

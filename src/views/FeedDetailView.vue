@@ -3,17 +3,18 @@
        多根（fragment）组件会被静默跳过动画——原本这里有 div.detail / article / teleport
        三个根级节点，导致从发现页进出详情页时，详情页那一侧的转场完全不生效
        （表现为只有列表在动，详情是硬切）。包一层后两侧动画才对称。 -->
-  <div class="fd-root" ref="fdRoot">
-  <div class="detail" v-if="item" :class="{ 'single-hero': isSingleHero }">
+  <div class="fd-root" :class="{ 'fd-root--embedded': embedded }" ref="fdRoot">
+  <div class="detail" ref="detailScroll" v-if="item" :class="{ 'single-hero': isSingleHero && !embedded }" @scroll.passive="rememberReadingScroll">
     <!-- 顶部：返回优先关闭原生详情 WebView（App 原生右滑路由），回退 router.back() -->
-    <TopBar sticky :back="goBack" :title="isSingleHero ? '' : (isActivity ? t('feed.detail.title.activity') : (item?.author || t('feed.detail.title.content')))">
+    <TopBar sticky :show-back="!embedded" :back="goBack" :title="isSingleHero && !embedded ? '' : (isActivity ? t('feed.detail.title.activity') : (item?.author || t('feed.detail.title.content')))">
+      <template v-if="embedded" #left><button type="button" class="reader-expand" :aria-label="t('discover.reader.expand')" @click="$emit('expand')"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></svg></button></template>
       <template #right>
-        <span class="more press" @click="onMoreClick">
+        <button type="button" class="more press" :aria-label="t('feed.moreActions')" @click="onMoreClick">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
-        </span>
-        <span class="share press" @click="onShare">
+        </button>
+        <button type="button" class="share press" :aria-label="t('feed.share')" @click="onShare">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-        </span>
+        </button>
       </template>
     </TopBar>
 
@@ -33,7 +34,7 @@
     </div>
     <!-- 单图：置顶全宽大图（贴顶栏、无间距，冲击感） -->
     <div v-else-if="item && images.length === 1" class="hero">
-      <img class="hero__single" :src="images[0]" :alt="item.title" @click="onPreview(images[0])" />
+      <img class="hero__single" :src="images[0]" :alt="item.title" tabindex="0" role="button" :aria-label="t('feed.imageView', { n: 1 })" @keydown.enter="onPreview(images[0])" @click="onPreview(images[0])" />
     </div>
     <!-- 5、8、10+ 图：置顶全宽横向轮播；6/7 图走 Bento，9 图走九宫格 -->
     <div v-else-if="item && usesImageCarousel" class="hero carousel">
@@ -44,6 +45,7 @@
           class="car-slide"
           :src="img"
           :alt="item.title"
+          tabindex="0" role="button" :aria-label="t('feed.imageView', { n: i + 1 })" @keydown.enter="onPreview(img)"
           @click="onPreview(img)"
         />
       </div>
@@ -112,13 +114,13 @@
 
     <!-- 标签 / 车型 -->
     <div class="tags" v-if="tagList.length">
-      <span
+      <button type="button"
         v-for="(tg, i) in tagList"
         :key="i"
         class="tag"
         :class="{ car: tg.car }"
-        @click="tg.car ? onCar(tg.v) : onTopic(tg.v)"
-      >#{{ tg.v }}</span>
+        @click="tg.car ? onModelDiscussion(tg.v) : onTopic(tg.v)"
+      >#{{ tg.v }}</button>
     </div>
 
     <!-- 种草商品卡 -->
@@ -165,12 +167,13 @@
           @blur="onCommentBlur"
           @keyup.enter="submitComment"
         />
-        <button class="cinput__send press" @click="submitComment">{{ t('feed.send') }}</button>
+        <button type="button" class="cinput__send press" :disabled="commentBusy" @click="submitComment">{{ t('feed.send') }}</button>
       </div>
     </teleport>
 
+    <slot name="navigation" />
     <!-- 相关推荐 -->
-    <div class="related" v-if="related.length">
+    <div class="related" v-if="!embedded && related.length">
       <div class="related__head">{{ t('feed.related') }}</div>
       <div class="related__grid">
         <div
@@ -200,7 +203,7 @@
        成转圈 → 观感「进详情在转圈加载」。两症状同一行判据。
        现在首帧就走骨架：转场里滑入的是一页「长得像详情」的内容，无空态、无转圈。 -->
   <div v-else-if="loading || showLoading" class="fd-skel">
-    <TopBar sticky :back="goBack" :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')" />
+    <TopBar sticky :show-back="!embedded" :back="goBack" :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')" />
     <div class="fd-skel__body">
       <span class="sk sk--cover"></span>
       <span class="sk sk--title"></span>
@@ -224,7 +227,7 @@
       <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
     </div>
     <div class="empty__txt">{{ t('feed.notFound') }}</div>
-    <button class="empty__back" @click="goBack">{{ t('feed.back') }}</button>
+    <button class="empty__back" @click="embedded ? load() : goBack()">{{ t(embedded ? 'discover.dynamic.retry' : 'feed.back') }}</button>
   </div>
 
   <!-- 底部互动栏：左侧输入框 + 右侧点赞/收藏/评论（对齐 App 详情页习惯） -->
@@ -234,15 +237,15 @@
       <span>{{ t('feed.writeComment') }}</span>
     </button>
     <div class="actions__icons">
-      <button class="actions__icon pop press" :class="{ liked }" @click="onLike">
+      <button type="button" class="actions__icon pop press" :class="{ liked }" :disabled="likeBusy" :aria-label="t('feed.like')" :aria-pressed="liked" @click="onLike">
         <svg viewBox="0 0 24 24" width="22" height="22" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
         <span>{{ likeCount }}</span>
       </button>
-      <button class="actions__icon pop press" :class="{ collected }" @click="onCollect">
+      <button type="button" class="actions__icon pop press" :class="{ collected }" :disabled="collectBusy" :aria-label="t('feed.collect.collect')" :aria-pressed="collected" @click="onCollect">
         <svg viewBox="0 0 24 24" width="22" height="22" :fill="collected ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39L17.56 20 12 17.08 6.44 20l1.06-6.07L3 9.54l6.22-.91L12 3Z"/></svg>
         <span>{{ collectCount }}</span>
       </button>
-      <button class="actions__icon pop press" @click="onCommentBtn">
+      <button type="button" class="actions__icon pop press" :aria-label="t('feed.writeComment')" @click="onCommentBtn">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
         <span>{{ commentCount }}</span>
       </button>
@@ -286,14 +289,17 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick, onMounted, onUpdated, onBeforeUnmount, watch } from 'vue'
+import { computed, ref, nextTick, onMounted, onActivated, onDeactivated, onUpdated, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { activities } from '../data/mock'
+import { feedGalleryLayout, feedUsesCarousel } from '../utils/feedGallery'
+import { discussionRoute } from '../utils/discussion'
 import bridge from '../bridge'
 import { t, locale, regionFromLocale } from '../i18n'
 import { fetchFeedDetail, fetchComments, reportFeed, fetchFeeds, recordFootprint, toggleFavorite, checkFavorite, fetchActivityDetail, deleteFeed, getDeviceId, invalidateFeedDetail, invalidateComments } from '../api/feed'
 import { mediaUrl } from '../storage'
 import { getFeedSnapshot } from '../utils/feedSnapshot'
+import { takeFeedReading } from '../utils/feedReading'
 import TopBar from '../components/TopBar.vue'
 import CommentNode from '../components/CommentNode.vue'
 import FeedMediaGrid from '../components/FeedMediaGrid.vue'
@@ -301,6 +307,15 @@ import FeedImagePreview from '../components/FeedImagePreview.vue'
 import { formatPublishedTime } from '../utils/time'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 
+const props = defineProps({ embedded: Boolean, feedId: [String, Number], initialItem: Object })
+const emit = defineEmits(['expand', 'change', 'removed'])
+const detailScroll = ref(null)
+let embeddedScrollTop = 0
+function rememberReadingScroll() {
+  // The media-query event arrives after CSS has already removed split sizing.
+  // Ignore that final reset and retain the last real reading position.
+  if (props.embedded && window.matchMedia('(min-width: 600px)').matches) embeddedScrollTop = detailScroll.value?.scrollTop || 0
+}
 const route = useRoute()
 const router = useRouter()
 const previewOpen = ref(false), previewIndex = ref(0)
@@ -317,6 +332,7 @@ const sortedComments = computed(() => comments.value.map((node, index) => ({ nod
 // 有 H5 内部历史（相关推荐 /feed/:id 二层）先 router.back() 退上一层，不能直接关 WebView。
 // 浏览器预览/桌面端/H5 独立预览无 PXIDApp 时回退 router.back()。
 function goBack() {
+  if (props.embedded) { emit('removed', id.value); return }
   const app = window.PXIDApp
   if (app && typeof app.postMessage === 'function') {
     if (bridge.isWebViewFirstPage()) app.postMessage('closeWebView')
@@ -328,8 +344,8 @@ function goBack() {
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 
-const isActivity = computed(() => route.path.startsWith('/activity'))
-const id = computed(() => Number(route.params.id))
+const isActivity = computed(() => !props.embedded && route.path.startsWith('/activity'))
+const id = computed(() => Number(props.embedded ? props.feedId : route.params.id))
 // 官方徽章以活动类型或后端明确的官方标记为准。
 const isOfficial = computed(() => isActivity.value || item.value?.kind === 'official' || item.value?.isOfficial === true)
 // 当前用户是否已报名该活动（控制报名按钮态）
@@ -353,8 +369,7 @@ const authorAvatar = computed(() => resolveAvatar(item.value?.author, item.value
 //    外部直开/分享进来（无快照）→ loading 保持 true，走骨架等接口。
 const bootSnap = (() => {
   if (isActivity.value) return null
-  const fid = Number(route.params.id)
-  return Number.isFinite(fid) ? getFeedSnapshot(fid) : null
+  return props.initialItem || (Number.isFinite(id.value) ? getFeedSnapshot(id.value) : null)
 })()
 const item = ref(bootSnap)
 const loading = ref(!bootSnap)
@@ -364,6 +379,7 @@ let detailMounted = false
 let readySeq = 0
 let lastReadyRoute = ''
 function schedulePageReady() {
+  if (props.embedded) return
   const seq = ++readySeq
   const pageRoute = route.fullPath
   if (!detailMounted || (!item.value && loading.value) || lastReadyRoute === pageRoute) return
@@ -385,9 +401,12 @@ const liked = ref(false)
 const likeCount = ref(0)
 const collected = ref(false)
 const collectCount = ref(0)
+const likeBusy = ref(false), collectBusy = ref(false), commentBusy = ref(false)
+let likeRevision = 0, collectRevision = 0, commentRevision = 0
 const comments = ref([])
 // 加载期间仅保留评论区标题，完成后再决定显示评论或空态。
 const commentsLoading = ref(true)
+const commentsLoaded = ref(false)
 // 快照同步落到各状态位：否则首帧会先画「0 赞 / 未收藏 / 未关注」再被 load() 修正（一帧跳变）
 if (bootSnap) {
   liked.value = !!bootSnap.isLiked
@@ -409,10 +428,12 @@ const commentInput = ref(null)
 //   ④ 键盘弹出是连续动画，需多帧同步取最终高度。
 const commenting = ref(false)
 const kbH = ref(0)
+const inputBounds = ref(null)
 // 输入栏预估高度（含 padding）。用于给主内容加 padding-bottom 让最后内容能滚到输入栏上方
 const CINPUT_RESERVE = 80
 // 同步键盘高度的 timer 集合
 let kbTimers = []
+let commentBlurTimer = null
 function clearKbTimers() {
   kbTimers.forEach((t) => clearTimeout(t))
   kbTimers = []
@@ -433,6 +454,7 @@ function calcKbH() {
 }
 let lastKbH = 0
 function syncKeyboard(force) {
+  if (props.embedded) inputBounds.value = fdRoot.value?.getBoundingClientRect()
   const h = calcKbH()
   // 变化小于 2px 忽略，避免键盘稳定过程中的微抖动让输入框上下跳；force 时不过滤
   if (!force && Math.abs(h - lastKbH) < 2) return
@@ -447,13 +469,18 @@ function syncKeyboard(force) {
 //   不支持的 WebView 则 bottom: 0 贴屏幕底，再由 focus 后的 scrollIntoView 兜底避免被键盘遮住。
 const cinputStyle = computed(() => {
   if (!commenting.value) return {}
-  if (kbH.value > 40) return { bottom: kbH.value + 'px' }
-  return {}
+  const style = kbH.value > 40 ? { bottom: kbH.value + 'px' } : {}
+  if (props.embedded && inputBounds.value) {
+    const rect = inputBounds.value
+    Object.assign(style, { left: rect.left + 'px', right: 'auto', width: rect.width + 'px', maxWidth: 'none', margin: 0 })
+  }
+  return style
 })
 function applyDetailPadding() {
-  const detailEl = document.querySelector('.detail')
+  const detailEl = detailScroll.value
   if (!detailEl) return
   const kb = kbH.value
+  if (props.embedded) { detailEl.style.paddingBottom = (CINPUT_RESERVE + kb) + 'px'; return }
   if (!kb) {
     detailEl.style.paddingBottom = ''
     return
@@ -463,7 +490,7 @@ function applyDetailPadding() {
   detailEl.style.paddingBottom = kb + CINPUT_RESERVE + 'px'
 }
 function clearDetailPadding() {
-  const detailEl = document.querySelector('.detail')
+  const detailEl = detailScroll.value
   if (detailEl) detailEl.style.paddingBottom = ''
 }
 function scheduleKeyboardSyncs() {
@@ -477,13 +504,12 @@ function scheduleKeyboardSyncs() {
   kbTimers.push(setTimeout(() => {
     if (kbH.value < 80) {
       const el = commentInput.value
-      if (el && typeof el.scrollIntoView === 'function') {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }
+      if (el && !props.embedded) window.scrollTo({ top: window.scrollY + Math.max(0, el.getBoundingClientRect().bottom - (window.visualViewport?.height || window.innerHeight)), behavior: 'auto' })
     }
   }, 360))
 }
 function onCommentFocus() {
+  clearTimeout(commentBlurTimer)
   commenting.value = true
   nextTick(() => {
     scheduleKeyboardSyncs()
@@ -497,14 +523,14 @@ function onCommentFocus() {
 function onCommentBlur() {
   // 延迟复位，避免点击发送按钮先 blur 再 click 丢失
   clearKbTimers()
-  setTimeout(() => {
+  commentBlurTimer = setTimeout(() => {
     commenting.value = false
     kbH.value = 0
     lastKbH = 0
     clearDetailPadding()
   }, 120)
 }
-onMounted(() => {
+function attachKeyboard() {
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', syncKeyboard)
     window.visualViewport.addEventListener('scroll', syncKeyboard)
@@ -512,13 +538,36 @@ onMounted(() => {
   // 补充：部分 WebView/浏览器键盘弹出只触发 window resize（Android adjustResize 等）
   window.addEventListener('resize', syncKeyboard)
   syncKeyboard()
+}
+function detachKeyboard() {
+  window.visualViewport?.removeEventListener('resize', syncKeyboard)
+  window.visualViewport?.removeEventListener('scroll', syncKeyboard)
+  window.removeEventListener('resize', syncKeyboard)
+}
+onMounted(attachKeyboard)
+onActivated(() => { detailMounted = true; attachKeyboard(); schedulePageReady() })
+onDeactivated(() => {
+  detailMounted = false
+  ++readySeq
+  cancelReadingRestore()
+  commentInput.value?.blur()
+  clearTimeout(commentBlurTimer)
+  clearKbTimers()
+  detachKeyboard()
+  commenting.value = false
+  kbH.value = lastKbH = 0
+  clearDetailPadding()
+  previewOpen.value = false
+  showReport.value = showDeleteConfirm.value = false
 })
 onBeforeUnmount(() => {
-  if (window.visualViewport) {
-    window.visualViewport.removeEventListener('resize', syncKeyboard)
-    window.visualViewport.removeEventListener('scroll', syncKeyboard)
-  }
-  window.removeEventListener('resize', syncKeyboard)
+  ++loadSeq
+  detailMounted = false
+  cancelReadingRestore()
+  clearTimeout(loadingTimer)
+  clearTimeout(toastTimer)
+  detachKeyboard()
+  clearTimeout(commentBlurTimer)
   clearKbTimers()
 })
 const showReport = ref(false)
@@ -596,6 +645,9 @@ async function load() {
   //    /feed/NaN、/feed/NaN/comments（2026-09-06 实测返回瞬间 4-5 个无效请求）。
   // ⚠️ 先自增序号作废上一次调用（返回列表时也会走这里），再判 id 是否有效
   const seq = ++loadSeq
+  cancelReadingRestore()
+  const likesAtStart = likeRevision, collectAtStart = collectRevision, commentsAtStart = commentRevision
+  commentsLoaded.value = false
   const fid = id.value
   // id 无效（路由异常）不能停在骨架分支：loading 初值 true，否则页面卡死在骨架上
   if (!Number.isFinite(fid)) { loading.value = false; showLoading.value = false; return }
@@ -603,7 +655,7 @@ async function load() {
   clearTimeout(loadingTimer)
   // ① 列表快照直出：点进来的那一刻内容就在位，转场里不会出现「加载圈 + 加载中」。
   //    接口返回后再静默替换（stale-while-revalidate），用户全程只看得到一次横滑。
-  const snap = isActivity.value ? null : getFeedSnapshot(fid)
+  const snap = isActivity.value ? null : (props.initialItem || getFeedSnapshot(fid))
   if (snap) {
     item.value = snap
     liked.value = !!snap.isLiked
@@ -616,6 +668,7 @@ async function load() {
     related.value = []
     loading.value = false
     showLoading.value = false
+    restoreReading()
   } else {
     item.value = null
     comments.value = []
@@ -637,25 +690,30 @@ async function load() {
       const data = await fetchFeedDetail(fid)
       if (stale()) return // 已经离开本页：后面的评论/收藏/关注/推荐都不用再发了
       if (data) {
+        if (commentRevision !== commentsAtStart) data.comments = commentCount.value
         item.value = data
         // 详情先显示，评论独立等待响应。
         commentsLoading.value = true
-        liked.value = !!data.isLiked
-        likeCount.value = data.likes || 0
-        collected.value = !!data.isFavorited
-        collectCount.value = data.favorites || 0
+        if (likeRevision === likesAtStart) {
+          liked.value = !!data.isLiked
+          likeCount.value = data.likes || 0
+        }
+        if (collectRevision === collectAtStart) {
+          collected.value = !!data.isFavorited
+          collectCount.value = data.favorites || 0
+        }
         // 记录浏览足迹（H5 自管，个人主页「足迹」Tab 用；静默失败不影响阅读）
         recordFootprint(fid)
         // 有 token 时补收藏态（公开详情默认不带 isFavorited，避免未登录被 401）
         jobs.push(
-          checkFavorite(fid).then((fav) => { collected.value = fav }).catch(() => {})
+          checkFavorite(fid).then((fav) => { if (!stale() && collectRevision === collectAtStart) collected.value = fav }).catch(() => {})
         )
       }
     } catch (e) { /* keep null → show empty */ }
     if (item.value) {
       // 评论 / 关注态 / 收藏态 / 相关推荐同时发出，谁先回来谁先渲染；
       // 评论区有骨架占住高度，先回来也不会把页面顶开
-      await Promise.all([loadComments(fid), Promise.resolve().then(loadRelated), ...jobs])
+      await Promise.all([loadComments(fid, seq), props.embedded ? Promise.resolve() : loadRelated(seq), ...jobs])
       if (stale()) return
     }
   }
@@ -664,6 +722,7 @@ async function load() {
   showLoading.value = false
   loading.value = false
   commentsLoading.value = false
+  restoreReading()
 }
 
 // ---- 图片统一淡入（消「谁先下完谁先冒」的加载感）----
@@ -710,20 +769,28 @@ onMounted(() => {
 // ⚠️ 这里不能提前 return：返回列表时 fullPath 同样会变，必须让 load() 真正跑一遍，
 //    由它开头的 ++loadSeq 把上一次「还在飞」的请求作废。否则快速「进详情→立刻返回」时，
 //    上一次 load 会继续用旧 id 把评论/收藏/关注/推荐全部发出去（2026-09-06 实测 5 个）。
-watch(() => route.fullPath, () => {
+watch(() => props.embedded ? props.feedId : route.fullPath, () => {
   load()
 })
 
 // 拉取真实评论列表
-async function loadComments(fid) {
+async function loadComments(fid, seq = loadSeq) {
+  const revision = commentRevision
   // 统一走 api/feed.js（fetchComments 已做跨端字段归一 + 失败返回 null 回落本地 seed）
   try {
     const list = await fetchComments(fid)
-    if (list) comments.value = list
+    if (list && seq === loadSeq) {
+      if (revision !== commentRevision) {
+        invalidateComments(fid)
+        return loadComments(fid, seq)
+      }
+      comments.value = list
+      commentsLoaded.value = true
+    }
   } catch (e) { /* 评论拉取失败不阻断详情 */ }
   finally {
     // 无论成败都要撤骨架，否则评论区永远停在灰条
-    commentsLoading.value = false
+    if (seq === loadSeq) commentsLoading.value = false
   }
 }
 
@@ -744,6 +811,7 @@ function formatCommentTime(ts) {
 }
 
 const commentCount = computed(() => {
+  if (!commentsLoaded.value) return Number(item.value?.comments) || 0
   let n = 0
   const walk = (list) => {
     list.forEach((c) => {
@@ -762,13 +830,8 @@ const images = computed(() => {
   return list.length ? list : item.value.cover ? [item.value.cover] : []
 })
 // 张数决定稳定的详情布局；不随机切换，避免返回或刷新后同一动态改变样式。
-const detailGalleryLayout = computed(() => ({
-  2: 'pair', 3: 'bento-3', 4: 'quad', 6: 'bento-6', 7: 'bento-7', 9: 'nine',
-})[images.value.length] || '')
-const usesImageCarousel = computed(() => {
-  const count = images.value.length
-  return count === 5 || count === 8 || count >= 10
-})
+const detailGalleryLayout = computed(() => feedGalleryLayout(images.value.length))
+const usesImageCarousel = computed(() => feedUsesCarousel(images.value.length))
 // 单图沉浸态：仅当普通 feed 且为单图（非视频、非活动）时，顶栏透明浮于图上
 const isSingleHero = computed(() => {
   if (!item.value || isActivity.value) return false
@@ -820,7 +883,7 @@ watch(id, () => { generatedPoster.value = '' })
 // 多图横向轮播：当前页索引（驱动 1/N 分页与圆点）
 const carIndex = ref(0)
 const carTrack = ref(null)
-watch(() => route.fullPath, () => { carIndex.value = 0 })
+watch(id, () => { carIndex.value = 0 })
 function onCarScroll() {
   const el = carTrack.value
   if (!el) return
@@ -832,10 +895,11 @@ function onCarScroll() {
 // 地区由当前语言映射（2026-08-31 定）：zh→CN、pt→BR、en→US
 const currentRegion = computed(() => regionFromLocale(locale.value))
 const related = ref([])
-async function loadRelated() {
+async function loadRelated(seq = loadSeq) {
   if (!item.value) return
   try {
     const list = await fetchFeeds('recommend', { region: currentRegion.value, pageSize: 30 })
+    if (seq !== loadSeq || !item.value) return
     const cur = item.value
     const curTags = new Set((cur.tags || []).map(String))
     const rel = list
@@ -960,14 +1024,18 @@ function onCar(model) {
 }
 // 点作者 → 个人主页（他人/自己统一由主页按 id 识别）
 function goAuthor() {
-  if (item.value && item.value.deviceId) router.push('/user/' + encodeURIComponent(item.value.deviceId))
+  if (item.value && item.value.deviceId) openSecondary('/user/' + encodeURIComponent(item.value.deviceId))
 }
-function onTopic(t) {
-  console.log('tap topic:', t)
-}
+function openSecondary(path) { if (!bridge.openFullscreenRoute(path)) router.push(path) }
+function onModelDiscussion(carModel) { router.push(discussionRoute({ carModel, from: props.embedded ? 'dynamic' : 'detail' })) }
+function onTopic(topic) { router.push(discussionRoute({ topic, from: props.embedded ? 'dynamic' : 'detail' })) }
 
 // 互动：点赞 / 收藏 / 分享
 async function onLike() {
+  if (likeBusy.value) return
+  likeBusy.value = true
+  ++likeRevision
+  const fid = id.value, seq = loadSeq
   // 点赞不强制前置登录：直接发请求由后端 requireAuth 最终鉴权（对齐 submitComment 评论流程）。
   // 背景（2026-08-26）：requireLogin 前置在真机 getUserInfo 字段差异下误判未登录 → 已登录用户被拉去登录页；
   //   评论无前置也能正常落库，故点赞/收藏同策略（未登录时后端 401 → 下方回滚 + toast 提示）。
@@ -984,28 +1052,34 @@ async function onLike() {
       bridge.getAuthToken(),
       bridge.getUserInfo().catch(() => ({ nickname: '', avatar: '' })),
     ])
-    const r = await fetch(`${API_BASE}/feed/${id.value}/like`, {
+    const r = await fetch(`${API_BASE}/feed/${fid}/like`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       // 带 actor 身份（nickname/avatar），通知作者时能显示是谁赞的
       body: JSON.stringify({ liked: next, nickname: profile.nickname || '', avatar: profile.avatar || '' }),
     })
     const j = await r.json()
+    if (j.code === 0 && j.data) invalidateFeedDetail(fid)
+    if (seq !== loadSeq) return
     if (j.code === 0 && j.data) {
       liked.value = !!j.data.isLiked
       likeCount.value = j.data.likes
-      invalidateFeedDetail(id.value) // 计数已变，别让 60s 详情缓存喂旧值
     } else {
       // 后端非 0 码（如 401/无权限）：回滚 + 明确提示（原静默失败，用户以为点赞无效）
       rollback()
       showToast(j.msg || j.message || t('feed.toast.likeFail'))
     }
   } catch (e) {
+    if (seq !== loadSeq) return
     rollback()
     showToast(t('feed.toast.likeFail'))
-  }
+  } finally { likeBusy.value = false }
 }
 async function onCollect() {
+  if (collectBusy.value) return
+  collectBusy.value = true
+  ++collectRevision
+  const fid = id.value, seq = loadSeq
   // 同 onLike：不强制前置登录，由后端鉴权（避免 requireLogin 误判拉登录页）
   const next = !collected.value
   collected.value = next
@@ -1015,7 +1089,8 @@ async function onCollect() {
     collectCount.value -= next ? 1 : -1
   }
   try {
-    const r = await toggleFavorite(id.value, next)
+    const r = await toggleFavorite(fid, next)
+    if (seq !== loadSeq) return
     if (r.ok) {
       collected.value = !!r.favorited
       if (typeof r.favorites === 'number') collectCount.value = r.favorites
@@ -1024,9 +1099,10 @@ async function onCollect() {
       showToast(r.message || t('feed.toast.collectFail'))
     }
   } catch (e) {
+    if (seq !== loadSeq) return
     rollback()
     showToast(t('feed.toast.collectFail'))
-  }
+  } finally { collectBusy.value = false }
 }
 // 海外用户无微信：点击分享直接复制链接，不再弹分享面板
 async function onShare() {
@@ -1087,7 +1163,7 @@ async function checkMySignup(aid) {
 }
 function onProductCard() {
   const p = item.value && item.value.productCard
-  if (p) router.push('/product/' + p.id)
+  if (p) openSecondary('/product/' + p.id)
 }
 function onPreview(img) {
   const index = typeof img === 'number' ? img : images.value.indexOf(img)
@@ -1102,23 +1178,28 @@ function onCommentBtn() {
   })
 }
 async function submitComment() {
+  if (commentBusy.value) return
   const text = commentText.value.trim()
   if (!text) return
+  commentBusy.value = true
+  const fid = id.value, seq = loadSeq
+  const replying = replyTo.value
+  try {
   const [profile, token] = await Promise.all([
     bridge.getUserInfo().catch(() => ({ nickname: t('feed.me'), avatar: '' })),
     bridge.getAuthToken(),
   ])
   const body = { content: text, nickname: profile.nickname, avatar: profile.avatar }
-  if (replyTo.value) {
-    body.parentId = replyTo.value.id
+  if (replying) {
+    body.parentId = replying.id
   }
-  try {
-    const r = await fetch(`${API_BASE}/feed/${id.value}/comment`, {
+    const r = await fetch(`${API_BASE}/feed/${fid}/comment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify(body),
     })
     const j = await r.json()
+    if (seq !== loadSeq) return
     if (j.code === 0 && j.data) {
       const newNode = {
         id: j.data.id,
@@ -1132,8 +1213,8 @@ async function submitComment() {
         isLiked: false,
         replies: [],
       }
-      if (replyTo.value) {
-        const parent = findNode(comments.value, replyTo.value.id)
+      if (replying) {
+        const parent = findNode(comments.value, replying.id)
         if (parent) {
           parent.replies = parent.replies || []
           parent.replies.unshift(newNode)
@@ -1145,15 +1226,17 @@ async function submitComment() {
         comments.value.unshift(newNode)
       }
       commentText.value = ''
-      invalidateFeedDetail(id.value) // 评论数已变
-      invalidateComments(id.value) // 评论列表缓存已变（防 60s 内重进少自己刚发的评论）
+      ++commentRevision
+      if (!commentsLoaded.value && item.value) item.value.comments = (Number(item.value.comments) || 0) + 1
+      invalidateFeedDetail(fid) // 评论数已变
+      invalidateComments(fid) // 评论列表缓存已变（防 60s 内重进少自己刚发的评论）
       showToast(t('feed.toast.commentOk'))
       return
     }
     showToast(j.msg || t('feed.toast.commentFail'))
   } catch (e) {
-    showToast(t('feed.toast.commentFail'))
-  }
+    if (seq === loadSeq) showToast(t('feed.toast.commentFail'))
+  } finally { commentBusy.value = false }
 }
 function findNode(list, id) {
   for (const n of list) {
@@ -1170,6 +1253,52 @@ function showToast(msg) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 1600)
 }
+// Same reader and actions in both postures; only the scroll container changes.
+function getReadingState() {
+  return { scrollTop: props.embedded ? embeddedScrollTop : window.scrollY, carouselIndex: carIndex.value, draft: commentText.value }
+}
+function getItem() {
+  return item.value ? { ...item.value, likes: likeCount.value, isLiked: liked.value, favorites: collectCount.value, isFavorited: collected.value, comments: commentCount.value } : null
+}
+watch(() => props.initialItem?.likes, value => {
+  if (props.embedded && value !== undefined && !likeBusy.value && likeCount.value !== Number(value)) { ++likeRevision; likeCount.value = Number(value) || 0 }
+})
+watch(() => props.initialItem?.isLiked, value => {
+  if (props.embedded && value !== undefined && !likeBusy.value && liked.value !== !!value) { ++likeRevision; liked.value = !!value }
+})
+watch(() => props.initialItem?.isFavorited, value => {
+  if (props.embedded && value !== undefined && !collectBusy.value && collected.value !== !!value) { ++collectRevision; collected.value = !!value }
+})
+let readingObserver = null
+function cancelReadingRestore() { readingObserver?.disconnect(); readingObserver = null }
+function restoreReading() {
+  if (props.embedded) return
+  const state = takeFeedReading(id.value)
+  if (!state) return
+  const fid = id.value
+  nextTick(() => requestAnimationFrame(() => {
+    if (id.value !== fid || !detailMounted || route.path !== `/feed/${fid}`) return
+    const root = fdRoot.value, top = Math.max(0, Number(state.scrollTop) || 0)
+    carIndex.value = Math.min(images.value.length - 1, Math.max(0, Number(state.carouselIndex) || 0))
+    if (carTrack.value) carTrack.value.scrollLeft = carTrack.value.clientWidth * carIndex.value
+    commentText.value = String(state.draft || '')
+    // App.vue holds the entering page as its own scroll container, then resets
+    // window scroll when the transition ends. Restore in both containers at
+    // that boundary, instead of racing its reset with a fixed timeout.
+    const restoreScroll = () => {
+      if (id.value !== fid || route.path !== `/feed/${fid}` || !root.isConnected) { cancelReadingRestore(); return }
+      if (root.classList.contains('page-enter-held') || root.classList.contains('slide-forward-enter-active')) root.scrollTop = top
+      else { window.scrollTo(0, top); cancelReadingRestore() }
+    }
+    readingObserver = new MutationObserver(restoreScroll)
+    readingObserver.observe(root, { attributes: true, attributeFilter: ['class'] })
+    restoreScroll()
+  }))
+}
+watch(() => [likeCount.value, liked.value, collected.value, collectCount.value, commentCount.value], () => {
+  if (props.embedded && item.value) emit('change', getItem())
+})
+defineExpose({ getReadingState, getItem })
 </script>
 
 <style scoped>
@@ -1307,7 +1436,7 @@ function showToast(msg) {
 .meta { flex: 1; min-width: 0; }
 .name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text);
   display: flex;
   align-items: center;
@@ -1470,7 +1599,7 @@ function showToast(msg) {
 }
 .comments__head {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text);
   display: flex;
   justify-content: space-between;
@@ -1696,5 +1825,24 @@ function showToast(msg) {
 .actions__input:focus-visible, .actions__icon:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .more, .share { min-width: 36px; min-height: 44px; align-items: center; justify-content: center; }
 .detail.single-hero .more { color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
+
+.fd-root--embedded { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--card); }
+.fd-root--embedded .detail { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding-bottom: 0; }
+.fd-root--embedded .actions { position: relative; flex: 0 0 auto; left: auto; transform: none; max-width: none; }
+.fd-root--embedded .fd-skel, .fd-root--embedded .empty { min-height: 0; flex: 1; }
+.article, .comments, .related { max-width: 680px; margin-left: auto; margin-right: auto; }
+.fd-root { background: var(--bg); }
+.fd-root:not(.fd-root--embedded) .detail { max-width: 680px; margin-left: auto; margin-right: auto; }
+.fd-root:not(.fd-root--embedded) .actions { max-width: 680px; }
+.detail :deep(.tb-title) { left: 108px; right: 108px; }
+.reader-expand { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; }
+.reader-expand:focus-visible, .tag:focus-visible, .more:focus-visible, .share:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.car-slide { aspect-ratio: 4 / 3; object-fit: contain; background: var(--bg); }
+.car-dots { right: 76px; }
+.time, .article__subtitle, .comments__sort { color: var(--text-sub); }
+.tag { min-height: 36px; }
+.tag, .cinput__send { color: var(--brand-ink); }
+.actions__icon:disabled, .cinput__send:disabled { opacity: .5; }
+@media (prefers-reduced-motion: reduce) { .fd-root img, .car-dot { transition: none; } .sk { animation: none; } }
 
 </style>

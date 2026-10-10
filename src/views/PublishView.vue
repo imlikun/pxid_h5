@@ -33,6 +33,14 @@
         </div>
       </div>
 
+      <section class="card section topic-section">
+        <div class="label">{{ t('publish.topics') }}</div>
+        <div class="topic-options"><button v-for="topic in DISCUSSION_TOPICS" :key="topic.name" type="button" :aria-pressed="selectedTopics.includes(topic.name)" :class="{ active: selectedTopics.includes(topic.name) }" @click="toggleTopic(topic.name)">#{{ t(`discover.topics.${topic.key}`) }}</button></div>
+        <div class="selected-topics"><button v-for="topic in selectedTopics.filter(name => !DISCUSSION_TOPICS.some(x => x.name === name))" :key="topic" type="button" @click="toggleTopic(topic)">#{{ topic }} ×</button></div>
+        <form class="topic-input" @submit.prevent="addTopic"><input v-model="topicInput" maxlength="80" :aria-label="t('publish.customTopic')" :placeholder="t('publish.customTopic')" /><button type="submit" :disabled="!topicInput.trim() || selectedTopics.length >= 3">{{ t('publish.addTopic') }}</button></form>
+        <p class="hint">{{ t('publish.topicHint') }}</p>
+      </section>
+
       <!-- 图片上传（真实上传 /media/upload，jpg/png/webp 白名单，≤9 张） -->
       <div class="card section">
         <div class="label">{{ t('publish.images') }}</div>
@@ -130,7 +138,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { DISCUSSION_TOPICS, normalizeTopic } from '../utils/discussion'
+import { normalizeCarModel } from '../data/carModels'
 import { useRouter, useRoute } from 'vue-router'
 import { carModels } from '../data/mock'
 import bridge from '../bridge'
@@ -150,24 +160,30 @@ const fileInputVideo = ref(null)
 
 const content = ref('')
 const carModel = ref('')
-// 我的车型回退方案：H5 localStorage 记忆（Flutter getUserInfo 未返回 carModel 时使用）
-// 第一方案仍是 Flutter getUserInfo().carModel，此处仅作兜底
-const MY_CAR_KEY = 'pxid_my_car_model'
-function persistMyCar(model) {
-  if (model && carModels.includes(model)) {
-    try { localStorage.setItem(MY_CAR_KEY, model) } catch (e) {}
-  }
+// 关联车型仅属于这条动态，不改写用户绑定车型。
+function selectCar(m) { carModel.value = carModel.value === m ? '' : m }
+const selectedTopics = ref([]), topicInput = ref('')
+function toggleTopic(name) {
+  const topic = normalizeTopic(name)
+  if (!topic || normalizeCarModel(topic)) return
+  const index = selectedTopics.value.indexOf(topic)
+  if (index >= 0) selectedTopics.value.splice(index, 1)
+  else if (selectedTopics.value.length < 3) selectedTopics.value.push(topic)
 }
-function selectCar(m) {
-  carModel.value = m
-  persistMyCar(m)
+function addTopic() {
+  const topic = normalizeTopic(topicInput.value)
+  if (topic && !selectedTopics.value.includes(topic)) toggleTopic(topic)
+  topicInput.value = ''
 }
-// 从广场车型卡跳过来时预选车型（?carModel=P2），并记忆
-const presetModel = route.query.carModel
-if (presetModel && carModels.includes(presetModel)) {
-  carModel.value = presetModel
-  persistMyCar(presetModel)
+function applyPreset() {
+  if (route.path !== '/publish') return
+  const model = normalizeCarModel(route.query.carModel)
+  if (model) carModel.value = model
+  const topic = normalizeTopic(route.query.topic)
+  if (topic && !normalizeCarModel(topic) && !selectedTopics.value.includes(topic) && selectedTopics.value.length < 3) selectedTopics.value.push(topic)
 }
+applyPreset()
+watch(() => route.fullPath, applyPreset)
 // 已选图片：{ file, url(本地预览), uploadedUrl, uploading }
 const picked = ref([])
 const uploading = ref(false)
@@ -371,6 +387,7 @@ async function uploadImages() {
 }
 
 function goBack() {
+  if (bridge.isWebViewFirstPage() && window.PXIDApp?.postMessage) { window.PXIDApp.postMessage('closeWebView'); return }
   if (window.history.length > 1) router.back()
   else router.push('/discover')
 }
@@ -421,12 +438,7 @@ async function onPublish() {
         content: content.value.trim(),
         images,
         carModel: cm,
-        // 🔴 不再把车型塞进 tags（2026-09-19 坤哥反馈「详情页出现两个 #P5」）：
-        //    此前 `tags: cm ? [cm] : []` 让同一车型被渲染两次——tags 出一个蓝色话题标签、
-        //    carModel 出一个灰色车型标签。车型只走 carModel 字段即可（详情页/卡片都读它）。
-        //    后端 feeds.tags 唯一功能性用途是活动话题统计（`tags LIKE '%act{xx}%'`），
-        //    不依赖车型，去掉不影响任何后端逻辑（已核 server.js）。
-        tags: [],
+        tags: [...selectedTopics.value],
         region,
         // ⚠️ 不再兜底「骑友」（2026-09-01 北帆整改清单 问题D）：取不到就传空，
         //    由后端按 token 身份从 user_profiles 解析真实昵称；传「骑友」会被写进 feeds 表
@@ -447,7 +459,9 @@ async function onPublish() {
       publishState.pendingTab = '动态'
       publishState.needsRefresh = true
       showToast(t('publish.success'))
-      setTimeout(() => router.push('/discover'), 600)
+      const returnTo = typeof route.query.returnTo === 'string' && /^\/discover(?:\?|$)/.test(route.query.returnTo) ? route.query.returnTo : '/discover?tab=dynamic'
+      content.value = ''; picked.value = []; videoFile.value = null; selectedTopics.value = []
+      setTimeout(() => router.push(returnTo), 600)
     } else {
       showToast(j.message || t('publish.fail'))
     }
@@ -460,6 +474,8 @@ async function onPublish() {
 </script>
 
 <style scoped>
+.topic-options, .selected-topics { display: flex; flex-wrap: wrap; gap: 8px; }.topic-options button, .selected-topics button { min-height: 40px; padding: 0 12px; border-radius: 10px; background: var(--bg); color: var(--text-sub); font-size: 13px; }.topic-options button.active, .selected-topics button { color: var(--brand); background: var(--brand-soft); }.topic-input { display: flex; gap: 8px; margin-top: 12px; }.topic-input input { flex: 1; min-width: 0; min-height: 42px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; }.topic-input button { min-height: 42px; font-size: 13px; color: var(--brand); }.topic-input button:disabled { color: var(--text-hint); }.topic-section button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
 .publish {
   min-height: 100vh;
   background: var(--bg);
