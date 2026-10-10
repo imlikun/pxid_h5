@@ -19,16 +19,7 @@
     <TopBar sticky :show-back="false">
       <template #left>
         <button v-if="inDiscussion" class="discussion-back" type="button" @click="leaveDiscussion"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 5-7 7 7 7" /></svg><span>{{ discussionTitle }}</span></button>
-        <div v-else class="tabs" role="tablist" :aria-label="t('discover.sections')" @keydown="onTabKey">
-          <button type="button" role="tab"
-            v-for="t in tabs"
-            :key="t"
-            class="tab" :aria-selected="activeTab === t" :tabindex="activeTab === t ? 0 : -1"
-            :class="{ active: activeTab === t }"
-            @click="setTab(t)"
-            >{{ tabLabel(t) }}</button
-          >
-        </div>
+        <RootTabs v-else :items="rootTabs" :model-value="activeTab" :aria-label="t('discover.sections')" @update:model-value="setTab" />
       </template>
       <template #right>
         <div class="topacts">
@@ -221,6 +212,7 @@ import { requireLogin } from '../utils/auth'
 import { putFeedSnapshot } from '../utils/feedSnapshot'
 import { handoffFeedReading, setDiscoverReturnAnchor } from '../utils/feedReading'
 import IconSvg from '../components/IconSvg.vue'
+import RootTabs from '../components/RootTabs.vue'
 import TopBar from '../components/TopBar.vue'
 const quickImage = (key) => ({
   small: import.meta.env.BASE_URL + `discover/quick-${key}-2x.webp`,
@@ -335,6 +327,7 @@ function onBannerTouchEnd(e) {
   if (Math.abs(dx) > 40) (dx < 0 ? nextBanner() : (bannerIdx.value = (bannerIdx.value - 1 + bannerSlides.value.length) % bannerSlides.value.length))
 }
 const tabs = discoverTabs
+const rootTabs = computed(() => tabs.map(tab => ({ key: tab, label: tabLabel(tab) })))
 const activeTab = ref('推荐')
 const activeFilter = ref('全部')
 // 当前登录用户绑定的车型（来自 getUserInfo().carModel）；仅当其属于在售 12 车型时才在筛选条前置「我的车」
@@ -598,18 +591,6 @@ const currentFeedKey = computed(() =>
   activeTab.value === '推荐' ? 'recommend' : activeTab.value === '动态' ? 'dynamic' : ''
 )
 
-function onTabKey(event) {
-  const current = tabs.indexOf(activeTab.value)
-  let next
-  if (event.key === 'ArrowRight') next = (current + 1) % tabs.length
-  else if (event.key === 'ArrowLeft') next = (current + tabs.length - 1) % tabs.length
-  else if (event.key === 'Home') next = 0
-  else if (event.key === 'End') next = tabs.length - 1
-  else return
-  event.preventDefault()
-  setTab(tabs[next])
-  event.currentTarget.querySelectorAll('[role="tab"]')[next]?.focus()
-}
 function setTab(t, forceDefault = false) {
   if (inDiscussion.value) { router.push({ path: '/discover', query: { tab: TAB_KEY[t] } }); return }
   activeTab.value = t
@@ -1253,21 +1234,6 @@ watch(() => route.fullPath, () => {
   }
 }
 .leftcol > :deep(.tb-bar > .tb-left) { min-width: 0; flex: 1; overflow: hidden; }
-.tabs {
-  display: flex; flex: 1 1 0; align-items: center; gap: 20px; margin-left: 8px;
-  min-width: 0; padding-right: 8px; overflow-x: auto; scrollbar-width: none;
-}
-.tabs::-webkit-scrollbar { display: none; }
-.tab {
-  position: relative; flex: 0 0 auto; font-size: var(--root-nav-size); font-weight: 500; line-height: 1.2; color: var(--text-sub); min-height: 44px; padding: 8px 0; background: none; white-space: nowrap;
-}
-.tab.active {
-  color: #000000;
-  font-weight: 700;
-}
-.tab.active::after {
-  content: ''; position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); width: var(--root-nav-indicator-width); height: var(--root-nav-indicator-height); border-radius: 2px; background: var(--brand);
-}
 .topacts {
   display: flex; align-items: center; gap: 8px;
 }
@@ -1596,10 +1562,9 @@ watch(() => route.fullPath, () => {
 .banner__copy p { margin: 0; font-size: 12px; line-height: 1.5; opacity: .92; }
 .banner__dot::after { content: ''; width: 5px; height: 5px; border-radius: 5px; background: rgba(255,255,255,.7); transition: width .2s ease; }
 .banner__dot.on::after { width: 14px; background: var(--brand); }
-.locale-en .tabs, .locale-pt .tabs { gap: 12px; }
 .discover button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
-@media(max-width: 359px) { .tabs { gap: 12px; } .topacts { gap: 4px; } .banner__copy h2 { font-size: 20px; } }
-@media(min-width: 600px) and (max-width: 749px) { .tabs { gap: 10px; margin-left: 2px; } .topacts { gap: 2px; } .act { width: 44px; height: 44px; } .banner__copy { padding: 12px 12px 12px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
+@media(max-width: 359px) { .topacts { gap: 4px; } .banner__copy h2 { font-size: 20px; } }
+@media(min-width: 600px) and (max-width: 749px) { .topacts { gap: 2px; } .act { width: 44px; height: 44px; } .banner__copy { padding: 12px 12px 12px; } .banner__copy h2 { font-size: 18px; } .banner__copy p { font-size: 11px; } }
 @media(prefers-reduced-motion: reduce) { .banner__track, .banner__dot::after, .quick__thumb { transition: none; } }
 /* 广场与动态：与推荐页保持同一圆角、边距和品牌色节奏。 */
 

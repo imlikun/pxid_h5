@@ -1,6 +1,6 @@
 <template>
   <button type="button" class="topiccard press" :class="{ 'topiccard--on': active }" :aria-pressed="active">
-    <div class="tc-cover"><IconSvg :name="topicIcon" :size="32" :stroke="1.6" /><span class="tc-cat">{{ category }}</span></div>
+    <div class="tc-cover"><TopicIcon :name="name" :size="32" :stroke="1.6" /><span class="tc-cat">{{ category }}</span></div>
     <div class="tc-body"><div class="tc-title"><span>#</span> {{ name }}</div><p>{{ t(active ? 'discover.topicExit' : 'discover.topicExplore') }}</p>
       <div class="tc-meta"><span>{{ t('discover.topicCount', { n: count }) }}</span><span class="tc-arrow" aria-hidden="true">→</span></div>
     </div>
@@ -8,11 +8,8 @@
 </template>
 <script setup>
 import { t } from '../i18n'
-import { computed } from 'vue'
-import IconSvg from './IconSvg.vue'
-import { DISCUSSION_TOPICS } from '../utils/discussion'
-const props = defineProps({ name: String, count: Number, active: Boolean, emoji: String, category: String })
-const topicIcon = computed(() => DISCUSSION_TOPICS.find(topic => topic.name === props.name)?.icon || 'chat')
+import TopicIcon from './TopicIcon.vue'
+defineProps({ name: String, count: Number, active: Boolean, emoji: String, category: String })
 </script>
 <style scoped>
 .topiccard { width: 100%; padding: 0; border: 0; border-radius: 12px; overflow: hidden; background: #fff; text-align: left; color: var(--text); box-shadow: none; }

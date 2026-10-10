@@ -106,7 +106,7 @@
         <p v-if="!v.reviews.length" class="rv-empty">暂无车主评价，欢迎前往 Shopify 商品页留言</p>
         <div v-for="(r, i) in v.reviews" :key="i" class="review-item">
           <div class="rv-head">
-            <img class="rv-avatar" :src="avatarUrl(r.avatar)" alt="" loading="lazy" @error="(e) => handleAvatarError(e, r.author)" />
+            <img class="rv-avatar" :src="resolveAvatar(r.author, r.avatar)" alt="" loading="lazy" @error="(e) => handleAvatarError(e, r.author)" />
             <div class="rv-info">
               <span class="rv-author">{{ r.author }}</span>
               <span class="rv-time">{{ r.time }}</span>
@@ -168,7 +168,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { fetchProducts, fetchProductDetail, getProductByHandle, sym, initRegion } from '../api/shop'
 import { initLocale } from '../i18n'
 import { plazaShowcase, VEHICLE_HANDLES, carModelToHandle } from '../data/mock'
-import { handleAvatarError } from '../utils/avatar'
+import { handleAvatarError, resolveAvatar } from '../utils/avatar'
 import bridge from '../bridge'
 
 const router = useRouter()
@@ -289,9 +289,6 @@ const selectedConfigName = computed(() => {
   }
   return parts.join(' / ')
 })
-
-// 头像 URL（真实评价接入后用）
-function avatarUrl(path) { return path || '' }
 
 // 热门推荐：其他真实车型
 const relatedHandles = computed(() => VEHICLE_HANDLES.filter((h) => h !== handle.value))

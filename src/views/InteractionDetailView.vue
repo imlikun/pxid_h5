@@ -14,8 +14,7 @@
       <!-- 对方信息 -->
       <div class="actor">
         <div class="avatar">
-          <img v-if="item.actorAvatar" :src="resolveAvatar(item.actorName, item.actorAvatar)" alt="" @error="(e) => handleAvatarError(e, item.actorName)" />
-          <span v-else class="avatar__ph">{{ avatarText(item) }}</span>
+          <img :src="resolveAvatar(item.actorName, item.actorAvatar)" alt="" @error="(e) => handleAvatarError(e, item.actorName)" />
         </div>
         <div class="who">
           <div class="name">{{ item.actorName || t('interaction.action.system') }}</div>
@@ -95,10 +94,6 @@ function actionText(n) {
   if (n.type === 'follow') return t('interaction.action.follow')
   if (n.type === 'favorite') return t('interaction.action.favorite')
   return t('interaction.action.system')
-}
-function avatarText(n) {
-  if (n.actorName) return n.actorName.slice(0, 1).toUpperCase()
-  return { like: '♥', comment: '💬', follow: '＋', favorite: '★', reply: '↩' }[n.type] || '!'
 }
 // 时间线样式：08/27 17:12
 function formatDateTime(s) {
@@ -202,11 +197,6 @@ function goBack() {
   flex: none;
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.avatar__ph {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--brand, #4a6cf7);
-}
 .who { flex: 1; min-width: 0; }
 .name {
   font-size: 15px;

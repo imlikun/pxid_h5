@@ -13,7 +13,7 @@
     </section>
     <section>
       <header class="hub-heading"><h2>{{ t('discover.plaza.topics') }}</h2><button type="button" :aria-expanded="allTopics" @click="allTopics = !allTopics">{{ t(allTopics ? 'discover.collapse' : 'discover.moreTopics') }} <span>›</span></button></header>
-      <div class="topic-grid"><button v-for="topic in shownTopics" :key="topic.name" type="button" class="topic-entry" @click="$emit('topic', topic.name)"><span class="topic-icon"><IconSvg :name="topic.icon || 'chat'" :size="21" :stroke="1.7" /></span><span><strong>{{ topicLabel(topic) }}</strong><small>{{ topic.count > 0 ? t('discover.topicCount', { n: topic.count }) : topic.key ? t(`discover.topics.${topic.key}Hint`) : t('discover.viewDiscussion') }}</small></span></button></div>
+      <div class="topic-grid"><button v-for="topic in shownTopics" :key="topic.name" type="button" class="topic-entry" @click="$emit('topic', topic.name)"><span class="topic-icon"><TopicIcon :name="topic.name" /></span><span><strong>{{ topicLabel(topic) }}</strong><small>{{ topic.count > 0 ? t('discover.topicCount', { n: topic.count }) : topic.key ? t(`discover.topics.${topic.key}Hint`) : t('discover.viewDiscussion') }}</small></span></button></div>
       <p v-if="topicsError" class="hub-status">{{ t('discover.topicsUnavailable') }} <button type="button" @click="$emit('retry-topics')">{{ t('discover.dynamic.retry') }}</button></p>
     </section>
     <section>
@@ -31,7 +31,7 @@ import { CAR_MODEL_LABELS } from '../data/carModels'
 import { DISCUSSION_TOPICS } from '../utils/discussion'
 import { activityPhase } from '../utils/activityPhase'
 import { t } from '../i18n'
-import IconSvg from './IconSvg.vue'
+import TopicIcon from './TopicIcon.vue'
 import ActivityCard from './ActivityCard.vue'
 const props = defineProps({ mine: String, topics: { type: Array, default: () => [] }, topicsError: Boolean, activities: { type: Array, default: () => [] }, loadingActivities: Boolean, activitiesError: Boolean })
 defineEmits(['model', 'topic', 'activities', 'activity', 'retry-topics'])

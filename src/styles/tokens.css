@@ -7,8 +7,10 @@
   --brand-ink: #315FCC;                   /* 小字号蓝色文字，区别于按钮填充色 */
   --root-page-bg: #F5F8FD;                /* 发现/精选共用的页面底色 */
   --root-nav-size: clamp(16px, 4.3vw, 19px);
+  --root-nav-gap: 4px;                    /* 相邻文字间距 = 按钮内距 8 + gap 4 + 内距 8 */
   --root-nav-indicator-width: 28px;
   --root-nav-indicator-height: 3px;
+  --root-nav-indicator-bottom: 2px;
   --accent: #FF7A2F;                      /* 活力橙：与品牌蓝搭配的第二强调色（未读点/话题卡/四宫格点缀） */
   --accent-soft: #FFF1E8;                /* 橙浅底（话题卡底/四宫格图标底） */
   --price: #e53935;                       /* 价格红 */

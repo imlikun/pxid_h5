@@ -48,8 +48,7 @@
               :class="{ stacked: g.count > 1 }"
               :style="{ zIndex: 10 - i, marginLeft: g.count > 1 && i > 0 ? '-12px' : '0' }"
             >
-              <img v-if="a.avatar" :src="a.avatar" alt="" @error="(e) => handleAvatarError(e, a.name)" />
-              <span v-else class="ava__ph">{{ (a.name || '?').slice(0, 1).toUpperCase() }}</span>
+              <img :src="resolveAvatar(a.name, a.avatar)" alt="" @error="(e) => handleAvatarError(e, a.name)" />
             </span>
             <span v-if="g.unread" class="dot"></span>
           </div>
@@ -107,7 +106,7 @@ import TopBar from '../components/TopBar.vue'
 import { t } from '../i18n'
 import { fetchNotifications, markNotificationRead, markAllRead } from '../api/notifications'
 import { cacheNotifications } from '../store/notificationStore'
-import { handleAvatarError } from '../utils/avatar'
+import { handleAvatarError, resolveAvatar } from '../utils/avatar'
 import { bridge } from '../bridge'
 
 const router = useRouter()
@@ -467,13 +466,6 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   height: 100%;
   object-fit: cover;
 }
-.ava__ph {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--brand, #4A6CF7);
-  letter-spacing: -0.5px;
-}
-
 /* ---- 气泡卡片 ---- */
 .bubble {
   flex: 1;

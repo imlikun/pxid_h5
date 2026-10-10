@@ -5,16 +5,7 @@
     <!-- 顶部：三 tab + 我的订单入口（右上角） -->
     <TopBar sticky :show-back="false">
       <template #left>
-        <div class="tabs">
-          <button type="button"
-            v-for="t in topTabs"
-            :key="t.key"
-            class="tab"
-            :class="{ active: activeTab === t.key }"
-            @click="activeTab = t.key"
-            >{{ t.label }}</button
-          >
-        </div>
+        <RootTabs v-model="activeTab" :items="topTabs" :aria-label="t('featured.sections')" />
       </template>
       <template #right>
         <button type="button" class="my-order-btn" @click="openSecondary('/order/list')">
@@ -287,6 +278,7 @@ import QuickActions from '../components/QuickActions.vue'
 import SectionHeader from '../components/SectionHeader.vue'
 import ProductCard from '../components/ProductCard.vue'
 import TopBar from '../components/TopBar.vue'
+import RootTabs from '../components/RootTabs.vue'
 import IconSvg from '../components/IconSvg.vue'
 import { featuredQuick } from '../data/mock'
 import { fetchProducts, getProducts, getStore, getLastError, initRegion, sym, API_BASE, fetchProductDetail } from '../api/shop'
@@ -621,50 +613,8 @@ async function retry() {
 .featured--native {
   padding-bottom: calc(var(--tab-h, 56px) + max(16px, env(safe-area-inset-bottom, 0px)));
 }
-.featured :deep(.tb-left) { min-width: 0; flex: 1; overflow: hidden; }
-.featured :deep(.tb-right) { min-width: 0; flex: none; }
-.tabs {
-  display: flex;
-  flex: 1 1 0;
-  align-items: center;
-  gap: clamp(13px, 4vw, 22px);
-  /* TopBar 自带 padding:0 8px，这里再左推 8px，整体 16px 与下方卡片 margin 对齐 */
-  margin-left: 8px;
-  min-width: 0;
-  padding-right: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.tabs::-webkit-scrollbar { display: none; }
-.tab {
-  position: relative;
-  flex: 0 0 auto;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  white-space: nowrap;
-  font-size: var(--root-nav-size);
-  font-weight: 500;
-  color: var(--text-sub);
-  line-height: 1.2;
-  padding: 4px 0;
-  min-height: 44px;
-}
-.tab.active {
-  color: var(--text);
-  font-weight: 700;
-}
-.tab.active::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  width: var(--root-nav-indicator-width);
-  height: var(--root-nav-indicator-height);
-  border-radius: 2px;
-  background: var(--brand, #4a6cf7);
-}
+.leftcol > :deep(.tb-bar > .tb-left) { min-width: 0; flex: 1; overflow: hidden; }
+.leftcol > :deep(.tb-bar > .tb-right) { min-width: 0; flex: none; }
 .my-order-btn {
   display: flex;
   align-items: center;
