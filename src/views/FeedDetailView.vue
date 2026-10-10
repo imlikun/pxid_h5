@@ -4,10 +4,19 @@
        三个根级节点，导致从发现页进出详情页时，详情页那一侧的转场完全不生效
        （表现为只有列表在动，详情是硬切）。包一层后两侧动画才对称。 -->
   <div class="fd-root" :class="{ 'fd-root--embedded': embedded }" ref="fdRoot">
-  <div class="detail" ref="detailScroll" v-if="item" :class="{ 'single-hero': isSingleHero && !embedded }" @scroll.passive="rememberReadingScroll">
+  <div class="detail" ref="detailScroll" v-if="item" @scroll.passive="rememberReadingScroll">
     <!-- 顶部：返回优先关闭原生详情 WebView（App 原生右滑路由），回退 router.back() -->
-    <TopBar sticky :show-back="!embedded" :back="goBack" :title="isSingleHero && !embedded ? '' : (isActivity ? t('feed.detail.title.activity') : (item?.author || t('feed.detail.title.content')))">
+    <TopBar sticky :show-back="!embedded" :back="goBack" :interactive="!isActivity" :class="{ 'detail-topbar--author': !isActivity }" :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
       <template v-if="embedded" #left><button type="button" class="reader-expand" :aria-label="t('discover.reader.expand')" @click="$emit('expand')"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></svg></button></template>
+      <template v-if="!isActivity" #title>
+        <component :is="item.deviceId ? 'button' : 'div'" :type="item.deviceId ? 'button' : undefined" class="author author--nav" @click="goAuthor">
+          <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.author)" />
+          <span class="nav-author__meta">
+            <span class="nav-author__name">{{ item.author || t('feed.author.official') }}</span>
+            <span v-if="isOfficial" class="badge-official">{{ t('feed.badge.official') }}</span>
+          </span>
+        </component>
+      </template>
       <template #right>
         <button type="button" class="more press" :aria-label="t('feed.moreActions')" @click="onMoreClick">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
@@ -65,8 +74,10 @@
       <h1 class="title">{{ articleTitle }}</h1>
       <p v-if="item.subtitle" class="article__subtitle">{{ item.subtitle }}</p>
 
-      <!-- 作者卡：点作者进个人主页（官方帖无 deviceId 不跳） -->
-      <div class="author" @click="goAuthor">
+      <!-- 动态身份在顶栏；正文仅保留时间与发布城市。 -->
+      <p v-if="!isActivity" class="article__meta time"><time>{{ formatPublishedTime(item.time || item.date) }}</time><span v-if="item.publishLocation || item.city"> · {{ item.publishLocation || item.city }}</span></p>
+      <!-- 活动详情保留原有作者卡与居中标题。 -->
+      <div v-else class="author" @click="goAuthor">
         <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.author)" />
         <div class="meta">
           <div class="name">
@@ -832,11 +843,6 @@ const images = computed(() => {
 // 张数决定稳定的详情布局；不随机切换，避免返回或刷新后同一动态改变样式。
 const detailGalleryLayout = computed(() => feedGalleryLayout(images.value.length))
 const usesImageCarousel = computed(() => feedUsesCarousel(images.value.length))
-// 单图沉浸态：仅当普通 feed 且为单图（非视频、非活动）时，顶栏透明浮于图上
-const isSingleHero = computed(() => {
-  if (!item.value || isActivity.value) return false
-  return !item.value.videoUrl && images.value.length === 1
-})
 const videoSrc = computed(() => mediaUrl(item.value && item.value.videoUrl))
 const generatedPoster = ref('')
 const videoPoster = computed(() => mediaUrl(item.value && item.value.videoCover) || generatedPoster.value || '')
@@ -1318,23 +1324,6 @@ defineExpose({ getReadingState, getItem })
   background: var(--bg);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
-/* 单图沉浸态：顶栏透明悬浮于图上，去掉白条与标题，只留返回+分享 */
-.detail.single-hero :deep(.tb-bar) {
-  background: transparent;
-  box-shadow: none;
-}
-.detail.single-hero :deep(.tb-title) { display: none; }
-.detail.single-hero .hero {
-  margin-top: -64px; /* 上移穿过 56px 顶栏 + 8px article 上间距，图片顶贴屏幕顶 */
-}
-.detail.single-hero :deep(.tb-back) {
-  color: #fff;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
-}
-.detail.single-hero .share {
-  color: #fff;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
-}
 /* 详情页返回键向左靠 8px（热区左缘 4px→0），仅作用于本页，不牵动全站 TopBar */
 :deep(.tb-back) { margin-left: -8px; }
 .share { display: flex; color: var(--text); }
@@ -1457,6 +1446,17 @@ defineExpose({ getReadingState, getItem })
   margin-top: 3px;
   line-height: 1.5;
 }
+.article__meta { margin: 10px 0 0; font-size: 12px; }
+/* 左对齐身份区使用顶栏剩余空间，避免长作者名压住两侧操作。 */
+.detail-topbar--author :deep(.tb-title) { position: static; flex: 1; min-width: 0; text-align: left; }
+.author--nav { width: 100%; min-height: 44px; margin: 0; padding: 0; gap: 8px; text-align: left; }
+.author--nav .avatar { width: 28px; height: 28px; }
+.nav-author__meta { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 2px; }
+.nav-author__name { max-width: 100%; font-size: 14px; font-weight: 500; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.author--nav .badge-official { padding: 0 5px; line-height: 14px; }
+.author--nav:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 6px; }
+.detail-topbar--author .more { margin-right: 0; }
+.detail-topbar--author .more, .detail-topbar--author .share { min-width: 44px; }
 /* 标题 */
 .title {
   font-size: 22px;
@@ -1824,7 +1824,6 @@ defineExpose({ getReadingState, getItem })
 .actions__icon svg { flex: none; width: 21px; height: 21px; }
 .actions__input:focus-visible, .actions__icon:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .more, .share { min-width: 36px; min-height: 44px; align-items: center; justify-content: center; }
-.detail.single-hero .more { color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
 
 .fd-root--embedded { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--card); }
 .fd-root--embedded .detail { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding-bottom: 0; }

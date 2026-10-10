@@ -35,7 +35,7 @@
           <button type="button" :aria-label="t('discover.search')" :aria-expanded="searchOpen" class="act act--search press" :class="{ 'act--on': searchOpen }" @click="toggleSearch">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
           </button>
-          <button type="button" :aria-label="t('discover.publish')" class="act act--add press" @click="onAdd">
+          <button type="button" :aria-label="inDiscussion ? `${t('discover.discussion.publish')}: ${discussionTitle}` : t('discover.publish')" class="act act--add press" @click="onAdd">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </button>
         </div>
@@ -126,10 +126,6 @@
       </div>
     </template>
 
-    <section v-if="inDiscussion && !showSearchResults" class="discussion-head">
-      <p>{{ t(discussionTopic ? 'discover.discussion.topicHint' : 'discover.discussion.modelHint') }}</p>
-      <div><span v-if="dynamicTotal > 0">{{ t('discover.topicCount', { n: dynamicTotal }) }}</span><button type="button" @click="onAdd">{{ t('discover.discussion.publish') }} <span aria-hidden="true">＋</span></button></div>
-    </section>
     <DiscoverFilterBar v-if="activeTab === '动态' && !showSearchResults" :scope="dynamicScope" :model="selectedDynamicModel()" :mine="myCarModel" @scope="setDynamicScope" @model="pickFilter($event || '最新')" />
     <header v-if="activeTab === '推荐' && !showSearchResults" class="recommend-heading"><h2>{{ t('discover.recommend.heading') }}</h2><button v-if="myCarModel" type="button" @click="openDiscussion(myCarModel)">{{ myCarModel }} {{ t('discover.viewDiscussion') }} ›</button><button v-else type="button" @click="setTab('广场')">{{ t('discover.plaza.topics') }} ›</button></header>
 
@@ -170,6 +166,7 @@
     <!-- 动态：独立 UGC 流（单列卡片） -->
     <template v-if="activeTab === '动态' && !showSearchResults">
       <div class="content">
+        <p v-if="inDiscussion && dynamicTotal > 0 && !dynamicLoading && !nearLoading && !dynamicError" class="discussion-summary">{{ t('discover.topicCount', { n: dynamicTotal }) }}</p>
         <MomentCard
           v-for="(it, i) in dynamicList"
           :key="it.id"
@@ -1255,7 +1252,7 @@ watch(() => route.fullPath, () => {
     transform: rotate(360deg);
   }
 }
-.discover :deep(.tb-left) { min-width: 0; flex: 1; overflow: hidden; }
+.leftcol > :deep(.tb-bar > .tb-left) { min-width: 0; flex: 1; overflow: hidden; }
 .tabs {
   display: flex; flex: 1 1 0; align-items: center; gap: 20px; margin-left: 8px;
   min-width: 0; padding-right: 8px; overflow-x: auto; scrollbar-width: none;
@@ -1416,7 +1413,7 @@ watch(() => route.fullPath, () => {
 }
 /* 焦点图：图片保持主体，底部渐变承载标题与轮播提示。 */
 .banner {
-  position: relative; margin: 10px 16px 0; border: 2px solid #fff; border-radius: 14px; overflow: hidden; aspect-ratio: 2; touch-action: pan-y; background: #fff;
+  position: relative; margin: 10px 16px 0; border: 2px solid #fff; border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 9; touch-action: pan-y; background: #fff;
   box-sizing: border-box;
 }
 .banner__track {
@@ -1444,7 +1441,7 @@ watch(() => route.fullPath, () => {
   background: transparent;
 }
 .quick {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 12px 16px 14px; padding: 10px 4px; border-radius: var(--radius-lg); background: var(--card);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 12px 16px 4px; padding: 10px 4px; border-radius: var(--radius-lg); background: var(--card);
 }
 .quick__item {
   position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 7px; background: transparent; padding: 0 2px;
@@ -1618,8 +1615,9 @@ watch(() => route.fullPath, () => {
 
 .discussion-back { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; padding: 0 8px; text-align: left; }
 .discussion-back span { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.discussion-head { padding: 14px 16px 8px; }.discussion-head p { font-size: 13px; color: var(--text-sub); line-height: 1.6; margin: 0 0 8px; }.discussion-head > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; }.discussion-head > div > span { font-size: 12px; color: var(--text-hint); }.discussion-head button { color: var(--brand-ink); font-size: 13px; min-height: 44px; margin-left: auto; }
-.recommend-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px 14px; }.recommend-heading h2 { margin: 0; font-size: 17px; font-weight: 700; }.recommend-heading button { min-height: 40px; color: var(--text-hint); font-size: 12px; }
+.discussion-summary { margin: 0 16px 8px; color: var(--text-sub); font-size: 12px; line-height: 20px; }
+.recommend-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 16px 0; }.recommend-heading h2 { margin: 0; font-size: 17px; font-weight: 700; }.recommend-heading button { min-height: 40px; color: var(--text-hint); font-size: 12px; }
+.recommend-heading + .content { margin-top: 4px; }
 @media (min-width: 600px) { .leftcol, .panel { height: 100dvh; overscroll-behavior-y: contain; } .panel { overflow: hidden; } }
 .discover :deep(.is-reading) { box-shadow: 0 0 0 2px var(--brand); }
 .discover :deep(.fcard:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }

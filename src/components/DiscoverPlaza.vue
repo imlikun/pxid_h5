@@ -18,7 +18,7 @@
     </section>
     <section>
       <header class="hub-heading"><h2>{{ t('discover.plaza.activities') }}</h2><button type="button" @click="$emit('activities')">{{ t('discover.more') }} <span>›</span></button></header>
-      <div class="activity-list"><button v-for="activity in currentActivities" :key="activity.id" type="button" class="hub-activity" @click="$emit('activity', activity)"><img v-if="activity.cover" :src="activity.cover" :alt="activity.title" loading="lazy" /><span class="event-copy"><span class="event-state">{{ t(activityPhase(activity) === 'upcoming' ? 'discover.activityUpcoming' : 'discover.activityLive') }}</span><strong>{{ activity.title }}</strong><small>{{ [activity.startDate || activity.start_date, activity.location].filter(Boolean).join(' · ') }}</small></span><span class="event-arrow">›</span></button></div>
+      <div class="activity-list"><ActivityCard v-for="activity in currentActivities" :key="activity.id" :activity="activity" class="hub-activity" @select="$emit('activity', $event)" /></div>
       <p v-if="!loadingActivities && !currentActivities.length" class="hub-status">{{ t(activitiesError ? 'discover.activitiesUnavailable' : 'discover.noActiveActivities') }}</p>
       <p v-if="loadingActivities" class="hub-status" role="status">{{ t('discover.loadingMore') }}</p>
       <button type="button" class="activity-history" @click="$emit('activities')">{{ t('discover.activityHistory') }}<span>›</span></button>
@@ -32,6 +32,7 @@ import { DISCUSSION_TOPICS } from '../utils/discussion'
 import { activityPhase } from '../utils/activityPhase'
 import { t } from '../i18n'
 import IconSvg from './IconSvg.vue'
+import ActivityCard from './ActivityCard.vue'
 const props = defineProps({ mine: String, topics: { type: Array, default: () => [] }, topicsError: Boolean, activities: { type: Array, default: () => [] }, loadingActivities: Boolean, activitiesError: Boolean })
 defineEmits(['model', 'topic', 'activities', 'activity', 'retry-topics'])
 const allModels = ref(false), allTopics = ref(false), coverFailed = ref(false)
@@ -54,14 +55,14 @@ function topicLabel(topic) { return topic.key ? t(`discover.topics.${topic.key}`
 .model-card { background: white; border-radius: 16px; overflow: hidden; }.model-main { display: flex; align-items: center; gap: 16px; padding: 16px; width: 100%; text-align: left; }.model-main img, .model-code { flex: 0 0 auto; width: 76px; height: 82px; object-fit: contain; border-radius: 10px; background: #f8f9fb; }.model-code { display: grid; place-items: center; font-size: 25px; font-weight: 700; color: var(--brand); }.model-copy { min-width: 0; display: flex; flex-direction: column; gap: 5px; }.model-copy strong { font-size: 17px; font-weight: 700; }.model-copy > span { color: var(--text-hint); font-size: 12px; line-height: 1.6; }.model-copy em { font-size: 12px; font-style: normal; color: var(--brand); margin-top: 4px; }
 .model-links { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid #f0f2f5; padding: 4px 8px; }.model-links button { min-height: 44px; font-size: 13px; color: var(--text-sub); }.model-links .more-models { font-size: 12px; }.model-links--all { row-gap: 4px; padding: 8px; }
 .topic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }.topic-entry { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 80px; padding: 12px; text-align: left; background: white; border-radius: 12px; }.topic-icon { display: grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; color: var(--brand); background: var(--brand-soft); border-radius: 10px; }.topic-entry > span:last-child { min-width: 0; }.topic-entry strong { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }.topic-entry small { display: block; color: var(--text-hint); font-size: 11px; margin-top: 5px; line-height: 1.5; }
-.activity-list { display: flex; flex-direction: column; gap: 10px; }.hub-activity { display: flex; align-items: center; gap: 12px; width: 100%; background: white; border-radius: 12px; padding: 12px; text-align: left; }.hub-activity img { flex: 0 0 auto; width: 68px; height: 78px; object-fit: cover; border-radius: 8px; }.event-copy { min-width: 0; flex: 1; }.event-copy strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; font-weight: 500; line-height: 1.5; margin: 5px 0; }.event-state { display: inline-block; color: var(--brand); background: var(--brand-soft); border-radius: 4px; font-size: 10px; padding: 2px 6px; }.event-copy small { font-size: 11px; color: var(--text-hint); overflow-wrap: anywhere; }.event-arrow { color: var(--text-hint); font-size: 22px; }.activity-history { display: flex; align-items: center; justify-content: space-between; min-height: 44px; width: 100%; padding: 0 2px; margin-top: 10px; font-size: 13px; color: var(--text-sub); }.activity-history span { font-size: 20px; }.hub-status { color: var(--text-hint); font-size: 12px; line-height: 1.7; margin: 12px 0; }.hub-status button { color: var(--brand); }
+.activity-list { display: flex; flex-direction: column; gap: 12px; }.activity-history { display: flex; align-items: center; justify-content: space-between; min-height: 44px; width: 100%; padding: 0 2px; margin-top: 10px; font-size: 13px; color: var(--text-sub); }.activity-history span { font-size: 20px; }.hub-status { color: var(--text-hint); font-size: 12px; line-height: 1.7; margin: 12px 0; }.hub-status button { color: var(--brand); }
 button:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .hub-heading button { min-height: 44px; color: var(--text-sub); }
-.model-card, .topic-entry, .hub-activity { border-radius: var(--radius-lg); box-shadow: var(--card-shadow); background: var(--card); }
-.topic-entry strong { font-size: 14px; line-height: 1.5; }.topic-entry small, .event-copy small, .model-copy > span, .hub-status { font-size: 12px; color: var(--text-sub); }
-.model-copy em, .event-state { color: var(--brand-ink); }
+.model-card, .topic-entry { border-radius: var(--radius-lg); box-shadow: var(--card-shadow); background: var(--card); }
+.topic-entry strong { font-size: 14px; line-height: 1.5; }.topic-entry small, .model-copy > span, .hub-status { font-size: 12px; color: var(--text-sub); }
+.model-copy em { color: var(--brand-ink); }
 .topic-icon { color: var(--brand-ink); }
-.model-main:active, .topic-entry:active, .hub-activity:active { background: var(--brand-soft); }
+.model-main:active, .topic-entry:active { background: var(--brand-soft); }
 @media (min-width: 760px) {
   .plaza-hub { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
   .plaza-hub section + section { margin-top: 0; }.plaza-hub section { min-width: 0; }.plaza-hub section:last-child { grid-column: 1 / -1; }
