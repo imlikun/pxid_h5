@@ -90,3 +90,32 @@ test('topic catalog counts distinct published regional posts and ignores model t
     assert.equal((await h.read('/feed', { region: 'CN', topic: '通勤骑行' })).data.total, 2)
   } finally { h.db.close() }
 })
+
+test('admin publication stores the author, media and region in the correct columns', () => {
+  const db = new DatabaseSync(':memory:')
+  try {
+    db.exec(`CREATE TABLE feeds (id INTEGER PRIMARY KEY, nickname TEXT, device_id TEXT, avatar TEXT, content TEXT, images TEXT, tags TEXT, car_model TEXT, region_code TEXT DEFAULT 'US', created_at TEXT, kind TEXT, status TEXT, pinned INTEGER, scheduled_at TEXT, updated_at TEXT, operator TEXT);`)
+    let handler, result
+    const context = vm.createContext({ db, app: { post(path, guard, fn) { handler = fn } }, requireAdmin() {},
+      now: () => '2026-10-10T12:00:00Z', OFFICIAL_NICKNAME: 'Official', OFFICIAL_AVATAR: '',
+      ok: data => ({ code: 0, data }), err: (code, message) => ({ code, message }), rowToFeed: row => row,
+    })
+    const route = source.slice(source.indexOf("app.post('/admin/feed',"), source.indexOf("app.put('/admin/feed/:id',"))
+    vm.runInContext(route, context)
+    const images = Array.from({ length: 9 }, (_, i) => `https://example.test/${i}.jpg`)
+    const publish = body => { handler({ body }, { json(data) { result = data } }); return JSON.parse(JSON.stringify(result)) }
+    const published = publish({ nickname: 'Visual studio', avatar: 'https://example.test/avatar.jpg', content: 'Nine images', images, tags: ['Photos'], region: 'CN', operator: 'layout-demo' })
+    assert.equal(published.code, 0)
+    assert.equal(published.data.nickname, 'Visual studio')
+    assert.equal(published.data.device_id, '')
+    assert.equal(published.data.avatar, 'https://example.test/avatar.jpg')
+    assert.equal(published.data.content, 'Nine images')
+    assert.deepEqual(JSON.parse(published.data.images), images)
+    assert.equal(published.data.region_code, 'CN')
+    assert.equal(published.data.kind, 'official')
+    assert.equal(published.data.status, 'published')
+    assert.equal(published.data.pinned, 0)
+    assert.equal(publish({ content: 'Default region' }).data.region_code, 'US')
+    assert.equal(publish({ content: 'Invalid region', region: 'invalid' }).data.region_code, 'US')
+  } finally { db.close() }
+})

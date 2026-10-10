@@ -2400,15 +2400,16 @@ app.get('/admin/feed', requireAdmin, (req, res) => {
 
 // 官方发帖（运营发布，kind=official）
 app.post('/admin/feed', requireAdmin, (req, res) => {
-  const { content, images = [], carModel = '', tags = [], scheduledAt, operator = 'admin', avatar, nickname } = req.body || {}
+  const { content, images = [], carModel = '', tags = [], scheduledAt, operator = 'admin', avatar, nickname, region = 'US' } = req.body || {}
   const text = String(content || '').trim()
   if (!text) return res.json(err(1, '内容不能为空'))
   if (text.length > 1000) return res.json(err(1, '内容不能超过 1000 字'))
   const st = scheduledAt && new Date(scheduledAt).getTime() > Date.now() ? 'scheduled' : 'published'
+  const reg = ['CN', 'BR', 'US'].includes(String(region).toUpperCase()) ? String(region).toUpperCase() : 'US'
   const info = db
     .prepare(
-      `INSERT INTO feeds (nickname, device_id, avatar, content, images, tags, car_model, created_at, kind, status, pinned, scheduled_at, updated_at, operator)
-       VALUES (?, '', '', ?, ?, ?, ?, ?, 'official', ?, 0, ?, ?, ?)`
+      `INSERT INTO feeds (nickname, device_id, avatar, content, images, tags, car_model, region_code, created_at, kind, status, pinned, scheduled_at, updated_at, operator)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'official', ?, 0, ?, ?, ?)`
     )
     .run(
       String(nickname || OFFICIAL_NICKNAME).slice(0, 50),
@@ -2418,6 +2419,7 @@ app.post('/admin/feed', requireAdmin, (req, res) => {
       JSON.stringify((images || []).slice(0, 9)),
       JSON.stringify((tags || []).slice(0, 5)),
       String(carModel || ''),
+      reg,
       now(),
       st,
       scheduledAt || null,
