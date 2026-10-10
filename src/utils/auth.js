@@ -19,7 +19,7 @@ export async function requireLogin() {
   let token = ''
   try {
     // 优先受限 token（HMAC 鉴权链注入的 getAuthToken），回退主 token；任一存在即视为已登录
-    token = (await bridge.getAuthToken()) || (await bridge.getToken()) || ''
+    token = (await bridge.getAuthToken({ forceRefresh: true })) || (await bridge.getToken()) || ''
   } catch (e) {
     token = ''
   }

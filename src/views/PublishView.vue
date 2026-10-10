@@ -146,7 +146,7 @@ import { carModels } from '../data/mock'
 import bridge from '../bridge'
 import { getDeviceId } from '../utils/device'
 import { t, locale, regionFromLocale } from '../i18n'
-import { fetchFeedUsers } from '../api/feed'
+import { fetchFeedUsers, fetchMyProfile } from '../api/feed'
 import { uploadMedia } from '../storage'
 import { publishState } from '../store/publish'
 import TopBar from '../components/TopBar.vue'
@@ -405,8 +405,14 @@ async function onPublish() {
   // 统一走 H5 自管发布（选→传→发），不再甩回原生 openNative，确保图片/视频都能上传
   uploading.value = true
   try {
-    const token = await bridge.getAuthToken()
+    const token = await bridge.getAuthToken({ forceRefresh: true })
     if (!token) { showToast(t('publish.needLogin')); uploading.value = false; return }
+    // Native posts must belong to the verified App member, not a warmed-up
+    // preview token or a fallback token with only an anonymous device identity.
+    if (bridge.isNative()) {
+      const account = await fetchMyProfile({ throwOnError: true })
+      if (!account?.memberUserId) throw new Error('App 登录信息未同步，请重新登录后再发布')
+    }
     const region = await getRegion()
     const cm = carModel.value || ''
     // 1) 图片
@@ -431,6 +437,9 @@ async function onPublish() {
     }
     // 3) 发帖
     const profile = await bridge.getUserInfo().catch(() => ({}))
+    if (bridge.isNative() && await bridge.getAuthToken({ forceRefresh: true }) !== token) {
+      throw new Error('App 登录账号已变化，请确认账号后重新发布')
+    }
     const r = await fetch(API_BASE + '/feed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },

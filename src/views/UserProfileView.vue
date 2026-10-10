@@ -32,35 +32,39 @@
     <!-- 四宫格：发布 / 收藏 / 关注 / 粉丝 -->
     <div class="u-grid">
       <div class="u-grid__item" :class="{ on: activeGrid === 'publish' }" @click="selectGrid('publish')">
-        <b>{{ user ? user.feedCount : 0 }}</b><span>发布</span>
+        <b>{{ user ? user.feedCount : '—' }}</b><span>发布</span>
       </div>
       <div v-if="isSelf" class="u-grid__item" :class="{ on: activeGrid === 'favorites' }" @click="selectGrid('favorites')">
-        <b>{{ user ? user.favoriteCount : 0 }}</b><span>收藏</span>
+        <b>{{ user ? user.favoriteCount : '—' }}</b><span>收藏</span>
       </div>
       <div class="u-grid__item" :class="{ on: activeGrid === 'follow' }" @click="selectGrid('follow')">
-        <b>{{ user ? user.followeeCount : 0 }}</b><span>关注</span>
+        <b>{{ user ? user.followeeCount : '—' }}</b><span>关注</span>
       </div>
       <div class="u-grid__item" :class="{ on: activeGrid === 'followers' }" @click="selectGrid('followers')">
-        <b>{{ user ? user.followerCount : 0 }}</b><span>粉丝</span>
+        <b>{{ user ? user.followerCount : '—' }}</b><span>粉丝</span>
       </div>
     </div>
 
     <!-- 内容区 -->
     <div class="u-body">
+      <div v-if="profileError" class="u-empty u-error" role="alert">
+        <p>{{ profileError }}</p><button @click="refreshProfile">重新加载</button>
+      </div>
+      <div v-else-if="profileLoading || (feedLoading && !feedList.length && !userList.length)" class="u-empty" role="status">加载中…</div>
       <!-- feed 型：动态 / 赞过 / 足迹 / 收藏 -->
-      <template v-if="isFeedList">
+      <template v-else-if="isFeedList">
         <template v-if="feedList.length">
           <MomentCard v-for="it in feedList" :key="it.id" :item="it" />
           <div v-if="loadingMore" class="u-more">加载中…</div>
-          <div v-else-if="!hasMore" class="u-more">没有更多了</div>
+          <div v-else-if="!hasMore && !contentError" class="u-more">没有更多了</div>
         </template>
-        <div v-else-if="!feedLoading" class="u-empty">{{ emptyText }}</div>
+        <div v-else-if="!feedLoading && !contentError" class="u-empty">{{ emptyText }}</div>
       </template>
 
       <!-- 用户型 Tab：关注 / 粉丝 -->
       <template v-else>
         <div v-if="userList.length" class="u-users">
-          <div v-for="u in userList" :key="u.deviceId" class="u-user" @click="gotoUser(u.deviceId)">
+          <div v-for="u in userList" :key="u.memberUserId ? 'm:' + u.memberUserId : 'd:' + u.deviceId" class="u-user" @click="gotoUser(u.memberUserId || u.deviceId)">
             <img class="u-user__av" :src="resolveAvatar(u.nickname, u.avatar)" :alt="u.nickname" @error="(e) => handleAvatarError(e, u.nickname)" />
             <div class="u-user__meta">
               <div class="u-user__name">{{ u.nickname }}</div>
@@ -69,8 +73,11 @@
             <span class="u-user__arrow">›</span>
           </div>
         </div>
-        <div v-else class="u-empty">{{ emptyText }}</div>
+        <div v-else-if="!contentError" class="u-empty">{{ emptyText }}</div>
       </template>
+      <div v-if="!profileError && contentError" class="u-empty u-error" role="alert">
+        <p>{{ contentError }}</p><button @click="retryContent">重试</button>
+      </div>
     </div>
 
     <transition name="fade">
@@ -80,87 +87,53 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, onActivated, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TopBar from '../components/TopBar.vue'
 import MomentCard from '../components/MomentCard.vue'
-import { getDeviceId } from '../api/feed'
 import {
-  fetchUserProfile,
-  fetchMyProfile,
-  fetchUserFeeds,
-  fetchMyFeeds,
-  followUser,
-  unfollowUser,
-  fetchFavorites,
-  fetchFollowList,
-  fetchFollowers,
+  fetchUserProfile, fetchMyProfile, updateMyProfile, fetchUserFeeds, fetchMyFeeds,
+  fetchFavorites, fetchFollowList, fetchFollowers,
 } from '../api/feed'
 import { handleAvatarError, resolveAvatar } from '../utils/avatar'
-import bridge from '../bridge'
+import bridge, { peekAuthToken } from '../bridge'
 
 const route = useRoute()
 const router = useRouter()
-
 const user = ref(null)
-const isSelf = computed(() => route.params.id === 'me' || (user.value && user.value.isSelf))
-
-// ---- 一级：四宫格 ----
-const activeGrid = ref('publish') // publish | favorites | follow | followers
-// 动态/赞过/足迹子 Tab 已下线，发布区固定显示「动态」
-const activeTab = ref('dynamic') // static
-const isFeedList = computed(() => activeGrid.value === 'publish' || activeGrid.value === 'favorites')
-
-const emptyText = computed(() => {
-  if (activeGrid.value === 'favorites') return '还没有收藏的内容'
-  if (activeGrid.value === 'follow') return '还没有关注的人'
-  if (activeGrid.value === 'followers') return '还没有粉丝'
-  const map = {
-    dynamic: '暂无动态',
-    liked: '还没有点赞过的内容',
-    footprints: '还没有浏览记录',
-  }
-  return map[activeTab.value] || '暂无内容'
-})
-
-// ---- 状态 ----
+const isSelf = computed(() => route.params.id === 'me' || !!user.value?.isSelf)
+const activeGrid = ref('publish')
+const isFeedList = computed(() => ['publish', 'favorites'].includes(activeGrid.value))
+const emptyText = computed(() => ({
+  publish: '暂无动态', favorites: '还没有收藏的内容',
+  follow: '还没有关注的人', followers: '还没有粉丝',
+}[activeGrid.value]))
 const feedList = ref([])
 const userList = ref([])
+const profileLoading = ref(true)
 const feedLoading = ref(true)
 const loadingMore = ref(false)
+const profileError = ref('')
+const contentError = ref('')
 const page = ref(1)
 const hasMore = ref(true)
 const toast = ref('')
-let toastTimer = null
-const PAGE_SIZE = 15
 const menuOpen = ref(false)
+const avatarText = computed(() => user.value?.nickname?.slice(0, 1).toUpperCase() || '?')
+const PAGE_SIZE = 15
+let toastTimer
+let active = false
+let profileRevision = 0
+let contentRevision = 0
+let profileRequest
+let contentRequest
+const isProfileRoute = () => route.path.startsWith('/user/')
 
-// 「我的」入口（App「我的」四宫格）进 /user/me：身份走原生桥真实设备 ID，
-// 与发帖/收藏/关注的落地身份一致（2026-08-29 修复两套 ID 割裂）。
-const myDeviceId = ref('')
-const targetDevice = computed(() =>
-  route.params.id === 'me' ? myDeviceId.value : String(route.params.id || '')
-)
-async function resolveMyDevice() {
-  myDeviceId.value = await getDeviceId()
-}
-// 预填昵称：进入个人主页时 bridge.getUserInfo 异步返回前，先用它显示首字母，避免一直显示「?」
-const prefillNick = ref('')
-bridge.getUserInfo().then((p) => { if (p && p.nickname) prefillNick.value = String(p.nickname) }).catch(() => {})
-const avatarText = computed(() => {
-  const n = (user.value && user.value.nickname) || prefillNick.value
-  return n ? n.slice(0, 1).toUpperCase() : '?'
-})
-
-function showToast(m) {
-  toast.value = m
+function showToast(message) {
+  toast.value = message
   clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => (toast.value = ''), 1600)
+  toastTimer = setTimeout(() => { toast.value = '' }, 1600)
 }
-// 返回：原生全屏 WebView（App「我的」四宫格入口 / 2026-09-08 起亦为发现页全屏白名单路由）
-// 第一层（无 H5 内部历史，history.state.position<=0）关 WebView 回「我的」/根页；
-// 有 H5 历史（如从粉丝列表点进他人主页）先回上一页；浏览器预览退回 router.back()。
-// 注意：关闭桥是 window.PXIDApp.postMessage('closeWebView')，不是 PXIDBridge.closeWebView（不存在）。
 function goBack() {
   const app = window.PXIDApp
   if (app && typeof app.postMessage === 'function') {
@@ -171,196 +144,192 @@ function goBack() {
   if (window.history.length > 1) router.back()
   else router.push('/discover')
 }
-function gotoUser(deviceId) {
-  if (deviceId) router.push('/user/' + encodeURIComponent(deviceId))
+function gotoUser(identity) {
+  if (identity) router.push('/user/' + encodeURIComponent(identity))
 }
-
-// ---- 一级切换 ----
+function applyQuery() {
+  const tab = String(route.query.tab || '')
+  activeGrid.value = ['publish', 'favorites', 'follow', 'followers'].includes(tab)
+    && !(tab === 'favorites' && !isSelf.value) ? tab : 'publish'
+}
 function selectGrid(key) {
   if (key === 'favorites' && !isSelf.value) return
   if (key === activeGrid.value) return
   activeGrid.value = key
   menuOpen.value = false
-  activeTab.value = 'dynamic'
   loadContent(true)
 }
-
-// ---- 加载 ----
-// 自己：Flutter/ToC 是主端，H5 是嵌入从端，**H5 资料永远以 Flutter 为准**。
-// 历史教训（2026-09-01 排查「头像串号」）：
-//   原逻辑 `!avatar && p.avatar` 只在 H5 为空时补，结果 H5 端的污染值（同 device 另一账号串过来的）
-//   永远不会被 Flutter 的最新值覆盖 → 用户「改完 App 头像，H5 还显示别人头像」。
-//   现在改成：Flutter 有值就直接覆盖，根治 H5 脏数据问题。
-//   边界：用户在 H5 ProfileEditView 改的资料没回写 Flutter（架构问题，不在本次范围）；
-//        H5 改的本来就是「孤儿」数据，以 Flutter 覆盖反而正确。
-const EMPTY_NICK = new Set(['', '骑友'])
-// 用户在 H5 改过资料后的「保护期」：期间不用 Flutter 值覆盖，避免刚改的资料被 Flutter 旧值吃掉。
-// 过期后恢复 Flutter 优先，自动纠正 H5 端可能存在的历史污染值。
-const H5_EDIT_TTL = 7 * 24 * 3600 * 1000
-async function mergeNativeProfile() {
-  try {
-    const p = await bridge.getUserInfo()
-    if (!p) return
-    // 头部展示直接采用 Flutter 主端实时值（与 App「我的」同源）——这才是唯一真源，
-    // H5 后端 user_profiles 只是它的缓存副本（给他人视角/评论用），不能反客为主覆盖展示。
-    const patch = {}
-    if (p.nickname && !EMPTY_NICK.has(String(p.nickname).trim())) { user.value.nickname = String(p.nickname); patch.nickname = user.value.nickname }
-    if (p.avatar) { user.value.avatar = String(p.avatar); patch.avatar = user.value.avatar }
-    if (p.carModel) { user.value.carModel = String(p.carModel); patch.carModel = user.value.carModel }
-    // 把 Flutter 当前资料写回 H5 user_profiles（幂等），让他人/评论/瀑布流看到你的新头像
-    if (Object.keys(patch).length) {
-      try {
-        await updateMyProfile(patch)
-        await loadContent(true) // 刷新列表，使「列表自己帖头像=头部」(9c75448) 立即生效
-      } catch (e) { console.warn('[mergeNativeProfile] persist failed:', e.message || e) }
-    }
-  } catch (e) { /* 原生桥未实现：保持后端数据 */ }
+function invalidateContent() {
+  contentRevision++
+  contentRequest?.abort()
+  loadingMore.value = false
+  feedLoading.value = false
+}
+function errorMessage(error, fallback) {
+  if (error.status === 401) return error.message.startsWith('App') ? error.message : '登录信息已失效，请重新登录后再试'
+  return fallback
 }
 
-async function loadProfile() {
-  const d = targetDevice.value
-  if (!d) { showToast('无法识别用户'); return }
-  // 自己：只走 /users/me（token 身份最可靠，且不回退 deviceId 避免跨账号串号）；他人：/users/:deviceId
-  user.value = isSelf.value ? await fetchMyProfile() : await fetchUserProfile(d)
-  if (!user.value) { showToast('用户信息加载失败'); return }
-  if (isSelf.value) await mergeNativeProfile()
-  // 关注/粉丝/收藏统一走后端 H5 关系表，避免 Flutter 桥返回空导致计数清零
+// Never persist the browser preview's mock profile over a real account.
+// Native information is merged only within the current, verified account load.
+async function mergeNativeProfile(profile, revision, signal) {
+  if (!bridge.isNative()) return profile
+  const native = await bridge.getUserInfo().catch(() => null)
+  if (!active || revision !== profileRevision || !native) return profile
+  const nativeMember = String(native.memberUserId || native.member_user_id || '')
+  if ((nativeMember && nativeMember !== String(profile.memberUserId || ''))
+      || (native.token && String(native.token) !== peekAuthToken())) {
+    throw Object.assign(new Error('App 登录账号已变化，请重新加载'), { status: 401 })
+  }
+  const patch = {}
+  for (const key of ['nickname', 'avatar', 'carModel']) {
+    const value = native[key] && String(native[key]).trim()
+    if (value && !(key === 'nickname' && value === '骑友') && value !== String(profile[key] || '')) patch[key] = value
+  }
+  if (Object.keys(patch).length) {
+    try { await updateMyProfile(patch, { signal }) }
+    catch (error) {
+      if (signal.aborted) throw error
+      console.warn('[profile] native profile sync failed:', error.message)
+    }
+  }
+  return { ...profile, ...patch }
+}
+
+async function refreshProfile() {
+  const identity = String(route.params.id || '')
+  if (!active || !isProfileRoute() || !identity) return
+  const revision = ++profileRevision
+  profileRequest?.abort()
+  profileRequest = new AbortController()
+  const signal = profileRequest.signal
+  invalidateContent()
+  user.value = null
+  feedList.value = []
+  userList.value = []
+  profileLoading.value = true
+  profileError.value = ''
+  contentError.value = ''
+  const current = () => active && revision === profileRevision && identity === String(route.params.id || '')
+  try {
+    // Refresh once at this private entry, without delaying public discovery reads.
+    await bridge.getAuthToken({ forceRefresh: true })
+    if (!current()) return
+    let profile = identity === 'me'
+      ? await fetchMyProfile({ throwOnError: true, signal })
+      : await fetchUserProfile(identity, { throwOnError: true, signal })
+    if (!current()) return
+    if (!profile) throw new Error('User profile unavailable')
+    if (identity === 'me' && bridge.isNative() && !profile.memberUserId) {
+      throw Object.assign(new Error('App 登录信息未同步，请重新登录后再试'), { status: 401 })
+    }
+    if (identity === 'me' || profile.isSelf) profile = await mergeNativeProfile(profile, revision, signal)
+    if (!current()) return
+    user.value = profile
+    if (activeGrid.value === 'favorites' && !isSelf.value) activeGrid.value = 'publish'
+    profileLoading.value = false
+    await loadContent(true)
+  } catch (error) {
+    if (current()) profileError.value = errorMessage(error, '用户信息加载失败，请重试')
+  } finally {
+    if (current()) profileLoading.value = false
+  }
 }
 
 async function loadContent(reset = true) {
+  if (!active || !isProfileRoute() || !user.value || profileLoading.value || profileError.value) return
+  if (!reset && (loadingMore.value || !hasMore.value || contentError.value)) return
+  if (reset) {
+    invalidateContent()
+    page.value = 1
+    feedList.value = []
+    userList.value = []
+    hasMore.value = true
+  }
+  const revision = ++contentRevision
+  const profileVersion = profileRevision
   const grid = activeGrid.value
+  const target = { ...user.value }
+  const requestPage = page.value
+  contentRequest = new AbortController()
+  const options = { throwOnError: true, signal: contentRequest.signal }
+  const current = () => active && revision === contentRevision
+    && profileVersion === profileRevision && grid === activeGrid.value
+  contentError.value = ''
   feedLoading.value = true
-  if (grid === 'publish' || grid === 'favorites') {
-    if (reset) { page.value = 1; feedList.value = []; hasMore.value = true }
-    if (loadingMore.value || !hasMore.value) { feedLoading.value = false; return }
-    loadingMore.value = true
-    try {
-      const d = targetDevice.value
-      let r = { list: [], total: 0 }
-      if (grid === 'favorites') r = await fetchFavorites({ page: page.value, pageSize: PAGE_SIZE })
-      else if (isSelf.value) r = await fetchMyFeeds({ page: page.value, pageSize: PAGE_SIZE })
-      else r = await fetchUserFeeds(user.value, { page: page.value, pageSize: PAGE_SIZE })
-      const list = r.list || []
-      // 自己主页：顶部头像可能被 mergeNativeProfile 用 Flutter 实时值覆盖，
-      // 而列表头像来自 H5 后端 user_profiles，两套资料源不同步时会出现
-      //「顶部新头像、列表旧头像」的不一致。这里把列表里自己的帖子头像
-      // 强制与顶部统一，保证当前用户看自己主页时视觉一致。
-      if (isSelf.value && user.value && user.value.avatar) {
-        const myMid = String(user.value.memberUserId || '')
-        const myDid = String(user.value.deviceId || '')
-        list.forEach((it) => {
-          const itMid = String(it.memberUserId || '')
-          const itDid = String(it.deviceId || '')
-          if ((myMid && itMid === myMid) || (!myMid && myDid && itDid === myDid)) {
-            it.avatar = user.value.avatar
-          }
+  loadingMore.value = true
+  try {
+    if (grid === 'publish' || grid === 'favorites') {
+      const params = { page: requestPage, pageSize: PAGE_SIZE, ...options }
+      const result = grid === 'favorites' ? await fetchFavorites(params)
+        : isSelf.value ? await fetchMyFeeds(params) : await fetchUserFeeds(target, params)
+      if (!current()) return
+      const list = result.list || []
+      if (isSelf.value && target.avatar) {
+        list.forEach(item => {
+          if (target.memberUserId ? String(item.memberUserId || '') === String(target.memberUserId)
+            : target.deviceId && item.deviceId === target.deviceId) item.avatar = target.avatar
         })
       }
-      feedList.value = reset ? list : feedList.value.concat(list)
-      hasMore.value = list.length >= PAGE_SIZE && feedList.value.length < (r.total || Infinity)
-      page.value += 1
-    } finally {
-      loadingMore.value = false
-      feedLoading.value = false
+      const combined = reset ? list : feedList.value.concat(list)
+      feedList.value = [...new Map(combined.map(item => [String(item.id), item])).values()]
+      const total = Number(result.total)
+      hasMore.value = list.length >= PAGE_SIZE && (!Number.isFinite(total) || feedList.value.length < total)
+      page.value = requestPage + 1
+      if (Number.isFinite(total)) user.value[grid === 'favorites' ? 'favoriteCount' : 'feedCount'] = total
+    } else {
+      // Use the resolved identity from /users/me or /users/:id, never the
+      // unverified bridge device. Counts and lists use the same relation filter.
+      const list = grid === 'follow'
+        ? await fetchFollowList(target.deviceId, target.memberUserId, options)
+        : await fetchFollowers(target.deviceId, target.memberUserId, options)
+      if (!current()) return
+      userList.value = list
+      user.value[grid === 'follow' ? 'followeeCount' : 'followerCount'] = list.length
     }
-  } else {
-    // 关注/粉丝列表：自己只看 memberUserId，避免同设备另一账号的行串进本账号列表（device_id OR 命中 bug）。
-    // 他人 profile 仍传双身份，向后兼容历史数据。
-    const d = targetDevice.value
-    const m = (user.value && user.value.memberUserId) || ''
-    const list = grid === 'follow'
-      ? await fetchFollowList(isSelf.value ? '' : d, isSelf.value ? m : '')
-      : await fetchFollowers(isSelf.value ? '' : d, isSelf.value ? m : '')
-    userList.value = list || []
-    feedLoading.value = false
+  } catch (error) {
+    if (current()) contentError.value = errorMessage(error, '内容加载失败，请重试')
+  } finally {
+    if (current()) { loadingMore.value = false; feedLoading.value = false }
   }
 }
-
-async function onToggleFollow() {
-  if (!user.value) return
-  const d = user.value.deviceId
-  const next = !user.value.isFollowing
-  user.value.isFollowing = next
-  user.value.followerCount += next ? 1 : -1
-  try {
-    if (next) await followUser(d)
-    else await unfollowUser(d)
-  } catch (e) {
-    user.value.isFollowing = !next
-    user.value.followerCount -= next ? 1 : -1
-    showToast('操作失败')
-  }
-}
-
-// ---- 他人主页动作（编辑 / 举报 / 拉黑）----
-// 举报、拉黑为二期能力：本期先桥接原生入口，无原生时给出占位提示，不阻断浏览
-function onEdit() {
-  // 编辑资料改为 H5 自管页（可控、即时生效），不再依赖原生跳转
-  router.push('/profile/edit')
-}
-function onReport() {
-  menuOpen.value = false
-  showToast('举报功能即将上线')
-}
-function onBlock() {
-  menuOpen.value = false
-  showToast('拉黑功能即将上线')
-}
-
+function onReport() { menuOpen.value = false; showToast('举报功能即将上线') }
+function onBlock() { menuOpen.value = false; showToast('拉黑功能即将上线') }
+function retryContent() { contentError.value = ''; loadContent(!feedList.value.length) }
 function onScroll() {
-  if (!isFeedList.value || loadingMore.value || !hasMore.value) return
+  if (!active || !isProfileRoute() || !isFeedList.value || profileLoading.value || contentError.value) return
   if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 120) loadContent(false)
 }
-
-// ---- 查询透传（App「我的」四宫格链接带 ?tab=&sub= 直接进对应页）----
-function applyQuery() {
-  const qTab = String(route.query.tab || '')
-  if (['publish', 'favorites', 'follow', 'followers'].includes(qTab)) {
-    if (!(qTab === 'favorites' && !isSelf.value)) activeGrid.value = qTab
-  }
-  // 动态/赞过/足迹子 Tab 已下线，忽略 qSub
+function onVisible() {
+  if (active && document.visibilityState === 'visible') refreshProfile()
 }
-
-watch(() => route.params.id, async () => {
-  // 跨用户进入时重置
-  activeGrid.value = 'publish'
-  activeTab.value = 'dynamic'
-  userList.value = []
+watch(() => route.params.id, () => {
+  if (!active || !isProfileRoute()) return
   applyQuery()
-  await resolveMyDevice()
-  await loadProfile()
-  await loadContent(true)
+  refreshProfile()
 })
-
+watch(() => route.query.tab, () => {
+  if (!active || !isProfileRoute()) return
+  applyQuery()
+  loadContent(true)
+})
 onMounted(() => {
-  // 预填 Flutter 主端资料，消除「?」闪现（App「我的」入口 deviceId 即本人，getUserInfo 走本地桥远快于网络 fetchMyProfile）
-  if (isSelf.value) {
-    bridge.getUserInfo().then((p) => {
-      if (p && (p.nickname || p.avatar)) {
-        const base = user.value && typeof user.value === 'object'
-          ? user.value
-          : { isSelf: true, followeeCount: 0, followerCount: 0, feedCount: 0, favoriteCount: 0 }
-        if (p.nickname) base.nickname = String(p.nickname)
-        if (p.avatar) base.avatar = String(p.avatar)
-        if (p.carModel) base.carModel = String(p.carModel)
-        user.value = { ...base }
-      }
-    }).catch(() => {})
-  }
   window.addEventListener('scroll', onScroll, { passive: true })
+  document.addEventListener('visibilitychange', onVisible)
 })
-// 返回本页（keep-alive 下从发布/详情等页 back）重新拉资料+列表：
-// 否则四宫格计数（发布/收藏/关注/粉丝）与发布列表停留在首次进入时的旧值，
-// 发布新帖后回到「我的」计数不刷新（与 DiscoverView onActivated 同因同修）。
-// onActivated 在首次挂载也会触发，故资料加载只放这里，避免 onMounted 重复拉。
-onActivated(async () => {
-  applyQuery()
-  await resolveMyDevice()
-  await loadProfile()
-  await loadContent(true)
+onActivated(() => { active = true; applyQuery(); refreshProfile() })
+onDeactivated(() => {
+  active = false
+  profileRevision++
+  profileRequest?.abort()
+  invalidateContent()
 })
 onUnmounted(() => {
+  active = false
+  profileRequest?.abort()
+  invalidateContent()
   window.removeEventListener('scroll', onScroll)
+  document.removeEventListener('visibilitychange', onVisible)
   clearTimeout(toastTimer)
 })
 </script>
@@ -542,6 +511,8 @@ onUnmounted(() => {
 .u-body { padding-top: 14px; }
 .u-more { text-align: center; padding: 14px 0 22px; font-size: 12px; color: var(--text-hint); }
 .u-empty { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--text-hint); }
+.u-error p { margin: 0 0 14px; }
+.u-error button { min-height: 44px; padding: 0 20px; border: 1px solid var(--line); border-radius: 10px; color: var(--brand); background: var(--card); font: inherit; }
 
 /* 用户列表（关注/粉丝，浮动卡片）*/
 .u-users {

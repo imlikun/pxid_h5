@@ -644,7 +644,8 @@ function userIdentityMatch(idCol, midCol, user, memberOnly = false) {
 function followRelMatch(midCol, devCol, member, device) {
   const m = String(member || '')
   const d = String(device || '')
-  if (m) return { clause: `(${midCol} = ? OR (${midCol} = '' AND ${devCol} = ?))`, args: [m, d] }
+  if (m && d) return { clause: `(${midCol} = ? OR (${midCol} = '' AND ${devCol} = ?))`, args: [m, d] }
+  if (m) return { clause: `(${midCol} = ?)`, args: [m] }
   if (d) return { clause: `(${devCol} = ?)`, args: [d] }
   return { clause: '(1=0)', args: [] }
 }
@@ -784,19 +785,16 @@ function buildViewerContext(viewer) {
   const deviceId = String(viewer.deviceId || '')
   const memberUserId = String(viewer.memberUserId || '')
   if (!deviceId && !memberUserId) return null
-  const conds = []
-  const args = []
-  if (deviceId) { conds.push('follower_device=?'); args.push(deviceId) }
-  if (memberUserId) { conds.push('follower_member_user_id=?'); args.push(memberUserId) }
+  const match = followRelMatch('follower_member_user_id', 'follower_device', memberUserId, deviceId)
   // 一次查全量关注关系建 Set，避免列表 N 条查 N 次（N+1）
   const set = new Set()
   try {
     const rows = db
-      .prepare(`SELECT followee_device, followee_member_user_id FROM follows WHERE ${conds.join(' OR ')}`)
-      .all(...args)
+      .prepare(`SELECT followee_device, followee_member_user_id FROM follows WHERE ${match.clause}`)
+      .all(...match.args)
     for (const x of rows) {
-      if (x.followee_device) set.add(String(x.followee_device))
-      if (x.followee_member_user_id) set.add(String(x.followee_member_user_id))
+      if (x.followee_member_user_id) set.add('m:' + x.followee_member_user_id)
+      else if (x.followee_device) set.add('d:' + x.followee_device)
     }
   } catch (e) {
     console.warn('[pxid-feed] buildViewerContext failed:', e.message || e)
@@ -807,13 +805,14 @@ function isViewerSelf(r, ctx) {
   if (!ctx) return false
   const d = String(r.device_id || '')
   const m = String(r.member_user_id || '')
-  return (!!d && d === ctx.deviceId) || (!!m && m === ctx.memberUserId)
+  if (m || ctx.memberUserId) return !!m && m === ctx.memberUserId
+  return !!d && d === ctx.deviceId
 }
 function followedFor(r, ctx) {
   if (!ctx || !ctx.followSet) return false
   const d = String(r.device_id || '')
   const m = String(r.member_user_id || '')
-  return (!!d && ctx.followSet.has(d)) || (!!m && ctx.followSet.has(m))
+  return (!!m && ctx.followSet.has('m:' + m)) || (!!d && ctx.followSet.has('d:' + d))
 }
 // 关注按钮可见性：官方帖（无作者可关注）+ 自己的帖 → 隐藏
 function canFollowFor(r, ctx) {
@@ -1122,8 +1121,8 @@ app.get('/users/me', requireAuth, (req, res) => {
         : "SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(device_id)>0 AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1"
       ).get(m || d)
     : null
-  // 四格计数 memberOnly：与前端列表口径一致（前端 /follow/list 只传 member，后端单条件查）。
-  //   此前四格用 OR 双身份算（含另一账号的行），列表用单条件算 → 数字必然对不上。
+  // Private post/favorite counts use the token's member identity exclusively.
+  // Follow counts and lists share followRelMatch and ignore empty device values.
   const im = userIdentityMatch('f.device_id', 'f.member_user_id', u, true)
   const feedCount = db.prepare(`SELECT COUNT(*) c FROM feeds f WHERE ${im.clause} AND f.status='published'`).get(...im.args).c
   const favIm = userIdentityMatch('v.device_id', 'v.member_user_id', u, true)
@@ -1205,25 +1204,23 @@ app.put('/users/profile', requireAuth, (req, res) => {
 // GET /users/:deviceId → { deviceId, nickname, avatar, carModel, followeeCount, followerCount, isFollowing, isSelf }
 // 兼容：deviceId 参数既可能是 device_id 也可能是 member_user_id（App「我的」入口传的是 member_user_id），
 // 资料与计数一律按「device_id OR member_user_id」双身份命中，避免 ToC 态只存 member_user_id 时查不到。
-app.get('/users/:deviceId', (req, res) => {
+app.get('/users/:deviceId', async (req, res) => {
   const raw = String(req.params.deviceId || '')
   if (!raw) return res.json(err(400, '缺少 deviceId'))
   // 可选身份：带有效 Bearer token 则解析（未登录也能看公开资料，只是 isFollowing/isSelf=false）
   let myDevice = ''
   let myMid = ''
   try {
-    const h = req.headers.authorization || ''
-    const t = h.startsWith('Bearer ') ? h.slice(7) : ''
-    if (t && USER_TOKEN_SECRET) {
-      const payload = verifyUserToken(t)
-      if (payload) { myDevice = String(payload.deviceId || ''); myMid = String(payload.memberUserId || '') }
-    }
+    const { user: viewer } = await resolveViewer(req)
+    if (viewer) { myDevice = String(viewer.deviceId || ''); myMid = String(viewer.memberUserId || '') }
   } catch (e) { /* 忽略，按未登录处理 */ }
   // 解析目标真实身份（device_id + member_user_id 双身份），用于回填返回字段，供前端 /feed 双身份过滤
   let tDevice = raw, tMid = ''
-  const idRow = db.prepare('SELECT device_id, member_user_id FROM feeds WHERE (device_id=? OR member_user_id=?) AND length(member_user_id)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
-    || db.prepare('SELECT device_id, member_user_id FROM user_profiles WHERE (device_id=? OR member_user_id=?) AND length(member_user_id)>0 ORDER BY id DESC LIMIT 1').get(raw, raw)
-  if (idRow) { tDevice = idRow.device_id || raw; tMid = idRow.member_user_id || '' }
+  const idRow = db.prepare('SELECT device_id, member_user_id FROM user_profiles WHERE member_user_id=? AND length(member_user_id)>0 LIMIT 1').get(raw)
+    || db.prepare('SELECT device_id, member_user_id FROM feeds WHERE member_user_id=? AND length(member_user_id)>0 ORDER BY id DESC LIMIT 1').get(raw)
+    || db.prepare('SELECT device_id, member_user_id FROM user_profiles WHERE device_id=? ORDER BY id DESC LIMIT 1').get(raw)
+    || db.prepare('SELECT device_id, member_user_id FROM feeds WHERE device_id=? ORDER BY id DESC LIMIT 1').get(raw)
+  if (idRow) { tDevice = idRow.device_id || ''; tMid = idRow.member_user_id || '' }
   // ⚠️ T040：以下所有查询一律用「解析后的真实身份 tDevice/tMid」，且【member 非空时只按 member 单条件】。
   //   此前这里全部拿 raw（URL 里的 device 串）做 OR 双身份匹配，同设备绑两个 member（17/24）时
   //   会把另一账号的行一起算进来 → 他人主页四格虚高（如 member24 关注 2 却显示 3）、昵称/头像串号。
@@ -1231,7 +1228,7 @@ app.get('/users/:deviceId', (req, res) => {
   const idCol = (devCol, midCol) => (qMid ? `${midCol}=?` : `${devCol}=?`)
   const idArg = () => (qMid || tDevice)
   // 解析资料：用真实身份（member 优先）；昵称若为默认"骑友"视为无效，回退 feeds 真实昵称
-  const profile = resolveProfile({ deviceId: tDevice, memberUserId: tMid, storedNickname: '', storedAvatar: '' })
+  const profile = resolveProfile({ deviceId: tDevice, memberUserId: tMid, storedNickname: '', storedAvatar: '', allowDeviceFallback: !tMid })
   const useFeedName = !profile.nickname || profile.nickname === '骑友'
   const feed = db.prepare(`SELECT nickname, avatar, car_model FROM feeds WHERE ${idCol('device_id', 'member_user_id')} AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1`).get(idArg())
   const nickname = useFeedName ? (feed && feed.nickname ? feed.nickname : (profile.nickname || '')) : profile.nickname
@@ -1248,10 +1245,10 @@ app.get('/users/:deviceId', (req, res) => {
     ? !!db.prepare(`SELECT 1 FROM follows WHERE ${myMatch.clause} AND ${idCol('followee_device', 'followee_member_user_id')}`).get(...myMatch.args, idArg())
     : false
   // isSelf 同时比对解析后的双身份，避免 App 用 member_user_id、token 用 device_id 时误判为他人
-  const isSelf = (myDevice && (myDevice === raw || myDevice === tDevice || (tMid && myDevice === tMid))) || (myMid && (myMid === raw || myMid === tMid))
+  const isSelf = !!((myMid || tMid) ? myMid && myMid === tMid : myDevice && myDevice === tDevice)
   // 四宫格计数：发布数（公开动态数）/ 收藏数（仅自己可见，他人返回 0 不泄露私密）
   const feedCount = db.prepare(`SELECT COUNT(*) c FROM feeds WHERE ${idCol('device_id', 'member_user_id')} AND status='published'`).get(idArg()).c
-  const favoriteCount = isSelf ? db.prepare(`SELECT COUNT(*) c FROM favorites WHERE ${idCol('device_id', 'member_user_id')}`).get(idArg()).c : 0
+  const favoriteCount = isSelf ? db.prepare(`SELECT COUNT(*) c FROM favorites v JOIN feeds f ON f.id=v.feed_id WHERE ${idCol('v.device_id', 'v.member_user_id')} AND f.status='published'`).get(idArg()).c : 0
   console.log(`[user-id] raw=${raw} myD=${myDevice} myM=${myMid} tD=${tDevice} tM=${tMid} nick=${nickname} car=${carModel} stats=${feedCount}/${favoriteCount}/${followeeCount}/${followerCount} isSelf=${isSelf}`)
   res.json(ok({
     deviceId: tDevice,
@@ -2822,11 +2819,19 @@ app.get('/admin/activities-stats', requireAdmin, (req, res) => {
 
 // ---- 关注 / 取关（动态关注流）----
 app.post('/follow', requireAuth, (req, res) => {
-  const { followerDevice, followeeDevice, followeeMemberUserId, followerMemberUserId } = req.body || {}
-  if (!followerDevice || !followeeDevice) return res.json(err(1, '缺少 followerDevice / followeeDevice'))
-  if (followerDevice === followeeDevice) return res.json(err(1, '不能关注自己'))
-  const followerMid = String(followerMemberUserId || (req.user && req.user.memberUserId) || '')
+  const { followeeDevice: targetDevice, followeeMemberUserId } = req.body || {}
+  const followerMid = String((req.user && req.user.memberUserId) || '')
   const followeeMid = String(followeeMemberUserId || '')
+  // Authoritative follower identity comes from authentication, never the body.
+  // A member-specific key also avoids the legacy device-pair unique index
+  // preventing two accounts on one phone from following the same person.
+  const followerDevice = followerMid ? 'member:' + followerMid : String((req.user && req.user.deviceId) || '')
+  const followeeDevice = String(targetDevice || followeeMid)
+  if (!followerDevice || !followeeDevice) return res.json(err(1, '缺少关注用户身份'))
+  if (followerMid ? followerMid === followeeMid : followerDevice === followeeDevice) return res.json(err(1, '不能关注自己'))
+  const me = userIdentityMatch('follower_device', 'follower_member_user_id', req.user, true)
+  const target = followeeMid ? 'followee_member_user_id=?' : 'followee_device=?'
+  if (db.prepare(`SELECT 1 FROM follows WHERE ${me.clause} AND ${target}`).get(...me.args, followeeMid || followeeDevice)) return res.json(ok({ following: true }))
   const followInfo = db.prepare('INSERT OR IGNORE INTO follows (follower_device, followee_device, follower_member_user_id, followee_member_user_id, created_at) VALUES (?,?,?,?,?)').run(followerDevice, followeeDevice, followerMid, followeeMid, now())
   // 社区成长：被关注 +10（给被关注者，按真实身份；INSERT OR IGNORE 的 changes() 防重复关注刷分）
   if (followInfo.changes) addPoints(followeeMid || followeeDevice, 10, 'followed')
@@ -2857,13 +2862,15 @@ app.delete('/follow', requireAuth, (req, res) => {
   res.json(ok({ following: false }))
 })
 // 解析某 deviceId 的公开简介（昵称/头像/车型），优先 user_profiles，回退最新发帖
-function userBrief(deviceId) {
-  const profile = resolveProfile({ deviceId, memberUserId: '', storedNickname: '', storedAvatar: '' })
+function userBrief(deviceId, memberUserId = '') {
+  memberUserId = String(memberUserId || '')
+  const profile = resolveProfile({ deviceId, memberUserId, storedNickname: '', storedAvatar: '', allowDeviceFallback: !memberUserId })
   const feed = !profile.nickname || profile.nickname === '骑友'
-    ? db.prepare("SELECT nickname, avatar, car_model FROM feeds WHERE device_id=? AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1").get(deviceId)
+    ? db.prepare(`SELECT nickname, avatar, car_model FROM feeds WHERE ${memberUserId ? 'member_user_id' : 'device_id'}=? AND length(nickname)>0 AND nickname<>'骑友' ORDER BY id DESC LIMIT 1`).get(memberUserId || deviceId)
     : null
   return {
     deviceId,
+    memberUserId,
     nickname: profile.nickname || (feed && feed.nickname) || '',
     avatar: profile.avatar || (feed && feed.avatar) || '',
     carModel: profile.carModel || (feed && feed.car_model) || '',
@@ -2877,8 +2884,8 @@ app.get('/follow/list', (req, res) => {
   const member = String(req.query.member || '')
   if (!device && !member) return res.json(err(1, '缺少 device / member'))
   const rel = followRelMatch('follower_member_user_id', 'follower_device', member, device)
-  const rows = db.prepare(`SELECT followee_device FROM follows WHERE ${rel.clause} ORDER BY created_at DESC`).all(...rel.args)
-  res.json(ok({ list: rows.map((r) => userBrief(r.followee_device)) }))
+  const rows = db.prepare(`SELECT followee_device, followee_member_user_id FROM follows WHERE ${rel.clause} ORDER BY created_at DESC`).all(...rel.args)
+  res.json(ok({ list: rows.map((r) => userBrief(r.followee_device, r.followee_member_user_id)) }))
 })
 // 粉丝列表：关注我的人（同结构）
 app.get('/follow/followers', (req, res) => {
@@ -2886,26 +2893,14 @@ app.get('/follow/followers', (req, res) => {
   const member = String(req.query.member || '')
   if (!device && !member) return res.json(err(1, '缺少 device / member'))
   const rel = followRelMatch('followee_member_user_id', 'followee_device', member, device)
-  const rows = db.prepare(`SELECT follower_device FROM follows WHERE ${rel.clause} ORDER BY created_at DESC`).all(...rel.args)
-  res.json(ok({ list: rows.map((r) => userBrief(r.follower_device)) }))
+  const rows = db.prepare(`SELECT follower_device, follower_member_user_id FROM follows WHERE ${rel.clause} ORDER BY created_at DESC`).all(...rel.args)
+  res.json(ok({ list: rows.map((r) => userBrief(r.follower_device, r.follower_member_user_id)) }))
 })
-app.get('/follow/check', (req, res) => {
-  const { follower, followee, followerMember, followeeMember } = req.query
-  if (!follower && !followerMember) return res.json(err(1, '缺少 follower / followerMember'))
+app.get('/follow/check', requireAuth, (req, res) => {
+  const { followee, followeeMember } = req.query
   if (!followee && !followeeMember) return res.json(err(1, '缺少 followee / followeeMember'))
-  // ⚠️ T040：空值绝不参与 OR。`follower_member_user_id=''` 会误命中所有 member 为空的历史行
-  //   → 明明没关注却返回「已关注」。只在传了非空值时才把该条件拼进去（与 /follow/list 同一保护）。
-  const build = (devVal, midVal, devCol, midCol) => {
-    const d = String(devVal || '')
-    const m = String(midVal || '')
-    const conds = []
-    const args = []
-    if (d) { conds.push(`${devCol}=?`); args.push(d) }
-    if (m) { conds.push(`${midCol}=?`); args.push(m) }
-    return { clause: conds.length ? `(${conds.join(' OR ')})` : '(1=0)', args }
-  }
-  const a = build(follower, followerMember, 'follower_device', 'follower_member_user_id')
-  const b = build(followee, followeeMember, 'followee_device', 'followee_member_user_id')
+  const a = userIdentityMatch('follower_device', 'follower_member_user_id', req.user, true)
+  const b = followRelMatch('followee_member_user_id', 'followee_device', followeeMember, followee)
   const row = db.prepare(`SELECT 1 FROM follows WHERE ${a.clause} AND ${b.clause}`).get(...a.args, ...b.args)
   res.json(ok({ following: !!row }))
 })

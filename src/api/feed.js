@@ -35,16 +35,17 @@ async function getAuthTokenSafe() {
 //                   不长时间等 token：已就绪就带上，未就绪先发请求（后端公开字段照常返回，
 //                   个性化状态由 checkFavorite / checkFollow 后续补）。
 //   改因：详情页冷启动实测被 token 串行阻塞拖慢（真机桥调用 300~800ms；预览态 /auth/token 2680ms）。
-async function request(path, { method = 'GET', body, auth = 'wait' } = {}) {
+async function request(path, { method = 'GET', body, auth = 'wait', signal } = {}) {
   const headers = { 'Content-Type': 'application/json' }
   const tk = auth === 'peek' ? await authTokenReady(80) : await getAuthTokenSafe()
   if (tk) headers.Authorization = 'Bearer ' + tk
   const res = await fetch(FEED_API + path, {
     method,
     headers,
+    signal,
     body: body ? JSON.stringify(body) : undefined,
   })
-  if (!res.ok) throw new Error('HTTP ' + res.status)
+  if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status })
   const json = await res.json()
   if (json.code !== 0) throw new Error(json.message || '接口错误')
   return json.data
@@ -87,6 +88,11 @@ export async function fetchFeeds(tab = 'dynamic', params = {}) {
 export async function publishFeed(payload) {
   if (FEED_API) {
     try {
+      if (bridge.isNative()) {
+        await bridge.getAuthToken({ forceRefresh: true })
+        const account = await fetchMyProfile({ throwOnError: true })
+        if (!account?.memberUserId) throw new Error('App 登录信息未同步，请重新登录后再发布')
+      }
       const data = await request('/feed', { method: 'POST', body: payload })
       await ensurePublishScope()
       addMoment(normalize(data), '动态')
@@ -436,11 +442,12 @@ export async function fetchFeedUsers(region = '') {
 }
 
 // ---- 个人主页：用户聚合信息（昵称/头像/车型 + 关注/粉丝 + 是否已关注/是否自己）----
-export async function fetchUserProfile(deviceId) {
+export async function fetchUserProfile(deviceId, options = {}) {
   if (!FEED_API || !deviceId) return null
   try {
-    return await request('/users/' + encodeURIComponent(deviceId))
+    return await request('/users/' + encodeURIComponent(deviceId), { signal: options.signal })
   } catch (e) {
+    if (options.throwOnError) throw e
     return null
   }
 }
@@ -449,20 +456,21 @@ export async function fetchUserProfile(deviceId) {
 // ⚠️ 严禁回退 /users/:deviceId（2026-09-01 与北帆整改清单对齐，问题B）：
 //    deviceId 是设备稳定 ID，**不随账号切换**。一旦 /users/me 失败就回退它，
 //    会出现「已切到乙账号、却显示甲的资料」的跨账号串号。拿不到就返回 null，让上层走错误/空态。
-export async function fetchMyProfile() {
+export async function fetchMyProfile(options = {}) {
   if (!FEED_API) return null
   try {
-    return await request('/users/me')
+    return await request('/users/me', { signal: options.signal })
   } catch (e) {
+    if (options.throwOnError) throw e
     console.warn('[fetchMyProfile] /users/me failed:', e.message || e)
     return null
   }
 }
 
 // 更新自己的资料（昵称/头像/车型），写入 user_profiles 唯一真相源
-export async function updateMyProfile(payload) {
+export async function updateMyProfile(payload, options = {}) {
   try {
-    return await request('/users/profile', { method: 'PUT', body: payload })
+    return await request('/users/profile', { method: 'PUT', body: payload, signal: options.signal })
   } catch (e) {
     throw e
   }
@@ -480,30 +488,34 @@ export async function uploadMedia(file) {
 // ---- 某人发布的动态（个人主页动态流，按 device_id / member_user_id 双身份过滤，解决 ToC 双 ID 漂移）----
 // target: { deviceId, memberUserId } 或 旧式字符串 deviceId；两者都传时后端任一命中即可
 export async function fetchUserFeeds(target, params = {}) {
+  const { throwOnError, signal, ...query } = params
   if (!FEED_API || !target) return { list: [], total: 0 }
   try {
-    const qs = new URLSearchParams({ tab: 'dynamic', ...params })
+    const qs = new URLSearchParams({ tab: 'dynamic', ...query })
     if (typeof target === 'string') {
       if (target) qs.set('deviceId', target)
     } else {
       if (target.deviceId) qs.set('deviceId', target.deviceId)
       if (target.memberUserId) qs.set('memberUserId', target.memberUserId)
     }
-    const data = await request('/feed?' + qs.toString())
+    const data = await request('/feed?' + qs.toString(), { signal })
     return { list: (data.list || []).map(normalize), total: data.total || 0 }
   } catch (e) {
+    if (throwOnError) throw e
     return { list: [], total: 0 }
   }
 }
 
 // ---- 我的发布（按 token 双身份，本人 /user/me 专用；不依赖 getDeviceId()，根治数量/列表不一致）----
 export async function fetchMyFeeds(params = {}) {
+  const { throwOnError, signal, ...query } = params
   if (!FEED_API) return { list: [], total: 0 }
   try {
-    const qs = new URLSearchParams(params).toString()
-    const data = await request('/feed/me' + (qs ? '?' + qs : ''))
+    const qs = new URLSearchParams(query).toString()
+    const data = await request('/feed/me' + (qs ? '?' + qs : ''), { signal })
     return { list: (data.list || []).map(normalize), total: data.total || 0 }
   } catch (e) {
+    if (throwOnError) throw e
     return { list: [], total: 0 }
   }
 }
@@ -522,12 +534,14 @@ export async function fetchLikedFeeds(params = {}) {
 }
 // 收藏：GET /favorites（仅本人）
 export async function fetchFavorites(params = {}) {
+  const { throwOnError, signal, ...query } = params
   if (!FEED_API) return { list: [], total: 0 }
   try {
-    const qs = new URLSearchParams(params).toString()
-    const data = await request('/favorites' + (qs ? '?' + qs : ''))
+    const qs = new URLSearchParams(query).toString()
+    const data = await request('/favorites' + (qs ? '?' + qs : ''), { signal })
     return { list: (data.list || []).map(normalize), total: data.total || 0 }
   } catch (e) {
+    if (throwOnError) throw e
     return { list: [], total: 0 }
   }
 }
@@ -544,28 +558,30 @@ export async function fetchFootprints(params = {}) {
 }
 // 关注列表：GET /follow/list（公开，返回对象数组）
 // 双身份：device 与 member 任一命中即可，与四宫格计数口径一致（根治 deviceId 漂移导致列表≠数字）
-export async function fetchFollowList(deviceId, memberUserId) {
+export async function fetchFollowList(deviceId, memberUserId, options = {}) {
   if (!FEED_API || (!deviceId && !memberUserId)) return []
   try {
     const qs = new URLSearchParams()
     if (deviceId) qs.set('device', String(deviceId))
     if (memberUserId) qs.set('member', String(memberUserId))
-    const data = await request('/follow/list?' + qs.toString())
+    const data = await request('/follow/list?' + qs.toString(), { signal: options.signal })
     return data.list || []
   } catch (e) {
+    if (options.throwOnError) throw e
     return []
   }
 }
 // 粉丝列表：GET /follow/followers（公开，返回对象数组）
-export async function fetchFollowers(deviceId, memberUserId) {
+export async function fetchFollowers(deviceId, memberUserId, options = {}) {
   if (!FEED_API || (!deviceId && !memberUserId)) return []
   try {
     const qs = new URLSearchParams()
     if (deviceId) qs.set('device', String(deviceId))
     if (memberUserId) qs.set('member', String(memberUserId))
-    const data = await request('/follow/followers?' + qs.toString())
+    const data = await request('/follow/followers?' + qs.toString(), { signal: options.signal })
     return data.list || []
   } catch (e) {
+    if (options.throwOnError) throw e
     return []
   }
 }

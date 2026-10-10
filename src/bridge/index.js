@@ -376,9 +376,24 @@ export function initBridge() {
 //         个性化状态（点赞/收藏）由后端公开字段 + checkFavorite/checkFollow 后续补。
 let _authTokenCache = ''
 let _authTokenPromise = null
+let _authTokenBridge = null
+let _authTokenRevision = 0
+
+function resetAuthToken() {
+  _authTokenCache = ''
+  _authTokenPromise = null
+  _authTokenBridge = window.PXIDBridge
+  _authTokenRevision++
+}
+function syncAuthBridge() {
+  // Flutter may inject its bridge after the preview bridge has already warmed up.
+  // An anonymous preview token must never survive that handover.
+  if (_authTokenBridge !== window.PXIDBridge) resetAuthToken()
+}
 
 // 同步读已就绪的 token（不发起任何桥调用/网络请求）
 export function peekAuthToken() {
+  syncAuthBridge()
   return _authTokenCache || ''
 }
 
@@ -389,6 +404,7 @@ export function peekAuthToken() {
 //    曾用 400ms，实测让详情页数据到位白白推迟 ~400ms（首屏 1377ms → 预期 ~900ms）。
 //    个性化状态（点赞/收藏）另有 checkFavorite / checkFollow 兜底。
 export function authTokenReady(ms = 80) {
+  syncAuthBridge()
   if (_authTokenCache) return Promise.resolve(_authTokenCache)
   return Promise.race([
     _loadAuthToken(),
@@ -396,20 +412,28 @@ export function authTokenReady(ms = 80) {
   ]).catch(() => '')
 }
 
-async function _loadAuthToken() {
+async function _loadAuthToken(forceRefresh = false) {
+  syncAuthBridge()
+  if (forceRefresh) resetAuthToken()
   if (_authTokenCache) return _authTokenCache
   if (_authTokenPromise) return _authTokenPromise
-  _authTokenPromise = (async () => {
+  const revision = _authTokenRevision
+  const nativeBridge = window.PXIDBridge
+  const pending = (async () => {
+    let token = ''
     try {
-      const u = await window.PXIDBridge.getUserInfo()
-      if (u && u.token) { _authTokenCache = u.token; return u.token }
+      const u = await nativeBridge.getUserInfo()
+      if (u && u.token) token = String(u.token)
     } catch (e) { /* 真机未实现 getUserInfo 时回退 */ }
-    try {
-      const t = await window.PXIDBridge.getToken()
-      if (t) { _authTokenCache = t; return t }
-    } catch (e) { /* 原生未注入时回退 */ }
-    return ''
-  })().finally(() => { _authTokenPromise = null })
+    if (!token) {
+      try { token = String((await nativeBridge.getToken()) || '') }
+      catch (e) { /* 原生未注入时回退 */ }
+    }
+    if (revision !== _authTokenRevision || nativeBridge !== window.PXIDBridge) return _loadAuthToken()
+    _authTokenCache = token
+    return token
+  })().finally(() => { if (_authTokenPromise === pending) _authTokenPromise = null })
+  _authTokenPromise = pending
   return _authTokenPromise
 }
 
@@ -436,7 +460,7 @@ export const bridge = {
   // 修复：真机 getToken() 未必返回登录 token，但登录态经 getUserInfo 注入 → 评论/点赞统一走这里
   // ⚠️ 2026-09-19：改为走 _loadAuthToken()（结果缓存），桥调用只发生一次；
   //    此前每次调用都重新 getUserInfo()+getToken()，是详情页冷启动被串行拖慢的主因之一。
-  getAuthToken: () => _loadAuthToken().then((t) => t || null),
+  getAuthToken: (options = {}) => _loadAuthToken(!!options.forceRefresh).then((t) => t || null),
   getUserInfo: () => Promise.resolve(window.PXIDBridge.getUserInfo()).then(normalizeProfile),
   // 关注列表 / 粉丝列表（App 账号关系，Flutter 经桥返回；原生未实现时 reject，由上层回退 H5 本地）
   getFollowList: () =>
