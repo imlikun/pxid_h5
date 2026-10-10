@@ -75,6 +75,9 @@ export async function fetchDetailJSON(kind, url, { signal, timeout = 9000, ...op
       const match = timings.match(new RegExp('(?:^|,)\\s*' + name + ';dur=([\\d.]+)'))
       if (match) server[name] = rounded(Number(match[1]))
     }
+    const cache = response.headers.get('X-Detail-Cache'), upstreamStatus = Number(response.headers.get('X-Upstream-Status'))
+    if (['hit', 'miss', 'joined', 'stale', 'cooldown'].includes(cache)) server.cache = cache
+    if (Number.isInteger(upstreamStatus) && upstreamStatus >= 100 && upstreamStatus <= 599) server.upstreamStatus = upstreamStatus
     const rawId = response.headers.get('X-Request-ID') || ''
     requestId = /^[a-f0-9]{16}$/.test(rawId) ? rawId : ''
     if (!response.ok) throw Object.assign(new Error('HTTP ' + response.status), { status: response.status })

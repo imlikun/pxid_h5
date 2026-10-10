@@ -39,14 +39,14 @@ test('slow details report timings once and never include raw routes or account d
 })
 test('network timings expose response/header/server correlation independently', async () => {
   const h = client(async () => { h.advance(50); return { ok: true, status: 200,
-    headers: new Headers({ 'Server-Timing': 'app;dur=12.5, shopify;dur=6.0', 'X-Request-ID': 'a123456789abcdef' }),
+    headers: new Headers({ 'Server-Timing': 'app;dur=12.5, shopify;dur=6.0', 'X-Request-ID': 'a123456789abcdef', 'X-Detail-Cache': 'miss', 'X-Upstream-Status': '429' }),
     json: async () => { h.advance(10); return { code: 0, data: {} } } } })
   const trace = h.context.createDetailTrace('feed', '/feed/1')
   try {
     await h.context.fetchDetailJSON('feed', 'https://example.test/feed/1')
     const row = h.read().at(-1)
     assert.equal(row.request.duration, 60); assert.equal(row.request.headers, 50)
-    assert.deepEqual(row.request.server, { app: 13, shopify: 6 })
+    assert.deepEqual(row.request.server, { app: 13, shopify: 6, cache: 'miss', upstreamStatus: 429 })
     assert.equal(row.request.id, 'a123456789abcdef')
   } finally { trace.close() }
 })
@@ -106,7 +106,8 @@ test('Shopify upstream timeout covers a stalled JSON body', async () => {
     fetch: async (_url, { signal }) => ({ ok: true, status: 200,
       json: () => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })) }),
   })
-  vm.runInContext(serverSource.slice(start, serverSource.indexOf('// 配置下发', start)), context)
+  const helpers = serverSource.slice(serverSource.indexOf('// Public Shopify reads only:'), serverSource.indexOf('// 单品详情：'))
+  vm.runInContext(helpers + serverSource.slice(start, serverSource.indexOf('// 配置下发', start)), context)
   await handler({ query: {}, headers: {}, params: { handle: 'bike' }, detailTiming: {} }, { json: data => { result = data } })
   assert.equal(result.data.error, 'upstream_timeout')
   assert.equal(result.data.product, null)

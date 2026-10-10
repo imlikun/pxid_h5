@@ -44,7 +44,7 @@ app.use((req, res, next) => {
   // 非允许来源：不设置 CORS 头（不回退 *），浏览器同源策略即拦截跨域读取
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-  res.setHeader('Access-Control-Expose-Headers', 'Server-Timing,X-Request-ID')
+  res.setHeader('Access-Control-Expose-Headers', 'Server-Timing,X-Request-ID,X-Detail-Cache,X-Upstream-Status')
   // 基础安全响应头
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('X-Frame-Options', 'DENY')
@@ -58,18 +58,20 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   const kind = req.method === 'GET' && (/^\/feed\/\d+$/.test(req.path) ? 'feed' : /^\/mall-api\/products\/[^/]+$/.test(req.path) ? 'product' : '')
   if (!kind) return next()
-  const timing = req.detailTiming = { id: crypto.randomBytes(8).toString('hex'), start: performance.now(), shopify: null }
+  const timing = req.detailTiming = { id: crypto.randomBytes(8).toString('hex'), start: performance.now(), shopify: null, cache: '', upstreamStatus: 0 }
   res.setHeader('X-Request-ID', timing.id)
   const end = res.end
   res.end = function (...args) {
     if (!res.headersSent) {
       const appMs = (performance.now() - timing.start).toFixed(1)
       res.setHeader('Server-Timing', 'app;dur=' + appMs + (timing.shopify === null ? '' : ', shopify;dur=' + timing.shopify.toFixed(1)))
+      if (timing.cache) res.setHeader('X-Detail-Cache', timing.cache)
+      if (timing.upstreamStatus) res.setHeader('X-Upstream-Status', String(timing.upstreamStatus))
     }
     return end.apply(this, args)
   }
   res.on('finish', () => console.log('[detail-api]', JSON.stringify({ id: timing.id, kind, status: res.statusCode,
-    ms: Math.round(performance.now() - timing.start), shopify: timing.shopify === null ? null : Math.round(timing.shopify) })))
+    ms: Math.round(performance.now() - timing.start), shopify: timing.shopify === null ? null : Math.round(timing.shopify), cache: timing.cache, upstreamStatus: timing.upstreamStatus })))
   next()
 })
 
@@ -142,7 +144,9 @@ function sanitizeDetailDiagnostic(input) {
   if (request && ['ok', 'timeout', 'error', 'cancelled'].includes(request.outcome)) record.request = {
     id: /^[a-f0-9]{16}$/.test(request.id || '') ? request.id : '', duration: duration(request.duration),
     headers: duration(request.headers), status: Number.isInteger(request.status) && request.status >= 0 && request.status <= 599 ? request.status : 0,
-    outcome: request.outcome, server: { app: duration(request.server?.app), shopify: duration(request.server?.shopify) },
+    outcome: request.outcome, server: { app: duration(request.server?.app), shopify: duration(request.server?.shopify),
+      cache: ['hit', 'miss', 'joined', 'stale', 'cooldown'].includes(request.server?.cache) ? request.server.cache : undefined,
+      upstreamStatus: Number.isInteger(request.server?.upstreamStatus) && request.server.upstreamStatus >= 100 && request.server.upstreamStatus <= 599 ? request.server.upstreamStatus : undefined },
   }
   return record
 }
@@ -3334,32 +3338,69 @@ function normalizeProductDetail(p, store, currency) {
   }
 }
 
+// Public Shopify reads only: store/URL-keyed bounded cache, single flight and
+// store-wide 429 cooldown. Never cache checkout, identities or personal data.
+const shopifyPublicCache = new Map(), shopifyPublicInflight = new Map(), shopifyCooldown = new Map()
+async function getShopifyPublicJSON(store, path, { ttl, staleMs = 0, validate }) {
+  const key = store + path, cached = shopifyPublicCache.get(key), age = cached ? Date.now() - cached.at : Infinity
+  if (age < ttl) return { data: cached.data, duration: 0, status: 0, cache: 'hit' }
+  const stale = () => cached && Date.now() - cached.at < staleMs ? { data: cached.data, duration: 0, status: 429, cache: 'stale' } : null
+  const cooldown = shopifyCooldown.get(store) || 0
+  if (cooldown > Date.now()) {
+    if (stale()) return stale()
+    throw Object.assign(new Error('upstream_rate_limited'), { reason: 'upstream_rate_limited', status: 429, duration: 0, cache: 'cooldown' })
+  }
+  shopifyCooldown.delete(store)
+  const shared = shopifyPublicInflight.get(key)
+  if (shared) return { ...await shared, cache: 'joined' }
+  const pending = (async () => {
+    const controller = new AbortController(), started = performance.now()
+    const timeout = setTimeout(() => controller.abort(), 7000)
+    let status = 0
+    try {
+      const response = await fetch('https://' + store + path, { signal: controller.signal })
+      status = response.status
+      if (status === 429) {
+        const value = response.headers.get('retry-after'), seconds = Number(value)
+        const retryMs = value ? (Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now()) : 15000
+        shopifyCooldown.set(store, Date.now() + Math.min(60000, Math.max(15000, Number.isFinite(retryMs) ? retryMs : 15000)))
+      }
+      if (!response.ok) throw new Error('HTTP ' + status)
+      const data = await response.json()
+      if (!validate(data)) throw new Error('Invalid upstream data')
+      shopifyPublicCache.delete(key)
+      shopifyPublicCache.set(key, { data, at: Date.now() })
+      if (shopifyPublicCache.size > 48) shopifyPublicCache.delete(shopifyPublicCache.keys().next().value)
+      return { data, duration: performance.now() - started, status, cache: 'miss' }
+    } catch (error) {
+      if (stale()) return { ...stale(), status, duration: performance.now() - started }
+      throw Object.assign(new Error('Shopify unavailable'), { reason: controller.signal.aborted ? 'upstream_timeout' : status === 429 ? 'upstream_rate_limited' : 'upstream_unavailable', status, duration: performance.now() - started, cache: 'miss' })
+    } finally { clearTimeout(timeout) }
+  })()
+  shopifyPublicInflight.set(key, pending)
+  try { return await pending }
+  finally { if (shopifyPublicInflight.get(key) === pending) shopifyPublicInflight.delete(key) }
+}
+function markShopifyTiming(req, result) {
+  if (req.detailTiming) Object.assign(req.detailTiming, { shopify: result.duration || 0, cache: result.cache || '', upstreamStatus: result.status || 0 })
+}
+
 // 单品详情：服务端代拉 Shopify 公开 /products/{handle}.json（含 body_html 描述/图廊/规格）
 //   按 ?region= / x-region 选对应国家店；缺失回退 US。用于 H5 精选详情页真拉 Shopify 内容。
 app.get('/mall-api/products/:handle', async (req, res) => {
   const region = resolveRegion(req.query.region || req.headers['x-region'])
   const cfg = getStoreConfig(region)
   const handle = req.params.handle
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 7000)
-  const upstreamStarted = performance.now()
   try {
-    const r = await fetch(`https://${cfg.store}/products/${encodeURIComponent(handle)}.json`, { signal: controller.signal })
-    if (req.detailTiming) req.detailTiming.shopify = performance.now() - upstreamStarted
-    if (!r.ok) {
-      if (r.status === 404) return res.json(ok({ product: null, region, store: cfg.store, error: 'not_found' }))
-      throw new Error('HTTP ' + r.status)
-    }
-    const data = await r.json()
-    if (req.detailTiming) req.detailTiming.shopify = performance.now() - upstreamStarted
+    const result = await getShopifyPublicJSON(cfg.store, `/products/${encodeURIComponent(handle)}.json`, { ttl: 30000, validate: data => data && 'product' in data })
+    markShopifyTiming(req, result)
+    const data = result.data
     const p = data.product
     if (!p) return res.json(ok({ product: null, region, store: cfg.store, error: 'not_found' }))
     res.json(ok({ product: normalizeProductDetail(p, cfg.store, cfg.currency), region, store: cfg.store }))
   } catch (e) {
-    if (req.detailTiming) req.detailTiming.shopify = performance.now() - upstreamStarted
-    res.json(ok({ product: null, region, store: cfg.store, error: controller.signal.aborted ? 'upstream_timeout' : 'upstream_unavailable' }))
-  } finally {
-    clearTimeout(timeout)
+    markShopifyTiming(req, e)
+    res.json(ok({ product: null, region, store: cfg.store, error: e.status === 404 ? 'not_found' : e.reason || 'upstream_unavailable' }))
   }
 })
 
@@ -3376,13 +3417,14 @@ app.get('/mall-api/products', async (req, res) => {
   const region = resolveRegion(req.query.region || req.headers['x-region'])
   const cfg = getStoreConfig(region)
   try {
-    const r = await fetch(`https://${cfg.store}/products.json?limit=250`)
-    if (!r.ok) throw new Error('HTTP ' + r.status)
-    const data = await r.json()
+    // A recent catalog may survive a transient rate limit. Detail purchase
+    // options still require their own fresh (30s) result; no stale-stock fallback.
+    const result = await getShopifyPublicJSON(cfg.store, '/products.json?limit=250', { ttl: 60000, staleMs: 600000, validate: data => Array.isArray(data?.products) })
+    const data = result.data
     const list = (data.products || []).map((p) => normalizeProduct(p, cfg.store, cfg.currency))
     res.json(ok({ list, region, store: cfg.store }))
   } catch (e) {
-    res.json(ok({ list: [], region, store: cfg.store, error: String(e.message || e) }))
+    res.status(503).json(ok({ list: [], region, store: cfg.store, error: e.reason || 'upstream_unavailable' }))
   }
 })
 
