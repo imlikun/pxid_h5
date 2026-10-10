@@ -16,6 +16,7 @@ import { publishState, addMoment, ensurePublishScope } from '../store/publish'
 import { moments, feedItems, defaultAvatar } from '../data/mock'
 import { getDeviceId } from '../utils/device'
 import bridge, { authTokenReady } from '../bridge'
+import { fetchDetailJSON, recordDetailStage } from '../utils/detailDiagnostics'
 
 // 后端就绪后改为真实地址（2026-08-18 已上线 pxid-api.appin.site）
 const FEED_API = import.meta.env.VITE_API_BASE || 'https://pxid-api.appin.site'
@@ -37,8 +38,16 @@ async function getAuthTokenSafe() {
 //   改因：详情页冷启动实测被 token 串行阻塞拖慢（真机桥调用 300~800ms；预览态 /auth/token 2680ms）。
 async function request(path, { method = 'GET', body, auth = 'wait', signal } = {}) {
   const headers = { 'Content-Type': 'application/json' }
+  const isDetail = method === 'GET' && /^\/feed\/\d+$/.test(path)
+  const authStarted = performance.now()
   const tk = auth === 'peek' ? await authTokenReady(80) : await getAuthTokenSafe()
+  if (isDetail) recordDetailStage('feed', 'auth', performance.now() - authStarted)
   if (tk) headers.Authorization = 'Bearer ' + tk
+  if (isDetail) {
+    const json = await fetchDetailJSON('feed', FEED_API + path, { method, headers, signal })
+    if (json.code !== 0) throw Object.assign(new Error(json.message || '接口错误'), { status: json.code })
+    return json.data
+  }
   const res = await fetch(FEED_API + path, {
     method,
     headers,
@@ -144,7 +153,9 @@ async function fetchFeedDetailRaw(id) {
       const data = await request('/feed/' + id, { auth: 'peek' })
       return normalize(data)
     } catch (e) {
-      /* 回落 */
+      // A real-detail failure must not wait indefinitely for the anonymous
+      // publishing bridge or substitute unrelated demo content.
+      throw e
     }
   }
   await ensurePublishScope()
@@ -370,6 +381,20 @@ export async function fetchActivities(params = {}) {
     if (!allowMockFallback) throw e
     return MOCK_ACTIVITIES
   }
+}
+
+// Account-owned registrations, including past events. Never use public/mock
+// activities as a fallback for this private list.
+export async function fetchJoinedActivities() {
+  if (!FEED_API) throw new Error('Activity API unavailable')
+  await bridge.getAuthToken({ forceRefresh: true })
+  const data = await request('/activities/me')
+  const seen = new Set()
+  return (data.list || []).filter(row => {
+    if (row.status !== 'joined' || !row.activity?.id || seen.has(String(row.activity.id))) return false
+    seen.add(String(row.activity.id))
+    return true
+  }).map(row => ({ ...row.activity, registration: { checked: row.checked === true } }))
 }
 
 // 全量公开话题统计，不以已下载的第一页冒充总讨论数。

@@ -12,7 +12,6 @@
       <div v-if="showOverlay" class="fcard__overlay"><div class="fcard__title">{{ item.title }}</div></div>
     </div>
     <div v-if="!showOverlay" class="fcard__title">{{ item.title }}</div>
-    <div v-if="appearance === 'discover' && discussionTag" class="fcard__discussion"><button type="button" @click.stop="goDiscussion">#{{ discussionTag }}</button></div>
     <div class="fcard__foot">
       <div class="author" @click.stop="goUser">
         <img class="avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
@@ -23,6 +22,7 @@
         <span class="like__num">{{ item.likes }}</span>
       </span>
     </div>
+    <div v-if="appearance === 'discover' && discussionTag" class="fcard__discussion"><button type="button" @click.stop="goDiscussion">#{{ discussionTag }}</button></div>
   </div>
 </template>
 
@@ -120,7 +120,7 @@ function goUser() {
 </script>
 
 <style scoped>
-.fcard__discussion { padding: 0 10px; }.fcard__discussion button { max-width: 100%; min-height: 32px; color: var(--brand); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.fcard__discussion { padding: 0 10px 6px; }.fcard__discussion button { max-width: 100%; min-height: 32px; color: var(--brand); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .fcard {
   /* 白底卡片（2026-09-21 坤哥反馈：发现页推荐列表每条改白色背景）。
      对齐 MomentCard 的既有白卡规范：--card 底 + 卡片档圆角 + 极轻阴影，

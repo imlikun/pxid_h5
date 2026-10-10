@@ -5,6 +5,7 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M7 3v4m10-4v4M3 11h18" /></svg>
     </span>
     <span class="activity-copy">
+      <span v-if="activity.registration" class="activity-state activity-registration">{{ t(activity.registration.checked ? 'activity.checkedIn' : 'activity.signed') }}</span>
       <span v-if="phase !== 'undated'" class="activity-state" :class="{ 'activity-state--past': phase === 'past' }">{{ statusText }}</span>
       <strong class="activity-title">{{ activity.title }}</strong>
       <span v-if="metadata" class="activity-meta">{{ metadata }}</span>
@@ -51,6 +52,7 @@ const signupText = computed(() => {
 .activity-copy { flex: 1; min-width: 0; }
 .activity-state { display: inline-block; padding: 2px 6px; font-size: 10px; line-height: 16px; color: var(--brand-ink); background: var(--brand-soft); border-radius: 4px; }
 .activity-state--past { color: var(--text-sub); background: var(--bg); }
+.activity-registration { margin-right: 6px; }
 .activity-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; margin: 5px 0; font-size: 14px; font-weight: 500; line-height: 1.5; color: var(--text); }
 .activity-meta { display: block; font-size: 12px; line-height: 1.6; color: var(--text-sub); overflow-wrap: anywhere; }
 .activity-signup { margin-top: 4px; }

@@ -44,11 +44,32 @@ app.use((req, res, next) => {
   // 非允许来源：不设置 CORS 头（不回退 *），浏览器同源策略即拦截跨域读取
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+  res.setHeader('Access-Control-Expose-Headers', 'Server-Timing,X-Request-ID')
   // 基础安全响应头
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('X-Frame-Options', 'DENY')
   res.setHeader('Referrer-Policy', 'no-referrer')
   if (req.method === 'OPTIONS') return res.sendStatus(204)
+  next()
+})
+
+// Detail timing: response headers correlate anonymous client reports with
+// server/upstream durations. Never include tokens, query strings or profiles.
+app.use((req, res, next) => {
+  const kind = req.method === 'GET' && (/^\/feed\/\d+$/.test(req.path) ? 'feed' : /^\/mall-api\/products\/[^/]+$/.test(req.path) ? 'product' : '')
+  if (!kind) return next()
+  const timing = req.detailTiming = { id: crypto.randomBytes(8).toString('hex'), start: performance.now(), shopify: null }
+  res.setHeader('X-Request-ID', timing.id)
+  const end = res.end
+  res.end = function (...args) {
+    if (!res.headersSent) {
+      const appMs = (performance.now() - timing.start).toFixed(1)
+      res.setHeader('Server-Timing', 'app;dur=' + appMs + (timing.shopify === null ? '' : ', shopify;dur=' + timing.shopify.toFixed(1)))
+    }
+    return end.apply(this, args)
+  }
+  res.on('finish', () => console.log('[detail-api]', JSON.stringify({ id: timing.id, kind, status: res.statusCode,
+    ms: Math.round(performance.now() - timing.start), shopify: timing.shopify === null ? null : Math.round(timing.shopify) })))
   next()
 })
 
@@ -92,6 +113,7 @@ function rateLimit(windowMs, max) {
 function pickLimit(path, method) {
   if (method !== 'POST' && method !== 'PUT' && method !== 'DELETE') return null
   if (path === '/auth/token') return rateLimit(60 * 1000, 10)
+  if (path === '/diagnostics/detail') return rateLimit(60 * 1000, 12)
   if (path.endsWith('/report')) return rateLimit(60 * 1000, 10)
   if (path === '/media/upload') return rateLimit(60 * 1000, 30)
   if (path === '/feed') return rateLimit(60 * 1000, 30)
@@ -102,6 +124,34 @@ app.use((req, res, next) => {
   const lim = pickLimit(req.path, req.method)
   if (!lim) return next()
   lim(req, res, next)
+})
+
+// Strict allowlist: clients cannot put arbitrary content/credentials into logs.
+function sanitizeDetailDiagnostic(input) {
+  if (!input || !['feed', 'product'].includes(input.kind) || !['ready', 'pending', 'error'].includes(input.status)) return null
+  const duration = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1800000 ? Math.round(value) : undefined
+  const stages = {}
+  for (const name of ['bootstrap', 'handoff', 'locale', 'auth', 'data', 'content', 'media']) {
+    const value = duration(input.stages?.[name]); if (value !== undefined) stages[name] = value
+  }
+  const record = { id: /^[a-z0-9]{8,12}$/.test(input.id || '') ? input.id : '', kind: input.kind,
+    status: input.status, native: input.native === true, embedded: input.embedded === true,
+    notified: input.notified === true, elapsed: duration(input.elapsed), stages }
+  if (['snapshot', 'api', 'empty'].includes(input.source)) record.source = input.source
+  const request = input.request
+  if (request && ['ok', 'timeout', 'error', 'cancelled'].includes(request.outcome)) record.request = {
+    id: /^[a-f0-9]{16}$/.test(request.id || '') ? request.id : '', duration: duration(request.duration),
+    headers: duration(request.headers), status: Number.isInteger(request.status) && request.status >= 0 && request.status <= 599 ? request.status : 0,
+    outcome: request.outcome, server: { app: duration(request.server?.app), shopify: duration(request.server?.shopify) },
+  }
+  return record
+}
+app.post('/diagnostics/detail', (req, res) => {
+  if (JSON.stringify(req.body || {}).length > 4096) return res.status(400).json(err(400, 'Invalid timing record'))
+  const record = sanitizeDetailDiagnostic(req.body)
+  if (!record) return res.status(400).json(err(400, 'Invalid timing record'))
+  console.log('[detail-client]', JSON.stringify(record))
+  res.json(ok({ accepted: true }))
 })
 
 // ---- 数据库 ----
@@ -3290,18 +3340,26 @@ app.get('/mall-api/products/:handle', async (req, res) => {
   const region = resolveRegion(req.query.region || req.headers['x-region'])
   const cfg = getStoreConfig(region)
   const handle = req.params.handle
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 7000)
+  const upstreamStarted = performance.now()
   try {
-    const r = await fetch(`https://${cfg.store}/products/${handle}.json`)
+    const r = await fetch(`https://${cfg.store}/products/${encodeURIComponent(handle)}.json`, { signal: controller.signal })
+    if (req.detailTiming) req.detailTiming.shopify = performance.now() - upstreamStarted
     if (!r.ok) {
       if (r.status === 404) return res.json(ok({ product: null, region, store: cfg.store, error: 'not_found' }))
       throw new Error('HTTP ' + r.status)
     }
     const data = await r.json()
+    if (req.detailTiming) req.detailTiming.shopify = performance.now() - upstreamStarted
     const p = data.product
     if (!p) return res.json(ok({ product: null, region, store: cfg.store, error: 'not_found' }))
     res.json(ok({ product: normalizeProductDetail(p, cfg.store, cfg.currency), region, store: cfg.store }))
   } catch (e) {
-    res.json(ok({ product: null, region, store: cfg.store, error: String(e.message || e) }))
+    if (req.detailTiming) req.detailTiming.shopify = performance.now() - upstreamStarted
+    res.json(ok({ product: null, region, store: cfg.store, error: controller.signal.aborted ? 'upstream_timeout' : 'upstream_unavailable' }))
+  } finally {
+    clearTimeout(timeout)
   }
 })
 

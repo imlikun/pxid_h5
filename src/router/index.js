@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { bridge } from '../bridge'
 import { takeDiscoverReturnAnchor } from '../utils/feedReading'
+import { recordDetailIntent } from '../utils/detailDiagnostics'
 
 // 路由级懒加载：全部页面动态 import，Vite 按路由拆 chunk，
 // 首屏只加载当前页面代码，大幅减小首包体积（原 30+ 页面全打一个 bundle）
@@ -179,6 +180,7 @@ const router = createRouter({
 
 // 服务模块已由 Flutter 原生版提供，H5 侧彻底屏蔽（tab 入口已移除 + 路由级拦截），任何环境都进不去 /service
 router.beforeEach((to, from, next) => {
+  if (from.matched.length) recordDetailIntent(to.path)
   if (to.path.startsWith('/service')) {
     next('/discover')
     return

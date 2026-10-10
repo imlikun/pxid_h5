@@ -237,8 +237,8 @@
     <div class="empty__icon">
       <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
     </div>
-    <div class="empty__txt">{{ t('feed.notFound') }}</div>
-    <button class="empty__back" @click="embedded ? load() : goBack()">{{ t(embedded ? 'discover.dynamic.retry' : 'feed.back') }}</button>
+    <div class="empty__txt">{{ t(detailError ? 'discover.loadFail' : 'feed.notFound') }}</div>
+    <button class="empty__back" @click="embedded || detailError ? load() : goBack()">{{ t(embedded || detailError ? 'discover.dynamic.retry' : 'feed.back') }}</button>
   </div>
 
   <!-- 底部互动栏：左侧输入框 + 右侧点赞/收藏/评论（对齐 App 详情页习惯） -->
@@ -317,6 +317,7 @@ import FeedMediaGrid from '../components/FeedMediaGrid.vue'
 import FeedImagePreview from '../components/FeedImagePreview.vue'
 import { formatPublishedTime } from '../utils/time'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
+import { createDetailTrace } from '../utils/detailDiagnostics'
 
 const props = defineProps({ embedded: Boolean, feedId: [String, Number], initialItem: Object })
 const emit = defineEmits(['expand', 'change', 'removed'])
@@ -384,24 +385,29 @@ const bootSnap = (() => {
 })()
 const item = ref(bootSnap)
 const loading = ref(!bootSnap)
+const detailError = ref(false)
+let traceFeedId = id.value
+let detailTrace = !isActivity.value ? createDetailTrace('feed', '/feed/' + id.value, props.embedded) : null
+let traceSource = bootSnap ? 'snapshot' : 'api'
 // 新 WebView 中列表快照可同步直出；正文真正画出后回报 Flutter，避免原生 loading
 // 继续盖在 H5 上。图片和评论可随后加载，不阻塞正文就绪。
 let detailMounted = false
 let readySeq = 0
 let lastReadyRoute = ''
 function schedulePageReady() {
-  if (props.embedded) return
   const seq = ++readySeq
-  const pageRoute = route.fullPath
+  const pageRoute = props.embedded ? '/feed/' + id.value : route.fullPath
   if (!detailMounted || (!item.value && loading.value) || lastReadyRoute === pageRoute) return
   nextTick(() => requestAnimationFrame(() => requestAnimationFrame(() => {
-    if (seq !== readySeq || route.fullPath !== pageRoute || (!item.value && loading.value)) return
+    if (seq !== readySeq || (props.embedded ? '/feed/' + id.value : route.fullPath) !== pageRoute || (!item.value && loading.value)) return
     lastReadyRoute = pageRoute
-    bridge.notifyPageReady(route.path)
+    const notified = !props.embedded && bridge.notifyPageReady(route.path)
+    detailTrace?.ready(item.value ? traceSource : 'empty', notified)
+    sweepSettledImgs()
   })))
 }
 onMounted(() => { detailMounted = true; schedulePageReady() })
-watch(() => [route.fullPath, !!item.value, loading.value], schedulePageReady, { flush: 'post' })
+watch(() => [route.fullPath, props.feedId, !!item.value, loading.value], schedulePageReady, { flush: 'post' })
 // 真正决定要不要亮「加载中」的是这个：接口 200ms 内没回来才显示。
 // 有列表快照时根本走不到这里（内容已直出），见 utils/feedSnapshot.js。
 const showLoading = ref(false)
@@ -559,6 +565,9 @@ onMounted(attachKeyboard)
 onActivated(() => { detailMounted = true; attachKeyboard(); schedulePageReady() })
 onDeactivated(() => {
   detailMounted = false
+  detailTrace?.close()
+  detailTrace = null
+  lastReadyRoute = ''
   ++readySeq
   cancelReadingRestore()
   commentInput.value?.blur()
@@ -661,12 +670,20 @@ async function load() {
   commentsLoaded.value = false
   const fid = id.value
   // id 无效（路由异常）不能停在骨架分支：loading 初值 true，否则页面卡死在骨架上
-  if (!Number.isFinite(fid)) { loading.value = false; showLoading.value = false; return }
+  if (!Number.isFinite(fid)) { detailTrace?.close(); detailTrace = null; loading.value = false; showLoading.value = false; return }
+  if (!isActivity.value && (!detailTrace || traceFeedId !== fid)) {
+    detailTrace?.close()
+    detailTrace = createDetailTrace('feed', '/feed/' + fid, props.embedded)
+    traceFeedId = fid
+    lastReadyRoute = ''
+  }
+  detailError.value = false
   const stale = () => seq !== loadSeq
   clearTimeout(loadingTimer)
   // ① 列表快照直出：点进来的那一刻内容就在位，转场里不会出现「加载圈 + 加载中」。
   //    接口返回后再静默替换（stale-while-revalidate），用户全程只看得到一次横滑。
   const snap = isActivity.value ? null : (props.initialItem || getFeedSnapshot(fid))
+  traceSource = snap ? 'snapshot' : 'api'
   if (snap) {
     item.value = snap
     liked.value = !!snap.isLiked
@@ -697,9 +714,11 @@ async function load() {
   } else {
     // 详情到位后要发的补充请求，全部并行（见下方 Promise.all）
     const jobs = []
+    const dataStarted = performance.now()
     try {
       const data = await fetchFeedDetail(fid)
       if (stale()) return // 已经离开本页：后面的评论/收藏/关注/推荐都不用再发了
+      detailTrace?.set('data', performance.now() - dataStarted)
       if (data) {
         if (commentRevision !== commentsAtStart) data.comments = commentCount.value
         item.value = data
@@ -720,7 +739,7 @@ async function load() {
           checkFavorite(fid).then((fav) => { if (!stale() && collectRevision === collectAtStart) collected.value = fav }).catch(() => {})
         )
       }
-    } catch (e) { /* keep null → show empty */ }
+    } catch (e) { if (!stale()) { detailError.value = e.status !== 404; detailTrace?.error() } }
     if (item.value) {
       // 评论 / 关注态 / 收藏态 / 相关推荐同时发出，谁先回来谁先渲染；
       // 评论区有骨架占住高度，先回来也不会把页面顶开
@@ -746,22 +765,28 @@ const fdRoot = ref(null)
 function markImgSettled(e) {
   const el = e.target
   if (el && el.tagName === 'IMG' && !el.classList.contains('is-loaded')) el.classList.add('is-loaded')
+  if (el?.closest('.hero, .body-gallery') && ((el.tagName === 'IMG' && el.naturalWidth > 0) || el.tagName === 'VIDEO')) detailTrace?.media()
 }
 function sweepSettledImgs() {
   // 补扫：HTTP 缓存命中的图可能在事件挂上之前就 complete（load 已错过）
   fdRoot.value?.querySelectorAll('img').forEach((el) => {
     if ((el.complete && el.naturalWidth > 0) || (el.complete && !el.naturalWidth)) el.classList.add('is-loaded')
+    if (el.closest('.hero, .body-gallery') && el.complete && el.naturalWidth > 0) detailTrace?.media()
   })
+  if (item.value && !images.value.length && !item.value.videoUrl) detailTrace?.media()
 }
 onMounted(() => {
   fdRoot.value?.addEventListener('load', markImgSettled, true)
   fdRoot.value?.addEventListener('error', markImgSettled, true)
+  fdRoot.value?.addEventListener('loadedmetadata', markImgSettled, true)
   nextTick(sweepSettledImgs)
 })
 onUpdated(() => nextTick(sweepSettledImgs))
 onBeforeUnmount(() => {
   fdRoot.value?.removeEventListener('load', markImgSettled, true)
   fdRoot.value?.removeEventListener('error', markImgSettled, true)
+  fdRoot.value?.removeEventListener('loadedmetadata', markImgSettled, true)
+  detailTrace?.close()
 })
 
 // ---- 底部互动栏与内容同帧出现（2026-09-07 坤哥真机反馈：晚出现感知明显）----
@@ -1451,9 +1476,9 @@ defineExpose({ getReadingState, getItem })
 .detail-topbar--author :deep(.tb-title) { position: static; flex: 1; min-width: 0; text-align: left; }
 .author--nav { width: 100%; min-height: 44px; margin: 0; padding: 0; gap: 8px; text-align: left; }
 .author--nav .avatar { width: 28px; height: 28px; }
-.nav-author__meta { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 2px; }
-.nav-author__name { max-width: 100%; font-size: 14px; font-weight: 500; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.author--nav .badge-official { padding: 0 5px; line-height: 14px; }
+.nav-author__meta { display: flex; flex: 1; min-width: 0; align-items: center; gap: 5px; }
+.nav-author__name { min-width: 0; font-size: 14px; font-weight: 500; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.author--nav .badge-official { flex: none; padding: 0 5px; line-height: 14px; transform: translateY(-2px); }
 .author--nav:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 6px; }
 .detail-topbar--author .more { margin-right: 0; }
 .detail-topbar--author .more, .detail-topbar--author .share { min-width: 44px; }

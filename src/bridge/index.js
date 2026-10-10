@@ -8,6 +8,8 @@
 // 接入细节见仓库根目录 INTEGRATION.md
 // ============================================================
 
+import { recordDetailIntent } from '../utils/detailDiagnostics'
+
 // 是否「嵌入原生 App」：只有 Flutter 注入真实桥（isNative === true）才算嵌入模式，
 // 此时 H5 不渲染底部 tab（由原生 tab 接管）。
 // 浏览器直接打开（含线上预览 appin.site）一律为独立预览：显示底部 tab、走 H5 兜底。
@@ -546,6 +548,7 @@ export const bridge = {
     try {
       const ch = window.ToFlutter_H5OpenFeedDetail
       if (ch && typeof ch.postMessage === 'function') {
+        recordDetailIntent('/feed/' + id)
         ch.postMessage('/feed/' + id)
         return true
       }
@@ -584,6 +587,7 @@ export const bridge = {
     try {
       const ch = window.ToFlutter_H5OpenFullscreen
       if (ch && typeof ch.postMessage === 'function') {
+        recordDetailIntent(route)
         ch.postMessage(route)
         return true
       }

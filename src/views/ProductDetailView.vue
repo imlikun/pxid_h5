@@ -23,6 +23,7 @@
         :src="src"
         :alt="product.name"
         :loading="i === 0 ? 'eager' : 'lazy'"
+        @load="detailTrace?.media()"
       />
       <div v-if="!galleryImages.length" class="slide empty-slide">无图</div>
     </div>
@@ -203,7 +204,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchProductDetail, getStore, sym, API_BASE, getRegion } from '../api/shop'
 import { initLocale } from '../i18n'
@@ -214,6 +215,7 @@ import { addToCart, cartCount } from '../store/cart'
 import { bridge } from '../bridge'
 import IconSvg from '../components/IconSvg.vue'
 import TopBar from '../components/TopBar.vue'
+import { createDetailTrace } from '../utils/detailDiagnostics'
 
 const route = useRoute()
 const router = useRouter()
@@ -458,14 +460,38 @@ const colorPreviews = computed(() => Object.fromEntries(
 
 // 在首次 setup / 路由切换的同步阶段展示快照；异步回包只补当前商品。
 let loadSeq = 0
+let loadController = null, detailTrace = null
+let detailMounted = false, readySeq = 0, lastReadyRoute = '', traceSource = 'api'
+function schedulePageReady() {
+  const path = route.fullPath, seq = ++readySeq
+  if (!detailMounted || route.name !== 'product' || (!product.value?.name && loading.value) || lastReadyRoute === path) return
+  nextTick(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (seq !== readySeq || route.fullPath !== path || (!product.value?.name && loading.value)) return
+    lastReadyRoute = path
+    detailTrace?.ready(product.value?.name ? traceSource : 'empty', bridge.notifyPageReady(route.path))
+    if (!galleryImages.value.length || gallery.value?.querySelector('img')?.complete && gallery.value.querySelector('img').naturalWidth > 0) detailTrace?.media()
+  })))
+}
+onMounted(() => { detailMounted = true; schedulePageReady() })
+onActivated(() => { detailMounted = true; schedulePageReady() })
+watch(() => [route.fullPath, product.value?.name, loading.value], schedulePageReady, { flush: 'post' })
+onDeactivated(() => { detailMounted = false; ++readySeq; loadController?.abort(); detailTrace?.close(); lastReadyRoute = '' })
+onUnmounted(() => { detailMounted = false; ++readySeq; loadController?.abort(); detailTrace?.close() })
 async function load() {
   if (route.name !== 'product') return
   const handle = String(route.params.id)
   const path = route.fullPath
   const seq = ++loadSeq
+  loadController?.abort()
+  loadController = new AbortController()
+  const signal = loadController.signal
+  detailTrace?.close()
+  detailTrace = createDetailTrace('product', route.path)
+  lastReadyRoute = ''
   const query = { ...route.query }
   const stale = () => seq !== loadSeq || route.fullPath !== path
   const snapshot = productEntry(handle, query)
+  traceSource = snapshot?.name ? 'snapshot' : 'api'
   product.value = snapshot
   entryCover.value = snapshot?.cover || ''
   detailReady.value = false
@@ -481,12 +507,19 @@ async function load() {
   // 列表数据可能没有图与变体关联，不猜颜色；可解析时同步选中。
   if (snapshot) initSelection(query.variant)
   try {
-    await initLocale()
+    const localeStarted = performance.now()
+    // The list already supplied the store. Do not wait for a second native
+    // locale round-trip before issuing that known-region detail request.
+    if (['CN', 'US', 'BR'].includes(query.region)) initLocale().catch(() => {})
+    else await initLocale()
     if (stale()) return
+    detailTrace?.set('locale', performance.now() - localeStarted)
     productRegion.value = ['CN', 'US', 'BR'].includes(query.region) ? query.region : getRegion()
     // 直链/全屏冷启动同样只请求这一件商品，不再请求商品全列表。
-    const detail = await fetchProductDetail(handle, productRegion.value)
+    const dataStarted = performance.now()
+    const detail = await fetchProductDetail(handle, productRegion.value, { signal })
     if (stale()) return
+    detailTrace?.set('data', performance.now() - dataStarted)
     if (detail) {
       // 展示文案采用本次点击快照，避免接口返回后整块插入/改行高；价格库存仍用实时变体。
       const display = snapshot?.presentationComplete ? Object.fromEntries(
@@ -500,16 +533,17 @@ async function load() {
       detailReady.value = true
     } else {
       error.value = '详情加载失败，请重试'
+      detailTrace?.error()
     }
   } catch (e) {
-    if (!stale()) error.value = '详情加载失败，请重试'
+    if (!stale()) { error.value = '详情加载失败，请重试'; detailTrace?.error() }
   } finally {
     if (!stale()) loading.value = false
   }
 }
 watch(() => route.name === 'product' ? route.fullPath : '', (path) => {
   if (path) load()
-  else ++loadSeq // 离屏时废弃在途请求，不重置正在离场的 DOM。
+  else { ++loadSeq; loadController?.abort(); detailTrace?.close() } // 离屏时废弃在途请求，不重置正在离场的 DOM。
 }, { immediate: true, flush: 'sync' })
 
 function onGalleryScroll() {

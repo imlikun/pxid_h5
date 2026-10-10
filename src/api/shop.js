@@ -2,6 +2,7 @@
 // 多店路由：region 不再由 Flutter 单独注入，而是由当前界面语言映射（2026-08-31 定）
 //   zh→CN，pt→BR，en→US。见 src/i18n/index.js 的 regionFromLocale。
 import { locale, regionFromLocale } from '../i18n'
+import { fetchDetailJSON } from '../utils/detailDiagnostics'
 
 // 地区随语言自动映射：中文看中国店，葡语看巴西店，英文看全球店
 export async function initRegion() {
@@ -89,21 +90,21 @@ export function getProductByHandle(handle) {
 
 // 单品详情：按 Shopify 对应链接真拉（/mall-api/products/:handle 服务端代拉 Shopify 商品 JSON）
 //   返回完整字段：含 description(body_html 富文本) / vendor / options / images / variants
-//   ECS→Shopify 偶发 fetch failed，最多重试 2 次（间隔 600ms）提升稳定性
-export async function fetchProductDetail(handle, region = getRegion()) {
+//   每次请求（含响应体）最多 9s；失败后重试 1 次，间隔 300ms；离页取消不重试。
+export async function fetchProductDetail(handle, region = getRegion(), { signal } = {}) {
   const url = `${API_BASE}/mall-api/products/${encodeURIComponent(handle)}?region=${region}`
   let lastErr = null
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const r = await fetch(url)
-      if (!r.ok) throw new Error('HTTP ' + r.status)
-      const json = await r.json()
+      const json = await fetchDetailJSON('product', url, { signal })
       const payload = json.data || json
+      if (payload.error && payload.error !== 'not_found') throw new Error('Product upstream unavailable')
       return payload.product || null
     } catch (e) {
       lastErr = e
       console.error('[shop] detail fetch failed (attempt ' + (attempt + 1) + '):', String(e.message || e))
-      if (attempt < 2) await new Promise((res) => setTimeout(res, 600))
+      if (signal?.aborted || e.status === 404) break
+      if (attempt < 1) await new Promise((res) => setTimeout(res, 300))
     }
   }
   console.error('[shop] detail fetch finally failed:', String(lastErr && lastErr.message))
