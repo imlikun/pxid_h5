@@ -423,13 +423,23 @@ async function _loadAuthToken(forceRefresh = false) {
   const nativeBridge = window.PXIDBridge
   const pending = (async () => {
     let token = ''
+    // 🔴 桥调用竞速 3s（2026-10-12 修「详情页转圈 ~20s」）：真机桥 getUserInfo/getToken
+    //    偶发挂死且无超时，wait 类请求（checkFavorite 等）会被串行拖住。超时按无 token
+    //    继续；桥晚到后本次 pending 正常完成并写缓存，下次调用即命中。
     try {
-      const u = await nativeBridge.getUserInfo()
+      const u = await Promise.race([
+        nativeBridge.getUserInfo(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
+      ])
       if (u && u.token) token = String(u.token)
     } catch (e) { /* 真机未实现 getUserInfo 时回退 */ }
     if (!token) {
-      try { token = String((await nativeBridge.getToken()) || '') }
-      catch (e) { /* 原生未注入时回退 */ }
+      try {
+        token = String((await Promise.race([
+          nativeBridge.getToken(),
+          new Promise((resolve) => setTimeout(() => resolve(''), 3000)),
+        ])) || '')
+      } catch (e) { /* 原生未注入时回退 */ }
     }
     if (revision !== _authTokenRevision || nativeBridge !== window.PXIDBridge) return _loadAuthToken()
     _authTokenCache = token

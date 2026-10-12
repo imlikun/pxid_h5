@@ -722,6 +722,13 @@ async function load() {
       if (data) {
         if (commentRevision !== commentsAtStart) data.comments = commentCount.value
         item.value = data
+        // 🔴 详情数据已就位，立即撤整页骨架（2026-10-12 修「进详情转圈 ~20s」）：
+        //    骨架原来要等 Promise.all(评论/相关推荐/收藏态) 才撤，而 checkFavorite 走
+        //    getAuthTokenSafe() 等桥取 token——真机桥偶发挂 ~20s 且无超时 → 整页跟着转圈。
+        //    内容先出，评论/相关推荐各自带骨架异步补，不再阻塞首屏。
+        clearTimeout(loadingTimer)
+        showLoading.value = false
+        loading.value = false
         // 详情先显示，评论独立等待响应。
         commentsLoading.value = true
         if (likeRevision === likesAtStart) {
@@ -742,8 +749,13 @@ async function load() {
     } catch (e) { if (!stale()) { detailError.value = e.status !== 404; detailTrace?.error() } }
     if (item.value) {
       // 评论 / 关注态 / 收藏态 / 相关推荐同时发出，谁先回来谁先渲染；
-      // 评论区有骨架占住高度，先回来也不会把页面顶开
-      await Promise.all([loadComments(fid, seq), props.embedded ? Promise.resolve() : loadRelated(seq), ...jobs])
+      // 评论区有骨架占住高度，先回来也不会把页面顶开。
+      // race 6s 兜底（2026-10-12）：这些请求无超时、且桥偶发挂——不能让 restoreReading
+      // 被它们堵住；超时后请求继续跑，回来自然渲染。
+      await Promise.race([
+        Promise.all([loadComments(fid, seq), props.embedded ? Promise.resolve() : loadRelated(seq), ...jobs]),
+        new Promise((r) => setTimeout(r, 6000)),
+      ])
       if (stale()) return
     }
   }
