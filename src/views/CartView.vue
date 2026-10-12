@@ -48,7 +48,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import IconSvg from '../components/IconSvg.vue'
 import TopBar from '../components/TopBar.vue'
@@ -63,10 +63,15 @@ import {
   checkedTotal,
   checkedCount,
 } from '../store/cart'
-import { getStore, sym, API_BASE, getRegion } from '../api/shop'
+import { getStore, sym, API_BASE, getRegion, fetchProducts } from '../api/shop'
 import { bridge } from '../bridge'
 
 const router = useRouter()
+
+// 本页是全屏 WebView 白名单路由（Flutter 可直开 /cart）：独立 WebView 里
+// api/shop.js 的模块缓存是全新实例，store 恒为空 → 点「去结算」必弹
+// 「店铺信息加载中」。进页先拉一次商品列表把店铺信息补上（有 _loading 锁，幂等）。
+onMounted(() => { fetchProducts().catch(() => {}) })
 
 const checkedCurrency = computed(() => {
   const first = checkedItems.value[0]
@@ -89,7 +94,12 @@ function goDiscover() {
 }
 async function goCheckout() {
   if (checkedCount.value === 0) return
-  const store = getStore()
+  let store = getStore()
+  if (!store) {
+    // 兜底：进页预热失败/缓存仍空时，结算前再拉一次商品列表补店铺信息
+    try { await fetchProducts() } catch (e) {}
+    store = getStore()
+  }
   if (!store) {
     alert('店铺信息加载中，请稍后重试')
     return
