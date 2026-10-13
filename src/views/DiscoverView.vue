@@ -127,7 +127,7 @@
           <template v-for="(x, i) in wfColA" :key="x.__key || x.id">
             <DiscoverTopicCard v-if="x.__topic" :name="x.__topic.name" :count="x.__topic.n" :active="!!x.__active"
               :category="topicCat(x.__topic.name)"
-              :covers="topicCovers(x.__topic.name)"
+              :covers="ensureTopicCovers(x.__topic.name)"
               @click="pickTopic(x.__topic.name)" />
             <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :selected="isSplit && selectedFeed?.id === x.id" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
@@ -136,7 +136,7 @@
           <template v-for="(x, i) in wfColB" :key="x.__key || x.id">
             <DiscoverTopicCard v-if="x.__topic" :name="x.__topic.name" :count="x.__topic.n" :active="!!x.__active"
               :category="topicCat(x.__topic.name)"
-              :covers="topicCovers(x.__topic.name)"
+              :covers="ensureTopicCovers(x.__topic.name)"
               @click="pickTopic(x.__topic.name)" />
             <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :selected="isSplit && selectedFeed?.id === x.id" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
@@ -200,7 +200,7 @@
 </template>
 
 <script setup>
-import { ref, computed, defineAsyncComponent, watch, onMounted, onActivated, onDeactivated, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, defineAsyncComponent, watch, onMounted, onActivated, onDeactivated, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import FeedCard from '../components/FeedCard.vue'
 import FeedLoadState from '../components/FeedLoadState.vue'
@@ -478,20 +478,43 @@ function estItemHeight(x) {
 }
 const leftPaneWidth = ref(window.innerWidth >= 600 ? window.innerWidth / 2 : window.innerWidth)
 let paneObserver = null
-// 2026-10-13 话题卡视觉升级：取话题下前 3 帖封面做拼贴（DiscoverTopicCard 用）
-function topicCovers(name) {
-  const key = String(name || '').toLowerCase()
-  const out = []
+// 2026-10-13 话题卡视觉升级：每张话题卡都要有自己专属的三联拼贴。
+// 只扫当前已加载的第一页会漏（首页可能没有该话题的帖子）→ 先同步扫已加载，
+// 不足 2 张再按话题向后端定向拉一次（/feed 原生支持 topic 参数），响应式回填。
+const topicCoverMap = reactive({})
+function fillTopicCovers(arr, key) {
+  const k = key.toLowerCase()
   for (const x of recommendList.value) {
-    if (out.length >= 3) break
+    if (arr.length >= 3) break
     const tags = Array.isArray(x.tags) ? x.tags : []
-    if (!tags.some((t) => String(t || '').toLowerCase() === key)) continue
+    if (!tags.some((t) => String(t || '').toLowerCase() === k)) continue
     const raw = x.cover || (Array.isArray(x.images) && x.images[0]) || ''
     const src = typeof raw === 'string' ? raw : raw && raw.src
-    if (!src) continue
-    out.push(mediaUrl(src))
+    const url = src ? mediaUrl(src) : ''
+    if (url && !arr.includes(url)) arr.push(url)
   }
-  return out
+}
+function ensureTopicCovers(name) {
+  const key = String(name || '')
+  if (!key) return []
+  if (topicCoverMap[key]) return topicCoverMap[key]
+  const arr = reactive([])
+  topicCoverMap[key] = arr
+  fillTopicCovers(arr, key)
+  if (arr.length < 2) {
+    fetchFeeds('recommend', { region: currentRegion.value, page: 1, pageSize: 6, topic: key, allowMockFallback: false })
+      .then((res) => {
+        for (const x of res.list || []) {
+          if (arr.length >= 3) break
+          const raw = x.cover || (Array.isArray(x.images) && x.images[0]) || ''
+          const src = typeof raw === 'string' ? raw : raw && raw.src
+          const url = src ? mediaUrl(src) : ''
+          if (url && !arr.includes(url)) arr.push(url)
+        }
+      })
+      .catch(() => {})
+  }
+  return arr
 }
 const wfColumns = computed(() => {
   if (isSplit.value && leftPaneWidth.value < 340) return [wfFeed.value, []]
