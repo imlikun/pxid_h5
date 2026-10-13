@@ -11,7 +11,12 @@
       <span v-if="item.videoUrl" class="fcard__play"><svg viewBox="0 0 24 24" width="18" height="18" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
       <div v-if="showOverlay" class="fcard__overlay"><div class="fcard__title">{{ item.title }}</div></div>
     </div>
-    <div v-if="!showOverlay" class="fcard__title">{{ item.title }}</div>
+    <!-- 2026-10-13 坤哥拍板：话题不再独占一行（对齐小红书），蓝色 #话题 内联标题尾部 -->
+    <div v-if="!showOverlay && appearance === 'discover' && discussionTag" class="fcard__titlerow">
+      <div class="fcard__title">{{ item.title }}</div>
+      <button type="button" class="fcard__topic" @click.stop="goDiscussion">#{{ discussionTag }}</button>
+    </div>
+    <div v-else-if="!showOverlay" class="fcard__title">{{ item.title }}</div>
     <div class="fcard__foot">
       <div class="author" @click.stop="goUser">
         <img class="avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
@@ -22,7 +27,6 @@
         <span class="like__num">{{ item.likes }}</span>
       </span>
     </div>
-    <div v-if="appearance === 'discover' && discussionTag" class="fcard__discussion"><button type="button" @click.stop="goDiscussion">#{{ discussionTag }}</button></div>
   </div>
 </template>
 
@@ -120,6 +124,10 @@ function goUser() {
 </script>
 
 <style scoped>
+/* 2026-10-13：话题内联标题尾部（小红书式），独立行已删 */
+.fcard__titlerow { display: flex; align-items: baseline; gap: 5px; min-width: 0; padding: 10px 10px 0; }
+.fcard__titlerow .fcard__title { flex: 1; min-width: 0; padding: 0; -webkit-line-clamp: 1; }
+.fcard__topic { flex: none; max-width: 45%; color: var(--brand); font-size: 11px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 .fcard__discussion { padding: 0 10px 6px; }.fcard__discussion button { max-width: 100%; min-height: 32px; color: var(--brand); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .fcard {
   /* 白底卡片（2026-09-21 坤哥反馈：发现页推荐列表每条改白色背景）。
@@ -253,6 +261,8 @@ function goUser() {
 .fcard--discover.fcard--video .fcard__cover { aspect-ratio: 4 / 3; }
 .fcard--discover.fcard--poster .fcard__cover { object-fit: contain; }
 .fcard--discover .fcard__title { font-size: 14px; font-weight: 500; line-height: 1.5; padding: 9px 10px 0; }
+.fcard--discover .fcard__titlerow { padding: 9px 10px 0; }
+.fcard--discover .fcard__titlerow .fcard__title { padding: 0; }
 .fcard--discover .fcard__foot { gap: 6px; padding: 10px; min-height: 38px; box-sizing: border-box; }
 .fcard--discover .author { flex: 1; gap: 4px; overflow: hidden; }
 .fcard--discover .avatar { width: 16px; height: 16px; }

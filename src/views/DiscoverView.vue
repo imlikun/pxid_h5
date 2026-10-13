@@ -127,6 +127,7 @@
           <template v-for="(x, i) in wfColA" :key="x.__key || x.id">
             <DiscoverTopicCard v-if="x.__topic" :name="x.__topic.name" :count="x.__topic.n" :active="!!x.__active"
               :category="topicCat(x.__topic.name)"
+              :covers="topicCovers(x.__topic.name)"
               @click="pickTopic(x.__topic.name)" />
             <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :selected="isSplit && selectedFeed?.id === x.id" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
@@ -135,6 +136,7 @@
           <template v-for="(x, i) in wfColB" :key="x.__key || x.id">
             <DiscoverTopicCard v-if="x.__topic" :name="x.__topic.name" :count="x.__topic.n" :active="!!x.__active"
               :category="topicCat(x.__topic.name)"
+              :covers="topicCovers(x.__topic.name)"
               @click="pickTopic(x.__topic.name)" />
             <FeedCard v-else appearance="discover" :featured="featuredIds.has(x.id)" :item="x" :selected="isSplit && selectedFeed?.id === x.id" :class="[fadeUp(), staggerFor(i)]" :on-select="isSplit ? selectDetail : null" />
           </template>
@@ -208,6 +210,7 @@ import DiscoverFilterBar from '../components/DiscoverFilterBar.vue'
 import DiscoverPlaza from '../components/DiscoverPlaza.vue'
 const FeedDetailReader = defineAsyncComponent(() => import('./FeedDetailView.vue'))
 import { discussionRoute, normalizeTopic } from '../utils/discussion'
+import { mediaUrl } from '../storage'
 import { requireLogin } from '../utils/auth'
 import { putFeedSnapshot } from '../utils/feedSnapshot'
 import { handoffFeedReading, setDiscoverReturnAnchor } from '../utils/feedReading'
@@ -475,11 +478,27 @@ function estItemHeight(x) {
 }
 const leftPaneWidth = ref(window.innerWidth >= 600 ? window.innerWidth / 2 : window.innerWidth)
 let paneObserver = null
+// 2026-10-13 话题卡视觉升级：取话题下前 3 帖封面做拼贴（DiscoverTopicCard 用）
+function topicCovers(name) {
+  const key = String(name || '').toLowerCase()
+  const out = []
+  for (const x of recommendList.value) {
+    if (out.length >= 3) break
+    const tags = Array.isArray(x.tags) ? x.tags : []
+    if (!tags.some((t) => String(t || '').toLowerCase() === key)) continue
+    const raw = x.cover || (Array.isArray(x.images) && x.images[0]) || ''
+    const src = typeof raw === 'string' ? raw : raw && raw.src
+    if (!src) continue
+    out.push(mediaUrl(src))
+  }
+  return out
+}
 const wfColumns = computed(() => {
   if (isSplit.value && leftPaneWidth.value < 340) return [wfFeed.value, []]
   const columns = [[], []], heights = [0, 0]
   for (const x of wfFeed.value) {
-    const i = heights[0] <= heights[1] ? 0 : 1
+    // 2026-10-13 坤哥拍板：聚合话题卡固定放左列（阅读动线锚点在左），帖子按短列优先分右
+    const i = x.__topic ? 0 : (heights[0] <= heights[1] ? 0 : 1)
     columns[i].push(x)
     heights[i] += estItemHeight(x) + 12
   }
