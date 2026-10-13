@@ -269,7 +269,9 @@ function goUser() {
 .fcard--discover .name { font-size: 11px; color: #858b96; }
 .fcard--discover .like { gap: 4px; font-size: 11px; color: #858b96; }
 .fcard--discover .fcard__tags { top: 8px; left: 8px; right: auto; bottom: auto; max-width: calc(100% - 16px); }
-.fcard--discover .fcard__pin { top: 8px; left: 8px; border-radius: 7px; padding: 5px 7px; }
+/* 2026-10-13：精选角标高度钉死 22px（flex 垂直居中），不再靠 padding 撑——
+   实测三卡渲染本就一致（52×22），钉死尺寸杜绝任何字体/瞬帧造成的观感差异 */
+.fcard--discover .fcard__pin { top: 8px; left: 8px; border-radius: 7px; padding: 0 8px; height: 22px; display: inline-flex; align-items: center; box-sizing: border-box; }
 .fcard__selected { display: flex; align-items: center; gap: 4px; font-weight: 700; }
 .fcard--featured .fcard__cover { aspect-ratio: 3 / 4; }
 .fcard__overlay { position: absolute; inset: 55% 0 0; display: flex; align-items: flex-end; padding: 10px; background: linear-gradient(transparent, rgba(0,0,0,.7)); pointer-events: none; }
