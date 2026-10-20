@@ -18,7 +18,7 @@
     </section>
     <section>
       <header class="hub-heading"><h2>{{ t('discover.plaza.activities') }}</h2><button type="button" @click="$emit('activities')">{{ t('discover.more') }} <span>›</span></button></header>
-      <div class="activity-list"><ActivityCard v-for="activity in currentActivities" :key="activity.id" :activity="activity" class="hub-activity" @select="$emit('activity', $event)" /></div>
+      <div class="activity-list"><ActivityCard v-for="activity in currentActivities" :key="activity.id" :activity="activity" :readonly="isSocialReadOnly" class="hub-activity" @select="$emit('activity', $event)" /></div>
       <p v-if="!loadingActivities && !currentActivities.length" class="hub-status">{{ t(activitiesError ? 'discover.activitiesUnavailable' : 'discover.noActiveActivities') }}</p>
       <p v-if="loadingActivities" class="hub-status" role="status">{{ t('discover.loadingMore') }}</p>
       <button type="button" class="activity-history" @click="$emit('activities')">{{ t('discover.activityHistory') }}<span>›</span></button>
@@ -33,6 +33,7 @@ import { activityPhase } from '../utils/activityPhase'
 import { t } from '../i18n'
 import TopicIcon from './TopicIcon.vue'
 import ActivityCard from './ActivityCard.vue'
+import { isSocialReadOnly } from '../config/socialMode'
 const props = defineProps({ mine: String, topics: { type: Array, default: () => [] }, topicsError: Boolean, activities: { type: Array, default: () => [] }, loadingActivities: Boolean, activitiesError: Boolean })
 defineEmits(['model', 'topic', 'activities', 'activity', 'retry-topics'])
 const allModels = ref(false), allTopics = ref(false), coverFailed = ref(false)

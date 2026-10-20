@@ -26,3 +26,5 @@ shots/
 .workbuddy/
 
 dist/
+# 渠道/预览临时构建目录（如小米只读包 dist-ro2），绝不入库
+dist-*/

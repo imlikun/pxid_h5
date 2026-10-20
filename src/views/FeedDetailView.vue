@@ -3,13 +3,13 @@
        多根（fragment）组件会被静默跳过动画——原本这里有 div.detail / article / teleport
        三个根级节点，导致从发现页进出详情页时，详情页那一侧的转场完全不生效
        （表现为只有列表在动，详情是硬切）。包一层后两侧动画才对称。 -->
-  <div class="fd-root" :class="{ 'fd-root--embedded': embedded }" ref="fdRoot">
+  <div class="fd-root" :class="{ 'fd-root--embedded': embedded, 'fd-root--readonly': isSocialReadOnly }" ref="fdRoot">
   <div class="detail" ref="detailScroll" v-if="item" @scroll.passive="rememberReadingScroll">
     <!-- 顶部：返回优先关闭原生详情 WebView（App 原生右滑路由），回退 router.back() -->
     <TopBar sticky :show-back="!embedded" :back="goBack" :interactive="!isActivity" :class="{ 'detail-topbar--author': !isActivity }" :title="isActivity ? t('feed.detail.title.activity') : t('feed.detail.title.content')">
       <template v-if="embedded" #left><button type="button" class="reader-expand" :aria-label="t('discover.reader.expand')" @click="$emit('expand')"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></svg></button></template>
       <template v-if="!isActivity" #title>
-        <component :is="item.deviceId ? 'button' : 'div'" :type="item.deviceId ? 'button' : undefined" class="author author--nav" @click="goAuthor">
+        <component :is="item.deviceId && !isSocialReadOnly ? 'button' : 'div'" :type="item.deviceId && !isSocialReadOnly ? 'button' : undefined" class="author author--nav" @click="!isSocialReadOnly && goAuthor()">
           <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.author)" />
           <span class="nav-author__meta">
             <span class="nav-author__name">{{ item.author || t('feed.author.official') }}</span>
@@ -17,7 +17,7 @@
           </span>
         </component>
       </template>
-      <template #right>
+      <template v-if="!isSocialReadOnly" #right>
         <button type="button" class="more press" :aria-label="t('feed.moreActions')" @click="onMoreClick">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
         </button>
@@ -77,7 +77,7 @@
       <!-- 动态身份在顶栏；正文仅保留时间与发布城市。 -->
       <p v-if="!isActivity" class="article__meta time"><time>{{ formatPublishedTime(item.time || item.date) }}</time><span v-if="item.publishLocation || item.city"> · {{ item.publishLocation || item.city }}</span></p>
       <!-- 活动详情保留原有作者卡与居中标题。 -->
-      <div v-else class="author" @click="goAuthor">
+      <div v-else class="author" @click="!isSocialReadOnly && goAuthor()">
         <img class="avatar" :src="authorAvatar" :alt="item.author" @error="(e) => handleAvatarError(e, item.author)" />
         <div class="meta">
           <div class="name">
@@ -91,7 +91,7 @@
 
     <div class="article__body">
     <!-- 活动报名卡 -->
-    <div v-if="isActivity" class="signup">
+    <div v-if="isActivity && !isSocialReadOnly" class="signup">
       <div class="signup__row">
         <span class="signup__k">{{ t('feed.signup.time') }}</span>
         <span class="signup__v">{{ activityDateText() }}</span>
@@ -145,8 +145,11 @@
     </div>
   </article>
 
+  <!-- 只读模式（小米审核）：隐藏评论区后，给短内容一个明确的结束标记，避免尾部出现无解释的大片灰白 -->
+  <div v-if="isSocialReadOnly" class="article-end">{{ locale === 'zh' ? '已展示全部内容' : locale === 'en' ? 'End of content' : 'Fim do conteúdo' }}</div>
+
     <!-- 评论区 -->
-    <div class="comments" ref="commentsBox">
+    <div v-if="!isSocialReadOnly" class="comments" ref="commentsBox">
       <div class="comments__head"><span>{{ t('feed.commentsCount', { n: commentCount }) }}</span><select v-model="commentSort" class="comments__sort" :aria-label="t('feed.commentSort')"><option value="latest">{{ t('feed.sort.latest') }}</option><option value="hot">{{ t('feed.sort.hot') }}</option></select></div>
       <!-- 评论数据返回后直接显示，不再渲染灰色骨架或补播淡入。 -->
       <div v-if="!commentsLoading && comments.length === 0" class="comments__empty">{{ t('feed.commentsEmpty') }}</div>
@@ -163,6 +166,7 @@
     <!-- 输入栏：Teleport 到 body，彻底避开 .app-root transform / keep-alive 等祖先包含块影响 -->
     <teleport to="body">
       <div
+        v-if="!isSocialReadOnly"
         v-show="commenting"
         class="cinput"
         :class="{ 'cinput--fixed': commenting }"
@@ -197,7 +201,7 @@
           <div class="rcard__title">{{ r.title }}</div>
           <div class="rcard__foot">
             <span class="rcard__author">{{ r.author }}</span>
-            <span class="rcard__like">
+            <span v-if="!isSocialReadOnly" class="rcard__like">
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
               {{ r.likes }}
             </span>
@@ -242,7 +246,7 @@
   </div>
 
   <!-- 底部互动栏：左侧输入框 + 右侧点赞/收藏/评论（对齐 App 详情页习惯） -->
-  <div v-if="item" class="actions" v-show="!commenting">
+  <div v-if="item && !isSocialReadOnly" class="actions" v-show="!commenting">
     <button type="button" class="actions__input press" @click="onCommentBtn">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       <span>{{ t('feed.writeComment') }}</span>
@@ -267,7 +271,7 @@
        （真机边缘滑动返回被原生吞 touchend 时 .app-root 残留 will-change，会导致 fixed 弹层错位「不居中/没样式」） -->
   <teleport to="body">
     <transition name="fade">
-      <div v-if="showReport" class="sheet-mask" @click="showReport = false">
+      <div v-if="!isSocialReadOnly && showReport" class="sheet-mask" @click="showReport = false">
         <div class="sheet" @click.stop>
           <div class="sheet__title">{{ t('feed.reportTitle') }}</div>
           <div v-for="r in reportReasons" :key="r" class="sheet__item" @click="doReport(r)">{{ r }}</div>
@@ -280,7 +284,7 @@
   <!-- 删除确认：自己发的帖才出现 -->
   <teleport to="body">
     <transition name="fade">
-      <div v-if="showDeleteConfirm" class="sheet-mask" @click="showDeleteConfirm = false">
+      <div v-if="!isSocialReadOnly && showDeleteConfirm" class="sheet-mask" @click="showDeleteConfirm = false">
         <div class="sheet" @click.stop>
           <div class="sheet__title">删除这条动态？</div>
           <div class="sheet__item sheet__danger" @click="doDelete">删除</div>
@@ -318,6 +322,7 @@ import FeedImagePreview from '../components/FeedImagePreview.vue'
 import { formatPublishedTime } from '../utils/time'
 import { resolveAvatar, handleAvatarError } from '../utils/avatar'
 import { createDetailTrace } from '../utils/detailDiagnostics'
+import { isSocialReadOnly } from '../config/socialMode'
 
 const props = defineProps({ embedded: Boolean, feedId: [String, Number], initialItem: Object })
 const emit = defineEmits(['expand', 'change', 'removed'])
@@ -1361,6 +1366,9 @@ defineExpose({ getReadingState, getItem })
   background: var(--bg);
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
+/* 只读模式（小米审核）：底部互动栏不渲染，去掉为它预留的 64px，避免页面尾部留白 */
+.fd-root--readonly .detail { padding-bottom: env(safe-area-inset-bottom); background: var(--card); }
+.article-end { padding: 24px 16px calc(28px + env(safe-area-inset-bottom)); text-align: center; font-size: 12px; color: var(--text-hint); background: var(--card); }
 /* 详情页返回键向左靠 8px（热区左缘 4px→0），仅作用于本页，不牵动全站 TopBar */
 :deep(.tb-back) { margin-left: -8px; }
 .share { display: flex; color: var(--text); }

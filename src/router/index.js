@@ -2,6 +2,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import { bridge } from '../bridge'
 import { takeDiscoverReturnAnchor } from '../utils/feedReading'
 import { recordDetailIntent } from '../utils/detailDiagnostics'
+import { isSocialReadOnly } from '../config/socialMode'
 
 // 路由级懒加载：全部页面动态 import，Vite 按路由拆 chunk，
 // 首屏只加载当前页面代码，大幅减小首包体积（原 30+ 页面全打一个 bundle）
@@ -182,6 +183,16 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   if (from.matched.length) recordDetailIntent(to.path)
   if (to.path.startsWith('/service')) {
+    next('/discover')
+    return
+  }
+  // 社交只读模式（小米审核）：发布/互动消息等社交路由直达也拦回发现页，
+  // 避免手输 URL 或原生 deep-link 绕过前端隐藏。
+  if (isSocialReadOnly && (
+    to.path === '/publish' ||
+    to.path === '/interactions' ||
+    to.path.startsWith('/interaction/')
+  )) {
     next('/discover')
     return
   }

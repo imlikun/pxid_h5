@@ -18,7 +18,7 @@
       <!-- 他人主页：只保留「更多」菜单（举报/拉黑入口）。
            关注 + 发消息入口已下线（2026-09-05 坤哥拍板：全站不做社交关注/私信），
            与发现页 MomentCard 的关注按钮同步移除，避免两处逻辑不一致。 -->
-      <div v-if="!isSelf" class="u-actions">
+      <div v-if="!isSelf && !isSocialReadOnly" class="u-actions">
         <button class="u-more-btn" @click="menuOpen = !menuOpen">⋯</button>
         <transition name="fade">
           <div v-if="menuOpen" class="u-menu" @click.stop>
@@ -34,13 +34,13 @@
       <div class="u-grid__item" :class="{ on: activeGrid === 'publish' }" @click="selectGrid('publish')">
         <b>{{ user ? user.feedCount : '—' }}</b><span>发布</span>
       </div>
-      <div v-if="isSelf" class="u-grid__item" :class="{ on: activeGrid === 'favorites' }" @click="selectGrid('favorites')">
+      <div v-if="!isSocialReadOnly && isSelf" class="u-grid__item" :class="{ on: activeGrid === 'favorites' }" @click="selectGrid('favorites')">
         <b>{{ user ? user.favoriteCount : '—' }}</b><span>收藏</span>
       </div>
-      <div class="u-grid__item" :class="{ on: activeGrid === 'follow' }" @click="selectGrid('follow')">
+      <div v-if="!isSocialReadOnly" class="u-grid__item" :class="{ on: activeGrid === 'follow' }" @click="selectGrid('follow')">
         <b>{{ user ? user.followeeCount : '—' }}</b><span>关注</span>
       </div>
-      <div class="u-grid__item" :class="{ on: activeGrid === 'followers' }" @click="selectGrid('followers')">
+      <div v-if="!isSocialReadOnly" class="u-grid__item" :class="{ on: activeGrid === 'followers' }" @click="selectGrid('followers')">
         <b>{{ user ? user.followerCount : '—' }}</b><span>粉丝</span>
       </div>
     </div>
@@ -96,6 +96,7 @@ import {
   fetchFavorites, fetchFollowList, fetchFollowers,
 } from '../api/feed'
 import { handleAvatarError, resolveAvatar } from '../utils/avatar'
+import { isSocialReadOnly } from '../config/socialMode'
 import bridge, { peekAuthToken } from '../bridge'
 
 const route = useRoute()
@@ -149,10 +150,12 @@ function gotoUser(identity) {
 }
 function applyQuery() {
   const tab = String(route.query.tab || '')
-  activeGrid.value = ['publish', 'favorites', 'follow', 'followers'].includes(tab)
+  const allowed = isSocialReadOnly ? ['publish'] : ['publish', 'favorites', 'follow', 'followers']
+  activeGrid.value = allowed.includes(tab)
     && !(tab === 'favorites' && !isSelf.value) ? tab : 'publish'
 }
 function selectGrid(key) {
+  if (isSocialReadOnly && key !== 'publish') return
   if (key === 'favorites' && !isSelf.value) return
   if (key === activeGrid.value) return
   activeGrid.value = key

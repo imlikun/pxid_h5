@@ -26,7 +26,7 @@
           <button type="button" :aria-label="t('discover.search')" :aria-expanded="searchOpen" class="act act--search press" :class="{ 'act--on': searchOpen }" @click="toggleSearch">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="m20.35 20.35-4.35-4.35"/></svg>
           </button>
-          <button type="button" :aria-label="inDiscussion ? `${t('discover.discussion.publish')}: ${discussionTitle}` : t('discover.publish')" class="act act--add press" @click="onAdd">
+          <button v-if="!isSocialReadOnly" type="button" :aria-label="inDiscussion ? `${t('discover.discussion.publish')}: ${discussionTitle}` : t('discover.publish')" class="act act--add press" @click="onAdd">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </button>
         </div>
@@ -117,7 +117,7 @@
       </div>
     </template>
 
-    <DiscoverFilterBar v-if="activeTab === '动态' && !showSearchResults" :scope="dynamicScope" :model="selectedDynamicModel()" :mine="myCarModel" @scope="setDynamicScope" @model="pickFilter($event || '最新')" />
+    <DiscoverFilterBar v-if="activeTab === '动态' && !showSearchResults" :scope="dynamicScope" :model="selectedDynamicModel()" :mine="myCarModel" :readonly="isSocialReadOnly" @scope="setDynamicScope" @model="pickFilter($event || '最新')" />
     <header v-if="activeTab === '推荐' && !showSearchResults" class="recommend-heading"><h2>{{ t('discover.recommend.heading') }}</h2><button v-if="myCarModel" type="button" @click="openDiscussion(myCarModel)">{{ myCarModel }} {{ t('discover.viewDiscussion') }} ›</button><button v-else type="button" @click="setTab('广场')">{{ t('discover.plaza.topics') }} ›</button></header>
 
     <!-- 推荐：瀑布流（两列错落，热门话题卡穿插在流内） -->
@@ -164,7 +164,7 @@
           v-for="(it, i) in dynamicList"
           :key="it.id"
           :item="it"
-          show-follow :selected="isSplit && selectedFeed?.id === it.id" :on-select="isSplit ? selectDetail : null" @follow-change="onFollowChanged" @change="syncFeedChange"
+          :show-follow="!isSocialReadOnly" :selected="isSplit && selectedFeed?.id === it.id" :on-select="isSplit ? selectDetail : null" @follow-change="onFollowChanged" @change="syncFeedChange"
         />
         <div v-if="(nearLoading || dynamicLoading) && dynamicList.length === 0" class="empty-tab">{{ nearLoading ? t('discover.nearLoading') : t('discover.loadingMore') }}</div>
         <div v-else-if="dynamicList.length === 0" class="empty-tab dynamic-empty" role="status">
@@ -173,7 +173,7 @@
           <div class="dynamic-empty__actions">
             <button v-if="dynamicError" type="button" class="dynamic-empty__action press" @click="reloadDynamicFeed">{{ t('discover.dynamic.retry') }}</button>
             <button v-if="hasDynamicFilter" type="button" class="dynamic-empty__action press" @click="clearDynamicFilters">{{ t('discover.dynamic.viewAll') }}</button>
-            <button v-if="!dynamicError" type="button" class="dynamic-empty__action press" @click="onAdd">{{ t('discover.dynamic.share') }}</button>
+            <button v-if="!isSocialReadOnly && !dynamicError" type="button" class="dynamic-empty__action press" @click="onAdd">{{ t('discover.dynamic.share') }}</button>
           </div>
         </div>
         <FeedLoadState v-if="currentFeedKey && dynamicList.length" :loading="loadingMore[currentFeedKey]" :finished="!feedPage[currentFeedKey].hasMore" />
@@ -240,6 +240,7 @@ import { t, locale, initLocale, regionFromLocale } from '../i18n'
 // 直接读 mock.notices 的 isRead 不会触发更新 —— mock 是普通数组，属性变化不会被 computed 追踪
 import { noticeUnread } from '../store/noticeStore'
 import { fetchFeeds, fetchActivities, fetchTopics } from '../api/feed'
+import { isSocialReadOnly } from '../config/socialMode'
 
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || 'https://pxid-api.appin.site'
 

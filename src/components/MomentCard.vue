@@ -6,8 +6,8 @@
         <div class="m-name">{{ item.author }}<span v-if="item.pinned" class="m-pin">{{ t('feed.pinned') }}</span></div>
         <div class="m-time">{{ formatFeedTime(item.time, locale) }}</div>
       </div>
-      <button v-if="showFollow && item.canFollow !== false && item.deviceId" type="button" class="m-follow" :class="{ 'm-follow--on': followed }" :disabled="followBusy" @click.stop="onFollow">{{ t(followed ? 'feed.follow.following' : 'feed.follow.follow') }}</button>
-      <button type="button" class="m-more" :aria-label="t('feed.moreActions')" @click.stop="showMore = true">···</button>
+      <button v-if="showFollow && !isSocialReadOnly && item.canFollow !== false && item.deviceId" type="button" class="m-follow" :class="{ 'm-follow--on': followed }" :disabled="followBusy" @click.stop="onFollow">{{ t(followed ? 'feed.follow.following' : 'feed.follow.follow') }}</button>
+      <button v-if="!isSocialReadOnly" type="button" class="m-more" :aria-label="t('feed.moreActions')" @click.stop="showMore = true">···</button>
 
     </div>
 
@@ -26,7 +26,7 @@
     <div class="m-foot">
       <button v-if="item.carModel" type="button" class="m-tag" @click.stop="onCar(item.carModel)">#{{ item.carModel }}</button>
       <button v-if="topicTag" type="button" class="m-tag m-tag--topic" @click.stop="onTopic(topicTag)">#{{ topicTag }}</button>
-      <div class="m-acts">
+      <div v-if="!isSocialReadOnly" class="m-acts">
         <button type="button" class="m-act" :class="{ liked }" @click.stop="onLike">
           <svg viewBox="0 0 24 24" width="16" height="16" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
           <span>{{ likeCount }}</span></button>
@@ -39,7 +39,7 @@
     </div>
   </div>
   <FeedImagePreview v-model="previewOpen" :images="displayImages" :start-index="previewIndex" :alt="item.title" />
-  <Teleport to="body"><div v-if="showMore" class="m-sheet-mask" @click="showMore = false"><div class="m-sheet" role="dialog" aria-modal="true" :aria-label="t('feed.moreActions')" @click.stop>
+  <Teleport to="body"><div v-if="!isSocialReadOnly && showMore" class="m-sheet-mask" @click="showMore = false"><div class="m-sheet" role="dialog" aria-modal="true" :aria-label="t('feed.moreActions')" @click.stop>
     <button type="button" @click="showMore = false; open()">{{ t('feed.goView') }}</button>
     <button type="button" @click="showMore = false; onFavorite()">{{ t(favorited ? 'feed.collect.collected' : 'feed.collect.collect') }}</button>
     <button type="button" @click="showMore = false; onShare()">{{ t('feed.share') }}</button>
@@ -66,6 +66,7 @@ import { likeFeed, toggleFavorite, prefetchFeedDetail, prefetchComments, prewarm
 import { discussionRoute } from '../utils/discussion'
 import { normalizeCarModel } from '../data/carModels'
 import { putFeedSnapshot } from '../utils/feedSnapshot'
+import { isSocialReadOnly } from '../config/socialMode'
 
 const props = defineProps({
   item: { type: Object, required: true },

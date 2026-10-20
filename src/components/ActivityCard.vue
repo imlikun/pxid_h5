@@ -5,11 +5,11 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M7 3v4m10-4v4M3 11h18" /></svg>
     </span>
     <span class="activity-copy">
-      <span v-if="activity.registration" class="activity-state activity-registration">{{ t(activity.registration.checked ? 'activity.checkedIn' : 'activity.signed') }}</span>
+      <span v-if="!readonly && activity.registration" class="activity-state activity-registration">{{ t(activity.registration.checked ? 'activity.checkedIn' : 'activity.signed') }}</span>
       <span v-if="phase !== 'undated'" class="activity-state" :class="{ 'activity-state--past': phase === 'past' }">{{ statusText }}</span>
       <strong class="activity-title">{{ activity.title }}</strong>
       <span v-if="metadata" class="activity-meta">{{ metadata }}</span>
-      <span v-if="showSignup && signupText" class="activity-meta activity-signup">{{ signupText }}</span>
+      <span v-if="!readonly && showSignup && signupText" class="activity-meta activity-signup">{{ signupText }}</span>
     </span>
     <span class="activity-arrow" aria-hidden="true">›</span>
   </button>
@@ -20,7 +20,7 @@ import { computed, ref, watch } from 'vue'
 import { t } from '../i18n'
 import { activityPhase } from '../utils/activityPhase'
 
-const props = defineProps({ activity: { type: Object, required: true }, showSignup: Boolean })
+const props = defineProps({ activity: { type: Object, required: true }, showSignup: Boolean, readonly: Boolean })
 defineEmits(['select'])
 const coverFailed = ref(false)
 watch(() => props.activity.cover, () => { coverFailed.value = false })

@@ -18,14 +18,18 @@
 import { computed, ref, nextTick, onMounted, onBeforeUnmount, onDeactivated } from 'vue'
 import { CAR_MODEL_LABELS } from '../data/carModels'
 import { t } from '../i18n'
-const props = defineProps({ scope: { type: String, default: 'all' }, model: { type: String, default: '' }, mine: { type: String, default: '' } })
+const props = defineProps({ scope: { type: String, default: 'all' }, model: { type: String, default: '' }, mine: { type: String, default: '' }, readonly: Boolean })
 const emit = defineEmits(['scope', 'model'])
 const root = ref(null), trigger = ref(null), open = ref(false)
-const scopes = computed(() => [
-  { value: 'all', label: t('discover.filter.all') },
-  { value: 'follow', label: t('discover.subFollow') },
-  { value: 'near', label: t('discover.subNear') },
-])
+const scopes = computed(() => {
+  const list = [
+    { value: 'all', label: t('discover.filter.all') },
+    { value: 'follow', label: t('discover.subFollow') },
+    { value: 'near', label: t('discover.subNear') },
+  ]
+  // 只读模式（小米审核）：隐藏"关注"这一社交筛选，保留"全部/附近"内容浏览
+  return props.readonly ? list.filter(item => item.value !== 'follow') : list
+})
 const models = computed(() => props.mine ? [props.mine, ...CAR_MODEL_LABELS.filter(x => x !== props.mine)] : CAR_MODEL_LABELS)
 function pick(value) { emit('model', value); open.value = false; trigger.value?.focus() }
 function toggle() {
@@ -46,7 +50,12 @@ function moveFocus(event) {
 }
 function outside(event) { if (!root.value?.contains(event.target)) open.value = false }
 function escape(event) { if (event.key === 'Escape' && open.value) { open.value = false; trigger.value?.focus() } }
-onMounted(() => { document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape) })
+onMounted(() => {
+  document.addEventListener('pointerdown', outside)
+  document.addEventListener('keydown', escape)
+  // 只读模式下若进入时仍带着"关注"筛选，回落到全部，避免列表被社交关系过滤后空白
+  if (props.readonly && props.scope === 'follow') emit('scope', 'all')
+})
 onBeforeUnmount(() => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) })
 onDeactivated(() => { open.value = false })
 </script>

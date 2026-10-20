@@ -22,7 +22,7 @@
         <img class="avatar" :src="avatarUrl" :alt="item.author" loading="lazy" @error="(e) => handleAvatarError(e, item.author)" />
         <span class="name">{{ item.author }}</span>
       </div>
-      <span class="like">
+      <span v-if="!isSocialReadOnly" class="like">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
         <span class="like__num">{{ item.likes }}</span>
       </span>
@@ -44,6 +44,7 @@ import { GENERATED_COVERS } from '../constants/feedCovers'
 import { discussionRoute } from '../utils/discussion'
 import { normalizeCarModel } from '../data/carModels'
 import { revealLoadedImage } from '../utils/motion'
+import { isSocialReadOnly } from '../config/socialMode'
 
 const props = defineProps({
   item: { type: Object, required: true },

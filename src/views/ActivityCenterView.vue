@@ -6,7 +6,7 @@
     <div class="body">
       <nav class="activity-tabs" :aria-label="t('activity.title')">
         <button type="button" :aria-pressed="tab === 'all'" :class="{ active: tab === 'all' }" @click="setTab('all')">{{ t('activity.all') }}</button>
-        <button type="button" :aria-pressed="tab === 'joined'" :class="{ active: tab === 'joined' }" @click="setTab('joined')">{{ t('activity.signed') }}</button>
+        <button v-if="!isSocialReadOnly" type="button" :aria-pressed="tab === 'joined'" :class="{ active: tab === 'joined' }" @click="setTab('joined')">{{ t('activity.signed') }}</button>
       </nav>
       <p v-if="loading && !list.length" class="empty" role="status">{{ t('common.loading') }}</p>
       <div v-else-if="needsLogin" class="empty" role="status">
@@ -19,7 +19,7 @@
       </div>
       <p v-else-if="!list.length" class="empty" role="status">{{ t(tab === 'joined' ? 'activity.joinedEmpty' : 'activity.empty') }}</p>
       <div v-else class="activity-list">
-        <ActivityCard v-for="a in list" :key="a.id" :activity="a" show-signup @select="goDetail" />
+        <ActivityCard v-for="a in list" :key="a.id" :activity="a" :show-signup="!isSocialReadOnly" :readonly="isSocialReadOnly" @select="goDetail" />
       </div>
     </div>
 
@@ -32,13 +32,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { t, locale, initLocale, regionFromLocale } from '../i18n'
 import TopBar from '../components/TopBar.vue'
 import ActivityCard from '../components/ActivityCard.vue'
+import { isSocialReadOnly } from '../config/socialMode'
 import { fetchActivities, fetchJoinedActivities } from '../api/feed'
 import { bridge } from '../bridge'
 import { requireLogin } from '../utils/auth'
 
 const route = useRoute()
 const router = useRouter()
-const tab = computed(() => route.query.tab === 'joined' ? 'joined' : 'all')
+const tab = computed(() => (!isSocialReadOnly && route.query.tab === 'joined') ? 'joined' : 'all')
 const list = ref([])
 const loading = ref(true)
 const loadError = ref(false)

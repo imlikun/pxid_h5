@@ -96,6 +96,7 @@ import TopBar from '../components/TopBar.vue'
 import bridge from '../bridge'
 import { t, locale } from '../i18n'
 import { askAssistant } from '../api/feed'
+import { isSocialReadOnly } from '../config/socialMode'
 
 const router = useRouter()
 
@@ -227,6 +228,18 @@ function tt(key) {
 // 快捷问题随语言切换
 const quickQuestions = computed(() => L[locale.value]?.quick ?? L.zh.quick)
 
+// 只读模式（小米审核）：发布/互动消息类问题不引导用户操作；积分回答去掉"发动态"表述
+const READONLY_REPLY = {
+  zh: { a: '该功能在当前版本暂未开放。' },
+  en: { a: 'This feature is not available in this version.' },
+  pt: { a: 'Este recurso não está disponível nesta versão.' },
+}
+const READONLY_POINTS_ANSWER = {
+  zh: '积分可在积分商城兑换原厂好物，100 积分抵 1 元，签到即可赚取积分。',
+  en: 'Redeem original accessories in the points mall — 100 points = ¥1. Earn points by checking in.',
+  pt: 'Resgate acessórios originais no mall de pontos — 100 pontos = R$1. Ganhe pontos fazendo check-in.',
+}
+
 // 意图关键词（多语），用于识别用户问题意图
 const INTENT_KEYWORDS = {
   store:       { zh: ['门店', '附近', '体验店'],                       en: ['store', 'nearby', 'shop', 'location'],            pt: ['loja', 'perto', 'lojas'] },
@@ -248,7 +261,14 @@ function smartReply(text) {
   const hit = (kws) => Object.values(kws).some((arr) => arr.some((k) => s.includes(k.toLowerCase())))
   for (const intent of Object.keys(INTENT_KEYWORDS)) {
     if (hit(INTENT_KEYWORDS[intent])) {
-      return L[locale.value]?.replies?.[intent] ?? L.zh.replies[intent]
+      const reply = L[locale.value]?.replies?.[intent] ?? L.zh.replies[intent]
+      if (isSocialReadOnly && (intent === 'publish' || intent === 'interaction')) {
+        return READONLY_REPLY[locale.value] || READONLY_REPLY.zh
+      }
+      if (isSocialReadOnly && intent === 'points') {
+        return { ...reply, a: READONLY_POINTS_ANSWER[locale.value] || READONLY_POINTS_ANSWER.zh }
+      }
+      return reply
     }
   }
   return L[locale.value]?.replies?.fallback ?? L.zh.replies.fallback
@@ -279,7 +299,11 @@ async function respond(userText, canned) {
   scrollDown({ forceBottom: true })
   let reply = ''
   try {
-    const r = await askAssistant(userText, history)
+    // 只读模式给模型一个约束，避免它教用户去发布/互动
+    const apiText = isSocialReadOnly
+      ? userText + '（当前版本为只读模式，不提供发布、评论、点赞、收藏、分享、关注功能，请勿引导用户进行这些操作）'
+      : userText
+    const r = await askAssistant(apiText, history)
     if (r && !r.fallback && r.reply) reply = r.reply
   } catch (e) {
     console.log('[pxid] assistant api failed, fallback to demo', e)
