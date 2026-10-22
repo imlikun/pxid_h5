@@ -118,7 +118,7 @@
     </template>
 
     <DiscoverFilterBar v-if="activeTab === '动态' && !showSearchResults" :scope="dynamicScope" :model="selectedDynamicModel()" :mine="myCarModel" :readonly="isSocialReadOnly" @scope="setDynamicScope" @model="pickFilter($event || '最新')" />
-    <header v-if="activeTab === '推荐' && !showSearchResults" class="recommend-heading"><h2>{{ t('discover.recommend.heading') }}</h2><button v-if="myCarModel" type="button" @click="openDiscussion(myCarModel)">{{ myCarModel }} {{ t('discover.viewDiscussion') }} ›</button><button v-else type="button" @click="setTab('广场')">{{ t('discover.plaza.topics') }} ›</button></header>
+    <header v-if="activeTab === '推荐' && !showSearchResults" class="recommend-heading"><h2>{{ t('discover.recommend.heading') }}</h2><button v-if="myCarModel" type="button" @click="openDiscussion(myCarModel)">{{ myCarModel }} {{ t('discover.viewDiscussion') }} ›</button><button v-else-if="!isSocialReadOnly" type="button" @click="setTab('广场')">{{ t('discover.plaza.topics') }} ›</button></header>
 
     <!-- 推荐：瀑布流（两列错落，热门话题卡穿插在流内） -->
     <div v-if="activeTab === '推荐' && !showSearchResults" class="content">
@@ -330,8 +330,11 @@ function onBannerTouchEnd(e) {
   const dx = e.changedTouches[0].clientX - bannerTouchX
   if (Math.abs(dx) > 40) (dx < 0 ? nextBanner() : (bannerIdx.value = (bannerIdx.value - 1 + bannerSlides.value.length) % bannerSlides.value.length))
 }
-const tabs = discoverTabs
-const rootTabs = computed(() => tabs.map(tab => ({ key: tab, label: tabLabel(tab) })))
+const rootTabs = computed(() => {
+  // 只读模式（小米审核）：广场是社区聚合页，和社交一起隐藏，只保留推荐/动态内容浏览
+  const list = isSocialReadOnly ? discoverTabs.filter(tab => tab !== '广场') : discoverTabs
+  return list.map(tab => ({ key: tab, label: tabLabel(tab) }))
+})
 const activeTab = ref('推荐')
 const activeFilter = ref('全部')
 // 当前登录用户绑定的车型（来自 getUserInfo().carModel）；仅当其属于在售 12 车型时才在筛选条前置「我的车」
@@ -635,6 +638,11 @@ const currentFeedKey = computed(() =>
 )
 
 function setTab(t, forceDefault = false) {
+  // 只读模式（小米审核）：广场不可进入；若当前正停在广场，回落到推荐
+  if (isSocialReadOnly && t === '广场') {
+    if (activeTab.value === '广场') activeTab.value = '推荐'
+    return
+  }
   if (inDiscussion.value) { router.push({ path: '/discover', query: { tab: TAB_KEY[t] } }); return }
   activeTab.value = t
   if (mountedReady && !forceDefault && route.query.tab !== TAB_KEY[t]) router.replace({ path: '/discover', query: { tab: TAB_KEY[t] } })
@@ -1226,9 +1234,11 @@ function applyDiscussionRoute(load = true) {
     showSearchResults.value = false; searchOpen.value = false
     if (load) reloadDynamicFeed()
   } else if (tab) {
+    // 只读模式：URL 带 ?tab=plaza 也回落到推荐，广场入口不因直达链接恢复
+    const safeTab = isSocialReadOnly && tab === '广场' ? '推荐' : tab
     // 退出主题页回到原栏目，避免上个讨论条件污染普通动态。
     if (route.query.discussion === undefined && lastDiscussion) { dynamicModel.value = ''; dynamicLoadedKey = '' }
-    if (activeTab.value !== tab || lastDiscussion) setTab(tab)
+    if (activeTab.value !== safeTab || lastDiscussion) setTab(safeTab)
   }
   lastDiscussion = inDiscussion.value
   lastDiscussionTopic = discussionTopic.value
