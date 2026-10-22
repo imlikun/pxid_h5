@@ -90,6 +90,16 @@ function isFullscreenWhitelisted(route) {
 // 标准化用户资料：兼容 Flutter 可能返回的不同字段名
 // 真机 getUserInfo 的头像/昵称字段名未必是约定的 avatar/nickname（如 headImgUrl / portrait / photo 等），
 // 这里统一归一到 { nickname, avatar, email }，避免 H5 取不到头像（评论/发帖/点赞带身份时丢失头像）。
+// Flutter 桥可能把对象序列化成 JSON 字符串返回（2026-10-22 实测：写操作拿不到凭证）。
+// 不解析的话，按对象取 token 永远是 undefined，用户信息字段也全是空。
+function parseBridgeResult(v) {
+  if (typeof v !== 'string') return v
+  const s = v.trim()
+  if (!s || s === 'null' || s === 'undefined') return null
+  if (s[0] !== '{' && s[0] !== '[') return v
+  try { return JSON.parse(s) } catch (e) { return v }
+}
+
 function normalizeProfile(raw) {
   if (!raw) return raw
   return {
@@ -414,6 +424,16 @@ export function authTokenReady(ms = 80) {
   ]).catch(() => '')
 }
 
+// 桥返回的 token 可能被序列化成字符串假值（2026-10-22 实测真机出现 "null"，
+// 后端只看到 4 个字符 → 一律 401 → 点赞/评论/收藏全部写不进去）。
+// 这类值绝不能当凭证发出去，一律按"没有凭证"处理。
+const FAKE_AUTH_TOKENS = new Set(['', 'null', 'undefined', 'NaN', 'false', '0'])
+function normalizeAuthToken(v) {
+  if (v === null || v === undefined) return ''
+  const s = String(v).trim()
+  return FAKE_AUTH_TOKENS.has(s) ? '' : s
+}
+
 async function _loadAuthToken(forceRefresh = false) {
   syncAuthBridge()
   if (forceRefresh) resetAuthToken()
@@ -427,18 +447,18 @@ async function _loadAuthToken(forceRefresh = false) {
     //    偶发挂死且无超时，wait 类请求（checkFavorite 等）会被串行拖住。超时按无 token
     //    继续；桥晚到后本次 pending 正常完成并写缓存，下次调用即命中。
     try {
-      const u = await Promise.race([
+      const u = parseBridgeResult(await Promise.race([
         nativeBridge.getUserInfo(),
         new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
-      ])
-      if (u && u.token) token = String(u.token)
+      ]))
+      if (u && u.token) token = normalizeAuthToken(u.token)
     } catch (e) { /* 真机未实现 getUserInfo 时回退 */ }
     if (!token) {
       try {
-        token = String((await Promise.race([
+        token = normalizeAuthToken(await Promise.race([
           nativeBridge.getToken(),
           new Promise((resolve) => setTimeout(() => resolve(''), 3000)),
-        ])) || '')
+        ]))
       } catch (e) { /* 原生未注入时回退 */ }
     }
     if (revision !== _authTokenRevision || nativeBridge !== window.PXIDBridge) return _loadAuthToken()
@@ -473,7 +493,7 @@ export const bridge = {
   // ⚠️ 2026-09-19：改为走 _loadAuthToken()（结果缓存），桥调用只发生一次；
   //    此前每次调用都重新 getUserInfo()+getToken()，是详情页冷启动被串行拖慢的主因之一。
   getAuthToken: (options = {}) => _loadAuthToken(!!options.forceRefresh).then((t) => t || null),
-  getUserInfo: () => Promise.resolve(window.PXIDBridge.getUserInfo()).then(normalizeProfile),
+  getUserInfo: () => Promise.resolve(window.PXIDBridge.getUserInfo()).then(parseBridgeResult).then(normalizeProfile),
   // 关注列表 / 粉丝列表（App 账号关系，Flutter 经桥返回；原生未实现时 reject，由上层回退 H5 本地）
   getFollowList: () =>
     window.PXIDBridge.getFollowList ? window.PXIDBridge.getFollowList() : Promise.reject(new Error('getFollowList 未实现')),

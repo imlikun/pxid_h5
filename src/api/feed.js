@@ -48,12 +48,28 @@ async function request(path, { method = 'GET', body, auth = 'wait', signal } = {
     if (json.code !== 0) throw Object.assign(new Error(json.message || '接口错误'), { status: json.code })
     return json.data
   }
-  const res = await fetch(FEED_API + path, {
+  let res = await fetch(FEED_API + path, {
     method,
     headers,
     signal,
     body: body ? JSON.stringify(body) : undefined,
   })
+  // 401 自救（2026-10-22）：Flutter 侧可能已经换了新凭证，但 H5 缓存着旧的
+  // （登录/续期后页面不重载，_authTokenCache 一直是旧值 → 写操作永远 401）。
+  // 这里强制刷新一次凭证并重试一次；拿到的还是同一个值就不重试，避免无意义请求。
+  if (res.status === 401 && auth === 'wait') {
+    let fresh = ''
+    try { fresh = await bridge.getAuthToken({ forceRefresh: true }) } catch (e) { fresh = '' }
+    if (fresh && fresh !== tk) {
+      headers.Authorization = 'Bearer ' + fresh
+      res = await fetch(FEED_API + path, {
+        method,
+        headers,
+        signal,
+        body: body ? JSON.stringify(body) : undefined,
+      })
+    }
+  }
   if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status })
   const json = await res.json()
   if (json.code !== 0) throw new Error(json.message || '接口错误')
