@@ -23,7 +23,10 @@
   - `POST https://pxid-api.appin.site/media/upload`（媒体上传）
   - `GET https://pxid-api.appin.site/feed/:id`（动态详情）
 - ❌ **不是**裸 `appin.site`（那是静态站，不承载接口）。
-- ❌ **不是** `toc.pxidiot.com:446`（那是 Flutter App / tocApp **自己**的后端，H5 完全不连它）。若你看到这个域名，那是 Flutter 侧惯例，与 H5 联调无关。
+- ⚠️ **`toc.pxidiot.com:446` 要分两层看**（2026-10-22 修正：原文写「H5 完全不连它」已过时，实际后端一直在调它）：
+  - **H5 前端不直连**：页面里所有业务请求都走 `pxid-api.appin.site`。
+  - **但 pxid-api 后端会调它**：带 `client_secret` 做 HMAC 签名，调 `POST https://toc.pxidiot.com/toc-api/open/discover/userinfo`，把用户 token 换成可信会员编号（`memberUserId`）。密钥只在服务端，绝不进 App 包。
+  - `saas-toc.pxidiot.com` 是 SaaS 多租户入口（要「应用标识」），不是这条链路用的地址。
 - 线上 nginx 把 `pxid-api.appin.site` 反代到 ECS `:8700`（Node + better-sqlite3）。
 
 ---

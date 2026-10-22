@@ -4,7 +4,7 @@
 
 ## 背景（1 分钟读懂）
 
-> ⚠️ **联调域名（最基础）**：H5 静态站 `https://appin.site/nav/pxid-h5/`；所有后端接口（含 `POST /feed`、`POST /media/upload`）基地址 `https://pxid-api.appin.site`。**不是**裸 `appin.site`，**不是** `toc.pxidiot.com:446`（那是 Flutter App 自己的后端，H5 不连）。
+> ⚠️ **联调域名（最基础）**：H5 静态站 `https://appin.site/nav/pxid-h5/`；所有后端接口（含 `POST /feed`、`POST /media/upload`）基地址 `https://pxid-api.appin.site`。**不是**裸 `appin.site`，**不是** `toc.pxidiot.com:446`（H5 **前端**不直连；但 `pxid-api` **后端**会带密钥签名调它换会员编号 `memberUserId`，详见 `INTEGRATION.md`）。
 
 - H5 是内嵌在 Flutter WebView 的 Vue3 应用，通过 `window.PXIDBridge`（`isNative:true`）与 Flutter 通信。
 - **发布页是 H5 自实现的页面（非原生页）**：路由 `/publish`（发现页「+」入口进入）。Flutter **不需要自己渲染发布页**，也不要把发布甩回原生——选→传→发全流程 H5 自管。

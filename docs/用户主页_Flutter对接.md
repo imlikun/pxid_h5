@@ -4,7 +4,7 @@
 
 ## 背景（1 分钟读懂）
 
-> ⚠️ **联调域名（最基础）**：H5 静态站 `https://appin.site/nav/pxid-h5/`；所有后端接口（含 `GET /users/:deviceId`）基地址 `https://pxid-api.appin.site`。**不是**裸 `appin.site`，**不是** `toc.pxidiot.com:446`（那是 Flutter App 自己的后端，H5 不连）。
+> ⚠️ **联调域名（最基础）**：H5 静态站 `https://appin.site/nav/pxid-h5/`；所有后端接口（含 `GET /users/:deviceId`）基地址 `https://pxid-api.appin.site`。**不是**裸 `appin.site`，**不是** `toc.pxidiot.com:446`（H5 **前端**不直连；但 `pxid-api` **后端**会带密钥签名调它换会员编号 `memberUserId`，详见 `INTEGRATION.md`）。
 
 - H5 是内嵌在 Flutter WebView 的 Vue3 应用，通过两套桥与 Flutter 通信：
   - **主桥 `window.PXIDBridge`**（`isNative:true`）：`getToken` / `getUserInfo` / `openNative` / `pickImages` / `openShopify` 等。
